@@ -5,7 +5,19 @@ import { Truck, Power, PowerOff, DollarSign, AlertCircle } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
 // Mock rigs
-const initialRigs = [
+interface Rig {
+  id: string
+  rigIdCustom: string
+  rigType: string
+  status: string
+  isActiveBillable: boolean
+  activatedAt: Date | null
+  projectName: string | null
+  activeDays: number
+  currentMonthCost: number
+}
+
+const initialRigs: Rig[] = [
   {
     id: '1',
     rigIdCustom: 'RIG-001',
@@ -64,7 +76,7 @@ const initialRigs = [
 ]
 
 export default function RigsPage() {
-  const [rigs, setRigs] = useState(initialRigs)
+  const [rigs, setRigs] = useState<Rig[]>(initialRigs)
 
   const toggleRigStatus = (rigId: string) => {
     setRigs(rigs.map(rig => {
