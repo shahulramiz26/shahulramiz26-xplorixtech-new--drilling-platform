@@ -11,6 +11,7 @@ import {
   LineChart,
   Line
 } from 'recharts'
+import AIInsights from '../../components/AIInsights'
 
 const drillerMetersData = [
   { driller: 'Mike J.', meters: 1245 },
@@ -43,9 +44,56 @@ const crewHoursData = [
   { date: 'Feb 26', hours: 416 },
 ]
 
+// AI Insights for Driller & Crew Dashboard
+const drillerInsights = [
+  {
+    id: '1',
+    type: 'anomaly' as const,
+    severity: 'warning' as const,
+    title: 'Low ROP Alert',
+    description: 'Alex R. showing ROP 20% below team average',
+    metric: 'ROP Performance',
+    change: '-20% vs avg',
+    recommendation: 'Provide additional training on drilling parameters'
+  },
+  {
+    id: '2',
+    type: 'trend' as const,
+    severity: 'info' as const,
+    title: 'Top Performer',
+    description: 'Chris W. consistently achieving highest ROP',
+    metric: 'Best ROP',
+    change: '58 m/hr avg',
+    recommendation: 'Document best practices from Chris for team training'
+  },
+  {
+    id: '3',
+    type: 'anomaly' as const,
+    severity: 'critical' as const,
+    title: 'High Downtime Pattern',
+    description: 'Alex R. has 78% more downtime than other drillers',
+    metric: 'Downtime',
+    change: '+78% vs team avg',
+    recommendation: 'Review equipment handling procedures with Alex'
+  },
+  {
+    id: '4',
+    type: 'prediction' as const,
+    severity: 'info' as const,
+    title: 'Crew Efficiency Forecast',
+    description: 'Team efficiency projected to increase 8% next week',
+    metric: 'Efficiency',
+    change: '+8% projected',
+    recommendation: 'Maintain current crew assignments'
+  }
+]
+
 export default function DrillerCrewDashboard() {
   return (
     <div className="space-y-8">
+      {/* AI Insights Panel */}
+      <AIInsights dashboardType="driller" insights={drillerInsights} />
+
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Driller & Crew Dashboard</h2>
         <p className="text-slate-600">Personnel performance metrics</p>

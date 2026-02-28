@@ -12,6 +12,7 @@ import {
   LineChart,
   Line
 } from 'recharts'
+import AIInsights from '../../components/AIInsights'
 
 const fluidData = [
   { date: 'Feb 20', water: 2500, fuel: 800, additives: 120 },
@@ -52,9 +53,56 @@ const equipmentData = [
   { date: 'Feb 26', hours: 64 },
 ]
 
+// AI Insights for Consumables Dashboard
+const consumablesInsights = [
+  {
+    id: '1',
+    type: 'anomaly' as const,
+    severity: 'warning' as const,
+    title: 'Fuel Consumption Spike',
+    description: 'Fuel usage 25% above baseline this week',
+    metric: 'Fuel Usage',
+    change: '+25% vs baseline',
+    recommendation: 'Check for fuel leaks or inefficient equipment operation'
+  },
+  {
+    id: '2',
+    type: 'prediction' as const,
+    severity: 'info' as const,
+    title: 'Accessories Stock Alert',
+    description: 'Core Lifters will run out in 3 days at current usage rate',
+    metric: 'Core Lifter Stock',
+    change: '3 days remaining',
+    recommendation: 'Order 50 units of Core Lifters immediately'
+  },
+  {
+    id: '3',
+    type: 'recommendation' as const,
+    severity: 'info' as const,
+    title: 'Water Usage Optimization',
+    description: 'AI suggests reducing water usage by 10% without impacting performance',
+    metric: 'Water Efficiency',
+    change: '-10% possible',
+    recommendation: 'Implement suggested drilling fluid mix ratio'
+  },
+  {
+    id: '4',
+    type: 'anomaly' as const,
+    severity: 'critical' as const,
+    title: 'Additives Overuse',
+    description: 'Additives consumption 40% higher than planned',
+    metric: 'Additives Usage',
+    change: '+40% over budget',
+    recommendation: 'Review additives application procedures'
+  }
+]
+
 export default function ConsumablesDashboard() {
   return (
     <div className="space-y-8">
+      {/* AI Insights Panel */}
+      <AIInsights dashboardType="consumables" insights={consumablesInsights} />
+
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Consumable Dashboard</h2>
         <p className="text-slate-600">Resource utilization and consumption tracking</p>

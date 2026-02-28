@@ -10,6 +10,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts'
+import AIInsights from '../../components/AIInsights'
 
 const incidentData = [
   { type: 'Minor', count: 8 },
@@ -37,9 +38,56 @@ const severityTrendData = [
   { date: 'Feb 26', minor: 1, major: 0, critical: 0 },
 ]
 
+// AI Insights for HSC Dashboard
+const hscInsights = [
+  {
+    id: '1',
+    type: 'anomaly' as const,
+    severity: 'critical' as const,
+    title: 'Critical Incident Spike',
+    description: '1 critical incident this week - requires immediate attention',
+    metric: 'Critical Incidents',
+    change: '1 this week',
+    recommendation: 'Conduct immediate safety stand-down meeting'
+  },
+  {
+    id: '2',
+    type: 'prediction' as const,
+    severity: 'warning' as const,
+    title: 'Injury Risk Forecast',
+    description: 'AI predicts elevated injury risk next week based on patterns',
+    metric: 'Injury Risk',
+    change: 'High risk predicted',
+    recommendation: 'Increase safety inspections and PPE checks'
+  },
+  {
+    id: '3',
+    type: 'trend' as const,
+    severity: 'info' as const,
+    title: 'Safety Improvement',
+    description: 'Minor incidents decreased 25% over last month',
+    metric: 'Minor Incidents',
+    change: '-25% trend',
+    recommendation: 'Continue current safety training program'
+  },
+  {
+    id: '4',
+    type: 'recommendation' as const,
+    severity: 'warning' as const,
+    title: 'Equipment Damage Pattern',
+    description: 'Equipment damage incidents concentrated in night shift',
+    metric: 'Equipment Damage',
+    change: '70% at night',
+    recommendation: 'Review night shift equipment handling procedures'
+  }
+]
+
 export default function HSCDashboard() {
   return (
     <div className="space-y-8">
+      {/* AI Insights Panel */}
+      <AIInsights dashboardType="hsc" insights={hscInsights} />
+
       <div>
         <h2 className="text-2xl font-bold text-slate-900">HSC Dashboard</h2>
         <p className="text-slate-600">Health, Safety & Compliance metrics</p>
