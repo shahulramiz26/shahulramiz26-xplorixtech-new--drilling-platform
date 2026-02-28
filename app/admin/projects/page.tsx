@@ -5,8 +5,22 @@ import Link from 'next/link'
 import { Plus, FolderOpen, MapPin, User, ChevronRight, MoreVertical } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
+// Types
+interface Project {
+  id: string
+  name: string
+  location: string
+  status: string
+  clientName: string | null
+  createdAt: Date
+  rigs: number
+  drillers: number
+  supervisors: number
+  bits: number
+}
+
 // Mock projects
-const initialProjects = [
+const initialProjects: Project[] = [
   {
     id: '1',
     name: 'Gold Mine Project A',
@@ -46,10 +60,10 @@ const initialProjects = [
 ]
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState(initialProjects)
+  const [projects, setProjects] = useState<Project[]>(initialProjects)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
-  const [selectedProject, setSelectedProject] = useState<typeof initialProjects[0] | null>(null)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [newProject, setNewProject] = useState({
     name: '',
     location: '',
@@ -58,12 +72,12 @@ export default function ProjectsPage() {
   })
 
   const handleCreateProject = () => {
-    const project = {
+    const project: Project = {
       id: String(projects.length + 1),
       name: newProject.name,
       location: newProject.location,
       status: newProject.status,
-      clientName: newProject.clientName,
+      clientName: newProject.clientName || null,
       createdAt: new Date(),
       rigs: 0,
       drillers: 0,
@@ -75,7 +89,7 @@ export default function ProjectsPage() {
     setShowCreateModal(false)
   }
 
-  const openProjectDetail = (project: typeof initialProjects[0]) => {
+  const openProjectDetail = (project: Project) => {
     setSelectedProject(project)
     setShowDetailModal(true)
   }
@@ -248,89 +262,14 @@ export default function ProjectsPage() {
               </button>
             </div>
 
-            {/* Resource Management Tabs */}
-            <ProjectResources project={selectedProject} />
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Project Resources Component
-function ProjectResources({ project }: { project: typeof initialProjects[0] }) {
-  const [activeTab, setActiveTab] = useState('rigs')
-  const [showAddModal, setShowAddModal] = useState(false)
-
-  const tabs = [
-    { id: 'rigs', label: 'Rigs', count: project.rigs },
-    { id: 'drillers', label: 'Drillers', count: project.drillers },
-    { id: 'supervisors', label: 'Supervisors', count: project.supervisors },
-    { id: 'bits', label: 'Bits', count: project.bits },
-  ]
-
-  return (
-    <div>
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-slate-200">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
-              activeTab === tab.id
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            {tab.label}
-            <span className="ml-2 px-2 py-0.5 bg-slate-100 rounded-full text-xs">{tab.count}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Add Button */}
-      <div className="mb-4">
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
-        >
-          <Plus className="w-4 h-4" />
-          Add {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-        </button>
-      </div>
-
-      {/* Content based on tab */}
-      <div className="bg-slate-50 rounded-lg p-8 text-center">
-        <p className="text-slate-500">
-          {activeTab === 'rigs' && 'No rigs added yet. Click "Add Rigs" to get started.'}
-          {activeTab === 'drillers' && 'No drillers assigned yet. Click "Add Drillers" to assign personnel.'}
-          {activeTab === 'supervisors' && 'No supervisors assigned yet. Click "Add Supervisors" to assign.'}
-          {activeTab === 'bits' && 'No bits registered yet. Click "Add Bits" to register equipment.'}
-        </p>
-      </div>
-
-      {/* Add Modal Placeholder */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">
-              Add {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-            </h3>
-            <p className="text-slate-600 mb-4">
-              This would open the detailed form for adding {activeTab} with all required fields as specified in Phase 4.
-            </p>
-            <div className="bg-blue-50 p-3 rounded-lg mb-4">
-              <p className="text-sm text-blue-800">
-                <strong>MVP Note:</strong> Full forms implemented in complete version.
+            <div className="bg-slate-50 rounded-lg p-8 text-center">
+              <p className="text-slate-500">
+                Resource management would open here with forms for Rigs, Drillers, Supervisors, and Bits.
+              </p>
+              <p className="text-sm text-slate-400 mt-2">
+                (Full implementation in production version)
               </p>
             </div>
-            <button
-              onClick={() => setShowAddModal(false)}
-              className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
-            >
-              Close
-            </button>
           </div>
         </div>
       )}
