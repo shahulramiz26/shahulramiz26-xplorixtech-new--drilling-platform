@@ -1,8 +1,11 @@
-# 🏗️ Drilling Industry Management Platform - MVP
+# 🚀 XPLORIX - Drilling Intelligence Platform MVP
 
-A comprehensive drilling operations management system for Exploration and Blast Hole industries.
+A comprehensive AI-powered drilling operations management system for Exploration and Blast Hole industries.
 
-## 📋 All 6 Phases Implemented
+**Brand Name:** XPLORIX  
+**Tagline:** Drilling Intelligence Platform
+
+## 📋 All 7 Phases Implemented
 
 ### ✅ Phase 1: Registration & Login
 - Complete registration form with all required fields
@@ -44,6 +47,24 @@ A comprehensive drilling operations management system for Exploration and Blast 
 4. **Consumable Dashboard**: Fluid usage, accessories, equipment hours
 5. **HSC Dashboard**: Incidents, severity analysis, safety metrics
 
+### ✅ Phase 7: AI Insights (NEW!)
+- **AI-Powered Anomaly Detection** across all dashboards
+- **Predictive Analytics** for downtime, maintenance, bit wear
+- **Smart Recommendations** for optimization
+- **Global Notification Center** for all alerts
+- **Real-time Insights Panel** with severity levels
+
+## 🎯 Key Features for Investors
+
+1. **Complete User Journey**: From registration to daily operations
+2. **Role-Based Access**: Admin vs Supervisor interfaces
+3. **Flexible Billing**: Per-rig per-day model with trial
+4. **Comprehensive Logging**: All drilling and maintenance data
+5. **Rich Analytics**: 5 dashboards with interactive charts
+6. **AI-Powered Insights**: Anomaly detection and predictions
+7. **Mobile Responsive**: Works on all devices
+8. **Scalable Architecture**: Ready for production deployment
+
 ## 🚀 Quick Start
 
 ```bash
@@ -57,54 +78,26 @@ cp .env.example .env.local
 npm run dev
 ```
 
-## 📁 Project Structure
-
-```
-├── app/
-│   ├── admin/           # Admin dashboard pages
-│   ├── supervisor/      # Supervisor pages
-│   ├── analytics/       # 5 analytics dashboards
-│   ├── auth/           # Login & registration
-│   └── page.tsx        # Landing page
-├── lib/
-│   ├── utils.ts        # Utility functions
-│   └── mock-data.ts    # Dropdown data
-├── prisma/
-│   └── schema.prisma   # Database schema
-└── components/         # Reusable components
-```
-
-## 🎯 Demo Credentials
-
-- **Admin**: admin@demo.com / password
-- **Supervisor**: supervisor@demo.com / password
-
 ## 🛠️ Tech Stack
 
 - Next.js 14 (App Router)
 - TypeScript
 - Tailwind CSS
 - Recharts (Analytics)
-- Prisma (Database ORM)
+- Lucide React (Icons)
 
-## 📊 Key Features for Investors
+## 📱 Demo Flow for Investors
 
-1. **Complete User Journey**: From registration to daily operations
-2. **Role-Based Access**: Admin vs Supervisor interfaces
-3. **Flexible Billing**: Per-rig per-day model with trial
-4. **Comprehensive Logging**: All drilling and maintenance data
-5. **Rich Analytics**: 5 dashboards with interactive charts
-6. **Scalable Architecture**: Ready for production deployment
-
-## 📝 Next Steps for Production
-
-1. Connect real database (PostgreSQL)
-2. Implement authentication (NextAuth.js)
-3. Add email service (Resend/SendGrid)
-4. Integrate payment gateway (Stripe)
-5. Add file upload (AWS S3)
-6. Implement real-time updates
+1. **Landing Page** - Professional XPLORIX branding
+2. **Register a Company** - Show 15-day trial activation
+3. **Login as Admin** - Dashboard with trial countdown
+4. **Create a User** - Auto-generated credentials feature
+5. **Create a Project** - Resource management
+6. **Activate a Rig** - Billing model demonstration
+7. **Switch to Supervisor** - Data entry forms
+8. **View Analytics** - 5 dashboards with AI insights
 
 ---
 
 **Built for investor demo and rapid iteration.**
+**Brand: XPLORIX - Drilling Intelligence Platform**

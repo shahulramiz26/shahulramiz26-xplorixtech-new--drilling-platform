@@ -38,7 +38,7 @@ export default function AdminLayout({
       {/* Mobile Header */}
       <div className="lg:hidden bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-50">
         <div>
-          <h1 className="text-lg font-bold">Drilling Platform</h1>
+          <h1 className="text-lg font-bold">XPLORIX</h1>
           <p className="text-xs text-slate-400">Admin Panel</p>
         </div>
         <div className="flex items-center gap-3">
@@ -72,7 +72,7 @@ export default function AdminLayout({
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}>
           <div className="p-6 border-b border-slate-800 hidden lg:block">
-            <h1 className="text-xl font-bold">Drilling Platform</h1>
+            <h1 className="text-xl font-bold">XPLORIX</h1>
             <p className="text-sm text-slate-400">Admin Panel</p>
           </div>
           

@@ -5,8 +5,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Drilling Platform MVP',
-  description: 'Drilling Industry Management Platform',
+  title: 'XPLORIX - Drilling Operations Management',
+  description: 'XPLORIX - Complete drilling operations management system for Exploration and Blast Hole industries',
 }
 
 export default function RootLayout({
