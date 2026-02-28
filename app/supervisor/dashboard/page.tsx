@@ -1,7 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { FileText, Wrench, BarChart3, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { 
+  FileText, 
+  Wrench, 
+  BarChart3, 
+  Clock, 
+  CheckCircle, 
+  AlertCircle,
+  TrendingUp,
+  Users,
+  Truck,
+  FolderOpen,
+  Drill
+} from 'lucide-react'
 
 const quickActions = [
   {
@@ -33,6 +45,27 @@ const recentLogs = [
   { type: 'Drilling', project: 'Copper Exploration', rig: 'RIG-002', date: 'Feb 26, 6:00 PM', status: 'Submitted' },
 ]
 
+// Mock KPI Data
+const productionKPIs = [
+  { label: 'Total Meters Drilled', value: '8,450', unit: 'm', icon: TrendingUp, color: 'bg-blue-500' },
+  { label: 'Total Drilling Hours', value: '1,240', unit: 'hrs', icon: Clock, color: 'bg-green-500' },
+  { label: 'Total Downtime', value: '186', unit: 'hrs', icon: AlertCircle, color: 'bg-red-500' },
+  { label: 'Average ROP', value: '6.8', unit: 'm/hr', icon: Drill, color: 'bg-purple-500' },
+  { label: 'Active Projects', value: '3', unit: '', icon: FolderOpen, color: 'bg-amber-500' },
+  { label: 'Active Rigs', value: '5', unit: '', icon: Truck, color: 'bg-cyan-500' },
+]
+
+const workforceKPIs = [
+  { label: 'Total Drillers', value: '12', icon: Users, color: 'bg-blue-600' },
+  { label: 'Total Supervisors', value: '4', icon: Users, color: 'bg-green-600' },
+  { label: 'Shifts Logged', value: '156', icon: FileText, color: 'bg-purple-600' },
+]
+
+const maintenanceKPIs = [
+  { label: 'Maintenance Logs', value: '28', icon: Wrench, color: 'bg-amber-600' },
+  { label: 'Maintenance Hours', value: '84', unit: 'hrs', icon: Clock, color: 'bg-red-600' },
+]
+
 export default function SupervisorDashboard() {
   return (
     <div className="p-8">
@@ -43,10 +76,71 @@ export default function SupervisorDashboard() {
       </div>
 
       {/* Assigned Projects */}
-      <div className="mb-8 p-4 bg-blue-50 rounded-lg">
+      <div className="mb-6 p-4 bg-blue-50 rounded-lg">
         <p className="text-sm text-blue-800">
           <strong>Assigned Projects:</strong> Gold Mine Project A, Copper Exploration Site
         </p>
+      </div>
+
+      {/* Production Snapshot */}
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5" /> Production Snapshot
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {productionKPIs.map((kpi, index) => (
+            <div key={index} className="bg-white rounded-xl shadow-sm p-4">
+              <div className={`w-10 h-10 ${kpi.color} rounded-lg flex items-center justify-center mb-3`}>
+                <kpi.icon className="w-5 h-5 text-white" />
+              </div>
+              <p className="text-2xl font-bold text-slate-900">
+                {kpi.value}<span className="text-sm font-normal text-slate-500">{kpi.unit}</span>
+              </p>
+              <p className="text-xs text-slate-600">{kpi.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Workforce & Maintenance Snapshots */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Workforce Snapshot */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <Users className="w-5 h-5" /> Workforce Snapshot
+          </h2>
+          <div className="grid grid-cols-3 gap-4">
+            {workforceKPIs.map((kpi, index) => (
+              <div key={index} className="text-center p-4 bg-slate-50 rounded-lg">
+                <div className={`w-12 h-12 ${kpi.color} rounded-full flex items-center justify-center mx-auto mb-2`}>
+                  <kpi.icon className="w-6 h-6 text-white" />
+                </div>
+                <p className="text-2xl font-bold text-slate-900">{kpi.value}</p>
+                <p className="text-xs text-slate-600">{kpi.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Maintenance Snapshot */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <Wrench className="w-5 h-5" /> Maintenance Snapshot
+          </h2>
+          <div className="grid grid-cols-2 gap-4">
+            {maintenanceKPIs.map((kpi, index) => (
+              <div key={index} className="text-center p-4 bg-slate-50 rounded-lg">
+                <div className={`w-12 h-12 ${kpi.color} rounded-full flex items-center justify-center mx-auto mb-2`}>
+                  <kpi.icon className="w-6 h-6 text-white" />
+                </div>
+                <p className="text-2xl font-bold text-slate-900">
+                  {kpi.value}{kpi.unit && <span className="text-sm font-normal text-slate-500 ml-1">{kpi.unit}</span>}
+                </p>
+                <p className="text-xs text-slate-600">{kpi.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Quick Actions */}

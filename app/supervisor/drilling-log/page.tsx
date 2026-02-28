@@ -8,6 +8,7 @@ const projects = ['Gold Mine Project A', 'Copper Exploration Site']
 const rigs = ['RIG-001', 'RIG-002', 'RIG-003']
 const drillers = ['Mike Johnson', 'David Brown', 'Chris Wilson']
 const supervisors = ['John Smith', 'Sarah Williams']
+const bits = ['BIT-001', 'BIT-002', 'BIT-003', 'BIT-004', 'BIT-005']
 const holeSizes = ['NQ', 'HQ', 'PQ', 'BQ', 'AQ', '4.5"', '5"', '5.5"', '6"', '6.5"', '8"']
 const formationTypes = ['Soft Formation', 'Medium Formation', 'Hard Formation', 'Mixed']
 const downtimeReasons = [
@@ -16,7 +17,12 @@ const downtimeReasons = [
   'Operator Delay', 'Shift Change Delay', 'Ground Condition Issue',
   'Site Access Issue', 'Safety Hold', 'Weather Condition', 'Waiting for Instruction'
 ]
-const completionTypes = ['Inner Worn', 'Outer Worn', 'Flat Worn', 'Broken']
+const completionTypes = [
+  { value: 'INNER_WORN', label: 'Inner Worn' },
+  { value: 'OUTER_WORN', label: 'Outer Worn' },
+  { value: 'FLAT_WORN', label: 'Flat Worn' },
+  { value: 'BROKEN', label: 'Broken' }
+]
 const accessories = [
   'Adaptor Sub', 'Air Hose', 'Casing', 'Core Barrel', 'Core Lifter',
   'Core Lifter Case', 'Coupling', 'DTH Hammer', 'Drill Pipe', 'Inner Tube',
@@ -44,9 +50,15 @@ export default function DrillingLogPage() {
     coreRecovery: '',
     holeSize: '',
     formationType: '',
+    // Bit Usage fields
+    bitId: '',
+    bitMetersDrilled: '',
+    completionType: '',
+    // Consumables
     fuel: '',
     water: '',
     additives: '',
+    // Incident
     incidentType: '',
     incidentSeverity: ''
   })
@@ -325,6 +337,46 @@ export default function DrillingLogPage() {
                   {reason}
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Bit Usage Section */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">Bit Usage</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Bit ID</label>
+              <select
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.bitId}
+                onChange={e => setFormData({...formData, bitId: e.target.value})}
+              >
+                <option value="">Select Bit</option>
+                {bits.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Meters Drilled (m)</label>
+              <input
+                type="number"
+                step="0.1"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.bitMetersDrilled}
+                onChange={e => setFormData({...formData, bitMetersDrilled: e.target.value})}
+                placeholder="Enter meters drilled with this bit"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Completion Type</label>
+              <select
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={formData.completionType}
+                onChange={e => setFormData({...formData, completionType: e.target.value})}
+              >
+                <option value="">Select Completion Type</option>
+                {completionTypes.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
             </div>
           </div>
         </div>
