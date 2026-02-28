@@ -16,6 +16,7 @@ import {
   Pie,
   Cell
 } from 'recharts'
+import AIInsights from '../../components/AIInsights'
 
 // Mock data
 const ropData = [
@@ -82,11 +83,68 @@ const completionData = [
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444']
 
+// AI Insights for Operation Dashboard
+const operationInsights = [
+  {
+    id: '1',
+    type: 'anomaly' as const,
+    severity: 'warning' as const,
+    title: 'Downtime Spike Detected',
+    description: 'RIG-001 showing 40% higher downtime than average this week',
+    metric: 'Downtime',
+    change: '+40% vs last week',
+    recommendation: 'Schedule preventive maintenance for hydraulic system'
+  },
+  {
+    id: '2',
+    type: 'prediction' as const,
+    severity: 'warning' as const,
+    title: 'Weekly Downtime Forecast',
+    description: 'Based on current trends, expect 40hrs downtime next week',
+    metric: 'Projected Downtime',
+    change: '40 hours',
+    recommendation: 'Pre-order replacement bits to reduce delays'
+  },
+  {
+    id: '3',
+    type: 'trend' as const,
+    severity: 'info' as const,
+    title: 'ROP Improvement',
+    description: 'Average ROP increased by 15% over last 7 days',
+    metric: 'ROP',
+    change: '+15%',
+    recommendation: 'Continue current drilling parameters'
+  },
+  {
+    id: '4',
+    type: 'anomaly' as const,
+    severity: 'critical' as const,
+    title: 'Bit Wear Acceleration',
+    description: 'BIT-003 wearing 2x faster than normal in hard formation',
+    metric: 'Bit Life',
+    change: '-50% expected life',
+    recommendation: 'Switch to impregnated bit for hard formation'
+  },
+  {
+    id: '5',
+    type: 'recommendation' as const,
+    severity: 'info' as const,
+    title: 'Optimal Drilling Window',
+    description: 'AI analysis shows best ROP between 6-8 AM',
+    metric: 'Peak Performance',
+    change: '6-8 AM daily',
+    recommendation: 'Schedule critical drilling during morning shift'
+  }
+]
+
 export default function OperationDashboard() {
   const [dateRange, setDateRange] = useState('7d')
 
   return (
     <div className="space-y-8">
+      {/* AI Insights Panel */}
+      <AIInsights dashboardType="operation" insights={operationInsights} />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

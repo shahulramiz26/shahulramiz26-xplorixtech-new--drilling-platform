@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import {
   BarChart,
   Bar,
@@ -14,6 +13,7 @@ import {
   Pie,
   Cell
 } from 'recharts'
+import AIInsights from '../../components/AIInsights'
 
 const maintenanceTypeData = [
   { name: 'Preventive', value: 45 },
@@ -59,9 +59,56 @@ const oilData = [
 
 const COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981']
 
+// AI Insights for Maintenance Dashboard
+const maintenanceInsights = [
+  {
+    id: '1',
+    type: 'anomaly' as const,
+    severity: 'critical' as const,
+    title: 'Hydraulic System Issues',
+    description: 'Hydraulic failures up 60% this month - above normal threshold',
+    metric: 'Hydraulic Failures',
+    change: '+60% vs avg',
+    recommendation: 'Inspect hydraulic fluid quality and filter replacement schedule'
+  },
+  {
+    id: '2',
+    type: 'prediction' as const,
+    severity: 'warning' as const,
+    title: 'Engine Maintenance Due',
+    description: 'RIG-002 engine showing signs of degradation',
+    metric: 'Engine Health',
+    change: 'Service needed in 5 days',
+    recommendation: 'Schedule preventive engine service immediately'
+  },
+  {
+    id: '3',
+    type: 'recommendation' as const,
+    severity: 'info' as const,
+    title: 'Oil Change Optimization',
+    description: 'AI suggests extending oil change interval by 10% based on usage',
+    metric: 'Oil Change Interval',
+    change: '+10% extension possible',
+    recommendation: 'Monitor oil analysis reports before extending'
+  },
+  {
+    id: '4',
+    type: 'anomaly' as const,
+    severity: 'warning' as const,
+    title: 'Mud Pump Pressure Drop',
+    description: 'Unusual pressure fluctuations detected in RIG-001 mud pump',
+    metric: 'Mud Pump Pressure',
+    change: '-15% from baseline',
+    recommendation: 'Check seals and valves for wear'
+  }
+]
+
 export default function MaintenanceDashboard() {
   return (
     <div className="space-y-8">
+      {/* AI Insights Panel */}
+      <AIInsights dashboardType="maintenance" insights={maintenanceInsights} />
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Maintenance Dashboard</h2>
