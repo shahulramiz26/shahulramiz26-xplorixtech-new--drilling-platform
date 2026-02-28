@@ -12,7 +12,8 @@ import {
   Users,
   Truck,
   FolderOpen,
-  Gauge
+  Gauge,
+  Activity
 } from 'lucide-react'
 
 const quickActions = [
@@ -50,7 +51,7 @@ const productionKPIs = [
   { label: 'Total Meters Drilled', value: '8,450', unit: 'm', icon: TrendingUp, color: 'bg-blue-500' },
   { label: 'Total Drilling Hours', value: '1,240', unit: 'hrs', icon: Clock, color: 'bg-green-500' },
   { label: 'Total Downtime', value: '186', unit: 'hrs', icon: AlertCircle, color: 'bg-red-500' },
-  { label: 'Average ROP', value: '6.8', unit: 'm/hr', icon: Gauge, color: 'bg-purple-500' },
+  { label: 'Average ROP', value: '6.8', unit: 'm/hr', icon: Activity, color: 'bg-purple-500' },
   { label: 'Active Projects', value: '3', unit: '', icon: FolderOpen, color: 'bg-amber-500' },
   { label: 'Active Rigs', value: '5', unit: '', icon: Truck, color: 'bg-cyan-500' },
 ]
