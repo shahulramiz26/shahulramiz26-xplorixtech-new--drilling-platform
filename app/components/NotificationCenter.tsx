@@ -110,11 +110,21 @@ export default function NotificationCenter() {
       {isOpen && (
         <>
           <div 
-            className="fixed inset-0 z-40" 
+            className="fixed inset-0 z-40 lg:absolute lg:inset-auto" 
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl shadow-xl z-50 max-h-[500px] overflow-auto">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+          <div className="
+            fixed lg:absolute 
+            right-0 lg:right-0 
+            top-full mt-2 
+            w-[calc(100vw-2rem)] lg:w-96 
+            max-w-sm
+            bg-white rounded-xl shadow-xl z-50 
+            max-h-[70vh] lg:max-h-[500px] 
+            overflow-auto
+            mx-4 lg:mx-0
+          ">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white">
               <h3 className="font-semibold text-slate-900">Notifications</h3>
               <div className="flex items-center gap-2">
                 {unreadCount > 0 && (
@@ -151,24 +161,24 @@ export default function NotificationCenter() {
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-lg ${typeColors[notification.type]}`}>
+                        <div className={`p-2 rounded-lg flex-shrink-0 ${typeColors[notification.type]}`}>
                           <Icon className="w-4 h-4" />
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
                             <p className={`font-medium text-sm ${
                               !notification.read ? 'text-slate-900' : 'text-slate-600'
                             }`}>
                               {notification.title}
                             </p>
                             {!notification.read && (
-                              <span className="w-2 h-2 bg-blue-500 rounded-full" />
+                              <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
                             )}
                           </div>
-                          <p className="text-sm text-slate-600 mt-1">
+                          <p className="text-sm text-slate-600 mt-1 line-clamp-2">
                             {notification.message}
                           </p>
-                          <div className="flex items-center gap-2 mt-2">
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
                             <span className="text-xs text-slate-400">
                               {notification.dashboard}
                             </span>
@@ -185,7 +195,7 @@ export default function NotificationCenter() {
               )}
             </div>
 
-            <div className="p-3 border-t border-slate-200 bg-slate-50 rounded-b-xl">
+            <div className="p-3 border-t border-slate-200 bg-slate-50 rounded-b-xl sticky bottom-0">
               <button className="w-full text-center text-sm text-blue-600 hover:text-blue-700">
                 View All Notifications
               </button>

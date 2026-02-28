@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Brain, AlertTriangle, TrendingUp, TrendingDown, Lightbulb, X, Bell } from 'lucide-react'
+import { Brain, AlertTriangle, TrendingUp, TrendingDown, Lightbulb, X, Bell, ChevronRight } from 'lucide-react'
 
 interface Insight {
   id: string
@@ -33,60 +33,45 @@ const typeIcons = {
 }
 
 export default function AIInsights({ dashboardType, insights }: AIInsightsProps) {
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
   const [selectedInsight, setSelectedInsight] = useState<Insight | null>(null)
 
-  if (!isOpen) {
-    return (
+  // Mobile view - show as expandable section at top
+  const MobileView = () => (
+    <div className="lg:hidden mb-6">
       <button
-        onClick={() => setIsOpen(true)}
-        className="fixed right-4 top-24 z-40 bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-full shadow-lg transition"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 rounded-xl flex items-center justify-between shadow-lg"
       >
-        <Brain className="w-6 h-6" />
-        {insights.length > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center">
-            {insights.length}
-          </span>
-        )}
-      </button>
-    )
-  }
-
-  return (
-    <div className="fixed right-4 top-24 w-80 bg-white rounded-xl shadow-xl z-40 max-h-[calc(100vh-120px)] overflow-auto">
-      <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-purple-600 to-blue-600 rounded-t-xl">
-        <div className="flex items-center gap-2 text-white">
-          <Brain className="w-5 h-5" />
-          <h3 className="font-semibold">AI Insights</h3>
+        <div className="flex items-center gap-3">
+          <Brain className="w-6 h-6" />
+          <div className="text-left">
+            <h3 className="font-semibold">AI Insights</h3>
+            <p className="text-sm text-white/80">{insights.length} insights available</p>
+          </div>
         </div>
-        <button onClick={() => setIsOpen(false)} className="text-white hover:bg-white/20 p-1 rounded">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      <div className="p-4 space-y-3">
-        {insights.length === 0 ? (
-          <p className="text-sm text-slate-500 text-center py-4">
-            Analyzing your data... Insights will appear here.
-          </p>
-        ) : (
-          insights.map((insight) => {
+        <ChevronRight className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+      </button>
+      
+      {isOpen && (
+        <div className="mt-3 space-y-3">
+          {insights.map((insight) => {
             const Icon = typeIcons[insight.type]
             return (
               <div
                 key={insight.id}
                 onClick={() => setSelectedInsight(insight)}
-                className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition ${severityColors[insight.severity]}`}
+                className={`p-4 rounded-lg border cursor-pointer ${severityColors[insight.severity]}`}
               >
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5">
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-5 h-5" />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm">{insight.title}</p>
-                    <p className="text-xs mt-1 opacity-90">{insight.description}</p>
+                    <p className="text-xs mt-1 opacity-90 line-clamp-2">{insight.description}</p>
                     {insight.change && (
-                      <p className="text-xs mt-1 font-semibold">
+                      <p className="text-xs mt-2 font-semibold">
                         Projected: {insight.change}
                       </p>
                     )}
@@ -94,14 +79,89 @@ export default function AIInsights({ dashboardType, insights }: AIInsightsProps)
                 </div>
               </div>
             )
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
+    </div>
+  )
 
-      {/* Detail Modal */}
+  // Desktop view - floating panel
+  const DesktopView = () => {
+    if (!isOpen) {
+      return (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="hidden lg:flex fixed right-4 top-24 z-40 bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-full shadow-lg transition items-center gap-2"
+        >
+          <Brain className="w-6 h-6" />
+          <span className="text-sm font-medium pr-1">AI Insights</span>
+          {insights.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center">
+              {insights.length}
+            </span>
+          )}
+        </button>
+      )
+    }
+
+    return (
+      <div className="hidden lg:block fixed right-4 top-24 w-80 bg-white rounded-xl shadow-xl z-40 max-h-[calc(100vh-120px)] overflow-auto">
+        <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-purple-600 to-blue-600 rounded-t-xl">
+          <div className="flex items-center gap-2 text-white">
+            <Brain className="w-5 h-5" />
+            <h3 className="font-semibold">AI Insights</h3>
+          </div>
+          <button onClick={() => setIsOpen(false)} className="text-white hover:bg-white/20 p-1 rounded">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          {insights.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-4">
+              Analyzing your data... Insights will appear here.
+            </p>
+          ) : (
+            insights.map((insight) => {
+              const Icon = typeIcons[insight.type]
+              return (
+                <div
+                  key={insight.id}
+                  onClick={() => setSelectedInsight(insight)}
+                  className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition ${severityColors[insight.severity]}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{insight.title}</p>
+                      <p className="text-xs mt-1 opacity-90">{insight.description}</p>
+                      {insight.change && (
+                        <p className="text-xs mt-1 font-semibold">
+                          Projected: {insight.change}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <MobileView />
+      <DesktopView />
+
+      {/* Detail Modal - Works for both mobile and desktop */}
       {selectedInsight && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 mx-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 {(() => {
@@ -138,6 +198,6 @@ export default function AIInsights({ dashboardType, insights }: AIInsightsProps)
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
