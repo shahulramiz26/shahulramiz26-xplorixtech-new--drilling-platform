@@ -8,6 +8,7 @@ import {
   CreditCard,
   LogOut
 } from 'lucide-react'
+import NotificationCenter from '../components/NotificationCenter'
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -58,7 +59,17 @@ export default function AdminLayout({
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        {children}
+        {/* Top Bar with Notification Center */}
+        <div className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-sm text-slate-500">Welcome back</p>
+            <p className="font-medium text-slate-900">Admin - Apex Drilling Solutions</p>
+          </div>
+          <NotificationCenter />
+        </div>
+        <div className="p-8">
+          {children}
+        </div>
       </main>
     </div>
   )
