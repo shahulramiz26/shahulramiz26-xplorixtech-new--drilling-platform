@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import NotificationCenter from '../components/NotificationCenter'
 
 export default function AnalyticsLayout({
   children,
@@ -19,7 +20,7 @@ export default function AnalyticsLayout({
               Back to Dashboards
             </Link>
             <h1 className="text-xl font-semibold text-slate-900">Analytics</h1>
-            <div className="w-24" /> {/* Spacer for centering */}
+            <NotificationCenter />
           </div>
         </div>
       </header>
