@@ -1,5 +1,6 @@
 'use client'
 
+import { motion } from 'framer-motion'
 import {
   BarChart,
   Bar,
@@ -11,53 +12,95 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  Area,
+  AreaChart,
+  ComposedChart,
+  Line,
+  ReferenceLine
 } from 'recharts'
+import { Wrench, Clock, AlertTriangle, TrendingUp, ArrowUpRight, ArrowDownRight, Filter } from 'lucide-react'
 import AIInsights from '../../../components/AIInsights'
 
+const COLORS = {
+  primary: '#3B82F6',
+  accent: '#10B981',
+  purple: '#8B5CF6',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  cyan: '#06B6D4',
+  pink: '#EC4899'
+}
+
+const PIE_COLORS = ['#3B82F6', '#EF4444', '#F59E0B', '#10B981']
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-[#1A2234] border border-[#1E293B] rounded-xl p-4 shadow-[0_16px_64px_rgba(0,0,0,0.8)]">
+        <p className="text-[#94A3B8] text-sm mb-2">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="flex items-center gap-2 mb-1 last:mb-0">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-[#94A3B8] text-sm">{entry.name}:</span>
+            <span className="text-[#F8FAFC] font-bold">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return null
+}
+
 const maintenanceTypeData = [
-  { name: 'Preventive', value: 45 },
-  { name: 'Breakdown', value: 25 },
-  { name: 'Scheduled', value: 20 },
-  { name: 'Component', value: 10 },
+  { name: 'Preventive', value: 45, cost: 4500 },
+  { name: 'Breakdown', value: 25, cost: 8500 },
+  { name: 'Scheduled', value: 20, cost: 3200 },
+  { name: 'Component', value: 10, cost: 1800 },
 ]
 
 const maintenanceHoursData = [
-  { date: 'Feb 20', hours: 8 },
-  { date: 'Feb 21', hours: 4 },
-  { date: 'Feb 22', hours: 12 },
-  { date: 'Feb 23', hours: 6 },
-  { date: 'Feb 24', hours: 10 },
-  { date: 'Feb 25', hours: 5 },
-  { date: 'Feb 26', hours: 7 },
+  { date: 'Feb 20', hours: 8, rigs: 2, cost: 800 },
+  { date: 'Feb 21', hours: 4, rigs: 1, cost: 400 },
+  { date: 'Feb 22', hours: 12, rigs: 3, cost: 1200 },
+  { date: 'Feb 23', hours: 6, rigs: 2, cost: 600 },
+  { date: 'Feb 24', hours: 10, rigs: 3, cost: 1000 },
+  { date: 'Feb 25', hours: 5, rigs: 1, cost: 500 },
+  { date: 'Feb 26', hours: 7, rigs: 2, cost: 700 },
 ]
 
 const componentData = [
-  { component: 'Engine', count: 8 },
-  { component: 'Hydraulic', count: 12 },
-  { component: 'Electrical', count: 6 },
-  { component: 'Transmission', count: 5 },
-  { component: 'Mud Pump', count: 7 },
-  { component: 'Compressor', count: 4 },
+  { component: 'Engine', count: 8, cost: 12000, downtime: 48 },
+  { component: 'Hydraulic', count: 12, cost: 8500, downtime: 72 },
+  { component: 'Electrical', count: 6, cost: 4500, downtime: 24 },
+  { component: 'Transmission', count: 5, cost: 15000, downtime: 40 },
+  { component: 'Mud Pump', count: 7, cost: 7000, downtime: 35 },
+  { component: 'Compressor', count: 4, cost: 6000, downtime: 20 },
 ]
 
 const actionData = [
-  { action: 'Repair', count: 28 },
-  { action: 'Replace', count: 15 },
-  { action: 'Temporary', count: 8 },
+  { action: 'Repair', count: 28, cost: 15000 },
+  { action: 'Replace', count: 15, cost: 35000 },
+  { action: 'Temporary', count: 8, cost: 2000 },
 ]
 
 const oilData = [
-  { date: 'Feb 20', engine: 15, hydraulic: 25, transmission: 10 },
-  { date: 'Feb 21', engine: 8, hydraulic: 12, transmission: 5 },
-  { date: 'Feb 22', engine: 20, hydraulic: 35, transmission: 15 },
-  { date: 'Feb 23', engine: 10, hydraulic: 18, transmission: 8 },
-  { date: 'Feb 24', engine: 18, hydraulic: 30, transmission: 12 },
-  { date: 'Feb 25', engine: 12, hydraulic: 20, transmission: 9 },
-  { date: 'Feb 26', engine: 14, hydraulic: 22, transmission: 11 },
+  { date: 'Feb 20', engine: 15, hydraulic: 25, transmission: 10, total: 50 },
+  { date: 'Feb 21', engine: 8, hydraulic: 12, transmission: 5, total: 25 },
+  { date: 'Feb 22', engine: 20, hydraulic: 35, transmission: 15, total: 70 },
+  { date: 'Feb 23', engine: 10, hydraulic: 18, transmission: 8, total: 36 },
+  { date: 'Feb 24', engine: 18, hydraulic: 30, transmission: 12, total: 60 },
+  { date: 'Feb 25', engine: 12, hydraulic: 20, transmission: 9, total: 41 },
+  { date: 'Feb 26', engine: 14, hydraulic: 22, transmission: 11, total: 47 },
 ]
 
-const COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981']
+const mtbfData = [
+  { rig: 'RIG-001', mtbf: 450, target: 400 },
+  { rig: 'RIG-002', mtbf: 380, target: 400 },
+  { rig: 'RIG-003', mtbf: 520, target: 400 },
+  { rig: 'RIG-004', mtbf: 290, target: 400 },
+  { rig: 'RIG-005', mtbf: 410, target: 400 },
+]
 
 const maintenanceInsights = [
   {
@@ -104,117 +147,237 @@ const maintenanceInsights = [
 
 export default function AdminMaintenanceDashboard() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-8">
       <AIInsights dashboardType="maintenance" insights={maintenanceInsights} />
 
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Maintenance Dashboard</h2>
-          <p className="text-slate-600">Rig maintenance and component health metrics - Admin View</p>
+          <h2 className="text-3xl font-bold text-[#F8FAFC]">Maintenance Dashboard</h2>
+          <p className="text-[#94A3B8] mt-1">Rig maintenance and component health metrics</p>
         </div>
-        <select className="px-4 py-2 border border-slate-300 rounded-lg">
-          <option>Last 7 Days</option>
-          <option>Last 30 Days</option>
-        </select>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-4 py-2 bg-[#1A2234] border border-[#1E293B] rounded-xl">
+            <Filter className="w-4 h-4 text-[#64748B]" />
+            <select className="bg-transparent text-[#F8FAFC] text-sm outline-none">
+              <option className="bg-[#1A2234]">Last 7 Days</option>
+              <option className="bg-[#1A2234]">Last 30 Days</option>
+              <option className="bg-[#1A2234]">Last 90 Days</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-4">
-        <select className="px-4 py-2 border border-slate-300 rounded-lg">
-          <option>All Projects</option>
-        </select>
-        <select className="px-4 py-2 border border-slate-300 rounded-lg">
-          <option>All Rigs</option>
-        </select>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Maint. Logs', value: '28', icon: Wrench, color: COLORS.warning, trend: '+12%', up: true },
+          { label: 'Maint. Hours', value: '84', unit: 'hrs', icon: Clock, color: COLORS.danger, trend: '+8%', up: false },
+          { label: 'Pending Service', value: '5', icon: AlertTriangle, color: COLORS.pink, trend: '-2', up: true },
+          { label: 'Avg MTBF', value: '410', unit: 'hrs', icon: TrendingUp, color: COLORS.accent, trend: '+5%', up: true },
+        ].map((kpi, i) => (
+          <motion.div 
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+            className="bg-[#111827] border border-[#1E293B] rounded-2xl p-5 hover:border-[#3B82F6]/30 transition-all"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${kpi.color}20` }}>
+                <kpi.icon className="w-5 h-5" style={{ color: kpi.color }} />
+              </div>
+              <div className={`flex items-center gap-1 text-xs font-medium ${kpi.up ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+                {kpi.up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                {kpi.trend}
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-[#F8FAFC]">{kpi.value}<span className="text-sm font-normal text-[#64748B] ml-1">{kpi.unit}</span></p>
+            <p className="text-sm text-[#94A3B8] mt-1">{kpi.label}</p>
+          </motion.div>
+        ))}
       </div>
 
+      {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Maintenance Type Distribution</h3>
-          <div className="h-64">
+        {/* Maintenance Type - Donut with Center Text */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
+        >
+          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Maintenance Type Distribution</h3>
+          <div className="h-72 relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={maintenanceTypeData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
+                  innerRadius={80}
+                  outerRadius={110}
+                  paddingAngle={4}
                   dataKey="value"
                 >
                   {maintenanceTypeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="#111827" strokeWidth={3} />
                   ))}
                 </Pie>
-                <Tooltip />
-                <Legend />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" />
               </PieChart>
             </ResponsiveContainer>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-[#F8FAFC]">100</p>
+                <p className="text-xs text-[#94A3B8]">Total</p>
+              </div>
+            </div>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Maintenance Hours per Day</h3>
-          <div className="h-64">
+        {/* Maintenance Hours Trend - Area Chart */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
+        >
+          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Maintenance Hours & Cost Trend</h3>
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={maintenanceHoursData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="hours" fill="#f59e0b" />
-              </BarChart>
+              <ComposedChart data={maintenanceHoursData}>
+                <defs>
+                  <linearGradient id="maintGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+                <XAxis dataKey="date" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
+                <YAxis yAxisId="left" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
+                <YAxis yAxisId="right" orientation="right" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                <Area yAxisId="left" type="monotone" dataKey="hours" name="Hours" stroke="#F59E0B" strokeWidth={3} fill="url(#maintGradient)" />
+                <Line yAxisId="right" type="monotone" dataKey="cost" name="Cost ($)" stroke="#EF4444" strokeWidth={3} dot={{ fill: '#EF4444', r: 4 }} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Component Affected Frequency</h3>
-          <div className="h-64">
+        {/* Component Affected - Horizontal Bar with Cost */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
+        >
+          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Component Failure Analysis</h3>
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={componentData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="component" type="category" width={100} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#ef4444" />
-              </BarChart>
+              <ComposedChart data={componentData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" horizontal={false} />
+                <XAxis type="number" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
+                <YAxis dataKey="component" type="category" stroke="#94A3B8" tick={{ fill: '#94A3B8', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} width={100} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                <Bar dataKey="count" name="Failure Count" fill="#3B82F6" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="downtime" name="Downtime (hrs)" fill="#EF4444" radius={[0, 4, 4, 0]} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Action Taken Distribution</h3>
-          <div className="h-64">
+        {/* Action Taken - Stacked Bar */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
+        >
+          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Action Taken Distribution</h3>
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={actionData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="action" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" fill="#3b82f6" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+                <XAxis dataKey="action" stroke="#94A3B8" tick={{ fill: '#94A3B8', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
+                <YAxis stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="count" name="Count" fill="#8B5CF6" radius={[4, 4, 0, 0]}>
+                  {actionData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={['#3B82F6', '#10B981', '#F59E0B'][index]} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 lg:col-span-2">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Oil Consumption per Day</h3>
-          <div className="h-64">
+        {/* Oil Consumption - Stacked Area */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6 lg:col-span-2"
+        >
+          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Oil Consumption Breakdown</h3>
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={oilData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="engine" name="Engine Oil" fill="#3b82f6" />
-                <Bar dataKey="hydraulic" name="Hydraulic Oil" fill="#ef4444" />
-                <Bar dataKey="transmission" name="Transmission Oil" fill="#f59e0b" />
-              </BarChart>
+              <AreaChart data={oilData}>
+                <defs>
+                  <linearGradient id="engineGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="hydraulicGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="transmissionGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+                <XAxis dataKey="date" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
+                <YAxis stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                <Area type="monotone" dataKey="engine" name="Engine Oil" stackId="1" stroke="#3B82F6" strokeWidth={2} fill="url(#engineGradient)" />
+                <Area type="monotone" dataKey="hydraulic" name="Hydraulic Oil" stackId="1" stroke="#EF4444" strokeWidth={2} fill="url(#hydraulicGradient)" />
+                <Area type="monotone" dataKey="transmission" name="Transmission Oil" stackId="1" stroke="#F59E0B" strokeWidth={2} fill="url(#transmissionGradient)" />
+                <Line type="monotone" dataKey="total" name="Total" stroke="#10B981" strokeWidth={3} strokeDasharray="5 5" dot={false} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </motion.div>
+
+        {/* MTBF by Rig - Bar with Target Line */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6 lg:col-span-2"
+        >
+          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Mean Time Between Failures (MTBF) by Rig</h3>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={mtbfData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+                <XAxis dataKey="rig" stroke="#94A3B8" tick={{ fill: '#94A3B8', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
+                <YAxis stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
+                <Tooltip content={<CustomTooltip />} />
+                <ReferenceLine y={400} stroke="#F59E0B" strokeDasharray="5 5" label={{ value: 'Target: 400h', fill: '#F59E0B', fontSize: 12 }} />
+                <Bar dataKey="mtbf" name="MTBF (hours)" fill="#06B6D4" radius={[4, 4, 0, 0]}>
+                  {mtbfData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.mtbf >= 400 ? '#10B981' : '#EF4444'} />
+                  ))}
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
       </div>
     </div>
   )
