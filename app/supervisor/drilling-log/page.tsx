@@ -73,7 +73,7 @@ export default function DrillingLogPage() {
         </div>
       </motion.div>
 
-      {/* Operation Details */}
+      {/* Operation Details - MISSING SECTION */}
       <motion.div className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]">
         <h2 className="text-xl font-semibold text-[#F8FAFC] mb-6 flex items-center gap-2">
           <Activity className="w-5 h-5 text-[#10B981]" />
