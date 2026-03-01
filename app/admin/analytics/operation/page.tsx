@@ -24,7 +24,6 @@ import {
 import { TrendingUp, Clock, AlertCircle, Activity, ArrowUpRight, ArrowDownRight, Filter } from 'lucide-react'
 import AIInsights from '../../../components/AIInsights'
 
-// Premium dark theme colors
 const COLORS = {
   primary: '#3B82F6',
   accent: '#10B981',
@@ -38,7 +37,6 @@ const COLORS = {
 
 const PIE_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444']
 
-// Custom Tooltip for dark theme
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -57,7 +55,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null
 }
 
-// Data
 const ropData = [
   { date: 'Feb 20', rop: 45, target: 50 },
   { date: 'Feb 21', rop: 52, target: 50 },
@@ -166,6 +163,16 @@ const operationInsights = [
     metric: 'Bit Life',
     change: '-50% expected life',
     recommendation: 'Switch to impregnated bit for hard formation'
+  },
+  {
+    id: '5',
+    type: 'recommendation' as const,
+    severity: 'info' as const,
+    title: 'Optimal Drilling Window',
+    description: 'AI analysis shows best ROP between 6-8 AM',
+    metric: 'Peak Performance',
+    change: '6-8 AM daily',
+    recommendation: 'Schedule critical drilling during morning shift'
   }
 ]
 
