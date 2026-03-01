@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { FileText, Save, Activity, Settings, Droplets, Zap, Plus, Trash2, AlertTriangle, Upload, Clock, Wrench, AlertCircle, Image, Paperclip } from 'lucide-react'
+import { FileText, Save, Activity, Droplets, Plus, Trash2, AlertTriangle, Upload, Clock, Wrench, AlertCircle, Image, Paperclip } from 'lucide-react'
 
 // Mock data for dropdowns - In production, these would come from API/Database
 const mockData = {
@@ -129,7 +129,6 @@ export default function DrillingLogPage() {
     setFormData(prev => {
       const newData = { ...prev, [key]: value }
       
-      // Validate hours when drilling or downtime changes
       if (key === 'drillingHours' || key === 'downtime') {
         validateHours(
           key === 'drillingHours' ? value : newData.drillingHours,
@@ -161,7 +160,6 @@ export default function DrillingLogPage() {
   }
 
   const handleSubmit = () => {
-    // Final validation
     const drillingHrs = parseFloat(formData.drillingHours) || 0
     const downtimeHrs = parseFloat(formData.downtime) || 0
     const total = drillingHrs + downtimeHrs
@@ -328,7 +326,6 @@ export default function DrillingLogPage() {
           Operation Details
         </h2>
         
-        {/* Hour Validation Alert */}
         {hourError && (
           <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-red-400" />
@@ -522,7 +519,6 @@ export default function DrillingLogPage() {
           </div>
         </div>
 
-        {/* Equipment */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
             <label className="block text-sm text-[#94A3B8] mb-2">Equipment</label>
@@ -558,7 +554,6 @@ export default function DrillingLogPage() {
           </div>
         </div>
 
-        {/* Accessories */}
         <div className="border-t border-[#1E293B] pt-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium text-[#F8FAFC]">Accessories</h3>
