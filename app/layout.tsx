@@ -1,30 +1,30 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { Sidebar } from "@/components/sidebar";
 
-const inter = Inter({ 
-  subsets: ['latin'],
-  variable: '--font-inter',
-})
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'XPLORIX | Drilling Intelligence Platform',
-  description: 'XPLORIX - Premium AI-powered drilling operations management system for Exploration and Blast Hole industries',
-}
+  title: "Drilling Platform MVP",
+  description: "Analytics Dashboard for drilling operations",
+};
 
 export default function RootLayout({
   children,
-}: {
-  children: React.ReactNode
-}) {
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.className} bg-[#0A0F1C] text-white min-h-screen`}>
-        <div className="bg-grid-pattern fixed inset-0 pointer-events-none" />
-        <div className="relative z-10">
-          {children}
+      <body className={`${inter.className} bg-[#0B0F19] text-white min-h-screen`}>
+        <div className="flex">
+          <Sidebar />
+          <main className="flex-1 p-8">
+            {children}
+          </main>
         </div>
       </body>
     </html>
-  )
+  );
 }
