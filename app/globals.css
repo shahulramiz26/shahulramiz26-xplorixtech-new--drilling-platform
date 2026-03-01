@@ -36,8 +36,13 @@
   }
 
   /* Force all backgrounds to dark */
-  div, section, article, aside, nav, header, footer, main {
+  div, section, article, aside, nav, header, footer, main, form, input, select, textarea, button {
     @apply bg-transparent;
+  }
+  
+  /* Force white backgrounds to dark */
+  .bg-white, [class*="bg-white"] {
+    @apply bg-[#111827] !important;
   }
 }
 
