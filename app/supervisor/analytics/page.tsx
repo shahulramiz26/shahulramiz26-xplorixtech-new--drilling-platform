@@ -21,9 +21,9 @@ import {
   ComposedChart,
   ReferenceLine
 } from 'recharts'
-import { TrendingUp, Clock, AlertCircle, Activity, Filter } from 'lucide-react'
+import { TrendingUp, Clock, AlertCircle, Activity, Filter, Droplets, Wrench, Users, ShieldAlert } from 'lucide-react'
+import Link from 'next/link'
 
-// Same chart components as Admin but with supervisor-specific data
 const COLORS = {
   primary: '#3B82F6',
   accent: '#10B981',
@@ -54,7 +54,16 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null
 }
 
-// Supervisor-specific data (filtered to their assigned projects)
+// Dashboard cards for supervisor
+const dashboardCards = [
+  { title: 'Operation', icon: TrendingUp, href: '/supervisor/analytics/operation', color: 'blue', desc: 'ROP, meters, downtime' },
+  { title: 'Maintenance', icon: Wrench, href: '/supervisor/analytics/maintenance', color: 'amber', desc: 'Service logs, components' },
+  { title: 'Driller & Crew', icon: Users, href: '/supervisor/analytics/driller-crew', color: 'emerald', desc: 'Performance metrics' },
+  { title: 'Consumables', icon: Droplets, href: '/supervisor/analytics/consumables', color: 'purple', desc: 'Resource usage' },
+  { title: 'HSC', icon: ShieldAlert, href: '/supervisor/analytics/hsc', color: 'red', desc: 'Safety compliance' },
+]
+
+// Sample data for charts
 const ropData = [
   { date: 'Feb 20', rop: 45, target: 50 },
   { date: 'Feb 21', rop: 52, target: 50 },
@@ -73,37 +82,6 @@ const metersData = [
   { date: 'Feb 24', meters: 210, recovery: 195 },
   { date: 'Feb 25', meters: 230, recovery: 215 },
   { date: 'Feb 26', meters: 250, recovery: 235 },
-]
-
-const downtimeData = [
-  { reason: 'Mechanical', hours: 12 },
-  { reason: 'Bit Change', hours: 8 },
-  { reason: 'Water Shortage', hours: 6 },
-  { reason: 'Weather', hours: 4 },
-]
-
-const formationData = [
-  { formation: 'Soft', rop: 62 },
-  { formation: 'Medium', rop: 48 },
-  { formation: 'Hard', rop: 35 },
-  { formation: 'Mixed', rop: 45 },
-]
-
-const bitPerformanceData = [
-  { date: 'Feb 20', meters: 180, cost: 1800 },
-  { date: 'Feb 21', meters: 220, cost: 2200 },
-  { date: 'Feb 22', meters: 195, cost: 1950 },
-  { date: 'Feb 23', meters: 245, cost: 2450 },
-  { date: 'Feb 24', meters: 210, cost: 2100 },
-  { date: 'Feb 25', meters: 230, cost: 2300 },
-  { date: 'Feb 26', meters: 250, cost: 2500 },
-]
-
-const completionData = [
-  { name: 'Inner Worn', value: 35 },
-  { name: 'Outer Worn', value: 28 },
-  { name: 'Flat Worn', value: 25 },
-  { name: 'Broken', value: 12 },
 ]
 
 export default function SupervisorAnalytics() {
@@ -132,6 +110,26 @@ export default function SupervisorAnalytics() {
         </div>
       </div>
 
+      {/* Dashboard Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {dashboardCards.map((card, i) => (
+          <Link key={card.title} href={card.href}>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="p-4 rounded-2xl bg-[#111827] border border-[#1E293B] hover:border-[#3B82F6]/30 transition-all cursor-pointer"
+            >
+              <div className={`w-10 h-10 rounded-xl bg-${card.color}-500/20 flex items-center justify-center mb-3`}>
+                <card.icon className={`w-5 h-5 text-${card.color}-400`} />
+              </div>
+              <p className="font-semibold text-[#F8FAFC] text-sm">{card.title}</p>
+              <p className="text-xs text-[#64748B] mt-1">{card.desc}</p>
+            </motion.div>
+          </Link>
+        ))}
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
@@ -144,7 +142,7 @@ export default function SupervisorAnalytics() {
             key={i}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
+            transition={{ delay: 0.2 + i * 0.1 }}
             className="bg-[#111827] border border-[#1E293B] rounded-2xl p-5 hover:border-[#3B82F6]/30 transition-all"
           >
             <div className="flex items-center justify-between mb-3">
@@ -158,7 +156,7 @@ export default function SupervisorAnalytics() {
         ))}
       </div>
 
-      {/* Charts Grid - Same as Admin but with supervisor view */}
+      {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ROP Trend */}
         <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
@@ -198,91 +196,6 @@ export default function SupervisorAnalytics() {
                 <Bar dataKey="meters" name="Meters Drilled" fill="#3B82F6" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="recovery" name="Core Recovery" fill="#10B981" radius={[4, 4, 0, 0]} />
               </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Downtime Analysis */}
-        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Downtime by Reason</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={downtimeData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" horizontal={false} />
-                <XAxis type="number" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
-                <YAxis dataKey="reason" type="category" stroke="#94A3B8" tick={{ fill: '#94A3B8', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} width={100} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="hours" name="Hours" fill="#EF4444" radius={[0, 4, 4, 0]}>
-                  {downtimeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? '#EF4444' : index === 1 ? '#F59E0B' : '#64748B'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Formation vs ROP */}
-        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Formation vs Average ROP</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={formationData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="formation" stroke="#94A3B8" tick={{ fill: '#94A3B8', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="rop" name="ROP (m/hr)" fill="#8B5CF6" radius={[4, 4, 0, 0]}>
-                  {formationData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'][index]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Bit Performance */}
-        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Bit Performance & Cost</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={bitPerformanceData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
-                <YAxis yAxisId="left" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
-                <YAxis yAxisId="right" orientation="right" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                <Bar yAxisId="left" dataKey="meters" name="Meters" fill="#06B6D4" radius={[4, 4, 0, 0]} />
-                <Line yAxisId="right" type="monotone" dataKey="cost" name="Cost ($)" stroke="#F59E0B" strokeWidth={3} dot={{ fill: '#F59E0B', r: 4 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Completion Type */}
-        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Completion Type Distribution</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={completionData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={70}
-                  outerRadius={100}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {completionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="#111827" strokeWidth={3} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" />
-              </PieChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
