@@ -8,7 +8,7 @@ const metrics = [
     value: "48",
     unit: "members",
     change: "+3",
-    trend: "up",
+    trend: "up" as const,
     icon: Users,
   },
   {
@@ -16,7 +16,7 @@ const metrics = [
     value: "92.4",
     unit: "%",
     change: "+2.1%",
-    trend: "up",
+    trend: "up" as const,
     icon: Award,
   },
   {
@@ -24,7 +24,7 @@ const metrics = [
     value: "1,248",
     unit: "hrs",
     change: "+156",
-    trend: "up",
+    trend: "up" as const,
     icon: Clock,
   },
   {
@@ -32,7 +32,7 @@ const metrics = [
     value: "45",
     unit: "members",
     change: "+2",
-    trend: "up",
+    trend: "up" as const,
     icon: GraduationCap,
   },
 ];
