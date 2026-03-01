@@ -8,7 +8,7 @@ const metrics = [
     value: "2,450",
     unit: "units",
     change: "+12%",
-    trend: "up",
+    trend: "up" as const,
     icon: Flame,
   },
   {
@@ -16,7 +16,7 @@ const metrics = [
     value: "8,320",
     unit: "units",
     change: "-5%",
-    trend: "down",
+    trend: "down" as const,
     icon: Package,
   },
   {
@@ -24,7 +24,7 @@ const metrics = [
     value: "18",
     unit: "items",
     change: "+3",
-    trend: "up",
+    trend: "up" as const,
     icon: TrendingDown,
   },
   {
@@ -32,7 +32,7 @@ const metrics = [
     value: "$45.2K",
     unit: "USD",
     change: "+8%",
-    trend: "up",
+    trend: "up" as const,
     icon: DollarSign,
   },
 ];
