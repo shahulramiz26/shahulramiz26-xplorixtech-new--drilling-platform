@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { 
   Users, 
   FolderOpen, 
@@ -14,13 +15,16 @@ import {
   Droplets,
   ShieldAlert,
   Activity,
-  Drill,
   MapPin,
-  CheckCircle2
+  CheckCircle2,
+  ArrowUpRight,
+  ArrowDownRight,
+  Zap,
+  Brain
 } from 'lucide-react'
 import { calculateTrialDays, formatDate } from '@/lib/utils'
 
-// Mock data for demo
+// Mock data
 const mockCompany = {
   name: "Apex Drilling Solutions",
   industryType: "Exploration",
@@ -29,14 +33,15 @@ const mockCompany = {
   dailyRate: 10
 }
 
-// Overall Company Stats
+// Premium Stat Cards
 const overallStats = [
   { 
     label: 'Total Projects', 
     value: '3', 
     subtext: '2 Active, 1 On Hold',
     icon: FolderOpen, 
-    color: 'bg-blue-500',
+    color: 'from-blue-500 to-cyan-500',
+    trend: '+1',
     href: '/admin/projects'
   },
   { 
@@ -44,7 +49,8 @@ const overallStats = [
     value: '5', 
     subtext: '3 Active, 2 Inactive',
     icon: Truck, 
-    color: 'bg-green-500',
+    color: 'from-emerald-500 to-teal-500',
+    trend: '+2',
     href: '/admin/rigs'
   },
   { 
@@ -52,7 +58,8 @@ const overallStats = [
     value: '6', 
     subtext: '1 Admin + 5 Operational',
     icon: Users, 
-    color: 'bg-purple-500',
+    color: 'from-purple-500 to-violet-500',
+    trend: '+3',
     href: '/admin/users'
   },
   { 
@@ -60,310 +67,356 @@ const overallStats = [
     value: '$830', 
     subtext: '83 active rig-days',
     icon: CreditCard, 
-    color: 'bg-amber-500',
+    color: 'from-amber-500 to-orange-500',
+    trend: '+12%',
     href: '/admin/billing'
   },
 ]
 
-// Production Snapshot Data
+// Production KPIs
 const productionKPIs = [
-  { label: 'Total Meters Drilled', value: '8,450', unit: 'm', icon: TrendingUp, color: 'bg-blue-500', trend: '+12%' },
-  { label: 'Total Drilling Hours', value: '1,240', unit: 'hrs', icon: Clock, color: 'bg-green-500', trend: '+8%' },
-  { label: 'Total Downtime', value: '186', unit: 'hrs', icon: AlertCircle, color: 'bg-red-500', trend: '-5%' },
-  { label: 'Average ROP', value: '6.8', unit: 'm/hr', icon: Activity, color: 'bg-purple-500', trend: '+15%' },
-  { label: 'Active Projects', value: '3', unit: '', icon: FolderOpen, color: 'bg-amber-500', trend: '' },
-  { label: 'Active Rigs', value: '3', unit: '', icon: Truck, color: 'bg-cyan-500', trend: '' },
+  { label: 'Total Meters', value: '8,450', unit: 'm', icon: TrendingUp, color: 'blue', trend: '+12%', trendUp: true },
+  { label: 'Drilling Hours', value: '1,240', unit: 'hrs', icon: Clock, color: 'emerald', trend: '+8%', trendUp: true },
+  { label: 'Downtime', value: '186', unit: 'hrs', icon: AlertCircle, color: 'red', trend: '-5%', trendUp: false },
+  { label: 'Avg ROP', value: '6.8', unit: 'm/hr', icon: Activity, color: 'purple', trend: '+15%', trendUp: true },
+  { label: 'Active Projects', value: '3', unit: '', icon: FolderOpen, color: 'cyan', trend: '', trendUp: true },
+  { label: 'Active Rigs', value: '3', unit: '', icon: Truck, color: 'amber', trend: '', trendUp: true },
 ]
 
-// Workforce Snapshot
+// Workforce KPIs
 const workforceKPIs = [
-  { label: 'Total Drillers', value: '12', icon: Users, color: 'bg-blue-600', subtext: 'Across all projects' },
-  { label: 'Total Supervisors', value: '4', icon: Users, color: 'bg-green-600', subtext: 'Across all projects' },
-  { label: 'Total Shifts Logged', value: '156', icon: Clock, color: 'bg-purple-600', subtext: 'This month' },
+  { label: 'Total Drillers', value: '12', icon: Users, color: 'blue', subtext: 'Across all projects' },
+  { label: 'Total Supervisors', value: '4', icon: Users, color: 'emerald', subtext: 'Across all projects' },
+  { label: 'Shifts Logged', value: '156', icon: Clock, color: 'purple', subtext: 'This month' },
 ]
 
-// Maintenance Snapshot
+// Maintenance KPIs
 const maintenanceKPIs = [
-  { label: 'Maintenance Logs', value: '28', icon: Wrench, color: 'bg-amber-600', subtext: 'This month' },
-  { label: 'Maintenance Hours', value: '84', unit: 'hrs', icon: Clock, color: 'bg-red-600', subtext: 'Total downtime' },
-  { label: 'Pending Service', value: '5', icon: AlertCircle, color: 'bg-orange-600', subtext: 'Rigs need attention' },
+  { label: 'Maint. Logs', value: '28', icon: Wrench, color: 'amber', subtext: 'This month' },
+  { label: 'Maint. Hours', value: '84', unit: 'hrs', icon: Clock, color: 'red', subtext: 'Total downtime' },
+  { label: 'Pending Service', value: '5', icon: AlertCircle, color: 'orange', subtext: 'Rigs need attention' },
 ]
 
-// Consumables Snapshot
+// Consumables KPIs
 const consumablesKPIs = [
-  { label: 'Fuel Used', value: '6,150', unit: 'L', icon: Droplets, color: 'bg-red-500', trend: '+10%' },
-  { label: 'Water Used', value: '18,900', unit: 'L', icon: Droplets, color: 'bg-blue-500', trend: '+5%' },
-  { label: 'Additives Used', value: '1,140', unit: 'kg', icon: Droplets, color: 'bg-amber-500', trend: '+8%' },
+  { label: 'Fuel Used', value: '6,150', unit: 'L', icon: Droplets, color: 'red', trend: '+10%' },
+  { label: 'Water Used', value: '18,900', unit: 'L', icon: Droplets, color: 'blue', trend: '+5%' },
+  { label: 'Additives', value: '1,140', unit: 'kg', icon: Droplets, color: 'amber', trend: '+8%' },
 ]
 
-// Safety Snapshot
+// Safety KPIs
 const safetyKPIs = [
-  { label: 'Days Without Incident', value: '5', icon: CheckCircle2, color: 'bg-green-500', subtext: 'Current streak' },
-  { label: 'Total Incidents', value: '12', icon: ShieldAlert, color: 'bg-red-500', subtext: 'Last 30 days' },
-  { label: 'PPE Compliance', value: '98%', icon: CheckCircle2, color: 'bg-blue-500', subtext: 'Across all sites' },
+  { label: 'Days Safe', value: '5', icon: CheckCircle2, color: 'emerald', subtext: 'Current streak' },
+  { label: 'Incidents', value: '12', icon: ShieldAlert, color: 'red', subtext: 'Last 30 days' },
+  { label: 'PPE Compliance', value: '98%', icon: CheckCircle2, color: 'blue', subtext: 'Across all sites' },
 ]
 
 // Project Breakdown
 const projectBreakdown = [
-  { name: 'Gold Mine Project A', meters: 3240, rigs: 2, status: 'ACTIVE', completion: '68%' },
-  { name: 'Copper Exploration Site', meters: 2890, rigs: 2, status: 'ACTIVE', completion: '45%' },
-  { name: 'Iron Ore Site B', meters: 1320, rigs: 1, status: 'ON_HOLD', completion: '32%' },
+  { name: 'Gold Mine Project A', meters: 3240, rigs: 2, status: 'ACTIVE', completion: '68%', color: 'blue' },
+  { name: 'Copper Exploration Site', meters: 2890, rigs: 2, status: 'ACTIVE', completion: '45%', color: 'emerald' },
+  { name: 'Iron Ore Site B', meters: 1320, rigs: 1, status: 'ON_HOLD', completion: '32%', color: 'amber' },
 ]
 
+// Recent Activity
 const recentActivity = [
-  { action: 'New drilling log submitted', project: 'Gold Mine Project A', time: '2 hours ago', user: 'John Smith' },
-  { action: 'RIG-003 activated', project: 'Copper Exploration', time: '5 hours ago', user: 'Admin' },
-  { action: 'Maintenance log added', project: 'Gold Mine Project A', time: '1 day ago', user: 'Mike Johnson' },
-  { action: 'New project created', project: 'Iron Ore Site B', time: '2 days ago', user: 'Admin' },
+  { action: 'New drilling log submitted', project: 'Gold Mine Project A', time: '2 hours ago', user: 'John Smith', type: 'drilling' },
+  { action: 'RIG-003 activated', project: 'Copper Exploration', time: '5 hours ago', user: 'Admin', type: 'rig' },
+  { action: 'Maintenance log added', project: 'Gold Mine Project A', time: '1 day ago', user: 'Mike Johnson', type: 'maintenance' },
+  { action: 'New project created', project: 'Iron Ore Site B', time: '2 days ago', user: 'Admin', type: 'project' },
 ]
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { 
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 }
+}
 
 export default function AdminDashboard() {
   const trialDays = calculateTrialDays(mockCompany.trialEndDate)
   
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-6 lg:mb-8">
-        <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-slate-600 mt-1 text-sm lg:text-base">Welcome back, {mockCompany.name}</p>
-      </div>
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-8"
+    >
+      {/* Header Section */}
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+          <p className="text-slate-400 mt-1">Welcome back, {mockCompany.name}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-slate-400">Last updated: Just now</span>
+          <button className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition">
+            <Zap className="w-5 h-5 text-[#0066FF]" />
+          </button>
+        </div>
+      </motion.div>
 
       {/* Trial Banner */}
       {trialDays > 0 && (
-        <div className="mb-6 p-3 lg:p-4 bg-blue-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Clock className="w-5 h-5 text-blue-600 flex-shrink-0" />
-            <div>
-              <p className="font-medium text-blue-900 text-sm lg:text-base">
-                Free Trial: {trialDays} days remaining
-              </p>
-              <p className="text-xs lg:text-sm text-blue-700">
-                All features unlocked until {formatDate(mockCompany.trialEndDate)}
-              </p>
+        <motion.div 
+          variants={itemVariants}
+          className="p-4 rounded-2xl bg-gradient-to-r from-[#0066FF]/20 via-[#111827] to-[#00D4AA]/10 
+                     border border-[#0066FF]/30 backdrop-blur-sm"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0066FF] to-[#00D4AA] 
+                              flex items-center justify-center shadow-[0_8px_32px_rgba(0,102,255,0.3)]">
+                <Clock className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-white">Free Trial: {trialDays} days remaining</p>
+                <p className="text-sm text-slate-400">
+                  All features unlocked until {formatDate(mockCompany.trialEndDate)}
+                </p>
+              </div>
             </div>
+            <Link
+              href="/admin/billing"
+              className="px-6 py-2.5 bg-gradient-to-r from-[#0066FF] to-[#0052CC] text-white font-semibold 
+                         rounded-xl shadow-[0_4px_20px_rgba(0,102,255,0.4)] hover:shadow-[0_8px_30px_rgba(0,102,255,0.6)]
+                         transition-all duration-300 text-center"
+            >
+              Upgrade Now
+            </Link>
           </div>
-          <Link
-            href="/admin/billing"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm text-center"
-          >
-            Upgrade Now
-          </Link>
-        </div>
+        </motion.div>
       )}
 
       {/* Overall Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-6 lg:mb-8">
-        {overallStats.map(stat => (
-          <Link
-            key={stat.label}
-            href={stat.href}
-            className="bg-white rounded-xl shadow-sm p-4 lg:p-6 hover:shadow-md transition"
-          >
-            <div className="flex items-start justify-between">
-              <div className="min-w-0">
-                <p className="text-xs lg:text-sm text-slate-600 mb-1">{stat.label}</p>
-                <p className="text-xl lg:text-3xl font-bold text-slate-900">{stat.value}</p>
-                <p className="text-xs text-slate-500 mt-1 hidden sm:block">{stat.subtext}</p>
+      <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {overallStats.map((stat, i) => (
+          <Link key={i} href={stat.href}>
+            <div className="group p-5 rounded-2xl bg-[#111827]/50 border border-[#1E293B]/50 
+                            hover:border-[#0066FF]/30 hover:bg-[#111827]/80
+                            transition-all duration-500">
+              <div className="flex items-start justify-between mb-4">
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} 
+                                flex items-center justify-center shadow-lg`}>
+                  <stat.icon className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex items-center gap-1 text-xs font-medium text-emerald-400">
+                  {stat.trend}
+                  <ArrowUpRight className="w-3 h-3" />
+                </div>
               </div>
-              <div className={`${stat.color} p-2 lg:p-3 rounded-lg flex-shrink-0`}>
-                <stat.icon className="w-4 h-4 lg:w-5 lg:h-5 text-white" />
-              </div>
+              <p className="text-3xl font-bold text-white mb-1">{stat.value}</p>
+              <p className="text-sm text-slate-400">{stat.label}</p>
+              <p className="text-xs text-slate-500 mt-1">{stat.subtext}</p>
             </div>
           </Link>
         ))}
-      </div>
+      </motion.div>
 
-      {/* PRODUCTION SNAPSHOT */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg lg:text-xl font-semibold text-slate-900 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" /> Production Snapshot
+      {/* Production Snapshot */}
+      <motion.div variants={itemVariants}>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-blue-400" />
+            </div>
+            Production Snapshot
           </h2>
-          <Link href="/admin/analytics/operation" className="text-sm text-blue-600 hover:underline">
-            View Details →
+          <Link href="/admin/analytics/operation" 
+                className="text-sm text-[#0066FF] hover:text-[#4D94FF] flex items-center gap-1 transition">
+            View Analytics <ArrowUpRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 lg:gap-4">
-          {productionKPIs.map((kpi, index) => (
-            <div key={index} className="bg-white rounded-xl shadow-sm p-3 lg:p-4">
-              <div className={`w-8 h-8 lg:w-10 lg:h-10 ${kpi.color} rounded-lg flex items-center justify-center mb-2`}>
-                <kpi.icon className="w-4 h-4 lg:w-5 lg:h-5 text-white" />
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {productionKPIs.map((kpi, i) => (
+            <div key={i} className="p-4 rounded-2xl bg-[#111827]/50 border border-[#1E293B]/50">
+              <div className={`w-10 h-10 rounded-lg bg-${kpi.color}-500/20 flex items-center justify-center mb-3`}>
+                <kpi.icon className={`w-5 h-5 text-${kpi.color}-400`} />
               </div>
-              <p className="text-lg lg:text-2xl font-bold text-slate-900">
-                {kpi.value}<span className="text-xs lg:text-sm font-normal text-slate-500">{kpi.unit}</span>
+              <p className="text-2xl font-bold text-white">
+                {kpi.value}<span className="text-sm font-normal text-slate-500 ml-1">{kpi.unit}</span>
               </p>
-              <p className="text-xs text-slate-600 truncate">{kpi.label}</p>
+              <p className="text-xs text-slate-400 mt-1">{kpi.label}</p>
               {kpi.trend && (
-                <p className={`text-xs mt-1 ${kpi.trend.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-                  {kpi.trend} vs last month
-                </p>
+                <div className={`flex items-center gap-1 mt-2 text-xs font-medium
+                  ${kpi.trendUp ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {kpi.trendUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                  {kpi.trend}
+                </div>
               )}
             </div>
           ))}
         </div>
+      </motion.div>
+
+      {/* Workforce & Maintenance */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Workforce */}
+        <motion.div variants={itemVariants} className="p-6 rounded-2xl bg-[#111827]/50 border border-[#1E293B]/50">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                <Users className="w-4 h-4 text-purple-400" />
+              </div>
+              Workforce
+            </h2>
+            <Link href="/admin/analytics/driller-crew" className="text-xs text-[#0066FF] hover:underline">
+              Details →
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {workforceKPIs.map((kpi, i) => (
+              <div key={i} className="text-center p-4 rounded-xl bg-white/5">
+                <div className={`w-12 h-12 rounded-full bg-${kpi.color}-500/20 flex items-center justify-center mx-auto mb-3`}>
+                  <kpi.icon className={`w-6 h-6 text-${kpi.color}-400`} />
+                </div>
+                <p className="text-2xl font-bold text-white">{kpi.value}</p>
+                <p className="text-xs text-slate-400 mt-1">{kpi.label}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Maintenance */}
+        <motion.div variants={itemVariants} className="p-6 rounded-2xl bg-[#111827]/50 border border-[#1E293B]/50">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Wrench className="w-4 h-4 text-amber-400" />
+              </div>
+              Maintenance
+            </h2>
+            <Link href="/admin/analytics/maintenance" className="text-xs text-[#0066FF] hover:underline">
+              Details →
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {maintenanceKPIs.map((kpi, i) => (
+              <div key={i} className="text-center p-4 rounded-xl bg-white/5">
+                <div className={`w-12 h-12 rounded-full bg-${kpi.color}-500/20 flex items-center justify-center mx-auto mb-3`}>
+                  <kpi.icon className={`w-6 h-6 text-${kpi.color}-400`} />
+                </div>
+                <p className="text-2xl font-bold text-white">{kpi.value}{kpi.unit && <span className="text-sm">{kpi.unit}</span>}</p>
+                <p className="text-xs text-slate-400 mt-1">{kpi.label}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </div>
 
-      {/* WORKFORCE & MAINTENANCE SNAPSHOTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
-        {/* Workforce Snapshot */}
-        <div className="bg-white rounded-xl shadow-sm p-4 lg:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base lg:text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Users className="w-5 h-5" /> Workforce Snapshot
+      {/* Consumables & Safety */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Consumables */}
+        <motion.div variants={itemVariants} className="p-6 rounded-2xl bg-[#111827]/50 border border-[#1E293B]/50">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                <Droplets className="w-4 h-4 text-cyan-400" />
+              </div>
+              Consumables
             </h2>
-            <Link href="/admin/analytics/driller-crew" className="text-xs text-blue-600 hover:underline">
-              View Details →
+            <Link href="/admin/analytics/consumables" className="text-xs text-[#0066FF] hover:underline">
+              Details →
             </Link>
           </div>
-          <div className="grid grid-cols-3 gap-3 lg:gap-4">
-            {workforceKPIs.map((kpi, index) => (
-              <div key={index} className="text-center p-3 lg:p-4 bg-slate-50 rounded-lg">
-                <div className={`w-10 h-10 lg:w-12 lg:h-12 ${kpi.color} rounded-full flex items-center justify-center mx-auto mb-2`}>
-                  <kpi.icon className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+          <div className="grid grid-cols-3 gap-4">
+            {consumablesKPIs.map((kpi, i) => (
+              <div key={i} className="text-center p-4 rounded-xl bg-white/5">
+                <div className={`w-12 h-12 rounded-full bg-${kpi.color}-500/20 flex items-center justify-center mx-auto mb-3`}>
+                  <kpi.icon className={`w-6 h-6 text-${kpi.color}-400`} />
                 </div>
-                <p className="text-xl lg:text-2xl font-bold text-slate-900">{kpi.value}</p>
-                <p className="text-xs text-slate-600">{kpi.label}</p>
-                <p className="text-xs text-slate-400 mt-1 hidden lg:block">{kpi.subtext}</p>
+                <p className="text-xl font-bold text-white">{kpi.value}<span className="text-xs">{kpi.unit}</span></p>
+                <p className="text-xs text-slate-400 mt-1">{kpi.label}</p>
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
 
-        {/* Maintenance Snapshot */}
-        <div className="bg-white rounded-xl shadow-sm p-4 lg:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base lg:text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Wrench className="w-5 h-5" /> Maintenance Snapshot
+        {/* Safety */}
+        <motion.div variants={itemVariants} className="p-6 rounded-2xl bg-[#111827]/50 border border-[#1E293B]/50">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                <ShieldAlert className="w-4 h-4 text-emerald-400" />
+              </div>
+              Safety & Compliance
             </h2>
-            <Link href="/admin/analytics/maintenance" className="text-xs text-blue-600 hover:underline">
-              View Details →
+            <Link href="/admin/analytics/hsc" className="text-xs text-[#0066FF] hover:underline">
+              Details →
             </Link>
           </div>
-          <div className="grid grid-cols-3 gap-3 lg:gap-4">
-            {maintenanceKPIs.map((kpi, index) => (
-              <div key={index} className="text-center p-3 lg:p-4 bg-slate-50 rounded-lg">
-                <div className={`w-10 h-10 lg:w-12 lg:h-12 ${kpi.color} rounded-full flex items-center justify-center mx-auto mb-2`}>
-                  <kpi.icon className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+          <div className="grid grid-cols-3 gap-4">
+            {safetyKPIs.map((kpi, i) => (
+              <div key={i} className="text-center p-4 rounded-xl bg-white/5">
+                <div className={`w-12 h-12 rounded-full bg-${kpi.color}-500/20 flex items-center justify-center mx-auto mb-3`}>
+                  <kpi.icon className={`w-6 h-6 text-${kpi.color}-400`} />
                 </div>
-                <p className="text-xl lg:text-2xl font-bold text-slate-900">
-                  {kpi.value}{kpi.unit && <span className="text-xs lg:text-sm font-normal text-slate-500 ml-1">{kpi.unit}</span>}
-                </p>
-                <p className="text-xs text-slate-600">{kpi.label}</p>
-                <p className="text-xs text-slate-400 mt-1 hidden lg:block">{kpi.subtext}</p>
+                <p className="text-2xl font-bold text-white">{kpi.value}</p>
+                <p className="text-xs text-slate-400 mt-1">{kpi.label}</p>
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
       </div>
 
-      {/* CONSUMABLES & SAFETY SNAPSHOTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
-        {/* Consumables Snapshot */}
-        <div className="bg-white rounded-xl shadow-sm p-4 lg:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base lg:text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Droplets className="w-5 h-5" /> Consumables Snapshot
-            </h2>
-            <Link href="/admin/analytics/consumables" className="text-xs text-blue-600 hover:underline">
-              View Details →
-            </Link>
-          </div>
-          <div className="grid grid-cols-3 gap-3 lg:gap-4">
-            {consumablesKPIs.map((kpi, index) => (
-              <div key={index} className="text-center p-3 lg:p-4 bg-slate-50 rounded-lg">
-                <div className={`w-10 h-10 lg:w-12 lg:h-12 ${kpi.color} rounded-full flex items-center justify-center mx-auto mb-2`}>
-                  <kpi.icon className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
-                </div>
-                <p className="text-lg lg:text-xl font-bold text-slate-900">
-                  {kpi.value}<span className="text-xs">{kpi.unit}</span>
-                </p>
-                <p className="text-xs text-slate-600">{kpi.label}</p>
-                {kpi.trend && (
-                  <p className={`text-xs mt-1 ${kpi.trend.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-                    {kpi.trend}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Safety Snapshot */}
-        <div className="bg-white rounded-xl shadow-sm p-4 lg:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base lg:text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5" /> Safety Snapshot
-            </h2>
-            <Link href="/admin/analytics/hsc" className="text-xs text-blue-600 hover:underline">
-              View Details →
-            </Link>
-          </div>
-          <div className="grid grid-cols-3 gap-3 lg:gap-4">
-            {safetyKPIs.map((kpi, index) => (
-              <div key={index} className="text-center p-3 lg:p-4 bg-slate-50 rounded-lg">
-                <div className={`w-10 h-10 lg:w-12 lg:h-12 ${kpi.color} rounded-full flex items-center justify-center mx-auto mb-2`}>
-                  <kpi.icon className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
-                </div>
-                <p className="text-xl lg:text-2xl font-bold text-slate-900">{kpi.value}</p>
-                <p className="text-xs text-slate-600">{kpi.label}</p>
-                <p className="text-xs text-slate-400 mt-1 hidden lg:block">{kpi.subtext}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* PROJECT BREAKDOWN */}
-      <div className="bg-white rounded-xl shadow-sm p-4 lg:p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base lg:text-lg font-semibold text-slate-900 flex items-center gap-2">
-            <MapPin className="w-5 h-5" /> Project Breakdown
+      {/* Project Breakdown */}
+      <motion.div variants={itemVariants} className="p-6 rounded-2xl bg-[#111827]/50 border border-[#1E293B]/50">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+              <MapPin className="w-4 h-4 text-indigo-400" />
+            </div>
+            Project Breakdown
           </h2>
-          <Link href="/admin/projects" className="text-sm text-blue-600 hover:underline">
-            Manage Projects →
+          <Link href="/admin/projects" className="text-sm text-[#0066FF] hover:underline">
+            Manage All →
           </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-900">Project</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-900">Status</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-900">Meters</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-900">Rigs</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-900">Progress</th>
+            <thead>
+              <tr className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <th className="pb-4">Project</th>
+                <th className="pb-4">Status</th>
+                <th className="pb-4 text-right">Meters</th>
+                <th className="pb-4 text-right">Rigs</th>
+                <th className="pb-4 text-right">Progress</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[#1E293B]/50">
               {projectBreakdown.map((project, i) => (
-                <tr key={i} className="hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-slate-900 text-sm">{project.name}</p>
+                <tr key={i} className="group hover:bg-white/5 transition">
+                  <td className="py-4">
+                    <p className="font-medium text-white">{project.name}</p>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      project.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                      project.status === 'ON_HOLD' ? 'bg-amber-100 text-amber-800' :
-                      'bg-slate-100 text-slate-800'
-                    }`}>
+                  <td className="py-4">
+                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium
+                      ${project.status === 'ACTIVE' 
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>
                       {project.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right font-medium text-slate-900">
+                  <td className="py-4 text-right font-medium text-white">
                     {project.meters.toLocaleString()} m
                   </td>
-                  <td className="px-4 py-3 text-right text-slate-600">
-                    {project.rigs}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <div className="w-16 bg-slate-200 rounded-full h-2">
+                  <td className="py-4 text-right text-slate-400">{project.rigs}</td>
+                  <td className="py-4">
+                    <div className="flex items-center justify-end gap-3">
+                      <div className="w-24 bg-[#1E293B] rounded-full h-2 overflow-hidden">
                         <div 
-                          className="bg-blue-600 h-2 rounded-full" 
+                          className={`h-full bg-gradient-to-r from-${project.color}-500 to-${project.color}-400 rounded-full`}
                           style={{ width: project.completion }}
                         />
                       </div>
-                      <span className="text-xs text-slate-600">{project.completion}</span>
+                      <span className="text-xs text-slate-400 w-10">{project.completion}</span>
                     </div>
                   </td>
                 </tr>
@@ -371,94 +424,57 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
-      </div>
+      </motion.div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-6">
-        <Link
-          href="/admin/users"
-          className="p-4 lg:p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition border border-slate-200"
-        >
-          <Users className="w-6 h-6 text-blue-600 mb-2" />
-          <p className="font-medium text-slate-900 text-sm">Add User</p>
-          <p className="text-xs text-slate-500 hidden lg:block">Create operational login</p>
-        </Link>
-        <Link
-          href="/admin/projects"
-          className="p-4 lg:p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition border border-slate-200"
-        >
-          <FolderOpen className="w-6 h-6 text-blue-600 mb-2" />
-          <p className="font-medium text-slate-900 text-sm">New Project</p>
-          <p className="text-xs text-slate-500 hidden lg:block">Set up drilling project</p>
-        </Link>
-        <Link
-          href="/admin/rigs"
-          className="p-4 lg:p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition border border-slate-200"
-        >
-          <Truck className="w-6 h-6 text-blue-600 mb-2" />
-          <p className="font-medium text-slate-900 text-sm">Activate Rig</p>
-          <p className="text-xs text-slate-500 hidden lg:block">Enable billing for rig</p>
-        </Link>
-        <Link
-          href="/admin/analytics"
-          className="p-4 lg:p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition border border-slate-200"
-        >
-          <BarChart3 className="w-6 h-6 text-blue-600 mb-2" />
-          <p className="font-medium text-slate-900 text-sm">View Analytics</p>
-          <p className="text-xs text-slate-500 hidden lg:block">Detailed reports</p>
-        </Link>
-      </div>
+      <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { icon: Users, label: 'Add User', desc: 'Create operational login', href: '/admin/users', color: 'blue' },
+          { icon: FolderOpen, label: 'New Project', desc: 'Set up drilling project', href: '/admin/projects', color: 'emerald' },
+          { icon: Truck, label: 'Activate Rig', desc: 'Enable billing for rig', href: '/admin/rigs', color: 'amber' },
+          { icon: BarChart3, label: 'View Analytics', desc: 'Detailed reports', href: '/admin/analytics', color: 'purple' },
+        ].map((action, i) => (
+          <Link key={i} href={action.href}>
+            <div className="group p-5 rounded-2xl bg-[#111827]/50 border border-[#1E293B]/50 
+                            hover:border-[#0066FF]/30 hover:bg-[#111827]/80 transition-all duration-300">
+              <div className={`w-12 h-12 rounded-xl bg-${action.color}-500/20 flex items-center justify-center mb-4
+                              group-hover:scale-110 transition-transform`}>
+                <action.icon className={`w-6 h-6 text-${action.color}-400`} />
+              </div>
+              <p className="font-medium text-white mb-1">{action.label}</p>
+              <p className="text-xs text-slate-500">{action.desc}</p>
+            </div>
+          </Link>
+        ))}
+      </motion.div>
 
       {/* Recent Activity */}
-      <div className="bg-white rounded-xl shadow-sm p-4 lg:p-6">
-        <h2 className="text-base lg:text-lg font-semibold text-slate-900 mb-4">Recent Activity</h2>
-        <div className="space-y-3 lg:space-y-4">
+      <motion.div variants={itemVariants} className="p-6 rounded-2xl bg-[#111827]/50 border border-[#1E293B]/50">
+        <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-pink-500/20 flex items-center justify-center">
+            <Brain className="w-4 h-4 text-pink-400" />
+          </div>
+          Recent Activity
+        </h2>
+        <div className="space-y-4">
           {recentActivity.map((activity, i) => (
-            <div key={i} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900">{activity.action}</p>
-                  <p className="text-xs text-slate-500 truncate">
-                    {activity.project} • {activity.user}
-                  </p>
+            <div key={i} className="flex items-center justify-between py-3 border-b border-[#1E293B]/50 last:border-0">
+              <div className="flex items-center gap-4">
+                <div className={`w-2 h-2 rounded-full ${
+                  activity.type === 'drilling' ? 'bg-blue-500' :
+                  activity.type === 'rig' ? 'bg-emerald-500' :
+                  activity.type === 'maintenance' ? 'bg-amber-500' : 'bg-purple-500'
+                }`} />
+                <div>
+                  <p className="text-sm font-medium text-white">{activity.action}</p>
+                  <p className="text-xs text-slate-500">{activity.project} • {activity.user}</p>
                 </div>
               </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-xs lg:text-sm text-slate-600">{activity.time}</p>
-              </div>
+              <span className="text-xs text-slate-500">{activity.time}</span>
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Billing Preview */}
-      <div className="mt-6 bg-white rounded-xl shadow-sm p-4 lg:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base lg:text-lg font-semibold text-slate-900">Billing Preview</h2>
-          <Link href="/admin/billing" className="text-blue-600 hover:underline text-sm">
-            View Details →
-          </Link>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-          <div className="p-3 lg:p-4 bg-slate-50 rounded-lg">
-            <p className="text-xs lg:text-sm text-slate-600">Daily Rate</p>
-            <p className="text-xl lg:text-2xl font-bold text-slate-900">${mockCompany.dailyRate}</p>
-          </div>
-          <div className="p-3 lg:p-4 bg-slate-50 rounded-lg">
-            <p className="text-xs lg:text-sm text-slate-600">Active Rig-Days</p>
-            <p className="text-xl lg:text-2xl font-bold text-slate-900">83</p>
-          </div>
-          <div className="p-3 lg:p-4 bg-slate-50 rounded-lg">
-            <p className="text-xs lg:text-sm text-slate-600">Current Month</p>
-            <p className="text-xl lg:text-2xl font-bold text-slate-900">$830</p>
-          </div>
-          <div className="p-3 lg:p-4 bg-green-50 rounded-lg">
-            <p className="text-xs lg:text-sm text-green-700">Projected (Est.)</p>
-            <p className="text-xl lg:text-2xl font-bold text-green-900">$1,240</p>
-          </div>
-        </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
