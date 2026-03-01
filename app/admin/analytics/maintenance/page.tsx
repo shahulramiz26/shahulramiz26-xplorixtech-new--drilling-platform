@@ -162,7 +162,6 @@ export default function AdminMaintenanceDashboard() {
             <select className="bg-transparent text-[#F8FAFC] text-sm outline-none">
               <option className="bg-[#1A2234]">Last 7 Days</option>
               <option className="bg-[#1A2234]">Last 30 Days</option>
-              <option className="bg-[#1A2234]">Last 90 Days</option>
             </select>
           </div>
         </div>
