@@ -10,6 +10,7 @@ import {
   Settings, 
   Truck, 
   CreditCard,
+  BarChart3,
   LogOut,
   Menu,
   X
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/admin/projects', label: 'Projects', icon: FolderOpen },
   { href: '/admin/rigs', label: 'Rigs', icon: Truck },
   { href: '/admin/billing', label: 'Billing', icon: CreditCard },
+  { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -91,7 +93,7 @@ export default function AdminLayout({
           
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {navItems.map(item => {
-              const isActive = pathname === item.href
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               return (
                 <Link
                   key={item.href}
