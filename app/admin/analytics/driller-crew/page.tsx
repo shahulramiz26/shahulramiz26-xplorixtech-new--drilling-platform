@@ -24,7 +24,7 @@ import {
   Area,
   Cell
 } from 'recharts'
-import { Users, Clock, TrendingUp, Target, Award, Filter, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { Users, Clock, TrendingUp, Award, Filter, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import AIInsights from '../../../components/AIInsights'
 
 const COLORS = {
@@ -202,12 +202,8 @@ export default function AdminDrillerCrewDashboard() {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Driller Performance - Composed Chart */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
-        >
+        {/* Driller Performance */}
+        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Driller Performance Overview</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -227,19 +223,14 @@ export default function AdminDrillerCrewDashboard() {
         </motion.div>
 
         {/* ROP vs Downtime Scatter */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
-        >
+        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">ROP vs Meters (Bubble = Downtime)</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
-                <XAxis type="number" dataKey="x" name="ROP" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} label={{ value: 'ROP (m/hr)', position: 'bottom', fill: '#64748B' }} />
-                <YAxis type="number" dataKey="y" name="Meters" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} label={{ value: 'Meters Drilled', angle: -90, position: 'insideLeft', fill: '#64748B' }} />
+                <XAxis type="number" dataKey="x" name="ROP" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
+                <YAxis type="number" dataKey="y" name="Meters" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
                 <ZAxis type="number" dataKey="z" range={[100, 500]} />
                 <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
                 <Scatter name="Drillers" data={productivityScatter} fill="#8B5CF6">
@@ -252,13 +243,8 @@ export default function AdminDrillerCrewDashboard() {
           </div>
         </motion.div>
 
-        {/* Crew Hours Trend - Area Chart */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
-        >
+        {/* Crew Hours Trend */}
+        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Crew Hours & Utilization</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -284,12 +270,7 @@ export default function AdminDrillerCrewDashboard() {
         </motion.div>
 
         {/* Shift Distribution */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
-        >
+        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Shift Distribution</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -307,12 +288,7 @@ export default function AdminDrillerCrewDashboard() {
         </motion.div>
 
         {/* Experience vs Performance */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
-        >
+        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Experience vs Average ROP</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -331,12 +307,7 @@ export default function AdminDrillerCrewDashboard() {
         </motion.div>
 
         {/* Performance Radar */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
-        >
+        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Performance Comparison (Top 2)</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
