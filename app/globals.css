@@ -7,12 +7,13 @@
   --foreground: #ffffff;
   --card: #151A27;
   --card-border: #2A3040;
+  --border: #2A3040;
   --muted: #94A3B8;
 }
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-[#2A3040];
   }
   body {
     @apply bg-[#0B0F19] text-white;
