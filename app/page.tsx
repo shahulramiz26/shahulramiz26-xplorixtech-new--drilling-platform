@@ -1,3 +1,7 @@
+"use client";
+
+export const dynamic = 'force-dynamic';
+
 import { DashboardCard } from "@/components/dashboard-card";
 import { Header } from "@/components/header";
 import { 

@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { Header } from "@/components/header";
 import { MetricCard } from "@/components/metric-card";
 import { Wrench, ClipboardList, Package, AlertTriangle } from "lucide-react";
