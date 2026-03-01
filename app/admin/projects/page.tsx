@@ -2,9 +2,41 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Plus, FolderOpen, MapPin, User, Power, PauseCircle, PlayCircle, MoreVertical, Trash2, Edit } from 'lucide-react'
+import { Plus, FolderOpen, MapPin, User, Power, PauseCircle, PlayCircle, MoreVertical, Trash2, Edit, X, ChevronRight, CheckCircle } from 'lucide-react'
 
 // Types
+interface Rig {
+  id: string
+  rigId: string
+  rigType: string
+  status: string
+}
+
+interface Driller {
+  id: string
+  name: string
+  drillerType: string
+  phone: string
+  emergencyContact: string
+}
+
+interface Supervisor {
+  id: string
+  name: string
+  supervisorType: string
+  phone: string
+  emergencyContact: string
+}
+
+interface Bit {
+  id: string
+  bitId: string
+  bitType: string
+  bitSize: string
+  manufacturer: string
+  purchasePrice: string
+}
+
 interface Project {
   id: string
   name: string
@@ -12,13 +44,13 @@ interface Project {
   status: string
   clientName: string | null
   createdAt: Date
-  rigs: number
-  drillers: number
-  supervisors: number
-  bits: number
+  rigs: Rig[]
+  drillers: Driller[]
+  supervisors: Supervisor[]
+  bits: Bit[]
 }
 
-// Mock projects
+// Mock projects with resources
 const initialProjects: Project[] = [
   {
     id: '1',
@@ -27,10 +59,21 @@ const initialProjects: Project[] = [
     status: 'ACTIVE',
     clientName: 'Golden Resources Inc.',
     createdAt: new Date('2024-01-10'),
-    rigs: 2,
-    drillers: 4,
-    supervisors: 2,
-    bits: 12
+    rigs: [
+      { id: '1', rigId: 'RIG-001', rigType: 'CORE', status: 'ACTIVE' },
+      { id: '2', rigId: 'RIG-002', rigType: 'RC', status: 'ACTIVE' }
+    ],
+    drillers: [
+      { id: '1', name: 'Mike Johnson', drillerType: 'CORE', phone: '+1-555-0101', emergencyContact: '+1-555-0102' },
+      { id: '2', name: 'David Brown', drillerType: 'RC', phone: '+1-555-0103', emergencyContact: '+1-555-0104' }
+    ],
+    supervisors: [
+      { id: '1', name: 'John Smith', supervisorType: 'CORE', phone: '+1-555-0201', emergencyContact: '+1-555-0202' }
+    ],
+    bits: [
+      { id: '1', bitId: 'BIT-001', bitType: 'SURFACE_SET', bitSize: 'HQ', manufacturer: 'Atlas Copco', purchasePrice: '2500' },
+      { id: '2', bitId: 'BIT-002', bitType: 'IMPREGNATED', bitSize: 'NQ', manufacturer: 'Boart Longyear', purchasePrice: '3200' }
+    ]
   },
   {
     id: '2',
@@ -39,10 +82,14 @@ const initialProjects: Project[] = [
     status: 'ACTIVE',
     clientName: 'CopperCorp Mining',
     createdAt: new Date('2024-01-15'),
-    rigs: 2,
-    drillers: 3,
-    supervisors: 1,
-    bits: 8
+    rigs: [
+      { id: '3', rigId: 'RIG-003', rigType: 'CORE', status: 'ACTIVE' }
+    ],
+    drillers: [
+      { id: '3', name: 'Chris Wilson', drillerType: 'CORE', phone: '+56-2-5555-0101', emergencyContact: '+56-2-5555-0102' }
+    ],
+    supervisors: [],
+    bits: []
   },
   {
     id: '3',
@@ -51,32 +98,49 @@ const initialProjects: Project[] = [
     status: 'ON_HOLD',
     clientName: 'Iron Mountain Ltd',
     createdAt: new Date('2024-02-01'),
-    rigs: 1,
-    drillers: 2,
-    supervisors: 1,
-    bits: 6
+    rigs: [],
+    drillers: [],
+    supervisors: [],
+    bits: []
   }
 ]
 
 const statusOptions = [
   { value: 'ACTIVE', label: 'Active', color: 'bg-green-100 text-green-800', icon: PlayCircle },
   { value: 'ON_HOLD', label: 'On Hold', color: 'bg-amber-100 text-amber-800', icon: PauseCircle },
-  { value: 'COMPLETED', label: 'Completed', color: 'bg-slate-100 text-slate-800', icon: Power },
+  { value: 'COMPLETED', label: 'Completed', color: 'bg-slate-100 text-slate-800', icon: CheckCircle },
   { value: 'INACTIVE', label: 'Inactive', color: 'bg-red-100 text-red-800', icon: Power }
 ]
+
+const rigTypes = ['CORE', 'RC', 'BLAST_HOLE']
+const bitTypes = ['SURFACE_SET', 'IMPREGNATED', 'PDC_CORE', 'DTH', 'TRICONE']
+const bitSizes = ['AQ', 'BQ', 'NQ', 'HQ', 'PQ', '4.5"', '5"', '5.5"', '6"', '6.5"', '8"', '9"', '12"']
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>(initialProjects)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [showResourceModal, setShowResourceModal] = useState(false)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [showStatusMenu, setShowStatusMenu] = useState<string | null>(null)
+  const [activeResourceTab, setActiveResourceTab] = useState('rigs')
   const [newProject, setNewProject] = useState({
     name: '',
     location: '',
     status: 'ACTIVE',
     clientName: ''
   })
+
+  // Resource states for "Add More" functionality
+  const [rigs, setRigs] = useState<Rig[]>([])
+  const [drillers, setDrillers] = useState<Driller[]>([])
+  const [supervisors, setSupervisors] = useState<Supervisor[]>([])
+  const [bits, setBits] = useState<Bit[]>([])
+
+  // Single item states
+  const [newRig, setNewRig] = useState({ rigId: '', rigType: 'CORE', status: 'ACTIVE' })
+  const [newDriller, setNewDriller] = useState({ name: '', drillerType: 'CORE', phone: '', emergencyContact: '' })
+  const [newSupervisor, setNewSupervisor] = useState({ name: '', supervisorType: 'CORE', phone: '', emergencyContact: '' })
+  const [newBit, setNewBit] = useState({ bitId: '', bitType: 'SURFACE_SET', bitSize: 'HQ', manufacturer: '', purchasePrice: '' })
 
   const handleCreateProject = () => {
     const project: Project = {
@@ -86,20 +150,81 @@ export default function ProjectsPage() {
       status: newProject.status,
       clientName: newProject.clientName || null,
       createdAt: new Date(),
-      rigs: 0,
-      drillers: 0,
-      supervisors: 0,
-      bits: 0
+      rigs: [],
+      drillers: [],
+      supervisors: [],
+      bits: []
     }
     setProjects([...projects, project])
     setNewProject({ name: '', location: '', status: 'ACTIVE', clientName: '' })
     setShowCreateModal(false)
+    
+    // Open resource modal for the new project
+    setSelectedProject(project)
+    setRigs([])
+    setDrillers([])
+    setSupervisors([])
+    setBits([])
+    setActiveResourceTab('rigs')
+    setShowResourceModal(true)
   }
 
-  const openProjectDetail = (project: Project) => {
+  const openResourceModal = (project: Project) => {
     setSelectedProject(project)
-    setShowDetailModal(true)
+    setRigs(project.rigs || [])
+    setDrillers(project.drillers || [])
+    setSupervisors(project.supervisors || [])
+    setBits(project.bits || [])
+    setActiveResourceTab('rigs')
+    setShowResourceModal(true)
   }
+
+  const saveResources = () => {
+    if (selectedProject) {
+      setProjects(projects.map(p => 
+        p.id === selectedProject.id 
+          ? { ...p, rigs, drillers, supervisors, bits }
+          : p
+      ))
+    }
+    setShowResourceModal(false)
+    setSelectedProject(null)
+  }
+
+  // Add More functions
+  const addRig = () => {
+    if (newRig.rigId) {
+      setRigs([...rigs, { ...newRig, id: Date.now().toString() }])
+      setNewRig({ rigId: '', rigType: 'CORE', status: 'ACTIVE' })
+    }
+  }
+
+  const addDriller = () => {
+    if (newDriller.name && newDriller.emergencyContact) {
+      setDrillers([...drillers, { ...newDriller, id: Date.now().toString() }])
+      setNewDriller({ name: '', drillerType: 'CORE', phone: '', emergencyContact: '' })
+    }
+  }
+
+  const addSupervisor = () => {
+    if (newSupervisor.name && newSupervisor.emergencyContact) {
+      setSupervisors([...supervisors, { ...newSupervisor, id: Date.now().toString() }])
+      setNewSupervisor({ name: '', supervisorType: 'CORE', phone: '', emergencyContact: '' })
+    }
+  }
+
+  const addBit = () => {
+    if (newBit.bitId && newBit.manufacturer && newBit.purchasePrice) {
+      setBits([...bits, { ...newBit, id: Date.now().toString() }])
+      setNewBit({ bitId: '', bitType: 'SURFACE_SET', bitSize: 'HQ', manufacturer: '', purchasePrice: '' })
+    }
+  }
+
+  // Remove functions
+  const removeRig = (id: string) => setRigs(rigs.filter(r => r.id !== id))
+  const removeDriller = (id: string) => setDrillers(drillers.filter(d => d.id !== id))
+  const removeSupervisor = (id: string) => setSupervisors(supervisors.filter(s => s.id !== id))
+  const removeBit = (id: string) => setBits(bits.filter(b => b.id !== id))
 
   const updateProjectStatus = (projectId: string, newStatus: string) => {
     setProjects(projects.map(p => 
@@ -151,11 +276,9 @@ export default function ProjectsPage() {
                   <FolderOpen className="w-6 h-6 text-blue-600" />
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Status Badge */}
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusConfig.color}`}>
                     {statusConfig.label}
                   </span>
-                  {/* Actions Menu */}
                   <div className="relative">
                     <button
                       onClick={() => setShowStatusMenu(showStatusMenu === project.id ? null : project.id)}
@@ -164,17 +287,11 @@ export default function ProjectsPage() {
                       <MoreVertical className="w-4 h-4 text-slate-400" />
                     </button>
                     
-                    {/* Status Dropdown */}
                     {showStatusMenu === project.id && (
                       <>
-                        <div 
-                          className="fixed inset-0 z-40" 
-                          onClick={() => setShowStatusMenu(null)}
-                        />
+                        <div className="fixed inset-0 z-40" onClick={() => setShowStatusMenu(null)} />
                         <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 z-50 py-1">
-                          <p className="px-3 py-2 text-xs font-medium text-slate-500 border-b border-slate-100">
-                            Change Status
-                          </p>
+                          <p className="px-3 py-2 text-xs font-medium text-slate-500 border-b border-slate-100">Change Status</p>
                           {statusOptions.map(option => {
                             const OptionIcon = option.icon
                             return (
@@ -187,28 +304,20 @@ export default function ProjectsPage() {
                               >
                                 <OptionIcon className="w-4 h-4" />
                                 {option.label}
-                                {project.status === option.value && (
-                                  <span className="ml-auto text-xs">✓</span>
-                                )}
+                                {project.status === option.value && <span className="ml-auto text-xs">✓</span>}
                               </button>
                             )
                           })}
                           <div className="border-t border-slate-100 mt-1 pt-1">
                             <button
-                              onClick={() => {
-                                setShowStatusMenu(null)
-                                openProjectDetail(project)
-                              }}
+                              onClick={() => { setShowStatusMenu(null); openResourceModal(project); }}
                               className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-slate-50 text-slate-700"
                             >
                               <Edit className="w-4 h-4" />
-                              Edit Project
+                              Manage Resources
                             </button>
                             <button
-                              onClick={() => {
-                                setShowStatusMenu(null)
-                                deleteProject(project.id)
-                              }}
+                              onClick={() => { setShowStatusMenu(null); deleteProject(project.id); }}
                               className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-red-50 text-red-600"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -222,7 +331,6 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
-              {/* Project Info */}
               <h3 className="text-lg font-semibold text-slate-900 mb-1">{project.name}</h3>
               <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
                 <MapPin className="w-4 h-4" />
@@ -236,69 +344,31 @@ export default function ProjectsPage() {
                 </div>
               )}
 
-              {/* Quick Status Actions */}
-              <div className="flex gap-2 mb-4">
-                {project.status === 'ACTIVE' ? (
-                  <>
-                    <button
-                      onClick={() => updateProjectStatus(project.id, 'ON_HOLD')}
-                      className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition"
-                    >
-                      <PauseCircle className="w-3 h-3" />
-                      Put on Hold
-                    </button>
-                    <button
-                      onClick={() => updateProjectStatus(project.id, 'INACTIVE')}
-                      className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition"
-                    >
-                      <Power className="w-3 h-3" />
-                      Deactivate
-                    </button>
-                  </>
-                ) : project.status === 'ON_HOLD' ? (
-                  <>
-                    <button
-                      onClick={() => updateProjectStatus(project.id, 'ACTIVE')}
-                      className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition"
-                    >
-                      <PlayCircle className="w-3 h-3" />
-                      Activate
-                    </button>
-                    <button
-                      onClick={() => updateProjectStatus(project.id, 'INACTIVE')}
-                      className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition"
-                    >
-                      <Power className="w-3 h-3" />
-                      Deactivate
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => updateProjectStatus(project.id, 'ACTIVE')}
-                    className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition"
-                  >
-                    <PlayCircle className="w-3 h-3" />
-                    Activate Project
-                  </button>
-                )}
-              </div>
+              {/* Manage Resources Button */}
+              <button
+                onClick={() => openResourceModal(project)}
+                className="w-full mb-4 flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition"
+              >
+                <Plus className="w-4 h-4" />
+                Manage Resources
+              </button>
 
               {/* Stats Grid */}
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-slate-900">{project.rigs}</p>
+                  <p className="text-2xl font-bold text-slate-900">{project.rigs.length}</p>
                   <p className="text-xs text-slate-500">Rigs</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-slate-900">{project.drillers}</p>
+                  <p className="text-2xl font-bold text-slate-900">{project.drillers.length}</p>
                   <p className="text-xs text-slate-500">Drillers</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-slate-900">{project.supervisors}</p>
+                  <p className="text-2xl font-bold text-slate-900">{project.supervisors.length}</p>
                   <p className="text-xs text-slate-500">Supervisors</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-slate-900">{project.bits}</p>
+                  <p className="text-2xl font-bold text-slate-900">{project.bits.length}</p>
                   <p className="text-xs text-slate-500">Bits</p>
                 </div>
               </div>
@@ -312,34 +382,31 @@ export default function ProjectsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
             <h2 className="text-xl font-bold text-slate-900 mb-4">Create New Project</h2>
-            
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Project Name *</label>
                 <input
                   type="text"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={newProject.name}
                   onChange={e => setNewProject({...newProject, name: e.target.value})}
                   placeholder="Enter project name"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Location *</label>
                 <input
                   type="text"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={newProject.location}
                   onChange={e => setNewProject({...newProject, location: e.target.value})}
                   placeholder="Enter location"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Status</label>
                 <select
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={newProject.status}
                   onChange={e => setNewProject({...newProject, status: e.target.value})}
                 >
@@ -349,19 +416,17 @@ export default function ProjectsPage() {
                   <option value="INACTIVE">Inactive</option>
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Client Name (Optional)</label>
                 <input
                   type="text"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={newProject.clientName}
                   onChange={e => setNewProject({...newProject, clientName: e.target.value})}
                   placeholder="Enter client name"
                 />
               </div>
             </div>
-
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowCreateModal(false)}
@@ -374,42 +439,390 @@ export default function ProjectsPage() {
                 disabled={!newProject.name || !newProject.location}
                 className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition"
               >
-                Create Project
+                Create & Add Resources
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Project Detail Modal */}
-      {showDetailModal && selectedProject && (
+      {/* Resource Management Modal */}
+      {showResourceModal && selectedProject && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-auto">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900">{selectedProject.name}</h2>
-                <p className="text-slate-600 flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  {selectedProject.location}
-                </p>
+                <h2 className="text-xl font-bold text-slate-900">Manage Resources</h2>
+                <p className="text-slate-600">{selectedProject.name} - {selectedProject.location}</p>
               </div>
-              <button
-                onClick={() => setShowDetailModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={() => setShowResourceModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="bg-slate-50 rounded-lg p-8 text-center">
-              <p className="text-slate-500">
-                Resource management would open here with forms for Rigs, Drillers, Supervisors, and Bits.
-              </p>
-              <p className="text-sm text-slate-400 mt-2">
-                (Full implementation in production version)
-              </p>
+            {/* Resource Tabs */}
+            <div className="p-6">
+              <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-200">
+                {[
+                  { id: 'rigs', label: `Rigs (${rigs.length})`, icon: '🔧' },
+                  { id: 'drillers', label: `Drillers (${drillers.length})`, icon: '👷' },
+                  { id: 'supervisors', label: `Supervisors (${supervisors.length})`, icon: '👔' },
+                  { id: 'bits', label: `Bits (${bits.length})`, icon: '⚙️' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveResourceTab(tab.id)}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
+                      activeResourceTab === tab.id
+                        ? 'border-blue-600 text-blue-600'
+                        : 'border-transparent text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {tab.icon} {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Rigs Tab */}
+              {activeResourceTab === 'rigs' && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-slate-900">Add Rigs</h3>
+                  
+                  {/* Add Rig Form */}
+                  <div className="bg-slate-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Rig ID *</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newRig.rigId}
+                          onChange={e => setNewRig({...newRig, rigId: e.target.value})}
+                          placeholder="e.g., RIG-001"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Rig Type *</label>
+                        <select
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newRig.rigType}
+                          onChange={e => setNewRig({...newRig, rigType: e.target.value})}
+                        >
+                          {rigTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                        <select
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newRig.status}
+                          onChange={e => setNewRig({...newRig, status: e.target.value})}
+                        >
+                          <option value="ACTIVE">Active</option>
+                          <option value="INACTIVE">Inactive</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button
+                      onClick={addRig}
+                      disabled={!newRig.rigId}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Another Rig
+                    </button>
+                  </div>
+
+                  {/* Added Rigs List */}
+                  {rigs.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-slate-900">Added Rigs ({rigs.length})</h4>
+                      {rigs.map(rig => (
+                        <div key={rig.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg">
+                          <div className="flex items-center gap-4">
+                            <span className="font-mono font-medium">{rig.rigId}</span>
+                            <span className="text-sm text-slate-600">{rig.rigType}</span>
+                            <span className={`text-xs px-2 py-1 rounded-full ${rig.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'}`}>
+                              {rig.status}
+                            </span>
+                          </div>
+                          <button onClick={() => removeRig(rig.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Drillers Tab */}
+              {activeResourceTab === 'drillers' && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-slate-900">Add Drillers</h3>
+                  
+                  <div className="bg-slate-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newDriller.name}
+                          onChange={e => setNewDriller({...newDriller, name: e.target.value})}
+                          placeholder="Full name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Driller Type *</label>
+                        <select
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newDriller.drillerType}
+                          onChange={e => setNewDriller({...newDriller, drillerType: e.target.value})}
+                        >
+                          {rigTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+                        <input
+                          type="tel"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newDriller.phone}
+                          onChange={e => setNewDriller({...newDriller, phone: e.target.value})}
+                          placeholder="Phone number"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Emergency Contact *</label>
+                        <input
+                          type="tel"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newDriller.emergencyContact}
+                          onChange={e => setNewDriller({...newDriller, emergencyContact: e.target.value})}
+                          placeholder="Emergency contact number"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={addDriller}
+                      disabled={!newDriller.name || !newDriller.emergencyContact}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Another Driller
+                    </button>
+                  </div>
+
+                  {drillers.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-slate-900">Added Drillers ({drillers.length})</h4>
+                      {drillers.map(driller => (
+                        <div key={driller.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg">
+                          <div>
+                            <span className="font-medium">{driller.name}</span>
+                            <span className="text-sm text-slate-600 ml-3">{driller.drillerType}</span>
+                            <div className="text-xs text-slate-500 mt-1">
+                              📞 {driller.phone} | 🚨 {driller.emergencyContact}
+                            </div>
+                          </div>
+                          <button onClick={() => removeDriller(driller.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Supervisors Tab */}
+              {activeResourceTab === 'supervisors' && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-slate-900">Add Supervisors</h3>
+                  
+                  <div className="bg-slate-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newSupervisor.name}
+                          onChange={e => setNewSupervisor({...newSupervisor, name: e.target.value})}
+                          placeholder="Full name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Supervisor Type *</label>
+                        <select
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newSupervisor.supervisorType}
+                          onChange={e => setNewSupervisor({...newSupervisor, supervisorType: e.target.value})}
+                        >
+                          {rigTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+                        <input
+                          type="tel"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newSupervisor.phone}
+                          onChange={e => setNewSupervisor({...newSupervisor, phone: e.target.value})}
+                          placeholder="Phone number"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Emergency Contact *</label>
+                        <input
+                          type="tel"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newSupervisor.emergencyContact}
+                          onChange={e => setNewSupervisor({...newSupervisor, emergencyContact: e.target.value})}
+                          placeholder="Emergency contact number"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={addSupervisor}
+                      disabled={!newSupervisor.name || !newSupervisor.emergencyContact}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Another Supervisor
+                    </button>
+                  </div>
+
+                  {supervisors.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-slate-900">Added Supervisors ({supervisors.length})</h4>
+                      {supervisors.map(supervisor => (
+                        <div key={supervisor.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg">
+                          <div>
+                            <span className="font-medium">{supervisor.name}</span>
+                            <span className="text-sm text-slate-600 ml-3">{supervisor.supervisorType}</span>
+                            <div className="text-xs text-slate-500 mt-1">
+                              📞 {supervisor.phone} | 🚨 {supervisor.emergencyContact}
+                            </div>
+                          </div>
+                          <button onClick={() => removeSupervisor(supervisor.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Bits Tab */}
+              {activeResourceTab === 'bits' && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-slate-900">Add Bits</h3>
+                  
+                  <div className="bg-slate-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Bit ID *</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newBit.bitId}
+                          onChange={e => setNewBit({...newBit, bitId: e.target.value})}
+                          placeholder="e.g., BIT-001"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Bit Type</label>
+                        <select
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newBit.bitType}
+                          onChange={e => setNewBit({...newBit, bitType: e.target.value})}
+                        >
+                          {bitTypes.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Bit Size</label>
+                        <select
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newBit.bitSize}
+                          onChange={e => setNewBit({...newBit, bitSize: e.target.value})}
+                        >
+                          {bitSizes.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Manufacturer *</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newBit.manufacturer}
+                          onChange={e => setNewBit({...newBit, manufacturer: e.target.value})}
+                          placeholder="e.g., Atlas Copco"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Purchase Price * ($)</label>
+                        <input
+                          type="number"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          value={newBit.purchasePrice}
+                          onChange={e => setNewBit({...newBit, purchasePrice: e.target.value})}
+                          placeholder="Enter price in USD"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={addBit}
+                      disabled={!newBit.bitId || !newBit.manufacturer || !newBit.purchasePrice}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Another Bit
+                    </button>
+                  </div>
+
+                  {bits.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-slate-900">Added Bits ({bits.length})</h4>
+                      {bits.map(bit => (
+                        <div key={bit.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg">
+                          <div>
+                            <span className="font-mono font-medium">{bit.bitId}</span>
+                            <span className="text-sm text-slate-600 ml-3">{bit.bitType.replace(/_/g, ' ')}</span>
+                            <span className="text-sm text-slate-500 ml-3">{bit.bitSize}</span>
+                            <div className="text-xs text-slate-500 mt-1">
+                              🏭 {bit.manufacturer} | 💰 ${bit.purchasePrice}
+                            </div>
+                          </div>
+                          <button onClick={() => removeBit(bit.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3 sticky bottom-0 bg-white">
+              <button
+                onClick={() => setShowResourceModal(false)}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveResources}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+              >
+                Save All Resources
+              </button>
             </div>
           </div>
         </div>
