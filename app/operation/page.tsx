@@ -1,3 +1,5 @@
+"use client";
+
 import { Header } from "@/components/header";
 import { MetricCard } from "@/components/metric-card";
 import { TrendingUp, Clock, Zap, Activity } from "lucide-react";

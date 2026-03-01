@@ -1,3 +1,5 @@
+"use client";
+
 import { Header } from "@/components/header";
 import { MetricCard } from "@/components/metric-card";
 import { Wrench, ClipboardList, Package, AlertTriangle } from "lucide-react";

@@ -1,3 +1,5 @@
+"use client";
+
 import { Header } from "@/components/header";
 import { MetricCard } from "@/components/metric-card";
 import { ShieldCheck, AlertTriangle, FileCheck, Users } from "lucide-react";
