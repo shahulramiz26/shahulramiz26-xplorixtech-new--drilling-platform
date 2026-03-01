@@ -21,7 +21,8 @@ import {
   Scatter,
   ZAxis,
   ComposedChart,
-  Area
+  Area,
+  Cell
 } from 'recharts'
 import { Users, Clock, TrendingUp, Target, Award, Filter, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import AIInsights from '../../../components/AIInsights'
