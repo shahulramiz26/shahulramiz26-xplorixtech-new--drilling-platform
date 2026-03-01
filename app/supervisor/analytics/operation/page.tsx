@@ -3,7 +3,6 @@
 import { motion } from "framer-motion";
 import { TrendingUp, Clock, Zap, Activity, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { PerformanceChart } from "@/app/components/PremiumCharts";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -23,16 +22,6 @@ const metrics = [
   { title: "Motor Efficiency", value: "87.5", unit: "%", icon: Zap, trend: "up", change: "+3%" },
   { title: "Downtime", value: "2.4", unit: "hrs", icon: Clock, trend: "down", change: "-18%" },
   { title: "Active Rigs", value: "12", unit: "units", icon: Activity, trend: "up", change: "+2" },
-];
-
-const performanceData = [
-  { name: "Mon", efficiency: 82, target: 85 },
-  { name: "Tue", efficiency: 88, target: 85 },
-  { name: "Wed", efficiency: 91, target: 85 },
-  { name: "Thu", efficiency: 85, target: 85 },
-  { name: "Fri", efficiency: 89, target: 85 },
-  { name: "Sat", efficiency: 87, target: 85 },
-  { name: "Sun", efficiency: 90, target: 85 },
 ];
 
 function MetricCard({ title, value, unit, icon: Icon, trend, change }: any) {
@@ -71,7 +60,7 @@ export default function SupervisorOperationPage() {
       {/* Header */}
       <motion.div variants={itemVariants} className="flex items-center gap-4">
         <Link
-          href="/supervisor/dashboard"
+          href="/supervisor/analytics"
           className="p-2 rounded-lg bg-[#151A27] border border-[#2A3040] hover:bg-[#1E2535] transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -89,17 +78,11 @@ export default function SupervisorOperationPage() {
         ))}
       </motion.div>
 
-      {/* Charts */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-[#151A27] rounded-xl border border-[#2A3040] p-6">
-          <h3 className="text-lg font-semibold mb-4">Drilling Efficiency</h3>
-          <PerformanceChart data={performanceData} />
-        </div>
-        <div className="bg-[#151A27] rounded-xl border border-[#2A3040] p-6">
-          <h3 className="text-lg font-semibold mb-4">Motor Performance</h3>
-          <div className="h-[300px] flex items-center justify-center text-[#94A3B8]">
-            Motor performance metrics will be displayed here
-          </div>
+      {/* Chart Placeholder */}
+      <motion.div variants={itemVariants} className="bg-[#151A27] rounded-xl border border-[#2A3040] p-6">
+        <h3 className="text-lg font-semibold mb-4">Drilling Efficiency</h3>
+        <div className="h-[300px] flex items-center justify-center text-[#94A3B8]">
+          <p>Drilling efficiency chart will be displayed here</p>
         </div>
       </motion.div>
     </motion.div>

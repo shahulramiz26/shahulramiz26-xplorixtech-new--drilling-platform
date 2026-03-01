@@ -3,7 +3,6 @@
 import { motion } from "framer-motion";
 import { Flame, Package, TrendingDown, DollarSign, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { ConsumptionChart } from "@/app/components/PremiumCharts";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -23,15 +22,6 @@ const metrics = [
   { title: "Inventory Level", value: "8,320", unit: "units", icon: Package, trend: "down", change: "-5%" },
   { title: "Low Stock Items", value: "18", unit: "items", icon: TrendingDown, trend: "up", change: "+3" },
   { title: "Cost This Month", value: "$45.2K", unit: "USD", icon: DollarSign, trend: "up", change: "+8%" },
-];
-
-const consumptionData = [
-  { month: "Jan", consumption: 2100, budget: 2000 },
-  { month: "Feb", consumption: 2200, budget: 2100 },
-  { month: "Mar", consumption: 2450, budget: 2300 },
-  { month: "Apr", consumption: 1800, budget: 2000 },
-  { month: "May", consumption: 1950, budget: 2000 },
-  { month: "Jun", consumption: 2100, budget: 2100 },
 ];
 
 const consumables = [
@@ -79,7 +69,7 @@ export default function SupervisorConsumablesPage() {
       {/* Header */}
       <motion.div variants={itemVariants} className="flex items-center gap-4">
         <Link
-          href="/supervisor/dashboard"
+          href="/supervisor/analytics"
           className="p-2 rounded-lg bg-[#151A27] border border-[#2A3040] hover:bg-[#1E2535] transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -97,42 +87,36 @@ export default function SupervisorConsumablesPage() {
         ))}
       </motion.div>
 
-      {/* Charts */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-[#151A27] rounded-xl border border-[#2A3040] p-6">
-          <h3 className="text-lg font-semibold mb-4">Consumption vs Budget</h3>
-          <ConsumptionChart data={consumptionData} />
-        </div>
-        <div className="bg-[#151A27] rounded-xl border border-[#2A3040] p-6">
-          <h3 className="text-lg font-semibold mb-4">Resource Inventory</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[#2A3040]">
-                  <th className="text-left py-3 px-2 text-[#94A3B8] text-sm">Item</th>
-                  <th className="text-left py-3 px-2 text-[#94A3B8] text-sm">Stock</th>
-                  <th className="text-left py-3 px-2 text-[#94A3B8] text-sm">Status</th>
+      {/* Inventory Table */}
+      <motion.div variants={itemVariants} className="bg-[#151A27] rounded-xl border border-[#2A3040] p-6">
+        <h3 className="text-lg font-semibold mb-4">Resource Inventory</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#2A3040]">
+                <th className="text-left py-3 px-2 text-[#94A3B8] text-sm">Item</th>
+                <th className="text-left py-3 px-2 text-[#94A3B8] text-sm">Stock</th>
+                <th className="text-left py-3 px-2 text-[#94A3B8] text-sm">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {consumables.map((item) => (
+                <tr key={item.id} className="border-b border-[#2A3040]/50">
+                  <td className="py-3 px-2 text-sm">{item.name}</td>
+                  <td className="py-3 px-2 text-sm">{item.stock}</td>
+                  <td className="py-3 px-2">
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      item.status === "Good" ? "bg-emerald-500/20 text-emerald-400" :
+                      item.status === "Low" ? "bg-amber-500/20 text-amber-400" :
+                      "bg-red-500/20 text-red-400"
+                    }`}>
+                      {item.status}
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {consumables.map((item) => (
-                  <tr key={item.id} className="border-b border-[#2A3040]/50">
-                    <td className="py-3 px-2 text-sm">{item.name}</td>
-                    <td className="py-3 px-2 text-sm">{item.stock}</td>
-                    <td className="py-3 px-2">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        item.status === "Good" ? "bg-emerald-500/20 text-emerald-400" :
-                        item.status === "Low" ? "bg-amber-500/20 text-amber-400" :
-                        "bg-red-500/20 text-red-400"
-                      }`}>
-                        {item.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       </motion.div>
     </motion.div>
