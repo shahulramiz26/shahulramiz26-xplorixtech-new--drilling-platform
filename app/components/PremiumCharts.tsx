@@ -1,312 +1,273 @@
-'use client'
+"use client";
 
+import React from "react";
 import {
   LineChart,
   Line,
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
+  Legend,
   PieChart,
   Pie,
   Cell,
-  Area,
-  AreaChart,
-  ComposedChart,
-  ReferenceLine
-} from 'recharts'
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+} from "recharts";
+import { motion } from "framer-motion";
 
-// Premium color palette
+// Color palette matching the dark theme
 const COLORS = {
-  primary: '#0066FF',
-  accent: '#00D4AA',
-  purple: '#7B61FF',
-  warning: '#FF9500',
-  danger: '#FF3B30',
-  cyan: '#00C7FF',
-  pink: '#FF6B9D',
-  slate: '#64748B'
-}
+  primary: "#3B82F6",
+  accent: "#F59E0B",
+  purple: "#8B5CF6",
+  warning: "#EF4444",
+  danger: "#DC2626",
+  cyan: "#06B6D4",
+  pink: "#EC4899",
+  slate: "#64748B",
+  emerald: "#10B981",
+};
 
-const CHART_COLORS = [
-  COLORS.primary,
-  COLORS.accent,
-  COLORS.purple,
-  COLORS.warning,
-  COLORS.cyan,
-  COLORS.pink
-]
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
 
-// Custom Tooltip Component
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: "easeOut",
+    },
+  },
+};
+
+// Custom tooltip component
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#111827]/95 backdrop-blur-xl border border-[#1E293B] rounded-xl p-4 shadow-[0_16px_64px_rgba(0,0,0,0.5)]">
-        <p className="text-slate-400 text-sm mb-2">{label}</p>
+      <div className="bg-[#1E2535] border border-[#2A3040] rounded-lg p-3 shadow-xl">
+        <p className="text-white font-medium mb-2">{label}</p>
         {payload.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-2 mb-1 last:mb-0">
-            <div 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: entry.color }}
-            />
-            <span className="text-white font-medium">{entry.name}:</span>
-            <span className="text-white font-bold">{entry.value}</span>
-          </div>
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {entry.name}: {entry.value}
+            {entry.name.includes("Hours") ? " hrs" : entry.name.includes("Rate") ? "%" : ""}
+          </p>
         ))}
       </div>
-    )
+    );
   }
-  return null
-}
+  return null;
+};
 
-// Premium Line Chart
-export function PremiumLineChart({ data, dataKey, name, color = 'primary', showArea = true }: any) {
-  const chartColor = COLORS[color as keyof typeof COLORS] || COLORS.primary
-  
+// Performance Line Chart
+export function PerformanceChart({ data }: { data: any[] }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-        <defs>
-          <linearGradient id={`gradient-${color}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={chartColor} stopOpacity={0.3}/>
-            <stop offset="95%" stopColor={chartColor} stopOpacity={0}/>
-          </linearGradient>
-        </defs>
-        <CartesianGrid 
-          strokeDasharray="3 3" 
-          stroke="#1E293B" 
-          vertical={false}
-        />
-        <XAxis 
-          dataKey="date" 
-          stroke="#64748B" 
-          tick={{ fill: '#64748B', fontSize: 12 }}
-          tickLine={false}
-          axisLine={{ stroke: '#1E293B' }}
-        />
-        <YAxis 
-          stroke="#64748B" 
-          tick={{ fill: '#64748B', fontSize: 12 }}
-          tickLine={false}
-          axisLine={{ stroke: '#1E293B' }}
-        />
-        <Tooltip content={<CustomTooltip />} />
-        {showArea && (
-          <Area 
-            type="monotone" 
-            dataKey={dataKey} 
-            stroke={chartColor}
+    <motion.div
+      variants={itemVariants}
+      className="w-full h-[300px]"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#2A3040" />
+          <XAxis dataKey="name" stroke="#64748B" fontSize={12} />
+          <YAxis stroke="#64748B" fontSize={12} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend />
+          <Line
+            type="monotone"
+            dataKey="efficiency"
+            name="Efficiency %"
+            stroke={COLORS.primary}
             strokeWidth={3}
-            fill={`url(#gradient-${color})`}
+            dot={{ fill: COLORS.primary, strokeWidth: 2 }}
+            activeDot={{ r: 6 }}
           />
-        )}
-        <Line 
-          type="monotone" 
-          dataKey={dataKey} 
-          stroke={chartColor}
-          strokeWidth={3}
-          dot={{ fill: chartColor, strokeWidth: 2, r: 4 }}
-          activeDot={{ r: 6, stroke: chartColor, strokeWidth: 2, fill: '#fff' }}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
-  )
-}
-
-// Premium Bar Chart
-export function PremiumBarChart({ data, dataKeys, stacked = false, horizontal = false }: any) {
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart 
-        data={data} 
-        margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-        layout={horizontal ? 'vertical' : 'horizontal'}
-      >
-        <CartesianGrid 
-          strokeDasharray="3 3" 
-          stroke="#1E293B" 
-          horizontal={!horizontal}
-          vertical={horizontal}
-        />
-        <XAxis 
-          dataKey={horizontal ? undefined : "date"} 
-          type={horizontal ? 'number' : 'category'}
-          stroke="#64748B" 
-          tick={{ fill: '#64748B', fontSize: 12 }}
-          tickLine={false}
-          axisLine={{ stroke: '#1E293B' }}
-        />
-        <YAxis 
-          dataKey={horizontal ? "reason" : undefined}
-          type={horizontal ? 'category' : 'number'}
-          stroke="#64748B" 
-          tick={{ fill: '#64748B', fontSize: 12 }}
-          tickLine={false}
-          axisLine={{ stroke: '#1E293B' }}
-          width={horizontal ? 100 : undefined}
-        />
-        <Tooltip content={<CustomTooltip />} />
-        <Legend 
-          wrapperStyle={{ paddingTop: '20px' }}
-          iconType="circle"
-        />
-        {dataKeys.map((key: any, index: number) => (
-          <Bar 
-            key={key.key}
-            dataKey={key.key} 
-            name={key.name}
-            fill={CHART_COLORS[index % CHART_COLORS.length]}
-            radius={[4, 4, 0, 0]}
-            stackId={stacked ? 'stack' : undefined}
+          <Line
+            type="monotone"
+            dataKey="target"
+            name="Target %"
+            stroke={COLORS.emerald}
+            strokeWidth={2}
+            strokeDasharray="5 5"
+            dot={false}
           />
-        ))}
-      </BarChart>
-    </ResponsiveContainer>
-  )
+        </LineChart>
+      </ResponsiveContainer>
+    </motion.div>
+  );
 }
 
-// Premium Pie Chart
-export function PremiumPieChart({ data }: any) {
+// Drilling Activity Bar Chart
+export function DrillingActivityChart({ data }: { data: any[] }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie
-          data={data}
-          cx="50%"
-          cy="50%"
-          innerRadius={60}
-          outerRadius={80}
-          paddingAngle={5}
-          dataKey="value"
-        >
-          {data.map((entry: any, index: number) => (
-            <Cell 
-              key={`cell-${index}`} 
-              fill={CHART_COLORS[index % CHART_COLORS.length]}
-              stroke="#111827"
-              strokeWidth={2}
-            />
-          ))}
-        </Pie>
-        <Tooltip content={<CustomTooltip />} />
-        <Legend 
-          verticalAlign="bottom" 
-          height={36}
-          iconType="circle"
-          wrapperStyle={{ paddingTop: '20px' }}
-        />
-      </PieChart>
-    </ResponsiveContainer>
-  )
+    <motion.div
+      variants={itemVariants}
+      className="w-full h-[300px]"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#2A3040" />
+          <XAxis dataKey="day" stroke="#64748B" fontSize={12} />
+          <YAxis stroke="#64748B" fontSize={12} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend />
+          <Bar dataKey="drilling" name="Drilling Hours" fill={COLORS.emerald} radius={[4, 4, 0, 0]} />
+          <Bar dataKey="downtime" name="Downtime" fill={COLORS.danger} radius={[4, 4, 0, 0]} />
+          <Line
+            type="monotone"
+            dataKey="efficiency"
+            name="Efficiency %"
+            stroke={COLORS.primary}
+            strokeWidth={2}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </motion.div>
+  );
 }
 
-// Premium Composed Chart (Mixed)
-export function PremiumComposedChart({ data }: any) {
+// Consumption Area Chart
+export function ConsumptionChart({ data }: { data: any[] }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
-        <XAxis 
-          dataKey="date" 
-          stroke="#64748B" 
-          tick={{ fill: '#64748B', fontSize: 12 }}
-          tickLine={false}
-        />
-        <YAxis 
-          stroke="#64748B" 
-          tick={{ fill: '#64748B', fontSize: 12 }}
-          tickLine={false}
-        />
-        <Tooltip content={<CustomTooltip />} />
-        <Legend />
-        <Bar dataKey="drilling" name="Drilling Hours" fill={COLORS.emerald} radius={[4, 4, 0, 0]} />
-        <Bar dataKey="downtime" name="Downtime" fill={COLORS.danger} radius={[4, 4, 0, 0]} />
-        <Line 
-          type="monotone" 
-          dataKey="efficiency" 
-          name="Efficiency %" 
-          stroke={COLORS.primary}
-          strokeWidth={3}
-          dot={{ fill: COLORS.primary, r: 4 }}
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
-  )
+    <motion.div
+      variants={itemVariants}
+      className="w-full h-[300px]"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#2A3040" />
+          <XAxis dataKey="month" stroke="#64748B" fontSize={12} />
+          <YAxis stroke="#64748B" fontSize={12} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend />
+          <Area
+            type="monotone"
+            dataKey="consumption"
+            name="Consumption"
+            stroke={COLORS.purple}
+            fill={COLORS.purple}
+            fillOpacity={0.3}
+          />
+          <Area
+            type="monotone"
+            dataKey="budget"
+            name="Budget"
+            stroke={COLORS.accent}
+            fill={COLORS.accent}
+            fillOpacity={0.1}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </motion.div>
+  );
 }
 
-// KPI Card Component
-export function KPICard({ title, value, unit, icon: Icon, color, trend, trendUp, subtext }: any) {
-  const colorClasses: any = {
-    blue: 'from-blue-500/20 to-blue-500/5 text-blue-400',
-    emerald: 'from-emerald-500/20 to-emerald-500/5 text-emerald-400',
-    red: 'from-red-500/20 to-red-500/5 text-red-400',
-    purple: 'from-purple-500/20 to-purple-500/5 text-purple-400',
-    cyan: 'from-cyan-500/20 to-cyan-500/5 text-cyan-400',
-    amber: 'from-amber-500/20 to-amber-500/5 text-amber-400',
-  }
-  
+// Safety Pie Chart
+export function SafetyChart({ data }: { data: any[] }) {
   return (
-    <div className="p-5 rounded-2xl bg-gradient-to-br from-[#111827] to-[#0D1320] 
-                    border border-[#1E293B]/50 hover:border-[#0066FF]/30 
-                    transition-all duration-500 group">
-      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${colorClasses[color]} 
-                      flex items-center justify-center mb-4
-                      group-hover:scale-110 transition-transform duration-300`}>
-        <Icon className="w-6 h-6" />
-      </div>
-      <div className="flex items-baseline gap-2">
-        <span className="text-3xl font-bold text-white">{value}</span>
-        {unit && <span className="text-sm text-slate-500">{unit}</span>}
-      </div>
-      <p className="text-sm text-slate-400 mt-1">{title}</p>
-      {trend && (
-        <div className={`flex items-center gap-1 mt-3 text-sm font-medium
-          ${trendUp ? 'text-emerald-400' : 'text-red-400'}`}>
-          {trendUp ? (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l5-5 5 5M12 12V3" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 7l-5 5-5-5M12 12V3" />
-            </svg>
-          )}
-          {trend}
-        </div>
-      )}
-      {subtext && <p className="text-xs text-slate-500 mt-2">{subtext}</p>}
-    </div>
-  )
+    <motion.div
+      variants={itemVariants}
+      className="w-full h-[300px]"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={100}
+            paddingAngle={5}
+            dataKey="value"
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip content={<CustomTooltip />} />
+          <Legend />
+        </PieChart>
+      </ResponsiveContainer>
+    </motion.div>
+  );
 }
 
-// Stat Card with Trend
-export function StatCard({ label, value, subtext, icon: Icon, color, trend, href }: any) {
+// Crew Performance Radar Chart
+export function CrewPerformanceChart({ data }: { data: any[] }) {
   return (
-    <div className="group p-6 rounded-2xl bg-gradient-to-br from-[#111827] to-[#0D1320] 
-                    border border-[#1E293B]/50 hover:border-[#0066FF]/30 
-                    transition-all duration-500 cursor-pointer">
-      <div className="flex items-start justify-between mb-4">
-        <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${color} 
-                        flex items-center justify-center shadow-lg
-                        group-hover:scale-110 transition-transform duration-300`}>
-          <Icon className="w-7 h-7 text-white" />
-        </div>
-        {trend && (
-          <div className="flex items-center gap-1 text-sm font-medium text-emerald-400">
-            {trend}
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l5-5 5 5M12 12V3" />
-            </svg>
-          </div>
-        )}
-      </div>
-      <p className="text-3xl font-bold text-white mb-1">{value}</p>
-      <p className="text-sm text-slate-400">{label}</p>
-      <p className="text-xs text-slate-500 mt-2">{subtext}</p>
-    </div>
-  )
+    <motion.div
+      variants={itemVariants}
+      className="w-full h-[300px]"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
+          <PolarGrid stroke="#2A3040" />
+          <PolarAngleAxis dataKey="subject" stroke="#64748B" fontSize={12} />
+          <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="#64748B" />
+          <Radar
+            name="Current"
+            dataKey="A"
+            stroke={COLORS.primary}
+            fill={COLORS.primary}
+            fillOpacity={0.3}
+          />
+          <Radar
+            name="Target"
+            dataKey="B"
+            stroke={COLORS.emerald}
+            fill={COLORS.emerald}
+            fillOpacity={0.1}
+          />
+          <Legend />
+          <Tooltip content={<CustomTooltip />} />
+        </RadarChart>
+      </ResponsiveContainer>
+    </motion.div>
+  );
 }
+
+// Maintenance Timeline Chart
+export function MaintenanceTimelineChart({ data }: { data: any[] }) {
+  return (
+    <motion.div
+      variants={itemVariants}
+      className="w-full h-[300px]"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} layout="vertical">
+          <CartesianGrid strokeDasharray="3 3" stroke="#2A3040" />
+          <XAxis type="number" stroke="#64748B" fontSize={12} />
+          <YAxis dataKey="equipment" type="category" stroke="#64748B" fontSize={12} width={100} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend />
+          <Bar dataKey="completed" name="Completed" stackId="a" fill={COLORS.emerald} radius={[0, 4, 4, 0]} />
+          <Bar dataKey="pending" name="Pending" stackId="a" fill={COLORS.accent} radius={[0, 4, 4, 0]} />
+          <Bar dataKey="overdue" name="Overdue" stackId="a" fill={COLORS.danger} radius={[0, 4, 4, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </motion.div>
+  );
+}
+
+// Export animation variants for use in parent components
+export { containerVariants, itemVariants };
