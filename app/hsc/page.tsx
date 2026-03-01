@@ -8,7 +8,7 @@ const metrics = [
     value: "96.8",
     unit: "%",
     change: "+1.2%",
-    trend: "up",
+    trend: "up" as const,
     icon: ShieldCheck,
   },
   {
@@ -16,7 +16,7 @@ const metrics = [
     value: "0",
     unit: "this month",
     change: "-2",
-    trend: "down",
+    trend: "down" as const,
     icon: AlertTriangle,
   },
   {
@@ -24,7 +24,7 @@ const metrics = [
     value: "12",
     unit: "audits",
     change: "+1",
-    trend: "up",
+    trend: "up" as const,
     icon: FileCheck,
   },
   {
@@ -32,7 +32,7 @@ const metrics = [
     value: "94",
     unit: "%",
     change: "+4%",
-    trend: "up",
+    trend: "up" as const,
     icon: Users,
   },
 ];

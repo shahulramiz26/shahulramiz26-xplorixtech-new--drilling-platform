@@ -8,7 +8,7 @@ const metrics = [
     value: "45.2",
     unit: "ft/hr",
     change: "+12%",
-    trend: "up",
+    trend: "up" as const,
     icon: TrendingUp,
   },
   {
@@ -16,7 +16,7 @@ const metrics = [
     value: "87.5",
     unit: "%",
     change: "+3%",
-    trend: "up",
+    trend: "up" as const,
     icon: Zap,
   },
   {
@@ -24,7 +24,7 @@ const metrics = [
     value: "2.4",
     unit: "hrs",
     change: "-18%",
-    trend: "down",
+    trend: "down" as const,
     icon: Clock,
   },
   {
@@ -32,7 +32,7 @@ const metrics = [
     value: "12",
     unit: "units",
     change: "+2",
-    trend: "up",
+    trend: "up" as const,
     icon: Activity,
   },
 ];

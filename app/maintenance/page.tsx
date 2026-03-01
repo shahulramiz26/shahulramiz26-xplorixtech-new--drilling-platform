@@ -8,7 +8,7 @@ const metrics = [
     value: "156",
     unit: "entries",
     change: "+8",
-    trend: "up",
+    trend: "up" as const,
     icon: ClipboardList,
   },
   {
@@ -16,7 +16,7 @@ const metrics = [
     value: "1,240",
     unit: "items",
     change: "+45",
-    trend: "up",
+    trend: "up" as const,
     icon: Package,
   },
   {
@@ -24,7 +24,7 @@ const metrics = [
     value: "23",
     unit: "tasks",
     change: "-5",
-    trend: "down",
+    trend: "down" as const,
     icon: Wrench,
   },
   {
@@ -32,7 +32,7 @@ const metrics = [
     value: "3",
     unit: "alerts",
     change: "-2",
-    trend: "down",
+    trend: "down" as const,
     icon: AlertTriangle,
   },
 ];
