@@ -14,8 +14,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  AreaChart,
-  Area,
   PieChart,
   Pie,
   Cell
@@ -55,11 +53,11 @@ const metersData = [
 ]
 
 const downtimeData = [
-  { reason: 'Mechanical', hours: 45, cost: 4500 },
-  { reason: 'Bit Change', hours: 32, cost: 3200 },
-  { reason: 'Water', hours: 24, cost: 2400 },
-  { reason: 'Weather', hours: 18, cost: 1800 },
-  { reason: 'Other', hours: 67, cost: 6700 },
+  { reason: 'Mechanical', hours: 45 },
+  { reason: 'Bit Change', hours: 32 },
+  { reason: 'Water', hours: 24 },
+  { reason: 'Weather', hours: 18 },
+  { reason: 'Other', hours: 67 },
 ]
 
 const formationData = [
@@ -74,8 +72,6 @@ const quickActions = [
   { icon: Wrench, label: 'Maintenance', href: '/supervisor/maintenance-log', color: 'amber' },
   { icon: BarChart3, label: 'Analytics', href: '/supervisor/analytics', color: 'purple' },
 ]
-
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444']
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
