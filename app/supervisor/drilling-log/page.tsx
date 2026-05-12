@@ -1,10 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { FileText, Save, Activity, Wrench, Droplets, Plus, Trash2, AlertTriangle, Clock, Upload, Image, Paperclip, AlertCircle } from 'lucide-react'
+import { Save, Plus, Trash2, Paperclip } from 'lucide-react'
 
-// Mock data for dropdowns - In production, these would come from API/Database
+// Mock data
 const mockData = {
   projects: ['PRJ-001 - Gold Mine Project A', 'PRJ-002 - Copper Exploration Site', 'PRJ-003 - Diamond Drilling'],
   rigs: ['RIG-001 - Drill Rig Alpha', 'RIG-002 - Drill Rig Beta', 'RIG-003 - Drill Rig Gamma'],
@@ -15,685 +14,558 @@ const mockData = {
 
 const holeSizes = ['NQ', 'HQ', 'PQ', 'BQ', 'AQ', '4.5"', '5"', '5.5"', '6"', '6.5"', '8"']
 const formationTypes = ['Soft Formation', 'Medium Formation', 'Hard Formation', 'Mixed']
-const downtimeReasons = [
-  'Mechanical Breakdown',
-  'Hydraulic Issue',
-  'Electrical Fault',
-  'Bit Change',
-  'Rod Change',
-  'Casing Installation',
-  'Water Shortage',
-  'Fuel Shortage',
-  'Operator Delay',
-  'Shift Change Delay',
-  'Ground Condition Issue',
-  'Site Access Issue',
-  'Safety Hold',
-  'Weather Condition',
-  'Waiting for Instruction',
-  'Others'
-]
-const completionTypes = ['Inner Worn', 'Outer Worn', 'Flat Worn', 'Broken']
-const equipmentList = [
-  'Air Compressor',
-  'Booster Compressor',
-  'Water Pump',
-  'Mud Pump',
-  'Generator',
-  'Welding Machine',
-  'Crane',
-  'Excavator',
-  'Loader',
-  'Service Truck',
-  'Others'
+const lithologyTypes = ['Sandstone', 'Limestone', 'Granite', 'Basalt', 'Shale', 'Quartzite', 'Dolerite', 'Others']
+const downtimeReasonsList = [
+  'Mechanical Breakdown', 'Hydraulic Issue', 'Electrical Fault', 'Bit Change',
+  'Rod Change', 'Casing Installation', 'Water Shortage', 'Fuel Shortage',
+  'Operator Delay', 'Shift Change Delay', 'Ground Condition Issue',
+  'Site Access Issue', 'Safety Hold', 'Weather Condition',
+  'Waiting for Instruction', 'Others'
 ]
 const accessoriesList = [
-  'Adaptor Sub',
-  'Air Hose',
-  'Casing',
-  'Core Barrel',
-  'Core Lifter',
-  'Core Lifter Case',
-  'Coupling',
-  'DTH Hammer',
-  'Drill Pipe',
-  'Inner Tube',
-  'Liner',
-  'O-Rings',
-  'Outer Tube',
-  'Reaming Shell',
-  'Shock Sub',
-  'Stabilizer',
-  'Others'
+  'Adaptor Sub', 'Air Hose', 'Casing', 'Core Barrel', 'Core Lifter',
+  'Core Lifter Case', 'Coupling', 'DTH Hammer', 'Drill Pipe', 'Inner Tube',
+  'Liner', 'O-Rings', 'Outer Tube', 'Reaming Shell', 'Shock Sub', 'Stabilizer', 'Others'
 ]
-const incidentTypes = ['Injury', 'Equipment Damage', 'Safety Violation']
+const incidentTypes = ['Injury', 'Near Miss', 'Equipment Damage', 'Safety Violation', 'Environmental', 'Others']
 const severityTypes = ['Minor', 'Major', 'Critical']
 const shifts = ['Day', 'Night']
 
-interface AccessoryItem {
-  id: string
-  name: string
-  quantity: number
-}
+interface DowntimeRow { id: string; reason: string; type: 'Internal' | 'Client'; hours: string }
+interface BitRow { id: string; bitId: string; meterStart: string; meterEnd: string; notes: string }
+interface AccessoryRow { id: string; name: string; quantity: string }
+interface IncidentRow { id: string; type: string; severity: string; description: string }
+
+const inputClass = "w-full px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors"
+const selectClass = "w-full px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
+const labelClass = "block text-sm text-[#94A3B8] mb-2"
+const sectionClass = "p-6 rounded-2xl bg-[#111827] border border-[#1E293B]"
+const sectionTitleClass = "text-lg font-bold text-[#F8FAFC]"
 
 export default function DrillingLogPage() {
   const [shiftMode, setShiftMode] = useState<10 | 12>(12)
-  const [hourError, setHourError] = useState('')
-  const [downtimeReasonOther, setDowntimeReasonOther] = useState('')
-  const [equipmentOther, setEquipmentOther] = useState('')
-  
-  const [formData, setFormData] = useState({
-    projectId: '',
-    rigId: '',
-    drillerName: '',
-    supervisorName: 'John Smith',
-    shift: '',
-    holeNumber: '',
-    crewCount: '',
-    date: new Date().toISOString().split('T')[0],
-    drillingHours: '',
-    downtime: '',
-    metersDrilled: '',
-    coreRecovery: '',
-    holeSize: '',
-    formationType: '',
-    downtimeReason: '',
-    bitId: '',
-    bitMetersDrilled: '',
-    completionType: '',
-    fuel: '',
-    water: '',
-    additives: '',
-    equipment: '',
-    equipmentHours: '',
-    incidentType: '',
-    severityType: '',
-    remarks: ''
-  })
 
-  const [accessories, setAccessories] = useState<AccessoryItem[]>([])
+  // Basic Shift Details
+  const [project, setProject] = useState('')
+  const [rig, setRig] = useState('')
+  const [shiftDate, setShiftDate] = useState(new Date().toLocaleDateString('en-GB').replace(/\//g, '-'))
+  const [shift, setShift] = useState('')
+  const [supervisor, setSupervisor] = useState('')
+  const [driller, setDriller] = useState('')
+  const [holeNumber, setHoleNumber] = useState('')
+  const [crewCount, setCrewCount] = useState('0')
 
-  const validateHours = (drilling: string, downtime: string) => {
-    const drillingHrs = parseFloat(drilling) || 0
-    const downtimeHrs = parseFloat(downtime) || 0
-    const total = drillingHrs + downtimeHrs
-    
-    if (total > 0 && total !== shiftMode) {
-      setHourError(`Total shift hours must match ${shiftMode} hours. Current: ${total} hours`)
-    } else {
-      setHourError('')
-    }
-  }
+  // Operation Details
+  const [drillingHours, setDrillingHours] = useState('')
+  const [downtimeHours, setDowntimeHours] = useState('')
+  const [meterStart, setMeterStart] = useState('')
+  const [meterEnd, setMeterEnd] = useState('')
+  const [coreRecovery, setCoreRecovery] = useState('')
+  const [holeSize, setHoleSize] = useState('')
+  const [formationType, setFormationType] = useState('')
+  const [lithology, setLithology] = useState('')
+  const [engineHmr, setEngineHmr] = useState('')
+  const [engineHours, setEngineHours] = useState('')
 
-  const handleInputChange = (key: string, value: string) => {
-    setFormData(prev => {
-      const newData = { ...prev, [key]: value }
-      
-      if (key === 'drillingHours' || key === 'downtime') {
-        validateHours(
-          key === 'drillingHours' ? value : newData.drillingHours,
-          key === 'downtime' ? value : newData.downtime
-        )
-      }
-      
-      return newData
-    })
-  }
+  // Computed
+  const metersDrilled = meterStart && meterEnd
+    ? Math.max(0, parseFloat(meterEnd) - parseFloat(meterStart)).toFixed(2)
+    : ''
 
-  const addAccessory = () => {
-    const newAccessory: AccessoryItem = {
-      id: Date.now().toString(),
-      name: '',
-      quantity: 1
-    }
-    setAccessories([...accessories, newAccessory])
-  }
+  // Dynamic sections
+  const [downtimeRows, setDowntimeRows] = useState<DowntimeRow[]>([
+    { id: '1', reason: '', type: 'Internal', hours: '' }
+  ])
+  const [bitRows, setBitRows] = useState<BitRow[]>([
+    { id: '1', bitId: '', meterStart: '', meterEnd: '', notes: '' }
+  ])
 
-  const updateAccessory = (id: string, field: 'name' | 'quantity', value: string | number) => {
-    setAccessories(accessories.map(acc => 
-      acc.id === id ? { ...acc, [field]: value } : acc
-    ))
-  }
+  // Consumables
+  const [fuel, setFuel] = useState('')
+  const [water, setWater] = useState('')
+  const [additives, setAdditives] = useState('')
 
-  const removeAccessory = (id: string) => {
-    setAccessories(accessories.filter(acc => acc.id !== id))
-  }
+  // Accessories
+  const [accessories, setAccessories] = useState<AccessoryRow[]>([
+    { id: '1', name: '', quantity: '' }
+  ])
+
+  // Incidents
+  const [incidents, setIncidents] = useState<IncidentRow[]>([
+    { id: '1', type: '', severity: '', description: '' }
+  ])
+
+  // Attachments
+  const [attachments, setAttachments] = useState<File[]>([])
+
+  // Downtime rows handlers
+  const addDowntime = () => setDowntimeRows(r => [...r, { id: Date.now().toString(), reason: '', type: 'Internal', hours: '' }])
+  const removeDowntime = (id: string) => setDowntimeRows(r => r.filter(x => x.id !== id))
+  const updateDowntime = (id: string, field: keyof DowntimeRow, value: string) =>
+    setDowntimeRows(r => r.map(x => x.id === id ? { ...x, [field]: value } : x))
+
+  // Bit rows handlers
+  const addBit = () => setBitRows(r => [...r, { id: Date.now().toString(), bitId: '', meterStart: '', meterEnd: '', notes: '' }])
+  const removeBit = (id: string) => setBitRows(r => r.filter(x => x.id !== id))
+  const updateBit = (id: string, field: keyof BitRow, value: string) =>
+    setBitRows(r => r.map(x => x.id === id ? { ...x, [field]: value } : x))
+
+  // Accessories handlers
+  const addAccessory = () => setAccessories(r => [...r, { id: Date.now().toString(), name: '', quantity: '' }])
+  const removeAccessory = (id: string) => setAccessories(r => r.filter(x => x.id !== id))
+  const updateAccessory = (id: string, field: keyof AccessoryRow, value: string) =>
+    setAccessories(r => r.map(x => x.id === id ? { ...x, [field]: value } : x))
+
+  // Incident handlers
+  const addIncident = () => setIncidents(r => [...r, { id: Date.now().toString(), type: '', severity: '', description: '' }])
+  const removeIncident = (id: string) => setIncidents(r => r.filter(x => x.id !== id))
+  const updateIncident = (id: string, field: keyof IncidentRow, value: string) =>
+    setIncidents(r => r.map(x => x.id === id ? { ...x, [field]: value } : x))
 
   const handleSubmit = () => {
-    const drillingHrs = parseFloat(formData.drillingHours) || 0
-    const downtimeHrs = parseFloat(formData.downtime) || 0
-    const total = drillingHrs + downtimeHrs
-    
-    if (total !== shiftMode) {
-      alert(`Validation Error: Total shift hours must match ${shiftMode} hours. Current: ${total} hours`)
-      return
-    }
-    
-    console.log('Form Data:', formData)
-    console.log('Accessories:', accessories)
     alert('Drilling log submitted successfully!')
   }
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-6 pb-8 max-w-7xl mx-auto">
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-[#F8FAFC]">Record Daily Drilling Operations</h1>
-          <p className="text-[#94A3B8] mt-1">Log shift details, performance metrics, and resource consumption</p>
+          <h1 className="text-2xl font-bold text-[#F8FAFC]">Daily Drilling Log</h1>
+          <p className="text-[#94A3B8] mt-1 text-sm">Record shift details, performance metrics and resource consumption</p>
         </div>
-        <button onClick={handleSubmit} className="flex items-center gap-2 px-6 py-3 bg-[#3B82F6] text-white rounded-xl hover:bg-[#2563EB] transition-colors">
-          <Save className="w-5 h-5" />
+        <button
+          onClick={handleSubmit}
+          className="flex items-center gap-2 px-6 py-3 bg-[#3B82F6] text-white rounded-xl hover:bg-[#2563EB] transition-colors font-medium"
+        >
+          <Save className="w-4 h-4" />
           Submit Log
         </button>
       </div>
 
-      {/* Shift Mode Toggle */}
-      <motion.div className="p-4 rounded-2xl bg-[#111827] border border-[#1E293B]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-[#3B82F6]" />
-            <span className="text-[#F8FAFC] font-medium">Shift Mode</span>
-          </div>
-          <div className="flex items-center gap-2 bg-[#1A2234] rounded-lg p-1">
+      {/* ── 1. BASIC SHIFT DETAILS ── */}
+      <div className={sectionClass}>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className={sectionTitleClass}>Basic Shift Details</h2>
+          {/* 10h / 12h toggle */}
+          <div className="flex items-center gap-1 bg-[#1A2234] rounded-lg p-1">
             <button
-              onClick={() => {
-                setShiftMode(10)
-                validateHours(formData.drillingHours, formData.downtime)
-              }}
-              className={`px-4 py-2 rounded-md transition-colors ${shiftMode === 10 ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}
-            >
-              10 Hours
-            </button>
+              onClick={() => setShiftMode(10)}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${shiftMode === 10 ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}
+            >10h</button>
             <button
-              onClick={() => {
-                setShiftMode(12)
-                validateHours(formData.drillingHours, formData.downtime)
-              }}
-              className={`px-4 py-2 rounded-md transition-colors ${shiftMode === 12 ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}
-            >
-              12 Hours
-            </button>
+              onClick={() => setShiftMode(12)}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${shiftMode === 12 ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}
+            >12h</button>
           </div>
         </div>
-      </motion.div>
 
-      {/* Basic Shift Details */}
-      <motion.div className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]">
-        <h2 className="text-xl font-semibold text-[#F8FAFC] mb-6 flex items-center gap-2">
-          <FileText className="w-5 h-5 text-[#3B82F6]" />
-          Basic Shift Details
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Row 1: Project, Rig, Shift Date, Shift */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Project ID *</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.projectId}
-              onChange={e => handleInputChange('projectId', e.target.value)}
-            >
-              <option value="">Select Project</option>
+            <label className={labelClass}>Project *</label>
+            <select className={selectClass} value={project} onChange={e => setProject(e.target.value)}>
+              <option value="">Select project...</option>
               {mockData.projects.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
-          
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Rig ID *</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.rigId}
-              onChange={e => handleInputChange('rigId', e.target.value)}
+            <label className={labelClass}>Rig *</label>
+            <select className={selectClass} value={rig} onChange={e => setRig(e.target.value)}
+              disabled={!project}
             >
-              <option value="">Select Rig</option>
+              <option value="">{project ? 'Select rig...' : 'Select a project first'}</option>
               {mockData.rigs.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
-          
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Driller Name *</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.drillerName}
-              onChange={e => handleInputChange('drillerName', e.target.value)}
-            >
-              <option value="">Select Driller</option>
-              {mockData.drillers.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
+            <label className={labelClass}>Shift Date *</label>
+            <input
+              type="text"
+              className={inputClass}
+              value={shiftDate}
+              onChange={e => setShiftDate(e.target.value)}
+            />
           </div>
-          
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Supervisor Name *</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.supervisorName}
-              onChange={e => handleInputChange('supervisorName', e.target.value)}
-            >
-              <option value="">Select Supervisor</option>
-              {mockData.supervisors.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Shift *</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.shift}
-              onChange={e => handleInputChange('shift', e.target.value)}
-            >
-              <option value="">Select Shift</option>
+            <label className={labelClass}>Shift *</label>
+            <select className={selectClass} value={shift} onChange={e => setShift(e.target.value)}>
+              <option value="">Select shift...</option>
               {shifts.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-          
+        </div>
+
+        {/* Row 2: Supervisor, Driller, Hole Number, Crew Count */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Hole Number *</label>
+            <label className={labelClass}>Supervisor *</label>
+            <select className={selectClass} value={supervisor} onChange={e => setSupervisor(e.target.value)}>
+              <option value="">Select supervisor...</option>
+              {mockData.supervisors.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Driller *</label>
+            <select className={selectClass} value={driller} onChange={e => setDriller(e.target.value)}>
+              <option value="">Select driller...</option>
+              {mockData.drillers.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Hole Number *</label>
             <input
-              type="number"
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
+              type="text"
+              className={inputClass}
               placeholder="Enter hole number"
-              value={formData.holeNumber}
-              onChange={e => handleInputChange('holeNumber', e.target.value)}
+              value={holeNumber}
+              onChange={e => setHoleNumber(e.target.value)}
             />
           </div>
-          
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Crew Count *</label>
+            <label className={labelClass}>Crew Count *</label>
             <input
               type="number"
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-              placeholder="Enter crew count"
-              value={formData.crewCount}
-              onChange={e => handleInputChange('crewCount', e.target.value)}
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Date</label>
-            <input
-              type="date"
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-              value={formData.date}
-              onChange={e => handleInputChange('date', e.target.value)}
+              className={inputClass}
+              placeholder="0"
+              value={crewCount}
+              onChange={e => setCrewCount(e.target.value)}
             />
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Operation Details */}
-      <motion.div className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]">
-        <h2 className="text-xl font-semibold text-[#F8FAFC] mb-6 flex items-center gap-2">
-          <Activity className="w-5 h-5 text-[#10B981]" />
-          Operation Details
-        </h2>
-        
-        {hourError && (
-          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-red-400" />
-            <span className="text-red-400 text-sm">{hourError}</span>
-          </div>
-        )}
-        
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* ── 2. OPERATION DETAILS ── */}
+      <div className={sectionClass}>
+        <h2 className={`${sectionTitleClass} mb-6`}>Operation Details</h2>
+
+        {/* Row 1: Drilling Hours, Downtime Hours */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Drilling Hours (hrs)</label>
-            <input
-              type="number"
-              step="0.5"
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-              placeholder="0.0"
-              value={formData.drillingHours}
-              onChange={e => handleInputChange('drillingHours', e.target.value)}
-            />
+            <label className={labelClass}>Drilling Hours *</label>
+            <input type="number" step="0.5" className={inputClass} placeholder="0"
+              value={drillingHours} onChange={e => setDrillingHours(e.target.value)} />
           </div>
-          
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Downtime (hrs)</label>
-            <input
-              type="number"
-              step="0.5"
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-              placeholder="0.0"
-              value={formData.downtime}
-              onChange={e => handleInputChange('downtime', e.target.value)}
-            />
+            <label className={labelClass}>Downtime Hours *</label>
+            <input type="number" step="0.5" className={inputClass} placeholder="0"
+              value={downtimeHours} onChange={e => setDowntimeHours(e.target.value)} />
           </div>
-          
+        </div>
+
+        {/* Row 2: Meter Start, Meter End, Meters Drilled (auto), Core Recovery */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Meters Drilled (m)</label>
-            <input
-              type="number"
-              step="0.1"
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-              placeholder="0.0"
-              value={formData.metersDrilled}
-              onChange={e => handleInputChange('metersDrilled', e.target.value)}
-            />
+            <label className={labelClass}>Meter Start (m) *</label>
+            <input type="number" step="0.1" className={inputClass} placeholder="0"
+              value={meterStart} onChange={e => setMeterStart(e.target.value)} />
           </div>
-          
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Core Recovery (m)</label>
-            <input
-              type="number"
-              step="0.1"
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-              placeholder="0.0"
-              value={formData.coreRecovery}
-              onChange={e => handleInputChange('coreRecovery', e.target.value)}
-            />
+            <label className={labelClass}>Meter End (m) *</label>
+            <input type="number" step="0.1" className={inputClass} placeholder="0"
+              value={meterEnd} onChange={e => setMeterEnd(e.target.value)} />
           </div>
-          
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Hole Size / Bit Size</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.holeSize}
-              onChange={e => handleInputChange('holeSize', e.target.value)}
-            >
-              <option value="">Select Size</option>
+            <label className={labelClass}>Meters Drilled (m) *</label>
+            <input type="number" className={`${inputClass} opacity-70 cursor-not-allowed`} placeholder="0"
+              value={metersDrilled} readOnly />
+            <p className="text-xs text-[#4B5563] mt-1">Calculated from start/end</p>
+          </div>
+          <div>
+            <label className={labelClass}>Core Recovery (m) *</label>
+            <input type="number" step="0.1" className={inputClass} placeholder="0"
+              value={coreRecovery} onChange={e => setCoreRecovery(e.target.value)} />
+          </div>
+        </div>
+
+        {/* Row 3: Hole/Bit Size, Formation Type, Lithology */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label className={labelClass}>Hole / Bit Size *</label>
+            <select className={selectClass} value={holeSize} onChange={e => setHoleSize(e.target.value)}>
+              <option value="">Select size...</option>
               {holeSizes.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-          
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Formation Type</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.formationType}
-              onChange={e => handleInputChange('formationType', e.target.value)}
-            >
-              <option value="">Select Formation</option>
+            <label className={labelClass}>Formation Type *</label>
+            <select className={selectClass} value={formationType} onChange={e => setFormationType(e.target.value)}>
+              <option value="">Select formation...</option>
               {formationTypes.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
           </div>
-          
-          <div className="md:col-span-2">
-            <label className="block text-sm text-[#94A3B8] mb-2">Downtime Reason</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.downtimeReason}
-              onChange={e => handleInputChange('downtimeReason', e.target.value)}
-            >
-              <option value="">Select Reason</option>
-              {downtimeReasons.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-            {formData.downtimeReason === 'Others' && (
-              <input
-                type="text"
-                className="w-full mt-2 px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-                placeholder="Specify other reason..."
-                value={downtimeReasonOther}
-                onChange={e => setDowntimeReasonOther(e.target.value)}
-              />
-            )}
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Bit Usage */}
-      <motion.div className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]">
-        <h2 className="text-xl font-semibold text-[#F8FAFC] mb-6 flex items-center gap-2">
-          <Wrench className="w-5 h-5 text-[#8B5CF6]" />
-          Bit Usage
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Bit ID</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.bitId}
-              onChange={e => handleInputChange('bitId', e.target.value)}
-            >
-              <option value="">Select Bit</option>
-              {mockData.bits.map(b => <option key={b} value={b}>{b}</option>)}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Meters Drilled (m)</label>
-            <input
-              type="number"
-              step="0.1"
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-              placeholder="0.0"
-              value={formData.bitMetersDrilled}
-              onChange={e => handleInputChange('bitMetersDrilled', e.target.value)}
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Completion Type</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.completionType}
-              onChange={e => handleInputChange('completionType', e.target.value)}
-            >
-              <option value="">Select Type</option>
-              {completionTypes.map(c => <option key={c} value={c}>{c}</option>)}
+            <label className={labelClass}>Lithology Types</label>
+            <select className={selectClass} value={lithology} onChange={e => setLithology(e.target.value)}>
+              <option value="">Select lithology...</option>
+              {lithologyTypes.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
           </div>
         </div>
-      </motion.div>
 
-      {/* Consumables */}
-      <motion.div className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]">
-        <h2 className="text-xl font-semibold text-[#F8FAFC] mb-6 flex items-center gap-2">
-          <Droplets className="w-5 h-5 text-[#06B6D4]" />
-          Consumables
-        </h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        {/* Row 4: Engine HMR, Engine Hours */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Fuel (L)</label>
-            <input
-              type="number"
-              step="0.1"
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-              placeholder="0.0"
-              value={formData.fuel}
-              onChange={e => handleInputChange('fuel', e.target.value)}
-            />
+            <label className={labelClass}>Engine HMR</label>
+            <input type="number" step="0.1" className={inputClass} placeholder="0"
+              value={engineHmr} onChange={e => setEngineHmr(e.target.value)} />
           </div>
-          
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Water (L)</label>
-            <input
-              type="number"
-              step="0.1"
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-              placeholder="0.0"
-              value={formData.water}
-              onChange={e => handleInputChange('water', e.target.value)}
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Additives (kg)</label>
-            <input
-              type="number"
-              step="0.1"
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-              placeholder="0.0"
-              value={formData.additives}
-              onChange={e => handleInputChange('additives', e.target.value)}
-            />
+            <label className={labelClass}>Engine Hours</label>
+            <input type="number" step="0.5" className={inputClass} placeholder="0"
+              value={engineHours} onChange={e => setEngineHours(e.target.value)} />
           </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Equipment</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.equipment}
-              onChange={e => handleInputChange('equipment', e.target.value)}
-            >
-              <option value="">Select Equipment</option>
-              {equipmentList.map(e => <option key={e} value={e}>{e}</option>)}
-            </select>
-            {formData.equipment === 'Others' && (
-              <input
-                type="text"
-                className="w-full mt-2 px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-                placeholder="Specify other equipment..."
-                value={equipmentOther}
-                onChange={e => setEquipmentOther(e.target.value)}
-              />
-            )}
-          </div>
-          
-          <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Equipment Used (hrs)</label>
-            <input
-              type="number"
-              step="0.5"
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-              placeholder="0.0"
-              value={formData.equipmentHours}
-              onChange={e => handleInputChange('equipmentHours', e.target.value)}
-            />
-          </div>
+      {/* ── 3. DOWNTIME REASONS ── */}
+      <div className={sectionClass}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className={sectionTitleClass}>Downtime Reasons</h2>
+          <button onClick={addDowntime}
+            className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium flex items-center gap-1 transition-colors">
+            <Plus className="w-4 h-4" /> Add
+          </button>
         </div>
 
-        <div className="border-t border-[#1E293B] pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-[#F8FAFC]">Accessories</h3>
-            <button
-              onClick={addAccessory}
-              className="flex items-center gap-2 px-4 py-2 bg-[#10B981]/20 text-[#10B981] rounded-lg hover:bg-[#10B981]/30 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add Accessories
-            </button>
-          </div>
-          
-          {accessories.length === 0 && (
-            <p className="text-[#64748B] text-sm italic">No accessories added. Click "Add Accessories" to add items.</p>
-          )}
-          
-          {accessories.map((accessory, index) => (
-            <div key={accessory.id} className="flex items-center gap-4 mb-3 p-3 bg-[#1A2234] rounded-xl">
-              <span className="text-[#64748B] text-sm w-8">{index + 1}.</span>
+        <div className="space-y-3">
+          {downtimeRows.map((row, index) => (
+            <div key={row.id} className="flex items-center gap-3">
+              <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
+              {/* Reason dropdown */}
               <select
-                className="flex-1 px-4 py-2 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] appearance-none cursor-pointer"
-                value={accessory.name}
-                onChange={e => updateAccessory(accessory.id, 'name', e.target.value)}
+                className="flex-1 px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
+                value={row.reason}
+                onChange={e => updateDowntime(row.id, 'reason', e.target.value)}
               >
-                <option value="">Select Accessory</option>
-                {accessoriesList.map(a => <option key={a} value={a}>{a}</option>)}
+                <option value="">Select reason</option>
+                {downtimeReasonsList.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
-              <div className="flex items-center gap-2">
-                <span className="text-[#94A3B8] text-sm">Qty:</span>
-                <input
-                  type="number"
-                  min="1"
-                  className="w-20 px-3 py-2 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] text-center"
-                  value={accessory.quantity}
-                  onChange={e => updateAccessory(accessory.id, 'quantity', parseInt(e.target.value) || 1)}
-                />
+              {/* Internal / Client toggle */}
+              <div className="flex items-center bg-[#1A2234] rounded-lg p-1 shrink-0">
+                <button
+                  onClick={() => updateDowntime(row.id, 'type', 'Internal')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${row.type === 'Internal' ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}
+                >Internal</button>
+                <button
+                  onClick={() => updateDowntime(row.id, 'type', 'Client')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${row.type === 'Client' ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}
+                >Client</button>
               </div>
-              <button
-                onClick={() => removeAccessory(accessory.id)}
-                className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-              >
+              {/* Hours */}
+              <input
+                type="number"
+                step="0.5"
+                className="w-28 px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors shrink-0"
+                placeholder="Hours"
+                value={row.hours}
+                onChange={e => updateDowntime(row.id, 'hours', e.target.value)}
+              />
+              <button onClick={() => removeDowntime(row.id)}
+                className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
           ))}
         </div>
-      </motion.div>
+      </div>
 
-      {/* Incident Reporting */}
-      <motion.div className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]">
-        <h2 className="text-xl font-semibold text-[#F8FAFC] mb-6 flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-[#EF4444]" />
-          Incident Reporting
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* ── 4. BIT USAGE ── */}
+      <div className={sectionClass}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className={sectionTitleClass}>Bit Usage</h2>
+          <button onClick={addBit}
+            className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium flex items-center gap-1 transition-colors">
+            <Plus className="w-4 h-4" /> Add
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {bitRows.map((row, index) => (
+            <div key={row.id} className="flex items-center gap-3">
+              <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
+              <select
+                className="flex-1 px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
+                value={row.bitId}
+                onChange={e => updateBit(row.id, 'bitId', e.target.value)}
+              >
+                <option value="">Select bit</option>
+                {mockData.bits.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+              <input type="number" step="0.1"
+                className="w-28 px-3 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors shrink-0"
+                placeholder="Meter S"
+                value={row.meterStart}
+                onChange={e => updateBit(row.id, 'meterStart', e.target.value)}
+              />
+              <span className="text-[#64748B] text-sm shrink-0">to</span>
+              <input type="number" step="0.1"
+                className="w-28 px-3 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors shrink-0"
+                placeholder="Meter E"
+                value={row.meterEnd}
+                onChange={e => updateBit(row.id, 'meterEnd', e.target.value)}
+              />
+              <input type="text"
+                className="flex-1 px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors"
+                placeholder="Notes (optional)"
+                value={row.notes}
+                onChange={e => updateBit(row.id, 'notes', e.target.value)}
+              />
+              <button onClick={() => removeBit(row.id)}
+                className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 5. CONSUMABLES ── */}
+      <div className={sectionClass}>
+        <h2 className={`${sectionTitleClass} mb-6`}>Consumables</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Incident Type</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.incidentType}
-              onChange={e => handleInputChange('incidentType', e.target.value)}
-            >
-              <option value="">Select Type</option>
-              {incidentTypes.map(i => <option key={i} value={i}>{i}</option>)}
-            </select>
+            <label className={labelClass}>Fuel (L) *</label>
+            <input type="number" step="0.1" className={inputClass} placeholder="0"
+              value={fuel} onChange={e => setFuel(e.target.value)} />
           </div>
-          
           <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Severity Type</label>
-            <select
-              className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer"
-              value={formData.severityType}
-              onChange={e => handleInputChange('severityType', e.target.value)}
-            >
-              <option value="">Select Severity</option>
-              {severityTypes.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <label className={labelClass}>Water (L) *</label>
+            <input type="number" step="0.1" className={inputClass} placeholder="0"
+              value={water} onChange={e => setWater(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelClass}>Additives (kg) *</label>
+            <input type="number" step="0.1" className={inputClass} placeholder="0"
+              value={additives} onChange={e => setAdditives(e.target.value)} />
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Attachments */}
-      <motion.div className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]">
-        <h2 className="text-xl font-semibold text-[#F8FAFC] mb-6 flex items-center gap-2">
-          <Upload className="w-5 h-5 text-[#F59E0B]" />
-          Attachments
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm text-[#94A3B8] mb-2 flex items-center gap-2">
-              <Image className="w-4 h-4" />
-              Photo Upload (Optional)
-            </label>
-            <div className="relative">
-              <input
-                type="file"
-                accept="image/*"
-                className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#3B82F6] file:text-white file:cursor-pointer cursor-pointer"
+      {/* ── 6. ACCESSORIES ── */}
+      <div className={sectionClass}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className={sectionTitleClass}>Accessories</h2>
+          <button onClick={addAccessory}
+            className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium flex items-center gap-1 transition-colors">
+            <Plus className="w-4 h-4" /> Add
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {accessories.map((row, index) => (
+            <div key={row.id} className="flex items-center gap-3 p-3 bg-[#0D1117] rounded-xl border border-[#1E293B]">
+              <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
+              <select
+                className="flex-1 px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
+                value={row.name}
+                onChange={e => updateAccessory(row.id, 'name', e.target.value)}
+              >
+                <option value="">Select accessory</option>
+                {accessoriesList.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+              <input type="number" min="1"
+                className="w-24 px-3 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors text-center shrink-0"
+                placeholder="Qty"
+                value={row.quantity}
+                onChange={e => updateAccessory(row.id, 'quantity', e.target.value)}
               />
+              <button onClick={() => removeAccessory(row.id)}
+                className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
-          </div>
-          
-          <div>
-            <label className="block text-sm text-[#94A3B8] mb-2 flex items-center gap-2">
+          ))}
+        </div>
+      </div>
+
+      {/* ── 7. INCIDENTS ── */}
+      <div className={sectionClass}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className={sectionTitleClass}>Incidents</h2>
+          <button onClick={addIncident}
+            className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium flex items-center gap-1 transition-colors">
+            <Plus className="w-4 h-4" /> Add
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {incidents.map((row, index) => (
+            <div key={row.id} className="flex items-center gap-3 p-3 bg-[#0D1117] rounded-xl border border-[#1E293B]">
+              <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
+              <select
+                className="flex-1 px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
+                value={row.type}
+                onChange={e => updateIncident(row.id, 'type', e.target.value)}
+              >
+                <option value="">Incident type</option>
+                {incidentTypes.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <select
+                className="flex-1 px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
+                value={row.severity}
+                onChange={e => updateIncident(row.id, 'severity', e.target.value)}
+              >
+                <option value="">Severity (optional)</option>
+                {severityTypes.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <input type="text"
+                className="flex-[2] px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors"
+                placeholder="Description"
+                value={row.description}
+                onChange={e => updateIncident(row.id, 'description', e.target.value)}
+              />
+              <button onClick={() => removeIncident(row.id)}
+                className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Attachments inside incidents section */}
+        <div className="mt-6 pt-6 border-t border-[#1E293B]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-[#94A3B8]">
               <Paperclip className="w-4 h-4" />
-              Document Upload (Optional)
-            </label>
-            <div className="relative">
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx,.xls,.xlsx"
-                className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#3B82F6] file:text-white file:cursor-pointer cursor-pointer"
-              />
+              <span className="text-sm font-medium text-[#F8FAFC]">Attachments</span>
             </div>
+            <label className="flex items-center gap-2 px-4 py-2 bg-[#1A2234] border border-[#1E293B] rounded-lg text-[#F8FAFC] text-sm cursor-pointer hover:bg-[#1E293B] transition-colors">
+              <Plus className="w-4 h-4" />
+              Add Files
+              <input type="file" multiple className="hidden"
+                onChange={e => setAttachments(prev => [...prev, ...Array.from(e.target.files || [])])} />
+            </label>
           </div>
+          {attachments.length === 0 ? (
+            <p className="text-[#4B5563] text-sm mt-3">No attachments added.</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {attachments.map((f, i) => (
+                <div key={i} className="flex items-center justify-between px-3 py-2 bg-[#0D1117] rounded-lg border border-[#1E293B]">
+                  <span className="text-[#94A3B8] text-sm">{f.name}</span>
+                  <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))}
+                    className="text-red-400 hover:text-red-300 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </motion.div>
+      </div>
 
-      {/* Remarks */}
-      <motion.div className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]">
-        <h2 className="text-xl font-semibold text-[#F8FAFC] mb-4">Remarks</h2>
-        <textarea
-          rows={4}
-          className="w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC]"
-          placeholder="Enter any additional notes or observations..."
-          value={formData.remarks}
-          onChange={e => handleInputChange('remarks', e.target.value)}
-        />
-      </motion.div>
-
-      {/* Submit Button */}
+      {/* Submit */}
       <div className="flex justify-end">
-        <button 
-          onClick={handleSubmit} 
-          className="flex items-center gap-2 px-8 py-4 bg-[#3B82F6] text-white rounded-xl hover:bg-[#2563EB] transition-colors text-lg font-medium"
-        >
+        <button onClick={handleSubmit}
+          className="flex items-center gap-2 px-8 py-4 bg-[#3B82F6] text-white rounded-xl hover:bg-[#2563EB] transition-colors text-base font-semibold">
           <Save className="w-5 h-5" />
           Submit Log
         </button>
       </div>
+
     </div>
   )
 }
+
