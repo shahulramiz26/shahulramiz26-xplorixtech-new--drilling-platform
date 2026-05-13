@@ -17,12 +17,14 @@ import {
   X,
   ChevronRight,
   Bell,
-  Search
+  Search,
+  DollarSign
 } from 'lucide-react'
 import NotificationCenter from '../components/NotificationCenter'
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/finance', label: 'Finance & Costing', icon: DollarSign },
   { href: '/admin/users', label: 'User Management', icon: Users },
   { href: '/admin/projects', label: 'Projects', icon: FolderOpen },
   { href: '/admin/rigs', label: 'Rigs & Equipment', icon: Truck },
@@ -187,3 +189,4 @@ export default function AdminLayout({
     </div>
   )
 }
+
