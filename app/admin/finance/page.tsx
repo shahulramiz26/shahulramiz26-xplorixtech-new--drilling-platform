@@ -10,6 +10,7 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
+import { useCurrency } from '../../components/currency-context'
 
 // ── MOCK DATA ──────────────────────────────────────────────────────────────
 const projects = ['All Projects', 'PRJ-001 Gold Mine A', 'PRJ-002 Copper Site', 'PRJ-003 Diamond Drill']
@@ -120,9 +121,7 @@ function KpiCard({ label, value, unit, change, good, icon: Icon, iconColor }: {
       <div className="mt-2">
         <p className="text-[#64748B] text-xs font-medium uppercase tracking-wider mb-1">{label}</p>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-2xl font-bold text-[#F8FAFC]">
-            {typeof value === 'number' ? (value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toFixed(1)) : value}
-          </span>
+          <span className="text-2xl font-bold text-[#F8FAFC]">{value}</span>
           <span className="text-[#64748B] text-sm">{unit}</span>
         </div>
       </div>
@@ -144,6 +143,7 @@ export default function FinanceDashboardPage() {
   const [project, setProject] = useState('All Projects')
   const [rig, setRig] = useState('All Rigs')
   const [dateRange, setDateRange] = useState('Last 30 Days')
+  const { format, formatShort, currency } = useCurrency()
 
   return (
     <div className="space-y-6 pb-10">
@@ -173,26 +173,26 @@ export default function FinanceDashboardPage() {
 
       {/* KPI Cards Row 1 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard label="Cost Per Meter" value={kpiData.costPerMeter.value} unit="$/m"
+        <KpiCard label="Cost Per Meter" value={`${currency.symbol}${(kpiData.costPerMeter.value * currency.rate).toFixed(1)}`} unit="/m"
           change={kpiData.costPerMeter.change} good={true}
           icon={Gauge} iconColor="bg-blue-500/10 text-blue-400" />
-        <KpiCard label="Fuel Cost / Meter" value={kpiData.fuelCostPerMeter.value} unit="$/m"
+        <KpiCard label="Fuel Cost / Meter" value={`${currency.symbol}${(kpiData.fuelCostPerMeter.value * currency.rate).toFixed(1)}`} unit="/m"
           change={kpiData.fuelCostPerMeter.change} good={false}
           icon={TrendingUp} iconColor="bg-amber-500/10 text-amber-400" />
-        <KpiCard label="Downtime Loss" value={kpiData.downtimeLoss.value} unit="$"
+        <KpiCard label="Downtime Loss" value={formatShort(kpiData.downtimeLoss.value)} unit=""
           change={kpiData.downtimeLoss.change} good={true}
           icon={AlertTriangle} iconColor="bg-red-500/10 text-red-400" />
-        <KpiCard label="Total Drilling Cost" value={kpiData.totalDrillingCost.value} unit="$"
+        <KpiCard label="Total Drilling Cost" value={formatShort(kpiData.totalDrillingCost.value)} unit=""
           change={kpiData.totalDrillingCost.change} good={true}
           icon={DollarSign} iconColor="bg-emerald-500/10 text-emerald-400" />
       </div>
 
       {/* KPI Cards Row 2 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard label="Maintenance Cost" value={kpiData.maintenanceCost.value} unit="$"
+        <KpiCard label="Maintenance Cost" value={formatShort(kpiData.maintenanceCost.value)} unit=""
           change={kpiData.maintenanceCost.change} good={false}
           icon={Wrench} iconColor="bg-purple-500/10 text-purple-400" />
-        <KpiCard label="Consumable Cost" value={kpiData.consumableCost.value} unit="$"
+        <KpiCard label="Consumable Cost" value={formatShort(kpiData.consumableCost.value)} unit=""
           change={kpiData.consumableCost.change} good={true}
           icon={Package} iconColor="bg-cyan-500/10 text-cyan-400" />
 
@@ -204,7 +204,7 @@ export default function FinanceDashboardPage() {
           </div>
           <p className="text-[#64748B] text-xs font-medium uppercase tracking-wider mb-1">Best Performing Rig</p>
           <p className="text-lg font-bold text-[#F8FAFC]">{kpiData.bestRig.value}</p>
-          <p className="text-emerald-400 text-sm font-medium">{kpiData.bestRig.unit}</p>
+          <p className="text-emerald-400 text-sm font-medium">{currency.symbol}124/m</p>
         </div>
 
         {/* Worst Rig */}
@@ -215,7 +215,7 @@ export default function FinanceDashboardPage() {
           </div>
           <p className="text-[#64748B] text-xs font-medium uppercase tracking-wider mb-1">Worst Downtime Rig</p>
           <p className="text-lg font-bold text-[#F8FAFC]">{kpiData.worstRig.value}</p>
-          <p className="text-red-400 text-sm font-medium">{kpiData.worstRig.unit}</p>
+          <p className="text-red-400 text-sm font-medium">{currency.symbol}178/m</p>
         </div>
       </div>
 
