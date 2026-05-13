@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import {
-  ChevronDown, Download, Search, TrendingUp, TrendingDown,
-  Drill, AlertTriangle, Droplets, Wrench, Package, DollarSign, ChevronRight
+  ChevronDown, Download, Search, TrendingUp,
+  AlertTriangle, DollarSign, ChevronRight
 } from 'lucide-react'
 
 // ── MOCK COST ENGINE DATA ──────────────────────────────────────────────────
