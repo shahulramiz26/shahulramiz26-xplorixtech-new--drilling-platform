@@ -11,6 +11,32 @@ import { Users, Clock, TrendingUp, Award, Filter, ArrowUpRight, ArrowDownRight }
 import AIInsights from '../../../components/AIInsights'
 import LeaderboardTable from '../../../components/LeaderboardTable'
 
+function KpiCard({ label, value, unit, icon: Icon, color, trend, trendUp }: {
+  label: string; value: string; unit?: string; icon: any
+  color: string; trend?: string; trendUp?: boolean
+}) {
+  return (
+    <div style={{ padding:20, borderRadius:16, background:'#0D1117', border:'1px solid #1E293B', transition:'border-color 0.2s' }}
+      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${color}40`}
+      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+        <div style={{ width:40, height:40, borderRadius:10, background:`${color}18`, border:`1px solid ${color}30`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <Icon style={{ width:18, height:18, color }} />
+        </div>
+        {trend && (
+          <span style={{ fontSize:11, fontWeight:700, color: trendUp ? '#10B981' : '#EF4444' }}>
+            {trendUp ? '↑' : '↓'} {trend}
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize:26, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>
+        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'#64748B', marginLeft:4 }}>{unit}</span>}
+      </div>
+      <div style={{ fontSize:13, color:'#94A3B8', marginTop:4 }}>{label}</div>
+    </div>
+  )
+}
+
 const COLORS = {
   primary: '#3B82F6', accent: '#10B981', purple: '#8B5CF6',
   warning: '#F59E0B', danger: '#EF4444', cyan: '#06B6D4', pink: '#EC4899'
@@ -122,36 +148,17 @@ export default function AdminDrillerCrewDashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label:'Total Drillers', value:'12',      icon:Users,     color:COLORS.primary, trend:'+2',  up:true  },
-          { label:'Avg ROP',        value:'50.6',    unit:'m/hr', icon:TrendingUp, color:COLORS.accent, trend:'+5%', up:true },
-          { label:'Total Hours',    value:'2,448',   unit:'hrs', icon:Clock, color:COLORS.cyan, trend:'+12%', up:true },
-          { label:'Top Performer',  value:'Chris W.',icon:Award, color:COLORS.purple, trend:'96%', up:true },
-        ].map((kpi, i) => (
-          <motion.div key={i} initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.1 }}
-            className="bg-[#111827] border border-[#1E293B] rounded-2xl p-5 hover:border-[#3B82F6]/30 transition-all">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor:`${kpi.color}20` }}>
-                <kpi.icon className="w-5 h-5" style={{ color:kpi.color }} />
-              </div>
-              {kpi.trend && (
-                <div className={`flex items-center gap-1 text-xs font-medium ${kpi.up ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                  {kpi.up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                  {kpi.trend}
-                </div>
-              )}
-            </div>
-            <p className="text-2xl font-bold text-[#F8FAFC]">{kpi.value}<span className="text-sm font-normal text-[#64748B] ml-1">{kpi.unit}</span></p>
-            <p className="text-sm text-[#94A3B8] mt-1">{kpi.label}</p>
-          </motion.div>
-        ))}
+        <KpiCard label="Total Drillers" value="12"       icon={Users}     color="#3B82F6" trend="+2"   trendUp={true}  />
+        <KpiCard label="Avg ROP"        value="50.6"     unit="m/hr" icon={TrendingUp} color="#10B981" trend="+5%" trendUp={true} />
+        <KpiCard label="Total Hours"    value="2,448"    unit="hrs"  icon={Clock}     color="#06B6D4" trend="+12%" trendUp={true} />
+        <KpiCard label="Top Performer"  value="Chris W." icon={Award}     color="#F97316" trend="96%"  trendUp={true}  />
       </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* ── DRILLER PERFORMANCE — REPLACED WITH LeaderboardTable ── */}
-        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6 lg:col-span-2">
+        <motion.div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }} className="lg:col-span-2">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-semibold text-[#F8FAFC]">Driller Performance Leaderboard</h3>
             <span className="text-xs text-[#64748B] bg-[#1A2234] px-3 py-1 rounded-full border border-[#1E293B]">
@@ -173,7 +180,7 @@ export default function AdminDrillerCrewDashboard() {
         </motion.div>
 
         {/* ROP vs Meters Scatter */}
-        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
+        <motion.div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">ROP vs Meters (Bubble = Downtime)</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -194,7 +201,7 @@ export default function AdminDrillerCrewDashboard() {
         </motion.div>
 
         {/* Crew Hours Trend */}
-        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
+        <motion.div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Crew Hours & Utilization</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -219,7 +226,7 @@ export default function AdminDrillerCrewDashboard() {
         </motion.div>
 
         {/* Shift Distribution */}
-        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
+        <motion.div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Shift Distribution</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -237,7 +244,7 @@ export default function AdminDrillerCrewDashboard() {
         </motion.div>
 
         {/* Experience vs ROP */}
-        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
+        <motion.div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Experience vs Average ROP</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -256,7 +263,7 @@ export default function AdminDrillerCrewDashboard() {
         </motion.div>
 
         {/* Performance Radar */}
-        <motion.div className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
+        <motion.div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Performance Comparison (Top 2)</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
