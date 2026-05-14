@@ -25,18 +25,33 @@ import { TrendingUp, Clock, AlertCircle, Activity, ArrowUpRight, ArrowDownRight,
 import AIInsights from '../../../components/AIInsights'
 import RankedList from '../../../components/RankedList'
 
-const COLORS = {
-  primary: '#3B82F6',
-  accent: '#10B981',
-  purple: '#8B5CF6',
-  warning: '#F59E0B',
-  danger: '#EF4444',
-  cyan: '#06B6D4',
-  pink: '#EC4899',
-  slate: '#64748B'
-}
+const PIE_COLORS = ['#F97316', '#3B82F6', '#10B981', '#F59E0B']
 
-const PIE_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444']
+function KpiCard({ label, value, unit, icon: Icon, color, trend, trendUp }: {
+  label: string; value: string; unit?: string; icon: any
+  color: string; trend?: string; trendUp?: boolean
+}) {
+  return (
+    <div style={{ padding:20, borderRadius:16, background:'#0D1117', border:'1px solid #1E293B', transition:'border-color 0.2s' }}
+      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${color}40`}
+      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+        <div style={{ width:40, height:40, borderRadius:10, background:`${color}18`, border:`1px solid ${color}30`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <Icon style={{ width:18, height:18, color }} />
+        </div>
+        {trend && (
+          <span style={{ fontSize:11, fontWeight:700, color: trendUp ? '#10B981' : '#EF4444' }}>
+            {trendUp ? '↑' : '↓'} {trend}
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize:26, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>
+        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'#64748B', marginLeft:4 }}>{unit}</span>}
+      </div>
+      <div style={{ fontSize:13, color:'#94A3B8', marginTop:4 }}>{label}</div>
+    </div>
+  )
+}
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -213,32 +228,10 @@ export default function AdminOperationDashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Avg ROP', value: '6.8', unit: 'm/hr', icon: Activity, color: COLORS.primary, trend: '+15%', up: true },
-          { label: 'Total Meters', value: '8,450', unit: 'm', icon: TrendingUp, color: COLORS.accent, trend: '+12%', up: true },
-          { label: 'Drilling Hours', value: '1,240', unit: 'hrs', icon: Clock, color: COLORS.cyan, trend: '+8%', up: true },
-          { label: 'Downtime', value: '186', unit: 'hrs', icon: AlertCircle, color: COLORS.danger, trend: '-5%', up: false },
-        ].map((kpi, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="bg-[#111827] border border-[#1E293B] rounded-2xl p-5 hover:border-[#3B82F6]/30 transition-all"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${kpi.color}20` }}>
-                <kpi.icon className="w-5 h-5" style={{ color: kpi.color }} />
-              </div>
-              <div className={`flex items-center gap-1 text-xs font-medium ${kpi.up ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                {kpi.up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {kpi.trend}
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-[#F8FAFC]">{kpi.value}<span className="text-sm font-normal text-[#64748B] ml-1">{kpi.unit}</span></p>
-            <p className="text-sm text-[#94A3B8] mt-1">{kpi.label}</p>
-          </motion.div>
-        ))}
+        <KpiCard label="Avg ROP"        value="6.8"   unit="m/hr" icon={Activity}     color="#F97316" trend="+15%" trendUp={true}  />
+        <KpiCard label="Total Meters"   value="8,450" unit="m"    icon={TrendingUp}   color="#3B82F6" trend="+12%" trendUp={true}  />
+        <KpiCard label="Drilling Hours" value="1,240" unit="hrs"  icon={Clock}        color="#10B981" trend="+8%"  trendUp={true}  />
+        <KpiCard label="Downtime"       value="186"   unit="hrs"  icon={AlertCircle}  color="#EF4444" trend="-5%"  trendUp={false} />
       </div>
 
       {/* Charts Grid */}
@@ -248,7 +241,7 @@ export default function AdminOperationDashboard() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}
         >
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-[#F8FAFC]">ROP Trend Analysis</h3>
@@ -285,7 +278,7 @@ export default function AdminOperationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}
         >
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Meters Drilled vs Core Recovery</h3>
           <div className="h-72">
@@ -308,7 +301,7 @@ export default function AdminOperationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}
         >
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-semibold text-[#F8FAFC]">Downtime by Reason</h3>
@@ -334,7 +327,7 @@ export default function AdminOperationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}
         >
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Productive Hours vs Downtime</h3>
           <div className="h-72">
@@ -359,7 +352,7 @@ export default function AdminOperationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}
         >
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Formation vs Average ROP</h3>
           <div className="h-72">
@@ -384,7 +377,7 @@ export default function AdminOperationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}
         >
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Bit Performance & Cost</h3>
           <div className="h-72">
@@ -408,7 +401,7 @@ export default function AdminOperationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}
         >
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Completion Type Distribution</h3>
           <div className="h-72">
@@ -439,7 +432,7 @@ export default function AdminOperationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}
         >
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Cost per Meter by Supplier</h3>
           <div className="h-72">
