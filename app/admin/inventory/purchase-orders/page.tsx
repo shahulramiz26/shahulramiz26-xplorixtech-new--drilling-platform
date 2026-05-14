@@ -6,7 +6,7 @@ import {
   Plus, Search, ChevronDown, X, Check, Truck,
   FileText, Clock, Package, ChevronRight, AlertCircle
 } from 'lucide-react'
-import { useCurrency } from '../../components/currency-context'
+import { useCurrency } from '../../../components/currency-context'
 
 // ── TYPES ──────────────────────────────────────────────────────────────────
 type POStatus = 'Draft' | 'Ordered' | 'Partially Received' | 'Received' | 'Cancelled'
