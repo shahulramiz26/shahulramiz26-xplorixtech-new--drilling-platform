@@ -10,7 +10,31 @@ import { Wrench, Clock, AlertTriangle, TrendingUp, ArrowUpRight, ArrowDownRight,
 import AIInsights from '../../../components/AIInsights'
 import DualMetricList from '../../../components/DualMetricList'
 
-const COLORS = {
+// KpiCard component
+function KpiCard({ label, value, unit, icon: Icon, color, trend, trendUp }: { label: string; value: string; unit?: string; icon: any; color: string; trend?: string; trendUp?: boolean }) {
+  return (
+    <div style={{ padding:20, borderRadius:16, background:'#0D1117', border:'1px solid #1E293B', transition:'border-color 0.2s' }}
+      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${color}40`}
+      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+        <div style={{ width:40, height:40, borderRadius:10, background:`${color}18`, border:`1px solid ${color}30`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <Icon style={{ width:18, height:18, color }} />
+        </div>
+        {trend && (
+          <span style={{ fontSize:11, fontWeight:700, color: trendUp ? '#10B981' : '#EF4444' }}>
+            {trendUp ? '↑' : '↓'} {trend}
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize:26, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>
+        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'#64748B', marginLeft:4 }}>{unit}</span>}
+      </div>
+      <div style={{ fontSize:13, color:'#94A3B8', marginTop:4 }}>{label}</div>
+    </div>
+  )
+}
+
+const COLORS_UNUSED = {
   primary: '#3B82F6', accent: '#10B981', purple: '#8B5CF6',
   warning: '#F59E0B', danger: '#EF4444', cyan: '#06B6D4', pink: '#EC4899'
 }
@@ -118,27 +142,10 @@ export default function AdminMaintenanceDashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label:'Total Maint. Logs', value:'28',   icon:Wrench,       color:COLORS.warning, trend:'+12%', up:true  },
-          { label:'Maint. Hours',      value:'84',   unit:'hrs', icon:Clock, color:COLORS.danger,  trend:'+8%',  up:false },
-          { label:'Pending Service',   value:'5',    icon:AlertTriangle, color:COLORS.pink,   trend:'-2',   up:true  },
-          { label:'Avg MTBF',          value:'410',  unit:'hrs', icon:TrendingUp, color:COLORS.accent, trend:'+5%', up:true },
-        ].map((kpi, i) => (
-          <motion.div key={i} initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.1 }}
-            className="bg-[#111827] border border-[#1E293B] rounded-2xl p-5 hover:border-[#3B82F6]/30 transition-all">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor:`${kpi.color}20` }}>
-                <kpi.icon className="w-5 h-5" style={{ color:kpi.color }} />
-              </div>
-              <div className={`flex items-center gap-1 text-xs font-medium ${kpi.up ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                {kpi.up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {kpi.trend}
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-[#F8FAFC]">{kpi.value}<span className="text-sm font-normal text-[#64748B] ml-1">{kpi.unit}</span></p>
-            <p className="text-sm text-[#94A3B8] mt-1">{kpi.label}</p>
-          </motion.div>
-        ))}
+        <KpiCard label="Total Maint. Logs" value="28"  icon={Wrench}       color="#F59E0B" trend="+12%" trendUp={true}  />
+        <KpiCard label="Maint. Hours"      value="84"  unit="hrs" icon={Clock} color="#EF4444" trend="+8%"  trendUp={false} />
+        <KpiCard label="Pending Service"   value="5"   icon={AlertTriangle} color="#F97316" trend="-2"   trendUp={true}  />
+        <KpiCard label="Avg MTBF"          value="410" unit="hrs" icon={TrendingUp} color="#10B981" trend="+5%" trendUp={true} />
       </div>
 
       {/* Charts Grid */}
@@ -146,7 +153,7 @@ export default function AdminMaintenanceDashboard() {
 
         {/* Maintenance Type Donut */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Maintenance Type Distribution</h3>
           <div className="h-72 relative">
             <ResponsiveContainer width="100%" height="100%">
@@ -171,7 +178,7 @@ export default function AdminMaintenanceDashboard() {
 
         {/* Maintenance Hours Trend */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Maintenance Hours & Cost Trend</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -197,7 +204,7 @@ export default function AdminMaintenanceDashboard() {
 
         {/* ── COMPONENT FAILURE ANALYSIS — REPLACED WITH DualMetricList ── */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-semibold text-[#F8FAFC]">Component Failure Analysis</h3>
             <span className="text-xs text-[#64748B] bg-[#1A2234] px-3 py-1 rounded-full border border-[#1E293B]">
@@ -220,7 +227,7 @@ export default function AdminMaintenanceDashboard() {
 
         {/* Action Taken Distribution */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.3 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6">
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Action Taken Distribution</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -241,7 +248,7 @@ export default function AdminMaintenanceDashboard() {
 
         {/* Oil Consumption */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.4 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6 lg:col-span-2">
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }} className="lg:col-span-2">
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Oil Consumption Breakdown</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -273,7 +280,7 @@ export default function AdminMaintenanceDashboard() {
 
         {/* MTBF by Rig */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.5 }}
-          className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6 lg:col-span-2">
+          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }} className="lg:col-span-2">
           <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Mean Time Between Failures (MTBF) by Rig</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
