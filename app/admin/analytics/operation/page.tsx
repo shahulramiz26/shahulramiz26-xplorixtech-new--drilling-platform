@@ -23,6 +23,7 @@ import {
 } from 'recharts'
 import { TrendingUp, Clock, AlertCircle, Activity, ArrowUpRight, ArrowDownRight, Filter } from 'lucide-react'
 import AIInsights from '../../../components/AIInsights'
+import RankedList from '../../../components/RankedList'
 
 const COLORS = {
   primary: '#3B82F6',
@@ -75,12 +76,17 @@ const metersData = [
   { date: 'Feb 26', meters: 250, recovery: 235 },
 ]
 
-const downtimeData = [
-  { reason: 'Mechanical', hours: 12, cost: 1200 },
-  { reason: 'Bit Change', hours: 8, cost: 800 },
-  { reason: 'Water Shortage', hours: 6, cost: 600 },
-  { reason: 'Weather', hours: 4, cost: 400 },
-  { reason: 'Operator Delay', hours: 3, cost: 300 },
+// ── DOWNTIME DATA — supports unlimited reasons ─────────────────────────────
+const downtimeItems = [
+  { label: 'Mechanical',     value: 12, unit: 'hrs', color: '#EF4444' },
+  { label: 'Bit Change',     value: 8,  unit: 'hrs', color: '#F59E0B' },
+  { label: 'Water Shortage', value: 6,  unit: 'hrs', color: '#64748B' },
+  { label: 'Weather',        value: 4,  unit: 'hrs', color: '#64748B' },
+  { label: 'Operator Delay', value: 3,  unit: 'hrs', color: '#64748B' },
+  { label: 'Hydraulic',      value: 2,  unit: 'hrs', color: '#64748B' },
+  { label: 'Electrical',     value: 2,  unit: 'hrs', color: '#64748B' },
+  { label: 'Safety Hold',    value: 1,  unit: 'hrs', color: '#64748B' },
+  { label: 'Others',         value: 1,  unit: 'hrs', color: '#334155' },
 ]
 
 const productiveData = [
@@ -192,7 +198,7 @@ export default function AdminOperationDashboard() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-4 py-2 bg-[#1A2234] border border-[#1E293B] rounded-xl">
             <Filter className="w-4 h-4 text-[#64748B]" />
-            <select 
+            <select
               className="bg-transparent text-[#F8FAFC] text-sm outline-none"
               value={dateRange}
               onChange={e => setDateRange(e.target.value)}
@@ -213,7 +219,7 @@ export default function AdminOperationDashboard() {
           { label: 'Drilling Hours', value: '1,240', unit: 'hrs', icon: Clock, color: COLORS.cyan, trend: '+8%', up: true },
           { label: 'Downtime', value: '186', unit: 'hrs', icon: AlertCircle, color: COLORS.danger, trend: '-5%', up: false },
         ].map((kpi, i) => (
-          <motion.div 
+          <motion.div
             key={i}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -237,8 +243,9 @@ export default function AdminOperationDashboard() {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* ROP Trend - Premium Area Chart */}
-        <motion.div 
+
+        {/* ROP Trend - keeps chart (only 7 data points, works fine) */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
@@ -273,8 +280,8 @@ export default function AdminOperationDashboard() {
           </div>
         </motion.div>
 
-        {/* Meters Drilled - Stacked Bar */}
-        <motion.div 
+        {/* Meters Drilled — keeps chart (only 7 days, works fine) */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -296,33 +303,34 @@ export default function AdminOperationDashboard() {
           </div>
         </motion.div>
 
-        {/* Downtime Analysis - Horizontal Bar */}
-        <motion.div 
+        {/* ── DOWNTIME BY REASON — REPLACED WITH RankedList ── */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="bg-[#111827] border border-[#1E293B] rounded-2xl p-6"
         >
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Downtime by Reason</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={downtimeData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" horizontal={false} />
-                <XAxis type="number" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} />
-                <YAxis dataKey="reason" type="category" stroke="#94A3B8" tick={{ fill: '#94A3B8', fontSize: 12 }} tickLine={false} axisLine={{ stroke: '#1E293B' }} width={100} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="hours" name="Hours" fill="#EF4444" radius={[0, 4, 4, 0]}>
-                  {downtimeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? '#EF4444' : index === 1 ? '#F59E0B' : '#64748B'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold text-[#F8FAFC]">Downtime by Reason</h3>
+            <span className="text-xs text-[#64748B] bg-[#1A2234] px-3 py-1 rounded-full border border-[#1E293B]">
+              {downtimeItems.reduce((s, i) => s + i.value, 0)} hrs total
+            </span>
           </div>
+          <p className="text-xs text-[#64748B] mb-4">Top causes ranked by hours lost — scroll to see all</p>
+          <RankedList
+            items={downtimeItems}
+            showPercent={true}
+            showValue={true}
+            showRank={true}
+            maxVisible={5}
+            searchable={true}
+            highlightTop={2}
+            colorMode="cycle"
+          />
         </motion.div>
 
-        {/* Productive vs Downtime - Composed Chart */}
-        <motion.div 
+        {/* Productive vs Downtime */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
@@ -346,8 +354,8 @@ export default function AdminOperationDashboard() {
           </div>
         </motion.div>
 
-        {/* Formation vs ROP - Scatter-style Bar */}
-        <motion.div 
+        {/* Formation vs ROP */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
@@ -371,8 +379,8 @@ export default function AdminOperationDashboard() {
           </div>
         </motion.div>
 
-        {/* Bit Performance - Dual Axis */}
-        <motion.div 
+        {/* Bit Performance */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
@@ -395,8 +403,8 @@ export default function AdminOperationDashboard() {
           </div>
         </motion.div>
 
-        {/* Completion Type - Donut Chart */}
-        <motion.div 
+        {/* Completion Type - Donut */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
@@ -426,8 +434,8 @@ export default function AdminOperationDashboard() {
           </div>
         </motion.div>
 
-        {/* Supplier Comparison - Radar-style Bar */}
-        <motion.div 
+        {/* Cost per Meter by Supplier */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
@@ -450,7 +458,9 @@ export default function AdminOperationDashboard() {
             </ResponsiveContainer>
           </div>
         </motion.div>
+
       </div>
     </div>
   )
 }
+
