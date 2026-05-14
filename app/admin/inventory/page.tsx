@@ -11,7 +11,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts'
-import { useCurrency } from '../../components/currency-context'
+import { useCurrency } from '../../../components/currency-context'
 
 // ── MOCK DATA ──────────────────────────────────────────────────────────────
 const sites = ['All Sites', 'Site A - Chhindwara', 'Site B - Madheri', 'Site C - Bokaro', 'Site D - Bhalukona']
