@@ -6,7 +6,7 @@ import {
   Plus, Trash2, Search, ChevronDown, ArrowLeftRight,
   AlertTriangle, TrendingDown, Package, History, X, Check
 } from 'lucide-react'
-import { useCurrency } from '../../components/currency-context'
+import { useCurrency } from '../../../components/currency-context'
 
 // ── TYPES ──────────────────────────────────────────────────────────────────
 interface StockItem {
