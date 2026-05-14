@@ -211,8 +211,6 @@ export default function AdminMaintenanceDashboard() {
             metric2Label="Downtime"
             metric1Color="#3B82F6"
             metric2Color="#EF4444"
-            metric1Unit="x"
-            metric2Unit="hrs"
             maxVisible={6}
             searchable={true}
             alertThreshold={40}
