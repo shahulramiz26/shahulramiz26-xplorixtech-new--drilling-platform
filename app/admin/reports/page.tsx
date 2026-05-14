@@ -488,10 +488,10 @@ export default function AdminReportPage() {
                 }}>{p.type}</div>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                {p.type==='Driller'
+                {(p.type==='Driller'
                   ? [{ l:'Meters', v:`${(p.totalMeters/1000).toFixed(0)}k m` },{ l:'ROP', v:`${p.avgROP} m/hr` },{ l:'Grade', v:p.grade }]
                   : [{ l:'Shifts', v:p.totalShifts.toString() },{ l:'Efficiency', v:`${p.efficiency}%` },{ l:'Grade', v:p.grade }]
-                }.map((s,i)=>(
+                ).map((s,i)=>(
                   <div key={i} style={{ padding:'8px 10px',background:'rgba(255,255,255,0.03)',borderRadius:8,border:'1px solid #1E293B' }}>
                     <div style={{ fontSize:9,color:'#64748B',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:2 }}>{s.l}</div>
                     <div style={{ fontSize:13,fontWeight:800,color:i===2?'#F97316':'#F8FAFC',fontFamily:"'Space Grotesk',sans-serif" }}>{s.v}</div>
