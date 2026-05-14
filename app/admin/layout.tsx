@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Users, FolderOpen, Settings,
   Truck, CreditCard, BarChart3, LogOut, Menu,
-  ChevronRight, Search, DollarSign, Bell, X
+  ChevronRight, Search, DollarSign, Bell, X, Boxes
 } from 'lucide-react'
 import NotificationCenter from '../components/NotificationCenter'
 import { CurrencyProvider } from '../components/currency-context'
@@ -16,6 +16,7 @@ import CurrencySwitcher from '../components/CurrencySwitcher'
 const navItems = [
   { href: '/admin/dashboard',  label: 'Dashboard',         icon: LayoutDashboard },
   { href: '/admin/finance',    label: 'Finance & Costing',  icon: DollarSign      },
+  { href: '/admin/inventory',  label: 'Inventory',          icon: Boxes           },
   { href: '/admin/users',      label: 'User Management',    icon: Users           },
   { href: '/admin/projects',   label: 'Projects',           icon: FolderOpen      },
   { href: '/admin/rigs',       label: 'Rigs & Equipment',   icon: Truck           },
