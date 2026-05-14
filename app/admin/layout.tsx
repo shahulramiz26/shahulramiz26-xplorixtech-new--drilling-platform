@@ -7,29 +7,29 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Users, FolderOpen, Settings,
   Truck, CreditCard, BarChart3, LogOut, Menu,
-  ChevronRight, Search, DollarSign, Bell, X, Boxes
+  ChevronRight, Search, DollarSign, Bell, X, Boxes, FileText
 } from 'lucide-react'
 import NotificationCenter from '../components/NotificationCenter'
 import { CurrencyProvider } from '../components/currency-context'
 import CurrencySwitcher from '../components/CurrencySwitcher'
 
 const navItems = [
-  { href: '/admin/dashboard',  label: 'Dashboard',         icon: LayoutDashboard },
-  { href: '/admin/finance',    label: 'Finance & Costing',  icon: DollarSign      },
-  { href: '/admin/inventory',  label: 'Inventory',          icon: Boxes           },
-  { href: '/admin/users',      label: 'User Management',    icon: Users           },
-  { href: '/admin/projects',   label: 'Projects',           icon: FolderOpen      },
-  { href: '/admin/rigs',       label: 'Rigs & Equipment',   icon: Truck           },
-  { href: '/admin/billing',    label: 'Billing',            icon: CreditCard      },
-  { href: '/admin/analytics',  label: 'Analytics',          icon: BarChart3       },
-  { href: '/admin/settings',   label: 'Settings',           icon: Settings        },
+  { href: '/admin/dashboard',  label: 'Dashboard',            icon: LayoutDashboard },
+  { href: '/admin/finance',    label: 'Finance & Costing',     icon: DollarSign      },
+  { href: '/admin/inventory',  label: 'Inventory',             icon: Boxes           },
+  { href: '/admin/users',      label: 'User Management',       icon: Users           },
+  { href: '/admin/projects',   label: 'Projects',              icon: FolderOpen      },
+  { href: '/admin/rigs',       label: 'Rigs & Equipment',      icon: Truck           },
+  { href: '/admin/billing',    label: 'Billing',               icon: CreditCard      },
+  { href: '/admin/analytics',  label: 'Analytics',             icon: BarChart3       },
+  { href: '/admin/reports',    label: 'Performance Reports',   icon: FileText        },
+  { href: '/admin/settings',   label: 'Settings',              icon: Settings        },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
 
-  // Get current page label for breadcrumb
   const currentPage = navItems.find(n => pathname === n.href || pathname.startsWith(n.href + '/'))
   const pageLabel = currentPage?.label || pathname.split('/')[2] || 'Dashboard'
 
@@ -98,7 +98,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       background: isActive ? 'linear-gradient(90deg, rgba(249,115,22,0.12), transparent)' : 'transparent',
                       borderLeft: isActive ? '2px solid #F97316' : '2px solid transparent',
                       color: isActive ? '#F8FAFC' : '#64748B',
-                      marginLeft: isActive ? 0 : 0,
                     }}
                     onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLElement).style.color = '#F8FAFC' }}
                     onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#64748B' }}}
@@ -120,7 +119,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           </nav>
 
-          {/* Bottom section - Live status indicator */}
+          {/* Live status */}
           <div className="px-4 pb-2">
             <div style={{
               padding: '10px 14px', borderRadius: 10,
@@ -182,8 +181,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   style={{ padding: 8, color: '#64748B', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 8, display: 'flex' }}>
                   <Menu size={22} />
                 </button>
-
-                {/* Breadcrumb */}
                 <div className="hidden md:flex items-center gap-2" style={{ fontSize: 13 }}>
                   <span style={{ color: '#334155', fontWeight: 500 }}>XPLORIX</span>
                   <ChevronRight size={14} style={{ color: '#334155' }} />
@@ -201,42 +198,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
               {/* Right */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-
-                {/* Search */}
                 <div className="hidden md:flex items-center gap-2"
-                  style={{
-                    padding: '8px 14px', borderRadius: 10,
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid #1E293B',
-                    transition: 'all 0.2s',
-                  }}>
+                  style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid #1E293B', transition: 'all 0.2s' }}>
                   <Search size={14} style={{ color: '#64748B', flexShrink: 0 }} />
                   <input type="text" placeholder="Search..."
-                    style={{
-                      background: 'none', border: 'none', outline: 'none',
-                      color: '#F8FAFC', fontSize: 13, width: 160,
-                      fontFamily: 'inherit',
-                    }}
-                  />
+                    style={{ background: 'none', border: 'none', outline: 'none', color: '#F8FAFC', fontSize: 13, width: 160, fontFamily: 'inherit' }} />
                 </div>
-
-                {/* Currency Switcher */}
                 <CurrencySwitcher />
-
-                {/* Notifications */}
                 <NotificationCenter />
-
-                {/* New Project CTA */}
                 <Link href="/admin/projects"
                   className="hidden sm:flex items-center gap-2"
-                  style={{
-                    padding: '8px 18px', borderRadius: 10,
-                    background: 'linear-gradient(135deg, #F97316, #EA580C)',
-                    color: '#fff', fontWeight: 700, fontSize: 13,
-                    textDecoration: 'none',
-                    boxShadow: '0 4px 20px rgba(249,115,22,0.3)',
-                    transition: 'all 0.25s',
-                    whiteSpace: 'nowrap',
-                  }}
+                  style={{ padding: '8px 18px', borderRadius: 10, background: 'linear-gradient(135deg, #F97316, #EA580C)', color: '#fff', fontWeight: 700, fontSize: 13, textDecoration: 'none', boxShadow: '0 4px 20px rgba(249,115,22,0.3)', transition: 'all 0.25s', whiteSpace: 'nowrap' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 30px rgba(249,115,22,0.45)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(249,115,22,0.3)' }}
                 >
@@ -254,7 +226,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         </main>
 
-        {/* Global pulse animation */}
         <style>{`
           @keyframes pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
