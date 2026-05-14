@@ -6,7 +6,7 @@ import {
   Plus, Trash2, Edit2, Check, X, Upload, Download,
   Search, ChevronDown, Package, AlertCircle, FileSpreadsheet
 } from 'lucide-react'
-import { useCurrency } from '../../components/currency-context'
+import { useCurrency } from '../../../components/currency-context'
 
 // ── TYPES ──────────────────────────────────────────────────────────────────
 interface Part {
