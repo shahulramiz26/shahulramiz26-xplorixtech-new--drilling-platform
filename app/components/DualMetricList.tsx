@@ -86,7 +86,7 @@ export default function DualMetricList({
             { label:metric2Label, color:metric2Color, key:'metric2' as const }].map(m => (
             <button key={m.key} onClick={() => setActiveSortBy(m.key)}
               style={{
-                display:'flex', alignItems:'center', gap:5, background:'none', border:'none', cursor:'pointer',
+                display:'flex', alignItems:'center', gap:5, border:'none', cursor:'pointer',
                 padding:'3px 8px', borderRadius:6,
                 background: activeSortBy===m.key ? 'rgba(255,255,255,0.06)' : 'transparent',
               }}>
