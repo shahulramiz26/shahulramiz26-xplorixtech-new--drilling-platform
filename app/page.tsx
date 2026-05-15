@@ -1,586 +1,950 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 
-export default function LandingPage() {
+// ── TYPES ──────────────────────────────────────────────────────────────────
+interface CounterProps { target: number; suffix?: string; prefix?: string; duration?: number }
 
-  // ── Animate counters on scroll ──
+// ── COUNTER HOOK ───────────────────────────────────────────────────────────
+function useCounter({ target, suffix = '', prefix = '', duration = 2000 }: CounterProps) {
+  const [value, setValue] = useState(0)
+  const [started, setStarted] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null)
+
   useEffect(() => {
-    // Generate chart bars
-    const bars = document.getElementById('chartBars')
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !started) {
+        setStarted(true)
+        let start = 0
+        const step = (timestamp: number) => {
+          if (!start) start = timestamp
+          const progress = Math.min((timestamp - start) / duration, 1)
+          setValue(Math.floor(progress * target))
+          if (progress < 1) requestAnimationFrame(step)
+          else setValue(target)
+        }
+        requestAnimationFrame(step)
+      }
+    }, { threshold: 0.5 })
+    if (ref.current) observer.observe(ref.current)
+    return () => observer.disconnect()
+  }, [target, duration, started])
+
+  return { value: `${prefix}${value.toLocaleString()}${suffix}`, ref }
+}
+
+// ── XPLORIX LOGO SVG ───────────────────────────────────────────────────────
+function XLogo({ size = 40, className = '' }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
+      <polygon points="50,50 5,5 5,95"    fill="#1a1a1a" />
+      <polygon points="50,50 5,5 30,5"    fill="#2a2a2a" />
+      <polygon points="50,50 5,95 30,95"  fill="#2a2a2a" />
+      <polygon points="50,50 95,5 95,95"  fill="#F97316" />
+      <polygon points="50,50 95,5 70,5"   fill="#EA580C" />
+      <polygon points="50,50 95,95 70,95" fill="#EA580C" />
+    </svg>
+  )
+}
+
+// ── SECTION TAG ────────────────────────────────────────────────────────────
+function Tag({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'5px 14px', borderRadius:100, border:'1px solid rgba(249,115,22,0.25)', background:'rgba(249,115,22,0.05)', fontSize:10, fontWeight:700, color:'#F97316', letterSpacing:'0.15em', textTransform:'uppercase' as const, marginBottom:20 }}>
+      <span style={{ width:5, height:5, borderRadius:'50%', background:'#F97316', display:'inline-block' }} />
+      {children}
+    </div>
+  )
+}
+
+// ── FADE IN WRAPPER ────────────────────────────────────────────────────────
+function FadeIn({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const observer = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true) }, { threshold: 0.1 })
+    if (ref.current) observer.observe(ref.current)
+    return () => observer.disconnect()
+  }, [])
+  return (
+    <div ref={ref} className={className} style={{ opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(28px)', transition: `opacity 0.6s ease ${delay}s, transform 0.6s ease ${delay}s` }}>
+      {children}
+    </div>
+  )
+}
+
+// ── MAIN PAGE ──────────────────────────────────────────────────────────────
+export default function LandingPage() {
+  const [activeTab, setActiveTab] = useState(0)
+  const [activeFaq, setActiveFaq] = useState<number | null>(null)
+  const [mobileMenu, setMobileMenu] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const [typeIndex, setTypeIndex] = useState(0)
+  const [displayText, setDisplayText] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const typingWords = ['Reimagined.', 'Simplified.', 'Optimized.', 'Digitized.']
+
+  // Typing effect
+  useEffect(() => {
+    const word = typingWords[typeIndex]
+    let timeout: ReturnType<typeof setTimeout>
+    if (!isDeleting) {
+      if (displayText.length < word.length) {
+        timeout = setTimeout(() => setDisplayText(word.slice(0, displayText.length + 1)), 80)
+      } else {
+        timeout = setTimeout(() => setIsDeleting(true), 2000)
+      }
+    } else {
+      if (displayText.length > 0) {
+        timeout = setTimeout(() => setDisplayText(displayText.slice(0, -1)), 40)
+      } else {
+        setIsDeleting(false)
+        setTypeIndex((typeIndex + 1) % typingWords.length)
+      }
+    }
+    return () => clearTimeout(timeout)
+  }, [displayText, isDeleting, typeIndex])
+
+  // Scroll handler
+  useEffect(() => {
+    const handler = () => setScrolled(window.scrollY > 40)
+    window.addEventListener('scroll', handler)
+    return () => window.removeEventListener('scroll', handler)
+  }, [])
+
+  // Generate chart bars for hero
+  useEffect(() => {
+    const bars = document.getElementById('heroBars')
     if (bars && bars.children.length === 0) {
-      const heights = [35,45,30,55,40,60,45,70,55,80,65,85,70,90,75,95,80,85,90,88]
+      const heights = [35, 48, 30, 58, 42, 65, 50, 72, 58, 80, 65, 88, 72, 92, 78, 95, 82, 88, 90, 86]
       heights.forEach((h, i) => {
         const b = document.createElement('div')
-        b.style.cssText = `flex:1;border-radius:3px 3px 0 0;height:${h}%;animation:barGrow 1s ease-out ${i*0.05}s both;transform-origin:bottom;background:${i>=16?'linear-gradient(to top,#F97316,#F59E0B)':'rgba(59,130,246,0.3)'}`
+        b.style.cssText = `flex:1;border-radius:3px 3px 0 0;height:${h}%;background:${i >= 15 ? 'linear-gradient(to top,#F97316,#F59E0B)' : 'rgba(59,130,246,0.35)'};animation:barGrow 1s ease-out ${i * 0.05}s both;transform-origin:bottom`
         bars.appendChild(b)
       })
     }
-
-    // Scroll fade-in
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('xpl-visible') })
-    }, { threshold: 0.1 })
-    document.querySelectorAll('.xpl-fade').forEach(el => observer.observe(el))
-
-    // Counter animation
-    function animateCounter(el: Element, target: number, suffix: string) {
-      let start = 0
-      const duration = 2000
-      const step = (timestamp: number) => {
-        if (!start) start = timestamp
-        const progress = Math.min((timestamp - start) / duration, 1)
-        ;(el as HTMLElement).textContent = Math.floor(progress * target) + suffix
-        if (progress < 1) requestAnimationFrame(step)
-        else (el as HTMLElement).textContent = target + suffix
-      }
-      requestAnimationFrame(step)
-    }
-
-    const counterObserver = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          const el = e.target as HTMLElement
-          animateCounter(el, parseInt(el.dataset.target || '0'), el.dataset.suffix || '+')
-          counterObserver.unobserve(el)
-        }
-      })
-    }, { threshold: 0.5 })
-    document.querySelectorAll('.xpl-counter').forEach(el => counterObserver.observe(el))
-
-    // Navbar scroll
-    const handleScroll = () => {
-      const nav = document.getElementById('xpl-nav')
-      if (nav) {
-        nav.style.background = window.scrollY > 50 ? 'rgba(8,11,16,0.98)' : 'rgba(8,11,16,0.8)'
-        nav.style.borderBottomColor = window.scrollY > 50 ? 'rgba(30,41,59,0.8)' : 'rgba(30,41,59,0.4)'
-      }
-    }
-    window.addEventListener('scroll', handleScroll)
-    return () => {
-      observer.disconnect()
-      counterObserver.disconnect()
-      window.removeEventListener('scroll', handleScroll)
-    }
   }, [])
 
+  const navLinks = [
+    { label: 'About',      href: '#about'      },
+    { label: 'Platform',   href: '#features'   },
+    { label: 'How it Works',href: '#how'       },
+    { label: 'AI Insights',href: '#ai'         },
+    { label: 'Industries', href: '#industries' },
+    { label: 'Contact',    href: '#contact'    },
+  ]
+
+  const features = [
+    {
+      tab: 'Operations',
+      icon: '⚡',
+      color: '#F97316',
+      title: 'Real-Time Operations Intelligence',
+      desc: 'Track every meter drilled, every shift, every rig — all in one place. Live dashboards give you complete visibility into ROP, downtime, core recovery and bit performance.',
+      points: ['Live ROP trending & alerts', 'Meters drilled vs target tracking', 'Downtime analysis by reason', 'Bit performance & cost per meter', 'Formation type comparison', 'Shift-by-shift productivity'],
+      stat: { label: 'Avg ROP Improvement', value: '+23%' }
+    },
+    {
+      tab: 'Maintenance',
+      icon: '🔧',
+      color: '#3B82F6',
+      title: 'Predictive Maintenance Dashboard',
+      desc: 'Stop reacting to breakdowns. XPLORIX tracks component health, maintenance history and failure patterns — so your team fixes problems before they become downtime.',
+      points: ['Component failure frequency tracking', 'MTBF by rig analysis', 'Maintenance cost trends', 'Oil consumption monitoring', 'Scheduled vs breakdown ratio', 'Repair action history'],
+      stat: { label: 'Downtime Reduction', value: '-35%' }
+    },
+    {
+      tab: 'Driller & Crew',
+      icon: '👷',
+      color: '#10B981',
+      title: 'Driller Performance Leaderboard',
+      desc: 'Know who your top performers are. Track individual driller metrics, compare shifts, and identify training opportunities — all backed by data from actual drill logs.',
+      points: ['Individual ROP & meters leaderboard', 'Shift comparison analytics', 'Crew hours & utilization', 'Experience vs performance analysis', 'Downloadable performance certificates', 'Top performer recognition'],
+      stat: { label: 'Productivity Gain', value: '+18%' }
+    },
+    {
+      tab: 'Consumables',
+      icon: '📦',
+      color: '#8B5CF6',
+      title: 'Consumables & Cost Control',
+      desc: 'Track every litre of fuel, every drill bit, every accessory. XPLORIX connects consumption data to performance — so you know exactly what\'s being used and why.',
+      points: ['Fuel & water consumption tracking', 'Accessory usage by cost rank', 'Inventory level alerts', 'Supplier performance scoring', 'Cost per meter breakdown', 'Waste reduction insights'],
+      stat: { label: 'Cost Savings', value: '18%' }
+    },
+    {
+      tab: 'HSC & Safety',
+      icon: '🛡',
+      color: '#EF4444',
+      title: 'Safety & Compliance Command Centre',
+      desc: 'Zero incidents starts with visibility. XPLORIX tracks safety metrics, PPE compliance, near-misses and training completion — keeping your team safe and your company compliant.',
+      points: ['Incident type & severity tracking', 'PPE compliance by item', 'Near-miss reporting & resolution', 'Safety training completion', 'Lost time injury rate (LTIF)', 'Hazard reporting dashboard'],
+      stat: { label: 'Safety Score', value: '98%' }
+    },
+  ]
+
+  const howItWorks = [
+    { step: '01', icon: '🔌', title: 'Connect Your Rigs', desc: 'Set up your company, add your projects and rigs in under 30 minutes. No IT team needed — just your admin login and a browser.', color: '#F97316' },
+    { step: '02', icon: '📋', title: 'Drillers Log Shifts', desc: 'Supervisors and drillers fill in digital shift logs on any device. Replaces paper completely — faster, more accurate, always backed up.', color: '#3B82F6' },
+    { step: '03', icon: '🧠', title: 'AI Analyses Everything', desc: 'XPLORIX automatically calculates performance metrics, detects anomalies, and delivers daily AI insights — no spreadsheets required.', color: '#10B981' },
+    { step: '04', icon: '📊', title: 'Make Better Decisions', desc: 'From cost per meter to driller performance to equipment health — every decision is backed by real data from your own operations.', color: '#8B5CF6' },
+  ]
+
+  const testimonials = [
+    { name: 'James Whitfield', role: 'Operations Manager', company: 'AusDrill Group', avatar: 'JW', color: '#F97316', quote: 'XPLORIX transformed how we manage our 24 rigs across 3 sites. The downtime tracking alone saved us over $400K in the first quarter.', stars: 5 },
+    { name: 'Priya Nair', role: 'Project Director', company: 'Mineral Exploration India', avatar: 'PN', color: '#3B82F6', quote: 'Finally a platform built for drilling contractors, not generic construction software. The drill log forms are exactly what our supervisors needed.', stars: 5 },
+    { name: 'Ahmed Al-Rashidi', role: 'Chief Drilling Officer', company: 'Gulf Exploration Co.', avatar: 'AA', color: '#10B981', quote: 'The AI insights feature predicted a hydraulic failure on RIG-07 before it happened. That\'s the kind of intelligence that changes the game.', stars: 5 },
+  ]
+
+  const faqs = [
+    { q: 'How long does it take to set up XPLORIX?', a: 'Most companies are fully operational within 24-48 hours. Setup involves creating your company profile, adding projects, rigs and users. Our onboarding team guides you through every step.' },
+    { q: 'Do drillers need training to use the system?', a: 'The drill log forms are designed to be intuitive — most drillers are comfortable after one shift. We also provide video walkthroughs and live support during your first week.' },
+    { q: 'Can XPLORIX work offline on remote sites?', a: 'Yes. The drilling log works in offline mode and automatically syncs when connectivity is restored. Perfect for remote exploration sites with limited internet.' },
+    { q: 'How is our drilling data kept secure?', a: 'All data is encrypted in transit and at rest. Each company has completely isolated data — no other company can see your data. We are SOC 2 compliant and follow enterprise security standards.' },
+    { q: 'Can I export our data to Excel or PDF?', a: 'Absolutely. All reports, dashboards and drill logs can be exported to Excel, CSV or PDF. Drillers can also download their personal performance certificates directly.' },
+    { q: 'Do you support multiple projects and sites simultaneously?', a: 'Yes. XPLORIX is built for multi-site, multi-project operations. You can manage unlimited projects and rigs, with each site having its own inventory, stock and reporting.' },
+    { q: 'What drilling types does XPLORIX support?', a: 'XPLORIX supports Diamond Core, RC, Blast Hole, Geotechnical and other exploration drilling types. The platform adapts to your industry type during setup.' },
+    { q: 'How does pricing work?', a: 'Pricing is customised based on your fleet size, number of projects and required features. Contact our team for a personalised quote — most companies find XPLORIX pays for itself within the first month.' },
+  ]
+
+  const industries = [
+    { icon: '⛏', title: 'Mining', desc: 'End-to-end visibility for surface & underground mining operations.', tag: 'LIVE' },
+    { icon: '🔩', title: 'Exploration Drilling', desc: 'Built first for diamond core & RC operations in remote environments.', tag: 'LIVE' },
+    { icon: '🏔', title: 'Geotechnical Drilling', desc: 'Track investigation programs at scale with full data visibility.', tag: 'LIVE' },
+    { icon: '💥', title: 'Blast Hole Drilling', desc: 'Productivity intelligence for high-volume production drilling.', tag: 'LIVE' },
+  ]
+
+  const aiInsights = [
+    { type: 'warning', icon: '⚠️', rig: 'RIG-003', title: 'Hydraulic Anomaly Detected', desc: 'Pressure fluctuation pattern matches pre-failure signature. Recommend inspection within 48hrs.', time: '2 min ago', badge: 'Predictive Alert' },
+    { type: 'success', icon: '📈', rig: 'RIG-001', title: 'ROP Optimisation Found', desc: 'Drilling at 72 bar vs current 85 bar improves ROP by 14% in medium formation. Adjust parameters.', time: '15 min ago', badge: 'Performance Tip' },
+    { type: 'info', icon: '💰', rig: 'All Rigs', title: 'Cost Per Meter Opportunity', desc: 'Switching to NQ SR-08 bits on RIG-004 & RIG-006 could reduce bit cost/m by 22% based on formation data.', time: '1 hr ago', badge: 'Cost Insight' },
+    { type: 'danger', icon: '🚨', rig: 'Site B', title: 'Fuel Consumption Spike', desc: 'Fuel usage 31% above 30-day baseline. Possible air compressor inefficiency or fuel leak. Inspect now.', time: '3 hrs ago', badge: 'Anomaly' },
+  ]
+
+  const insightColors: Record<string, [string, string]> = {
+    warning: ['rgba(245,158,11,0.08)', '#F59E0B'],
+    success: ['rgba(16,185,129,0.08)', '#10B981'],
+    info:    ['rgba(59,130,246,0.08)', '#3B82F6'],
+    danger:  ['rgba(239,68,68,0.08)',  '#EF4444'],
+  }
+
   return (
-    <>
-      {/* ── GLOBAL STYLES ── */}
+    <div style={{ fontFamily:"'Inter',sans-serif", background:'#080B10', color:'#F8FAFC', overflowX:'hidden' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
-
-        .xpl-page * { margin:0; padding:0; box-sizing:border-box; }
-        .xpl-page {
-          font-family:'Inter',sans-serif;
-          background:#080B10; color:#F8FAFC;
-          overflow-x:hidden; scroll-behavior:smooth;
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
+        * { box-sizing:border-box; margin:0; padding:0; }
+        html { scroll-behavior:smooth; }
+        ::-webkit-scrollbar { width:4px; }
+        ::-webkit-scrollbar-track { background:#080B10; }
+        ::-webkit-scrollbar-thumb { background:#1E293B; border-radius:2px; }
+        ::selection { background:rgba(249,115,22,0.2); }
+        @keyframes barGrow { from{transform:scaleY(0)} to{transform:scaleY(1)} }
+        @keyframes xplPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.5)} }
+        @keyframes xplFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        @keyframes xplFloat2 { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-7px) rotate(-2deg)} }
+        @keyframes xplFloat3 { 0%,100%{transform:translateY(0) rotate(1deg)} 50%{transform:translateY(7px) rotate(1deg)} }
+        @keyframes xplSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes xplGlow { 0%,100%{box-shadow:0 0 20px rgba(249,115,22,0.2)} 50%{box-shadow:0 0 40px rgba(249,115,22,0.5)} }
+        .xpl-float  { animation:xplFloat  6s ease-in-out infinite; }
+        .xpl-float2 { animation:xplFloat2 5s ease-in-out infinite; }
+        .xpl-float3 { animation:xplFloat3 7s ease-in-out infinite; }
+        .xpl-pulse  { animation:xplPulse  2s infinite; }
+        .xpl-glow   { animation:xplGlow   3s ease-in-out infinite; }
+        .nav-link { color:#94A3B8; text-decoration:none; font-size:14px; font-weight:500; transition:color 0.2s; }
+        .nav-link:hover { color:#F8FAFC; }
+        .btn-primary { display:inline-flex;align-items:center;gap:8px;padding:13px 28px;border-radius:12px;border:none;cursor:pointer;background:linear-gradient(135deg,#F97316,#EA580C);color:#fff;font-weight:700;font-size:15px;font-family:'Inter',sans-serif;box-shadow:0 4px 30px rgba(249,115,22,0.3);transition:all 0.25s;text-decoration:none; }
+        .btn-primary:hover { transform:translateY(-2px);box-shadow:0 8px 40px rgba(249,115,22,0.45); }
+        .btn-ghost { display:inline-flex;align-items:center;gap:8px;padding:13px 28px;border-radius:12px;cursor:pointer;background:rgba(255,255,255,0.05);border:1px solid #1E293B;color:#F8FAFC;font-weight:600;font-size:15px;font-family:'Inter',sans-serif;transition:all 0.25s;text-decoration:none; }
+        .btn-ghost:hover { background:rgba(255,255,255,0.09);border-color:#334155; }
+        .card-hover { transition:all 0.3s; }
+        .card-hover:hover { border-color:rgba(249,115,22,0.3)!important;transform:translateY(-4px);box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+        .faq-item { transition:all 0.3s; }
+        @media(max-width:768px) {
+          .hero-grid { grid-template-columns:1fr!important; }
+          .hero-visual { display:none!important; }
+          .features-grid { grid-template-columns:1fr!important; }
+          .how-grid { grid-template-columns:1fr 1fr!important; }
+          .testi-grid { grid-template-columns:1fr!important; }
+          .ind-grid { grid-template-columns:1fr 1fr!important; }
+          .footer-grid { grid-template-columns:1fr 1fr!important; }
+          .stat-grid { grid-template-columns:1fr 1fr!important; }
         }
-        .xpl-page h1,.xpl-page h2,.xpl-page h3,.xpl-page h4 {
-          font-family:'Space Grotesk',sans-serif; font-weight:700;
-        }
-        .xpl-page ::-webkit-scrollbar{width:4px}
-        .xpl-page ::-webkit-scrollbar-track{background:#080B10}
-        .xpl-page ::-webkit-scrollbar-thumb{background:#1E293B;border-radius:2px}
-
-        /* Fade animations */
-        .xpl-fade { opacity:0; transform:translateY(28px); transition:opacity 0.6s ease, transform 0.6s ease; }
-        .xpl-fade.xpl-visible { opacity:1; transform:translateY(0); }
-        .xpl-d1{transition-delay:0.1s} .xpl-d2{transition-delay:0.2s}
-        .xpl-d3{transition-delay:0.3s} .xpl-d4{transition-delay:0.4s}
-
-        /* Float */
-        @keyframes xplFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
-        @keyframes xplFloat2{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-8px) rotate(-2deg)}}
-        @keyframes xplFloat3{0%,100%{transform:translateY(0) rotate(1deg)}50%{transform:translateY(8px) rotate(1deg)}}
-        @keyframes barGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-        @keyframes xplPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.4)}}
-
-        .xpl-float{animation:xplFloat 6s ease-in-out infinite}
-        .xpl-float2{animation:xplFloat2 5s ease-in-out infinite}
-        .xpl-float3{animation:xplFloat3 7s ease-in-out infinite}
-        .xpl-pulse{animation:xplPulse 2s infinite}
-
-        /* Gradient text */
-        .xpl-orange{color:#F97316}
-        .xpl-blue{color:#60A5FA}
-        .xpl-muted{color:#94A3B8}
-        .xpl-dim{color:#64748B}
-
-        /* Buttons */
-        .xpl-btn-primary{
-          display:inline-flex;align-items:center;gap:8px;
-          padding:14px 28px;border-radius:12px;border:none;cursor:pointer;
-          background:linear-gradient(135deg,#F97316,#EA580C);
-          color:#fff;font-weight:700;font-size:15px;font-family:'Inter',sans-serif;
-          box-shadow:0 4px 30px rgba(249,115,22,0.3);
-          transition:all 0.25s;text-decoration:none;
-        }
-        .xpl-btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 40px rgba(249,115,22,0.45)}
-        .xpl-btn-secondary{
-          display:inline-flex;align-items:center;gap:8px;
-          padding:14px 28px;border-radius:12px;cursor:pointer;
-          background:rgba(255,255,255,0.05);border:1px solid #1E293B;
-          color:#F8FAFC;font-weight:600;font-size:15px;font-family:'Inter',sans-serif;
-          transition:all 0.25s;text-decoration:none;
-        }
-        .xpl-btn-secondary:hover{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.2)}
-
-        /* Section tag */
-        .xpl-tag{
-          display:inline-flex;align-items:center;gap:8px;
-          padding:5px 14px;border-radius:100px;
-          border:1px solid rgba(249,115,22,0.25);
-          background:rgba(249,115,22,0.05);
-          font-size:10px;font-weight:700;letter-spacing:0.15em;color:#F97316;
-          text-transform:uppercase;margin-bottom:20px;
-        }
-        .xpl-tag-dot{width:5px;height:5px;border-radius:50%;background:#F97316}
-
-        /* Cards */
-        .xpl-card{
-          background:#0D1117;border:1px solid #1E293B;
-          border-radius:20px;transition:all 0.3s;
-        }
-        .xpl-card:hover{border-color:rgba(249,115,22,0.25)}
-
-        /* Nav */
-        #xpl-nav{
-          position:fixed;top:0;left:0;right:0;z-index:900;
-          display:flex;align-items:center;justify-content:space-between;
-          padding:16px 60px;
-          background:rgba(8,11,16,0.8);
-          backdrop-filter:blur(20px);
-          border-bottom:1px solid rgba(30,41,59,0.4);
-          transition:all 0.3s;
-        }
-
-        /* Responsive */
-        @media(max-width:1024px){
-          #xpl-nav{padding:14px 20px}
-          .xpl-nav-links{display:none!important}
-          .xpl-hero-inner{grid-template-columns:1fr!important}
-          .xpl-hero-visual{display:none!important}
-          .xpl-about-grid,.xpl-log-grid,.xpl-ai-grid,.xpl-cta-grid{grid-template-columns:1fr!important}
-          .xpl-vm-grid,.xpl-dash-grid{grid-template-columns:1fr!important}
-          .xpl-ind-grid{grid-template-columns:1fr 1fr!important}
-          .xpl-stats-inner{grid-template-columns:1fr 1fr!important}
-          .xpl-form-row{grid-template-columns:1fr!important}
-          .xpl-section{padding:70px 20px!important}
-          .xpl-stats-bar{padding:40px 20px!important}
+        @media(max-width:480px) {
+          .how-grid { grid-template-columns:1fr!important; }
+          .ind-grid { grid-template-columns:1fr!important; }
+          .footer-grid { grid-template-columns:1fr!important; }
         }
       `}</style>
 
-      <div className="xpl-page">
-
-        {/* ── NAV ── */}
-        <nav id="xpl-nav">
-          <Link href="/" style={{ display:'flex', alignItems:'center', gap:12, textDecoration:'none' }}>
-            <div style={{ width:38,height:38,borderRadius:10,background:'linear-gradient(135deg,#F97316,#F59E0B)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:18,color:'#000',boxShadow:'0 0 20px rgba(249,115,22,0.3)',fontFamily:"'Space Grotesk',sans-serif" }}>X</div>
-            <div>
-              <div style={{ fontSize:16,fontWeight:700,color:'#F8FAFC',letterSpacing:'0.05em',fontFamily:"'Space Grotesk',sans-serif" }}>XPLORIX</div>
-              <div style={{ fontSize:9,color:'#64748B',letterSpacing:'0.15em',textTransform:'uppercase' }}>Drilling Intelligence</div>
-            </div>
-          </Link>
-          <ul className="xpl-nav-links" style={{ display:'flex',gap:36,listStyle:'none' }}>
-            {['#about','#dashboards','#ai','#industries','#cta'].map((href, i) => (
-              <li key={i}><a href={href} style={{ color:'#94A3B8',textDecoration:'none',fontSize:14,fontWeight:500,transition:'color 0.2s' }}
-                onMouseEnter={e => (e.currentTarget.style.color='#F8FAFC')}
-                onMouseLeave={e => (e.currentTarget.style.color='#94A3B8')}
-              >{['About','Platform','AI Insights','Industries','Contact'][i]}</a></li>
-            ))}
-          </ul>
-          <div style={{ display:'flex',alignItems:'center',gap:14 }}>
-            <Link href="/auth/login" style={{ background:'none',border:'none',color:'#94A3B8',fontSize:14,cursor:'pointer',fontFamily:'inherit',textDecoration:'none',fontWeight:500,transition:'color 0.2s' }}
-              onMouseEnter={e => (e.currentTarget.style.color='#F8FAFC')}
-              onMouseLeave={e => (e.currentTarget.style.color='#94A3B8')}
-            >Sign in</Link>
-            <a href="#cta" className="xpl-btn-primary" style={{ padding:'9px 20px',fontSize:13,borderRadius:10 }}>Schedule Demo</a>
+      {/* ══════════════════════════════════════════════════
+          NAV
+      ══════════════════════════════════════════════════ */}
+      <nav style={{ position:'fixed', top:0, left:0, right:0, zIndex:900, padding:'14px 60px', display:'flex', alignItems:'center', justifyContent:'space-between', transition:'all 0.3s', background: scrolled ? 'rgba(8,11,16,0.97)' : 'rgba(8,11,16,0.7)', backdropFilter:'blur(20px)', borderBottom: scrolled ? '1px solid rgba(30,41,59,0.6)' : '1px solid transparent' }}>
+        <a href="/" style={{ display:'flex', alignItems:'center', gap:12, textDecoration:'none' }}>
+          <XLogo size={36} />
+          <div>
+            <div style={{ fontSize:16, fontWeight:800, color:'#F8FAFC', letterSpacing:'0.06em', fontFamily:"'Space Grotesk',sans-serif" }}>XPLORIX</div>
+            <div style={{ fontSize:8, color:'#64748B', letterSpacing:'0.18em', textTransform:'uppercase' }}>Drilling Intelligence</div>
           </div>
-        </nav>
+        </a>
+        <div style={{ display:'flex', gap:32, listStyle:'none' }} className="hidden md:flex">
+          {navLinks.map(n => <a key={n.href} href={n.href} className="nav-link">{n.label}</a>)}
+        </div>
+        <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+          <Link href="/auth/login" style={{ color:'#94A3B8', textDecoration:'none', fontSize:14, fontWeight:500, transition:'color 0.2s' }}
+            onMouseEnter={e=>(e.currentTarget.style.color='#F8FAFC')} onMouseLeave={e=>(e.currentTarget.style.color='#94A3B8')}>Sign in</Link>
+          <a href="#contact" className="btn-primary" style={{ padding:'9px 20px', fontSize:13, borderRadius:10 }}>Schedule Demo</a>
+        </div>
+      </nav>
 
-        {/* ── HERO ── */}
-        <section style={{ minHeight:'100vh',display:'flex',alignItems:'center',padding:'120px 60px 60px',position:'relative',overflow:'hidden' }}>
-          {/* BG */}
-          <div style={{ position:'absolute',inset:0,background:'radial-gradient(ellipse 80% 60% at 50% -10%,rgba(249,115,22,0.08) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 80% 60%,rgba(59,130,246,0.06) 0%,transparent 60%),#080B10' }} />
-          <div style={{ position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(30,41,59,0.15) 1px,transparent 1px),linear-gradient(90deg,rgba(30,41,59,0.15) 1px,transparent 1px)',backgroundSize:'60px 60px',WebkitMaskImage:'radial-gradient(ellipse 80% 80% at 50% 0%,black 0%,transparent 70%)' }} />
+      {/* ══════════════════════════════════════════════════
+          HERO
+      ══════════════════════════════════════════════════ */}
+      <section style={{ minHeight:'100vh', display:'flex', alignItems:'center', padding:'120px 60px 60px', position:'relative', overflow:'hidden' }}>
+        {/* BG */}
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 80% 60% at 50% -10%,rgba(249,115,22,0.07) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 80% 60%,rgba(59,130,246,0.05) 0%,transparent 60%),#080B10' }} />
+        <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(30,41,59,0.12) 1px,transparent 1px),linear-gradient(90deg,rgba(30,41,59,0.12) 1px,transparent 1px)', backgroundSize:'60px 60px', WebkitMaskImage:'radial-gradient(ellipse 100% 80% at 50% 0%,black 0%,transparent 70%)' }} />
 
-          <div className="xpl-hero-inner" style={{ position:'relative',zIndex:2,width:'100%',display:'grid',gridTemplateColumns:'1fr 1fr',gap:60,alignItems:'center',maxWidth:1400,margin:'0 auto' }}>
-            {/* Left */}
-            <div>
-              <div className="xpl-tag" style={{ marginBottom:28 }}>
-                <span style={{ width:6,height:6,borderRadius:'50%',background:'#F97316',animation:'xplPulse 2s infinite',display:'inline-block' }} />
+        <div className="hero-grid" style={{ position:'relative', zIndex:2, width:'100%', maxWidth:1400, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:60, alignItems:'center' }}>
+
+          {/* Left */}
+          <div>
+            <FadeIn>
+              <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'6px 14px', borderRadius:100, border:'1px solid rgba(249,115,22,0.3)', background:'rgba(249,115,22,0.05)', fontSize:11, fontWeight:700, color:'#F97316', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:28 }}>
+                <span className="xpl-pulse" style={{ width:6, height:6, borderRadius:'50%', background:'#F97316', display:'inline-block' }} />
                 Live · AI Drilling Intelligence V3.0
               </div>
-              <h1 style={{ fontSize:'clamp(48px,5vw,78px)',lineHeight:1.05,marginBottom:24 }}>
+            </FadeIn>
+            <FadeIn delay={0.1}>
+              <h1 style={{ fontSize:'clamp(44px,5vw,76px)', lineHeight:1.05, fontFamily:"'Space Grotesk',sans-serif", fontWeight:900, marginBottom:8 }}>
                 Drilling Intelligence<br />
-                <span className="xpl-orange">Reimagi</span><span className="xpl-blue">ned</span>
+                <span style={{ color:'#F97316' }}>{displayText}</span>
+                <span style={{ borderRight:'3px solid #F97316', marginLeft:2, animation:'xplPulse 1s infinite' }}></span>
               </h1>
-              <p style={{ fontSize:17,lineHeight:1.7,color:'#94A3B8',maxWidth:540,marginBottom:40 }}>
-                AI-powered performance intelligence platform for exploration drilling operations — delivering real-time analytics, digital logging, operational visibility, and smarter decision-making.
+            </FadeIn>
+            <FadeIn delay={0.2}>
+              <p style={{ fontSize:17, lineHeight:1.7, color:'#94A3B8', maxWidth:520, marginBottom:36, marginTop:16 }}>
+                AI-powered performance intelligence for exploration drilling operations — real-time analytics, digital logging, and smarter decisions. Built for the toughest operations on earth.
               </p>
-              <div style={{ display:'flex',gap:16,flexWrap:'wrap' }}>
-                <a href="#cta" className="xpl-btn-primary">Schedule Demo →</a>
-                <a href="#dashboards" className="xpl-btn-secondary">▷ Explore Platform</a>
+            </FadeIn>
+            <FadeIn delay={0.3}>
+              <div style={{ display:'flex', gap:14, flexWrap:'wrap', marginBottom:36 }}>
+                <a href="#contact" className="btn-primary">Schedule Demo →</a>
+                <a href="#features" className="btn-ghost">▷ Explore Platform</a>
               </div>
-            </div>
-
-            {/* Right — Dashboard card */}
-            <div className="xpl-hero-visual" style={{ position:'relative' }}>
-              {/* Floating cards */}
-              <div className="xpl-float2" style={{ position:'absolute',top:-30,right:-20,background:'rgba(13,17,23,0.95)',border:'1px solid #1E293B',borderRadius:12,padding:'12px 16px',backdropFilter:'blur(20px)',boxShadow:'0 20px 40px rgba(0,0,0,0.4)',zIndex:2 }}>
-                <div style={{ fontSize:18,fontWeight:700,fontFamily:"'Space Grotesk',sans-serif",color:'#10B981' }}>+12%</div>
-                <div style={{ fontSize:10,color:'#64748B',marginTop:2 }}>AI Insight · Efficiency</div>
-              </div>
-              <div className="xpl-float3" style={{ position:'absolute',bottom:20,left:-30,background:'rgba(13,17,23,0.95)',border:'1px solid #1E293B',borderRadius:12,padding:'12px 16px',backdropFilter:'blur(20px)',boxShadow:'0 20px 40px rgba(0,0,0,0.4)',zIndex:2,display:'flex',gap:16,alignItems:'center' }}>
-                <div><div style={{ fontSize:18,fontWeight:700,fontFamily:"'Space Grotesk',sans-serif",color:'#F8FAFC' }}>1,844</div><div style={{ fontSize:10,color:'#64748B',marginTop:2 }}>Downtime hrs</div></div>
-                <div style={{ width:1,height:32,background:'#1E293B' }} />
-                <div><div style={{ fontSize:16,fontWeight:700,color:'#F97316' }}>-3%</div><div style={{ fontSize:10,color:'#10B981' }}>Improving</div></div>
-              </div>
-
-              {/* Main dashboard card */}
-              <div className="xpl-float" style={{ background:'rgba(13,17,23,0.95)',border:'1px solid #1E293B',borderRadius:20,padding:20,backdropFilter:'blur(20px)',boxShadow:'0 40px 80px rgba(0,0,0,0.5)' }}>
-                <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20 }}>
-                  <div>
-                    <div style={{ fontSize:14,fontWeight:600,color:'#F8FAFC' }}>Rig 07 · Pilbara</div>
-                    <div style={{ fontSize:11,color:'#64748B',marginTop:2 }}>Live Operations</div>
-                  </div>
-                  <div style={{ display:'flex',alignItems:'center',gap:6,fontSize:11,color:'#F97316',background:'rgba(249,115,22,0.1)',padding:'4px 10px',borderRadius:20,border:'1px solid rgba(249,115,22,0.2)' }}>
-                    <span style={{ width:6,height:6,borderRadius:'50%',background:'#F97316',animation:'xplPulse 1.5s infinite',display:'inline-block' }} />
-                    Drilling
-                  </div>
-                </div>
-                <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16 }}>
-                  {[
-                    { icon:'⚡', val:'9.8', unit:'m/hr', label:'Avg ROP',      color:'#F8FAFC', change:'+2.1%' },
-                    { icon:'📊', val:'34.9K',unit:'',   label:'Meters',       color:'#60A5FA', change:'+1%'   },
-                    { icon:'🎯', val:'92%',  unit:'',   label:'Productivity', color:'#F97316', change:'+3%'   },
-                    { icon:'💎', val:'97.4%',unit:'',   label:'Core Recovery',color:'#10B981', change:'+0.8%' },
-                  ].map((k,i) => (
-                    <div key={i} style={{ background:'rgba(255,255,255,0.03)',border:'1px solid #1E293B',borderRadius:12,padding:14 }}>
-                      <div style={{ fontSize:16,marginBottom:8 }}>{k.icon}</div>
-                      <div style={{ fontSize:22,fontWeight:700,fontFamily:"'Space Grotesk',sans-serif",color:k.color }}>{k.val}<span style={{ fontSize:12,color:'#64748B',fontWeight:400 }}> {k.unit}</span></div>
-                      <div style={{ fontSize:11,color:'#64748B',marginTop:2 }}>{k.label}</div>
-                      <div style={{ fontSize:11,color:'#10B981',marginTop:4 }}>▲ {k.change}</div>
+            </FadeIn>
+            <FadeIn delay={0.4}>
+              {/* Social proof */}
+              <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+                <div style={{ display:'flex' }}>
+                  {['#F97316','#3B82F6','#10B981','#8B5CF6','#F59E0B'].map((c,i)=>(
+                    <div key={i} style={{ width:32, height:32, borderRadius:'50%', background:c, border:'2px solid #080B10', marginLeft: i===0?0:-8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff' }}>
+                      {['JW','PN','AA','MK','RT'][i]}
                     </div>
                   ))}
                 </div>
-                <div style={{ background:'rgba(255,255,255,0.02)',border:'1px solid #1E293B',borderRadius:12,padding:14 }}>
-                  <div style={{ display:'flex',justifyContent:'space-between',fontSize:11,marginBottom:10 }}>
-                    <span style={{ color:'#94A3B8' }}>ROP Trend · 24h</span>
-                    <span style={{ color:'#F97316' }}>↗ Optimal</span>
+                <div>
+                  <div style={{ display:'flex', gap:2, marginBottom:2 }}>
+                    {[1,2,3,4,5].map(i=><span key={i} style={{ color:'#F59E0B', fontSize:12 }}>★</span>)}
                   </div>
-                  <div id="chartBars" style={{ display:'flex',alignItems:'flex-end',gap:4,height:50 }} />
+                  <div style={{ fontSize:12, color:'#64748B' }}><span style={{ color:'#F8FAFC', fontWeight:600 }}>30+ companies</span> trust XPLORIX</div>
                 </div>
               </div>
-            </div>
+            </FadeIn>
           </div>
-        </section>
 
-        {/* ── STATS ── */}
-        <div className="xpl-stats-bar" style={{ background:'#0D1117',borderTop:'1px solid #1E293B',borderBottom:'1px solid #1E293B',padding:'40px 60px' }}>
-          <div className="xpl-stats-inner" style={{ maxWidth:1400,margin:'0 auto',display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:40 }}>
-            {[
-              { target:30, suffix:'+', label:'Countries Served' },
-              { target:5,  suffix:'M+',label:'Meters Logged' },
-              { target:99, suffix:'%', label:'Platform Uptime' },
-              { target:40, suffix:'%', label:'Downtime Reduction' },
-            ].map((s,i) => (
-              <div key={i} className="xpl-fade" style={{ textAlign:'center' }}>
-                <span className="xpl-counter" data-target={s.target} data-suffix={s.suffix}
-                  style={{ fontSize:40,fontWeight:800,fontFamily:"'Space Grotesk',sans-serif",background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',display:'block' }}>
-                  0{s.suffix}
-                </span>
-                <div style={{ color:'#94A3B8',fontSize:13,marginTop:6 }}>{s.label}</div>
+          {/* Right — Dashboard */}
+          <div className="hero-visual xpl-float" style={{ position:'relative' }}>
+            {/* Floating card 1 */}
+            <div className="xpl-float2" style={{ position:'absolute', top:-24, right:-16, background:'rgba(13,17,23,0.95)', border:'1px solid #1E293B', borderRadius:12, padding:'12px 16px', backdropFilter:'blur(20px)', boxShadow:'0 20px 40px rgba(0,0,0,0.4)', zIndex:2 }}>
+              <div style={{ fontSize:11, color:'#10B981', fontWeight:700 }}>▲ +23% ROP this week</div>
+              <div style={{ fontSize:10, color:'#64748B', marginTop:2 }}>AI Insight · Pilbara Site</div>
+            </div>
+            {/* Floating card 2 */}
+            <div className="xpl-float3" style={{ position:'absolute', bottom:16, left:-24, background:'rgba(13,17,23,0.95)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:12, padding:'12px 16px', backdropFilter:'blur(20px)', boxShadow:'0 20px 40px rgba(0,0,0,0.4)', zIndex:2 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <span style={{ fontSize:10, background:'rgba(239,68,68,0.1)', color:'#EF4444', padding:'2px 7px', borderRadius:5, fontWeight:700 }}>⚠ Alert</span>
               </div>
-            ))}
+              <div style={{ fontSize:12, fontWeight:700, color:'#F8FAFC', marginTop:4 }}>RIG-003 Hydraulic</div>
+              <div style={{ fontSize:10, color:'#64748B' }}>Inspect in 48hrs</div>
+            </div>
+
+            {/* Main dashboard card */}
+            <div style={{ background:'rgba(13,17,23,0.95)', border:'1px solid #1E293B', borderRadius:20, padding:22, backdropFilter:'blur(20px)', boxShadow:'0 40px 80px rgba(0,0,0,0.5)' }}>
+              {/* Card header */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>Rig 07 · Pilbara</div>
+                  <div style={{ fontSize:11, color:'#64748B', marginTop:1 }}>Live Operations · Day Shift</div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#F97316', background:'rgba(249,115,22,0.1)', padding:'4px 10px', borderRadius:20, border:'1px solid rgba(249,115,22,0.2)' }}>
+                  <span className="xpl-pulse" style={{ width:6, height:6, borderRadius:'50%', background:'#F97316', display:'inline-block' }} />
+                  Drilling
+                </div>
+              </div>
+              {/* KPIs */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
+                {[
+                  { icon:'⚡', val:'9.8', unit:'m/hr', label:'Avg ROP',       color:'#F8FAFC', change:'+2.1%' },
+                  { icon:'📊', val:'34.9K',unit:'m',  label:'Meters',        color:'#60A5FA', change:'+1%'   },
+                  { icon:'🎯', val:'92%',  unit:'',   label:'Productivity',  color:'#F97316', change:'+3%'   },
+                  { icon:'💎', val:'97.4%',unit:'',   label:'Core Recovery', color:'#10B981', change:'+0.8%' },
+                ].map((k,i)=>(
+                  <div key={i} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid #1E293B', borderRadius:11, padding:13 }}>
+                    <div style={{ fontSize:14, marginBottom:7 }}>{k.icon}</div>
+                    <div style={{ fontSize:20, fontWeight:800, fontFamily:"'Space Grotesk',sans-serif", color:k.color }}>{k.val}<span style={{ fontSize:11, color:'#64748B', fontWeight:400 }}> {k.unit}</span></div>
+                    <div style={{ fontSize:10, color:'#64748B', marginTop:2 }}>{k.label}</div>
+                    <div style={{ fontSize:10, color:'#10B981', marginTop:3 }}>▲ {k.change}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Chart */}
+              <div style={{ background:'rgba(255,255,255,0.02)', border:'1px solid #1E293B', borderRadius:11, padding:13 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:9 }}>
+                  <span style={{ color:'#94A3B8' }}>ROP Trend · 24h</span>
+                  <span style={{ color:'#F97316', fontWeight:600 }}>↗ Optimal</span>
+                </div>
+                <div id="heroBars" style={{ display:'flex', alignItems:'flex-end', gap:3, height:48 }} />
+              </div>
+            </div>
           </div>
         </div>
+      </section>
 
-        {/* ── ABOUT ── */}
-        <section id="about" className="xpl-section" style={{ padding:'100px 60px' }}>
-          <div className="xpl-about-grid" style={{ maxWidth:1400,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1.2fr',gap:80,alignItems:'center' }}>
-            <div className="xpl-fade">
-              <div className="xpl-tag"><span className="xpl-tag-dot" />About Xplorix</div>
-              <h2 style={{ fontSize:'clamp(36px,4vw,54px)',lineHeight:1.1,marginBottom:24 }}>
-                Performance intelligence for <span className="xpl-orange">exploration drilling.</span>
-              </h2>
-              <p style={{ fontSize:16,color:'#94A3B8',lineHeight:1.8,marginBottom:16 }}>
-                Xplorix is a performance intelligence platform built for exploration drilling and core operations. Our software helps companies improve operational efficiency, increase data visibility, and make smarter decisions through real-time analytics and digital workflows.
-              </p>
-              <p style={{ fontSize:16,color:'#94A3B8',lineHeight:1.8 }}>
-                Designed to replace manual processes with intelligent, data-driven operations — Xplorix enables teams to achieve higher accuracy, stronger operational control, scalable performance management, and AI-powered insights across projects.
-              </p>
+      {/* ══════════════════════════════════════════════════
+          STATS BAR
+      ══════════════════════════════════════════════════ */}
+      <section style={{ background:'#0D1117', borderTop:'1px solid #1E293B', borderBottom:'1px solid #1E293B', padding:'44px 60px' }}>
+        <div className="stat-grid" style={{ maxWidth:1400, margin:'0 auto', display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:32 }}>
+          {[
+            { icon:'🌍', target:30,   suffix:'+',  label:'Countries Served',       color:'#F97316' },
+            { icon:'⛏', target:5,    suffix:'M+', label:'Meters Logged',           color:'#3B82F6' },
+            { icon:'🔩', target:500,  suffix:'+',  label:'Rigs Managed',            color:'#10B981' },
+            { icon:'📋', target:2,    suffix:'M+', label:'Drill Logs Processed',    color:'#8B5CF6' },
+            { icon:'⏱', target:99,   suffix:'%',  label:'Platform Uptime',         color:'#F59E0B' },
+            { icon:'📉', target:40,   suffix:'%',  label:'Avg Downtime Reduction',  color:'#EF4444' },
+          ].map((s,i) => {
+            const { value, ref } = useCounter({ target:s.target, suffix:s.suffix, duration:2000 })
+            return (
+              <div key={i} style={{ textAlign:'center' }}>
+                <div style={{ fontSize:22, marginBottom:8 }}>{s.icon}</div>
+                <span ref={ref} style={{ fontSize:34, fontWeight:900, fontFamily:"'Space Grotesk',sans-serif", background:`linear-gradient(135deg,${s.color},${s.color}99)`, WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', display:'block' }}>
+                  {value}
+                </span>
+                <div style={{ fontSize:12, color:'#64748B', marginTop:5, fontWeight:500 }}>{s.label}</div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════
+          ABOUT
+      ══════════════════════════════════════════════════ */}
+      <section id="about" style={{ padding:'100px 60px' }}>
+        <div style={{ maxWidth:1400, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1.1fr', gap:80, alignItems:'center' }}>
+          <FadeIn>
+            <Tag>About Xplorix</Tag>
+            <h2 style={{ fontSize:'clamp(34px,4vw,52px)', fontFamily:"'Space Grotesk',sans-serif", fontWeight:900, lineHeight:1.1, marginBottom:20 }}>
+              Performance intelligence for <span style={{ color:'#F97316' }}>exploration drilling.</span>
+            </h2>
+            <p style={{ fontSize:16, color:'#94A3B8', lineHeight:1.8, marginBottom:16 }}>
+              Xplorix is built specifically for drilling contractors and exploration companies who are tired of managing operations on spreadsheets, paper logs and WhatsApp groups.
+            </p>
+            <p style={{ fontSize:16, color:'#94A3B8', lineHeight:1.8, marginBottom:32 }}>
+              We replace your entire paper-based workflow with a single intelligent platform — giving you real-time visibility, AI-powered insights, and data-driven decisions across every rig and every site.
+            </p>
+            <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+              {['Real-time visibility', 'AI-powered', 'Zero paperwork', 'Multi-site ready', 'Mobile first'].map(pill=>(
+                <span key={pill} style={{ padding:'6px 14px', borderRadius:20, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.2)', color:'#F97316', fontSize:12, fontWeight:600 }}>{pill}</span>
+              ))}
             </div>
-            <div className="xpl-fade xpl-d2" style={{ background:'#0D1117',border:'1px solid #1E293B',borderRadius:24,overflow:'hidden',boxShadow:'0 40px 80px rgba(0,0,0,0.3)' }}>
-              <div style={{ padding:20,background:'#111827' }}>
-                <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:16,paddingBottom:12,borderBottom:'1px solid #1E293B' }}>
-                  <div style={{ width:24,height:24,borderRadius:6,background:'linear-gradient(135deg,#F97316,#F59E0B)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:12,color:'#000' }}>X</div>
-                  <span style={{ fontWeight:600,color:'#F8FAFC',fontSize:13 }}>XPLORIX</span>
-                  <span style={{ color:'#64748B',fontSize:12,marginLeft:4 }}>› Dashboard</span>
+          </FadeIn>
+          <FadeIn delay={0.2}>
+            <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:20, overflow:'hidden', boxShadow:'0 40px 80px rgba(0,0,0,0.3)' }}>
+              {/* Simulated dashboard */}
+              <div style={{ padding:20 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14, paddingBottom:12, borderBottom:'1px solid #1E293B' }}>
+                  <XLogo size={22} />
+                  <span style={{ fontWeight:700, color:'#F8FAFC', fontSize:13 }}>XPLORIX</span>
+                  <span style={{ color:'#64748B', fontSize:11, marginLeft:4 }}>› Admin Dashboard</span>
                 </div>
-                <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12 }}>
-                  {[{v:'16',l:'Projects'},{v:'16',l:'Total Rigs'},{v:'12',l:'Users'},{v:'AI',l:'Insights',c:'#F97316'}].map((k,i)=>(
-                    <div key={i} style={{ background:'#0D1117',border:'1px solid #1E293B',borderRadius:8,padding:10,textAlign:'center' }}>
-                      <div style={{ fontSize:18,fontWeight:800,color:k.c||'#F8FAFC' }}>{k.v}</div>
-                      <div style={{ color:'#64748B',fontSize:10,marginTop:2 }}>{k.l}</div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, marginBottom:12 }}>
+                  {[{v:'16',l:'Projects',c:'#60A5FA'},{v:'16',l:'Rigs',c:'#10B981'},{v:'12',l:'Users',c:'#8B5CF6'},{v:'AI',l:'Active',c:'#F97316'}].map((k,i)=>(
+                    <div key={i} style={{ background:'#080B10', border:'1px solid #1E293B', borderRadius:8, padding:10, textAlign:'center' }}>
+                      <div style={{ fontSize:18, fontWeight:800, color:k.c, fontFamily:"'Space Grotesk',sans-serif" }}>{k.v}</div>
+                      <div style={{ color:'#64748B', fontSize:10, marginTop:2 }}>{k.l}</div>
                     </div>
                   ))}
                 </div>
-                <div style={{ background:'#0D1117',border:'1px solid #1E293B',borderRadius:8,padding:12 }}>
-                  <div style={{ color:'#94A3B8',marginBottom:8,fontWeight:600,fontSize:12 }}>Production Snapshot</div>
-                  <div style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8 }}>
-                    {[{v:'34,986m',l:'Total Meters',c:'#F8FAFC'},{v:'3,580hrs',l:'Drilling Hrs',c:'#60A5FA'},{v:'9.8m/hr',l:'Avg ROP',c:'#F97316'}].map((k,i)=>(
-                      <div key={i}><div style={{ fontSize:14,fontWeight:800,color:k.c }}>{k.v}</div><div style={{ color:'#64748B',fontSize:10,marginTop:2 }}>{k.l}</div></div>
+                <div style={{ background:'#080B10', border:'1px solid #1E293B', borderRadius:8, padding:12 }}>
+                  <div style={{ color:'#94A3B8', marginBottom:10, fontWeight:700, fontSize:12, display:'flex', justifyContent:'space-between' }}>
+                    <span>Production Snapshot</span>
+                    <span style={{ color:'#F97316', fontSize:11 }}>View Analytics →</span>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+                    {[{v:'34,986m',l:'Total Meters',c:'#F8FAFC'},{v:'3,580hrs',l:'Drilling Hrs',c:'#60A5FA'},{v:'9.8 m/hr',l:'Avg ROP',c:'#F97316'}].map((k,i)=>(
+                      <div key={i}><div style={{ fontSize:14, fontWeight:800, color:k.c, fontFamily:"'Space Grotesk',sans-serif" }}>{k.v}</div><div style={{ color:'#64748B', fontSize:10, marginTop:2 }}>{k.l}</div></div>
                     ))}
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </FadeIn>
+        </div>
+      </section>
 
-        {/* ── VISION & MISSION ── */}
-        <section id="vision" style={{ background:'#0D1117',padding:'100px 60px' }}>
-          <div style={{ maxWidth:1400,margin:'0 auto' }}>
-            <div className="xpl-fade" style={{ textAlign:'center',marginBottom:60 }}>
-              <div className="xpl-tag" style={{ margin:'0 auto 20px',display:'inline-flex' }}><span className="xpl-tag-dot" />Our Purpose</div>
-              <h2 style={{ fontSize:'clamp(36px,4vw,54px)' }}>Built with a clear <span className="xpl-orange">direction.</span></h2>
+      {/* ══════════════════════════════════════════════════
+          HOW IT WORKS
+      ══════════════════════════════════════════════════ */}
+      <section id="how" style={{ background:'#0D1117', padding:'100px 60px', borderTop:'1px solid #1E293B' }}>
+        <div style={{ maxWidth:1400, margin:'0 auto' }}>
+          <FadeIn>
+            <div style={{ textAlign:'center', marginBottom:60 }}>
+              <Tag>How It Works</Tag>
+              <h2 style={{ fontSize:'clamp(32px,4vw,52px)', fontFamily:"'Space Grotesk',sans-serif", fontWeight:900 }}>
+                Up and running in <span style={{ color:'#F97316' }}>under 30 minutes.</span>
+              </h2>
             </div>
-            <div className="xpl-vm-grid" style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:24 }}>
-              {[
-                { tag:'▲ VISION', tagStyle:{ background:'rgba(249,115,22,0.1)',border:'1px solid rgba(249,115,22,0.2)',color:'#F97316' }, cardStyle:{ background:'linear-gradient(135deg,rgba(249,115,22,0.07),rgba(13,17,23,0.95))',border:'1px solid rgba(249,115,22,0.2)' }, glow:'#F97316', text:'To help drilling contractors easily understand operations and performance through intelligent and simplified analytics.' },
-                { tag:'⚙ MISSION', tagStyle:{ background:'rgba(59,130,246,0.1)',border:'1px solid rgba(59,130,246,0.2)',color:'#60A5FA' }, cardStyle:{ background:'linear-gradient(135deg,rgba(59,130,246,0.07),rgba(13,17,23,0.95))',border:'1px solid rgba(59,130,246,0.2)' }, glow:'#3B82F6', text:'To modernize exploration drilling operations using digital logging, real-time monitoring, AI-driven insights, and performance analytics that improve efficiency, visibility, and operational decision-making.' },
-              ].map((vm,i) => (
-                <div key={i} className={`xpl-fade ${i===1?'xpl-d2':''}`} style={{ borderRadius:20,padding:48,position:'relative',overflow:'hidden',...vm.cardStyle }}>
-                  <div style={{ position:'absolute',width:200,height:200,borderRadius:'50%',filter:'blur(80px)',opacity:0.12,right:-40,top:-40,background:vm.glow,pointerEvents:'none' }} />
-                  <div style={{ display:'inline-flex',alignItems:'center',gap:8,padding:'5px 14px',borderRadius:100,marginBottom:28,fontSize:10,fontWeight:700,letterSpacing:'0.15em',...vm.tagStyle }}>{vm.tag}</div>
-                  <p style={{ fontSize:24,lineHeight:1.45,fontWeight:700,fontFamily:"'Space Grotesk',sans-serif",marginBottom:32 }}>{vm.text}</p>
-                  <div style={{ display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#64748B' }}>
-                    <div style={{ width:24,height:2,background:vm.glow,borderRadius:1 }} />
-                    Engineered for the next decade of exploration
+          </FadeIn>
+          <div className="how-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:20 }}>
+            {howItWorks.map((step,i)=>(
+              <FadeIn key={i} delay={i*0.1}>
+                <div className="card-hover" style={{ background:'#080B10', border:'1px solid #1E293B', borderRadius:18, padding:28, position:'relative', height:'100%' }}>
+                  {/* Connector line */}
+                  {i < howItWorks.length - 1 && (
+                    <div style={{ position:'absolute', top:44, right:-10, width:20, height:2, background:'linear-gradient(90deg,#1E293B,transparent)', zIndex:1 }} />
+                  )}
+                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:18 }}>
+                    <div style={{ width:44, height:44, borderRadius:12, background:`${step.color}12`, border:`1px solid ${step.color}30`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>{step.icon}</div>
+                    <span style={{ fontSize:22, fontWeight:900, color:`${step.color}40`, fontFamily:"'Space Grotesk',sans-serif" }}>{step.step}</span>
                   </div>
+                  <h3 style={{ fontSize:16, fontWeight:700, color:'#F8FAFC', marginBottom:10, fontFamily:"'Space Grotesk',sans-serif" }}>{step.title}</h3>
+                  <p style={{ fontSize:13, color:'#94A3B8', lineHeight:1.7 }}>{step.desc}</p>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── DASHBOARDS ── */}
-        <section id="dashboards" className="xpl-section" style={{ padding:'100px 60px' }}>
-          <div style={{ maxWidth:1400,margin:'0 auto' }}>
-            <div className="xpl-fade" style={{ textAlign:'center',marginBottom:60 }}>
-              <div className="xpl-tag" style={{ margin:'0 auto 20px',display:'inline-flex' }}><span className="xpl-tag-dot" />Platform</div>
-              <h2 style={{ fontSize:'clamp(36px,4vw,56px)' }}>Operational Intelligence <span className="xpl-blue">Dashboards</span></h2>
-              <p style={{ fontSize:16,color:'#94A3B8',maxWidth:600,margin:'16px auto 0',lineHeight:1.7 }}>One unified platform — four powerful command centers built for the speed and complexity of modern exploration.</p>
-            </div>
-            <div className="xpl-dash-grid" style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:20 }}>
-              {[
-                { icon:'⚡', iconBg:'rgba(249,115,22,0.15)', iconBorder:'rgba(249,115,22,0.2)', title:'Operations Dashboard', desc:'Track drilling operations in real time with complete visibility into meters drilled, downtime, core recovery, productivity and bit cost per meter.', tags:['LIVE KPIS','ROP TRENDS','PRODUCTIVITY'] },
-                { icon:'🔧', iconBg:'rgba(59,130,246,0.15)',  iconBorder:'rgba(59,130,246,0.2)',  title:'Maintenance Dashboard', desc:'Monitor equipment health, maintenance schedules, breakdown trends, servicing records and maintenance performance from a centralized hub.', tags:['MTBF','COST TREND','SCHEDULES'] },
-                { icon:'👷', iconBg:'rgba(139,92,246,0.15)', iconBorder:'rgba(139,92,246,0.2)', title:'Driller & Crew Performance', desc:'Evaluate driller and crew performance using productivity tracking, efficiency metrics and shift comparisons to identify top-performing teams.', tags:['CREW SCORE','SHIFT COMPARE','LEADERBOARDS'] },
-                { icon:'📦', iconBg:'rgba(16,185,129,0.15)', iconBorder:'rgba(16,185,129,0.2)', title:'Consumables & HSC', desc:'Track consumable usage, drilling accessories, inventory movement and HSC compliance to improve operational control and site safety.', tags:['INVENTORY','BIT LIFE','HSC'] },
-              ].map((d,i) => (
-                <div key={i} className={`xpl-card xpl-fade xpl-d${i%2===0?'1':'2'}`} style={{ overflow:'hidden',cursor:'pointer' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.3)'; (e.currentTarget as HTMLElement).style.transform='translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow='0 20px 60px rgba(0,0,0,0.3)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor='#1E293B'; (e.currentTarget as HTMLElement).style.transform=''; (e.currentTarget as HTMLElement).style.boxShadow='' }}
-                >
-                  <div style={{ padding:28 }}>
-                    <div style={{ width:44,height:44,borderRadius:12,background:d.iconBg,border:`1px solid ${d.iconBorder}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,marginBottom:16 }}>{d.icon}</div>
-                    <div style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:10 }}>
-                      <h3 style={{ fontSize:19,fontWeight:700 }}>{d.title}</h3>
-                      <span style={{ color:'#64748B',fontSize:18,transition:'all 0.2s' }}>↗</span>
-                    </div>
-                    <p style={{ fontSize:14,color:'#94A3B8',lineHeight:1.6,marginBottom:16 }}>{d.desc}</p>
-                    <div style={{ display:'flex',gap:8,flexWrap:'wrap' }}>
-                      {d.tags.map(t => <span key={t} style={{ padding:'4px 10px',borderRadius:6,background:'rgba(255,255,255,0.04)',border:'1px solid #1E293B',fontSize:10,fontWeight:600,color:'#64748B',letterSpacing:'0.08em' }}>{t}</span>)}
-                    </div>
-                  </div>
-                  <div style={{ height:120,background:'#111827',borderTop:'1px solid #1E293B',display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,opacity:0.08 }}>{d.icon}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── DIGITAL LOGGING ── */}
-        <section id="logging" style={{ background:'#0D1117',padding:'100px 60px' }}>
-          <div className="xpl-log-grid" style={{ maxWidth:1400,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:80,alignItems:'center' }}>
-            <div className="xpl-fade" style={{ background:'#111827',border:'1px solid #1E293B',borderRadius:20,overflow:'hidden',position:'relative',aspectRatio:'4/3',display:'flex',alignItems:'center',justifyContent:'center' }}>
-              <div style={{ fontSize:80,opacity:0.1 }}>📋</div>
-              <div style={{ position:'absolute',bottom:20,left:20,background:'rgba(13,17,23,0.95)',border:'1px solid #1E293B',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:10,backdropFilter:'blur(20px)' }}>
-                <div style={{ width:8,height:8,borderRadius:'50%',background:'#10B981',boxShadow:'0 0 8px #10B981',animation:'xplPulse 2s infinite',flexShrink:0 }} />
-                <div>
-                  <div style={{ fontSize:12,fontWeight:600,color:'#F8FAFC' }}>Synced · just now</div>
-                  <div style={{ fontSize:10,color:'#64748B',marginTop:2 }}>247 drill logs uploaded across 8 rigs</div>
-                </div>
-              </div>
-            </div>
-            <div className="xpl-fade xpl-d2">
-              <div className="xpl-tag"><span className="xpl-tag-dot" />Digital Drill Logging</div>
-              <h2 style={{ fontSize:'clamp(32px,3.5vw,50px)',lineHeight:1.1,marginBottom:20 }}>Replace paper. <span className="xpl-orange">Capture truth</span> <span className="xpl-blue">in real time.</span></h2>
-              <p style={{ fontSize:16,color:'#94A3B8',lineHeight:1.7,marginBottom:32 }}>Access drill logs and maintenance logs anytime, anywhere through a centralized digital platform. Replace paper-based workflows with faster, more accurate, and real-time operational logging.</p>
-              <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
-                {[{icon:'☁',title:'Cloud sync',sub:'Auto-upload across all rigs'},{icon:'🛡',title:'Audit trail',sub:'Full change history'},{icon:'📡',title:'Offline-first',sub:'Works without internet'},{icon:'✨',title:'AI auto-fill',sub:'Smart field suggestions'}].map((f,i)=>(
-                  <div key={i} style={{ display:'flex',alignItems:'center',gap:12,padding:'14px 16px',borderRadius:12,background:'rgba(255,255,255,0.03)',border:'1px solid #1E293B' }}>
-                    <div style={{ width:36,height:36,borderRadius:10,flexShrink:0,background:'rgba(59,130,246,0.1)',border:'1px solid rgba(59,130,246,0.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16 }}>{f.icon}</div>
-                    <div><div style={{ fontSize:13,fontWeight:600 }}>{f.title}</div><div style={{ fontSize:11,color:'#64748B',marginTop:2 }}>{f.sub}</div></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── AI INSIGHTS ── */}
-        <section id="ai" className="xpl-section" style={{ padding:'100px 60px' }}>
-          <div className="xpl-ai-grid" style={{ maxWidth:1400,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:80,alignItems:'center' }}>
-            <div className="xpl-fade">
-              <div className="xpl-tag"><span className="xpl-tag-dot" />AI-Powered Insights</div>
-              <h2 style={{ fontSize:'clamp(32px,3.5vw,50px)',lineHeight:1.1,marginBottom:20 }}>Intelligence that <span className="xpl-orange">acts</span> before you <span className="xpl-blue">ask.</span></h2>
-              <p style={{ fontSize:16,color:'#94A3B8',lineHeight:1.7 }}>Xplorix AI simplifies complex operational analytics — delivering intelligent daily insights and recommendations that help teams take action faster and improve drilling performance proactively.</p>
-            </div>
-            <div className="xpl-fade xpl-d2" style={{ display:'flex',flexDirection:'column',gap:14 }}>
-              {[
-                { icon:'🧠', title:'Predictive Performance', desc:'AI models predict ROP decline and equipment issues before they cause downtime.', badge:'▲ 23% downtime reduction', badgeColor:'rgba(16,185,129,0.1)', badgeBorder:'rgba(16,185,129,0.2)', badgeText:'#10B981' },
-                { icon:'📈', title:'Daily Operational Insights', desc:'Automated shift reports summarize key metrics, highlight anomalies, and recommend corrective actions.', badge:'⚡ Generated in seconds', badgeColor:'rgba(59,130,246,0.1)', badgeBorder:'rgba(59,130,246,0.2)', badgeText:'#60A5FA' },
-                { icon:'🎯', title:'Cost Optimization Engine', desc:'Continuously analyzes cost-per-meter across rigs and formations, surfacing optimization opportunities.', badge:'💰 Avg 18% cost savings', badgeColor:'rgba(249,115,22,0.1)', badgeBorder:'rgba(249,115,22,0.2)', badgeText:'#F97316' },
-                { icon:'🚨', title:'Smart Alerts', desc:'Automated alerts for critical thresholds — core recovery drops, unusual downtime, bit performance degradation.', badge:'Real-time monitoring', badgeColor:'rgba(139,92,246,0.1)', badgeBorder:'rgba(139,92,246,0.2)', badgeText:'#8B5CF6' },
-              ].map((a,i)=>(
-                <div key={i} style={{ background:'#0D1117',border:'1px solid #1E293B',borderRadius:14,padding:18,display:'flex',alignItems:'flex-start',gap:14,transition:'all 0.3s',cursor:'default' }}
-                  onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor='rgba(59,130,246,0.3)';(e.currentTarget as HTMLElement).style.transform='translateX(6px)'}}
-                  onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor='#1E293B';(e.currentTarget as HTMLElement).style.transform=''}}
-                >
-                  <div style={{ width:40,height:40,borderRadius:10,flexShrink:0,background:'rgba(59,130,246,0.1)',border:'1px solid rgba(59,130,246,0.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18 }}>{a.icon}</div>
-                  <div>
-                    <div style={{ fontSize:14,fontWeight:600,marginBottom:5 }}>{a.title}</div>
-                    <div style={{ fontSize:13,color:'#94A3B8',lineHeight:1.6,marginBottom:8 }}>{a.desc}</div>
-                    <span style={{ display:'inline-flex',alignItems:'center',padding:'3px 8px',borderRadius:6,background:a.badgeColor,border:`1px solid ${a.badgeBorder}`,fontSize:10,fontWeight:600,color:a.badgeText }}>{a.badge}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── INDUSTRIES ── */}
-        <section id="industries" style={{ background:'#0D1117',padding:'100px 60px' }}>
-          <div style={{ maxWidth:1400,margin:'0 auto' }}>
-            <div className="xpl-fade" style={{ textAlign:'center',marginBottom:60 }}>
-              <h2 style={{ fontSize:'clamp(36px,4vw,58px)' }}>Built for the toughest <span className="xpl-orange">operations on earth.</span></h2>
-            </div>
-            <div className="xpl-ind-grid" style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:16 }}>
-              {[
-                { icon:'⛏', title:'Mining',               desc:'End-to-end visibility for surface & underground mining operations.' },
-                { icon:'🔩', title:'Exploration Drilling', desc:'Built first for diamond core & RC operations in remote environments.' },
-                { icon:'🏔', title:'Geotechnical Drilling',desc:'Track investigation programs at scale with full data visibility.' },
-                { icon:'💥', title:'Blast Hole Drilling',  desc:'Productivity intelligence for high-volume production drilling.' },
-              ].map((ind,i)=>(
-                <div key={i} className={`xpl-fade xpl-d${i+1}`} style={{ background:'#111827',border:'1px solid #1E293B',borderRadius:20,padding:'32px 24px',transition:'all 0.3s',cursor:'pointer',position:'relative',overflow:'hidden' }}
-                  onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.3)';(e.currentTarget as HTMLElement).style.transform='translateY(-6px)';(e.currentTarget as HTMLElement).style.boxShadow='0 20px 60px rgba(0,0,0,0.3)'}}
-                  onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor='#1E293B';(e.currentTarget as HTMLElement).style.transform='';(e.currentTarget as HTMLElement).style.boxShadow=''}}
-                >
-                  <div style={{ width:52,height:52,borderRadius:14,marginBottom:20,background:'linear-gradient(135deg,rgba(249,115,22,0.15),rgba(245,158,11,0.05))',border:'1px solid rgba(249,115,22,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24 }}>{ind.icon}</div>
-                  <h3 style={{ fontSize:17,fontWeight:700,marginBottom:10 }}>{ind.title}</h3>
-                  <p style={{ fontSize:13,color:'#94A3B8',lineHeight:1.6,marginBottom:20 }}>{ind.desc}</p>
-                  <div style={{ display:'flex',alignItems:'center',gap:8,fontSize:10,color:'#64748B',fontWeight:600,letterSpacing:'0.08em' }}>
-                    <div style={{ width:20,height:2,background:'linear-gradient(90deg,#F97316,#3B82F6)',borderRadius:1 }} />
-                    LIVE DEPLOYMENTS
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── CTA ── */}
-        <section id="cta" className="xpl-section" style={{ padding:'100px 60px',background:'linear-gradient(135deg,rgba(249,115,22,0.03) 0%,transparent 50%,rgba(59,130,246,0.03) 100%)',borderTop:'1px solid #1E293B' }}>
-          <div className="xpl-cta-grid" style={{ maxWidth:1400,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1.2fr',gap:80,alignItems:'start' }}>
-            <div className="xpl-fade">
-              <div className="xpl-tag"><span className="xpl-tag-dot" />Get Started</div>
-              <h2 style={{ fontSize:'clamp(32px,3.5vw,48px)',lineHeight:1.1,marginBottom:20 }}>Transform your drilling operations with <span className="xpl-orange">AI.</span></h2>
-              <p style={{ fontSize:15,color:'#94A3B8',lineHeight:1.7,marginBottom:32 }}>Book a personalised walkthrough of the Xplorix platform. We'll show you how teams cut downtime, boost productivity and digitise drill logs in under 30 days.</p>
-              {[{icon:'🌍',title:'Deployed across 30+ countries',sub:'Global infrastructure, local support'},{icon:'🛡',title:'Enterprise-grade security & SSO',sub:'SOC 2 compliant, end-to-end encrypted'},{icon:'✨',title:'AI insights from day one',sub:'No training required — insights start immediately'}].map((pt,i)=>(
-                <div key={i} style={{ display:'flex',alignItems:'center',gap:16,marginBottom:16 }}>
-                  <div style={{ width:44,height:44,borderRadius:12,flexShrink:0,background:'rgba(255,255,255,0.04)',border:'1px solid #1E293B',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20 }}>{pt.icon}</div>
-                  <div><div style={{ fontSize:15,fontWeight:600 }}>{pt.title}</div><div style={{ fontSize:13,color:'#64748B',marginTop:2 }}>{pt.sub}</div></div>
-                </div>
-              ))}
-            </div>
-
-            {/* Form */}
-            <div className="xpl-fade xpl-d2" style={{ background:'#0D1117',border:'1px solid #1E293B',borderRadius:24,padding:36 }}>
-              <div className="xpl-form-row" style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:0 }}>
-                {[{label:'Name',ph:'Jane Doe',type:'text'},{label:'Company',ph:'Acme Drilling Co.',type:'text'}].map((f,i)=>(
-                  <div key={i} style={{ display:'flex',flexDirection:'column',gap:8,marginBottom:16 }}>
-                    <label style={{ fontSize:11,fontWeight:600,letterSpacing:'0.1em',color:'#64748B',textTransform:'uppercase' }}>{f.label}</label>
-                    <input type={f.type} placeholder={f.ph} style={{ padding:'13px 16px',borderRadius:12,border:'1px solid #1E293B',background:'rgba(255,255,255,0.03)',color:'#F8FAFC',fontFamily:'inherit',fontSize:14,outline:'none',transition:'all 0.2s' }}
-                      onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,0.4)';e.target.style.boxShadow='0 0 0 3px rgba(249,115,22,0.08)'}}
-                      onBlur={e=>{e.target.style.borderColor='#1E293B';e.target.style.boxShadow=''}}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="xpl-form-row" style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:16 }}>
-                {[{label:'Email',ph:'jane@acme.com',type:'email'},{label:'Phone',ph:'+1 555 000 1234',type:'tel'}].map((f,i)=>(
-                  <div key={i} style={{ display:'flex',flexDirection:'column',gap:8,marginBottom:16 }}>
-                    <label style={{ fontSize:11,fontWeight:600,letterSpacing:'0.1em',color:'#64748B',textTransform:'uppercase' }}>{f.label}</label>
-                    <input type={f.type} placeholder={f.ph} style={{ padding:'13px 16px',borderRadius:12,border:'1px solid #1E293B',background:'rgba(255,255,255,0.03)',color:'#F8FAFC',fontFamily:'inherit',fontSize:14,outline:'none',transition:'all 0.2s' }}
-                      onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,0.4)';e.target.style.boxShadow='0 0 0 3px rgba(249,115,22,0.08)'}}
-                      onBlur={e=>{e.target.style.borderColor='#1E293B';e.target.style.boxShadow=''}}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="xpl-form-row" style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:16 }}>
-                {[{label:'Country',opts:['Australia','United States','India','Canada','Saudi Arabia','United Kingdom','South Africa','Other']},{label:'Role',opts:['Operations Manager','Drilling Supervisor','Project Manager','CEO / Director','Other']}].map((f,i)=>(
-                  <div key={i} style={{ display:'flex',flexDirection:'column',gap:8,marginBottom:16 }}>
-                    <label style={{ fontSize:11,fontWeight:600,letterSpacing:'0.1em',color:'#64748B',textTransform:'uppercase' }}>{f.label}</label>
-                    <select style={{ padding:'13px 16px',borderRadius:12,border:'1px solid #1E293B',background:'rgba(255,255,255,0.03)',color:'#F8FAFC',fontFamily:'inherit',fontSize:14,outline:'none',cursor:'pointer',transition:'all 0.2s',appearance:'none' }}>
-                      {f.opts.map(o=><option key={o} style={{ background:'#0D1117' }}>{o}</option>)}
-                    </select>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display:'flex',flexDirection:'column',gap:8,marginBottom:20 }}>
-                <label style={{ fontSize:11,fontWeight:600,letterSpacing:'0.1em',color:'#64748B',textTransform:'uppercase' }}>Message</label>
-                <textarea placeholder="Tell us about your fleet and goals..." rows={4} style={{ padding:'13px 16px',borderRadius:12,border:'1px solid #1E293B',background:'rgba(255,255,255,0.03)',color:'#F8FAFC',fontFamily:'inherit',fontSize:14,outline:'none',resize:'vertical',transition:'all 0.2s' }}
-                  onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,0.4)';e.target.style.boxShadow='0 0 0 3px rgba(249,115,22,0.08)'}}
-                  onBlur={e=>{e.target.style.borderColor='#1E293B';e.target.style.boxShadow=''}}
-                />
-              </div>
-              <div style={{ display:'flex',gap:12 }}>
-                <button className="xpl-btn-secondary" style={{ flex:1,justifyContent:'center' }}>Contact Sales</button>
-                <button className="xpl-btn-primary" style={{ flex:1,justifyContent:'center' }}>Schedule Demo →</button>
-              </div>
-              <p style={{ fontSize:11,color:'#64748B',textAlign:'center',marginTop:16 }}>By submitting, you agree to our terms & privacy policy.</p>
-            </div>
-          </div>
-        </section>
-
-        {/* ── FOOTER ── */}
-        <footer style={{ background:'#0D1117',borderTop:'1px solid #1E293B',padding:'50px 60px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:20 }}>
-          <div style={{ display:'flex',alignItems:'center',gap:12 }}>
-            <div style={{ width:36,height:36,borderRadius:9,background:'linear-gradient(135deg,#F97316,#F59E0B)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:16,color:'#000' }}>X</div>
-            <div>
-              <div style={{ fontSize:15,fontWeight:700,fontFamily:"'Space Grotesk',sans-serif" }}>XPLORIX</div>
-              <div style={{ fontSize:9,color:'#64748B',letterSpacing:'0.15em',textTransform:'uppercase',marginTop:1 }}>Drilling Intelligence</div>
-            </div>
-          </div>
-          <p style={{ fontSize:13,color:'#64748B' }}>© 2026 Xplorix. All rights reserved. Built for the world&apos;s toughest operations.</p>
-          <div style={{ display:'flex',gap:24 }}>
-            {['Privacy','Terms','Contact'].map(l=>(
-              <a key={l} href="#" style={{ fontSize:13,color:'#64748B',textDecoration:'none',transition:'color 0.2s' }}
-                onMouseEnter={e=>(e.currentTarget.style.color='#F8FAFC')}
-                onMouseLeave={e=>(e.currentTarget.style.color='#64748B')}
-              >{l}</a>
+              </FadeIn>
             ))}
           </div>
-        </footer>
+        </div>
+      </section>
 
-      </div>
-    </>
+      {/* ══════════════════════════════════════════════════
+          FEATURES — TABBED
+      ══════════════════════════════════════════════════ */}
+      <section id="features" style={{ padding:'100px 60px' }}>
+        <div style={{ maxWidth:1400, margin:'0 auto' }}>
+          <FadeIn>
+            <div style={{ textAlign:'center', marginBottom:48 }}>
+              <Tag>Platform</Tag>
+              <h2 style={{ fontSize:'clamp(32px,4vw,52px)', fontFamily:"'Space Grotesk',sans-serif", fontWeight:900 }}>
+                Operational Intelligence <span style={{ color:'#60A5FA' }}>Dashboards</span>
+              </h2>
+              <p style={{ fontSize:16, color:'#94A3B8', maxWidth:560, margin:'16px auto 0', lineHeight:1.7 }}>
+                Five powerful dashboards — one unified platform built for the speed and complexity of modern exploration.
+              </p>
+            </div>
+          </FadeIn>
+
+          {/* Tab buttons */}
+          <div style={{ display:'flex', gap:8, marginBottom:32, flexWrap:'wrap', justifyContent:'center' }}>
+            {features.map((f,i)=>(
+              <button key={i} onClick={()=>setActiveTab(i)}
+                style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 18px', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', transition:'all 0.2s',
+                  background: activeTab===i ? `${f.color}15` : 'rgba(255,255,255,0.04)',
+                  border: activeTab===i ? `1px solid ${f.color}40` : '1px solid #1E293B',
+                  color: activeTab===i ? f.color : '#94A3B8',
+                }}>
+                <span>{f.icon}</span> {f.tab}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          <div className="features-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:40, alignItems:'center', background:'#0D1117', border:'1px solid #1E293B', borderRadius:20, padding:40 }}>
+            <div>
+              <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'4px 12px', borderRadius:20, background:`${features[activeTab].color}10`, border:`1px solid ${features[activeTab].color}30`, fontSize:11, fontWeight:700, color:features[activeTab].color, marginBottom:16 }}>
+                {features[activeTab].icon} {features[activeTab].tab}
+              </div>
+              <h3 style={{ fontSize:24, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif", marginBottom:14, lineHeight:1.2 }}>{features[activeTab].title}</h3>
+              <p style={{ fontSize:14, color:'#94A3B8', lineHeight:1.7, marginBottom:24 }}>{features[activeTab].desc}</p>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:28 }}>
+                {features[activeTab].points.map((point,i)=>(
+                  <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color:'#94A3B8' }}>
+                    <span style={{ color:features[activeTab].color, fontSize:14 }}>✓</span> {point}
+                  </div>
+                ))}
+              </div>
+              <div style={{ display:'inline-flex', alignItems:'center', gap:12, padding:'12px 20px', background:`${features[activeTab].color}08`, border:`1px solid ${features[activeTab].color}20`, borderRadius:12 }}>
+                <div style={{ fontSize:24, fontWeight:900, color:features[activeTab].color, fontFamily:"'Space Grotesk',sans-serif" }}>{features[activeTab].stat.value}</div>
+                <div style={{ fontSize:13, color:'#64748B' }}>{features[activeTab].stat.label}</div>
+              </div>
+            </div>
+            {/* Visual placeholder */}
+            <div style={{ background:'#080B10', border:'1px solid #1E293B', borderRadius:16, padding:24, minHeight:280, display:'flex', flexDirection:'column', gap:12 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                <div style={{ width:8, height:8, borderRadius:'50%', background:'#EF4444' }} />
+                <div style={{ width:8, height:8, borderRadius:'50%', background:'#F59E0B' }} />
+                <div style={{ width:8, height:8, borderRadius:'50%', background:'#10B981' }} />
+                <span style={{ fontSize:11, color:'#64748B', marginLeft:8 }}>XPLORIX › {features[activeTab].tab} Dashboard</span>
+              </div>
+              {[...Array(4)].map((_,i)=>(
+                <div key={i} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid #1E293B', borderRadius:9, padding:14, display:'flex', alignItems:'center', gap:12 }}>
+                  <div style={{ width:36, height:36, borderRadius:9, background:`${features[activeTab].color}15`, border:`1px solid ${features[activeTab].color}20`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>{features[activeTab].icon}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ height:8, background:'#1E293B', borderRadius:4, marginBottom:6, width:`${70+i*8}%` }} />
+                    <div style={{ height:6, background:'#1A2234', borderRadius:4, width:`${40+i*10}%` }} />
+                  </div>
+                  <div style={{ fontSize:14, fontWeight:800, color:features[activeTab].color, fontFamily:"'Space Grotesk',sans-serif" }}>{['98%','✓','A+','↑'][i]}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════
+          AI INSIGHTS
+      ══════════════════════════════════════════════════ */}
+      <section id="ai" style={{ background:'#0D1117', padding:'100px 60px', borderTop:'1px solid #1E293B' }}>
+        <div style={{ maxWidth:1400, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:80, alignItems:'center' }}>
+          <FadeIn>
+            <Tag>AI-Powered Insights</Tag>
+            <h2 style={{ fontSize:'clamp(32px,4vw,50px)', fontFamily:"'Space Grotesk',sans-serif", fontWeight:900, lineHeight:1.1, marginBottom:20 }}>
+              Intelligence that <span style={{ color:'#F97316' }}>acts</span> before you <span style={{ color:'#60A5FA' }}>ask.</span>
+            </h2>
+            <p style={{ fontSize:16, color:'#94A3B8', lineHeight:1.7, marginBottom:28 }}>
+              XPLORIX AI monitors every data point from every rig, every shift. It spots anomalies, predicts failures, finds cost savings and delivers daily recommendations — automatically.
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              {[
+                { icon:'🔮', title:'Predictive Failure Detection', desc:'Identifies equipment failure patterns before they cause costly downtime' },
+                { icon:'💡', title:'Daily Performance Recommendations', desc:'Automated shift summaries with specific actionable improvements' },
+                { icon:'💰', title:'Cost Optimisation Engine', desc:'Continuously finds cost-per-meter savings across rigs and formations' },
+              ].map((f,i)=>(
+                <div key={i} style={{ display:'flex', gap:14, padding:'14px 16px', background:'rgba(255,255,255,0.02)', border:'1px solid #1E293B', borderRadius:12, transition:'all 0.2s', cursor:'default' }}
+                  onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.25)'}
+                  onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+                  <div style={{ fontSize:22, flexShrink:0 }}>{f.icon}</div>
+                  <div><div style={{ fontSize:14, fontWeight:600, color:'#F8FAFC', marginBottom:4 }}>{f.title}</div><div style={{ fontSize:12, color:'#94A3B8', lineHeight:1.6 }}>{f.desc}</div></div>
+                </div>
+              ))}
+            </div>
+          </FadeIn>
+          <FadeIn delay={0.2}>
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'#64748B', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:4 }}>Live AI Insights Feed</div>
+              {aiInsights.map((insight,i)=>{
+                const [bg, border] = insightColors[insight.type]
+                return (
+                  <div key={i} style={{ padding:16, borderRadius:14, background:bg, border:`1px solid ${border}30`, transition:'transform 0.2s' }}
+                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.transform='translateX(4px)'}
+                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.transform=''}>
+                    <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:8 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <span style={{ fontSize:16 }}>{insight.icon}</span>
+                        <div>
+                          <div style={{ fontSize:12, fontWeight:700, color:'#F8FAFC' }}>{insight.title}</div>
+                          <div style={{ fontSize:10, color:'#64748B' }}>{insight.rig} · {insight.time}</div>
+                        </div>
+                      </div>
+                      <span style={{ fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:5, background:`${border}20`, color:border, border:`1px solid ${border}30`, whiteSpace:'nowrap', flexShrink:0, marginLeft:8 }}>{insight.badge}</span>
+                    </div>
+                    <p style={{ fontSize:12, color:'#94A3B8', lineHeight:1.6 }}>{insight.desc}</p>
+                  </div>
+                )
+              })}
+            </div>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════
+          INDUSTRIES
+      ══════════════════════════════════════════════════ */}
+      <section id="industries" style={{ padding:'100px 60px' }}>
+        <div style={{ maxWidth:1400, margin:'0 auto' }}>
+          <FadeIn>
+            <div style={{ textAlign:'center', marginBottom:60 }}>
+              <h2 style={{ fontSize:'clamp(34px,4vw,56px)', fontFamily:"'Space Grotesk',sans-serif", fontWeight:900 }}>
+                Built for the toughest <span style={{ color:'#F97316' }}>operations on earth.</span>
+              </h2>
+            </div>
+          </FadeIn>
+          <div className="ind-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16 }}>
+            {industries.map((ind,i)=>(
+              <FadeIn key={i} delay={i*0.1}>
+                <div className="card-hover" style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:18, padding:'28px 24px', cursor:'pointer', position:'relative', overflow:'hidden', height:'100%' }}>
+                  <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:'linear-gradient(90deg,#F97316,transparent)', opacity:0, transition:'opacity 0.3s' }} />
+                  <div style={{ width:48, height:48, borderRadius:13, background:'linear-gradient(135deg,rgba(249,115,22,0.15),rgba(245,158,11,0.05))', border:'1px solid rgba(249,115,22,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, marginBottom:18 }}>{ind.icon}</div>
+                  <h3 style={{ fontSize:16, fontWeight:700, color:'#F8FAFC', marginBottom:10, fontFamily:"'Space Grotesk',sans-serif" }}>{ind.title}</h3>
+                  <p style={{ fontSize:13, color:'#94A3B8', lineHeight:1.6, marginBottom:18 }}>{ind.desc}</p>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:10, color:'#64748B', fontWeight:700, letterSpacing:'0.08em' }}>
+                    <div style={{ width:20, height:2, background:'linear-gradient(90deg,#F97316,#3B82F6)', borderRadius:1 }} />
+                    {ind.tag} DEPLOYMENTS
+                  </div>
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════
+          TESTIMONIALS
+      ══════════════════════════════════════════════════ */}
+      <section style={{ background:'#0D1117', padding:'100px 60px', borderTop:'1px solid #1E293B' }}>
+        <div style={{ maxWidth:1400, margin:'0 auto' }}>
+          <FadeIn>
+            <div style={{ textAlign:'center', marginBottom:56 }}>
+              <Tag>Testimonials</Tag>
+              <h2 style={{ fontSize:'clamp(32px,4vw,50px)', fontFamily:"'Space Grotesk',sans-serif", fontWeight:900 }}>
+                Trusted by drilling teams <span style={{ color:'#F97316' }}>worldwide.</span>
+              </h2>
+            </div>
+          </FadeIn>
+          <div className="testi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:20 }}>
+            {testimonials.map((t,i)=>(
+              <FadeIn key={i} delay={i*0.1}>
+                <div className="card-hover" style={{ background:'#080B10', border:'1px solid #1E293B', borderRadius:18, padding:28, height:'100%', display:'flex', flexDirection:'column', gap:20 }}>
+                  {/* Stars */}
+                  <div style={{ display:'flex', gap:3 }}>
+                    {[1,2,3,4,5].map(s=><span key={s} style={{ color:'#F59E0B', fontSize:14 }}>★</span>)}
+                  </div>
+                  {/* Quote */}
+                  <p style={{ fontSize:14, color:'#94A3B8', lineHeight:1.8, fontStyle:'italic', flex:1 }}>"{t.quote}"</p>
+                  {/* Author */}
+                  <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                    <div style={{ width:40, height:40, borderRadius:'50%', background:t.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:'#fff', flexShrink:0 }}>{t.avatar}</div>
+                    <div>
+                      <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>{t.name}</div>
+                      <div style={{ fontSize:11, color:'#64748B', marginTop:1 }}>{t.role} · {t.company}</div>
+                    </div>
+                  </div>
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════
+          PRICING — "Contact Us"
+      ══════════════════════════════════════════════════ */}
+      <section style={{ padding:'100px 60px' }}>
+        <div style={{ maxWidth:900, margin:'0 auto', textAlign:'center' }}>
+          <FadeIn>
+            <Tag>Pricing</Tag>
+            <h2 style={{ fontSize:'clamp(32px,4vw,52px)', fontFamily:"'Space Grotesk',sans-serif", fontWeight:900, marginBottom:16 }}>
+              Pricing built around <span style={{ color:'#F97316' }}>your fleet.</span>
+            </h2>
+            <p style={{ fontSize:16, color:'#94A3B8', lineHeight:1.7, marginBottom:40, maxWidth:560, margin:'0 auto 40px' }}>
+              Every drilling operation is different. Our pricing is tailored to your fleet size, number of sites, and required features — so you only pay for what you use.
+            </p>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:40 }}>
+              {[
+                { icon:'🔩', title:'Starter',    desc:'1-5 rigs · Single site · Core logging & analytics',          tag:'For small contractors' },
+                { icon:'⚡', title:'Professional',desc:'6-20 rigs · Multi-site · Full AI insights & Finance module', tag:'Most popular', highlight:true },
+                { icon:'🏢', title:'Enterprise',  desc:'Unlimited rigs · Custom features · Dedicated support',      tag:'For large operations' },
+              ].map((plan,i)=>(
+                <div key={i} style={{ padding:28, borderRadius:18, background: plan.highlight ? 'rgba(249,115,22,0.06)' : '#0D1117', border: plan.highlight ? '2px solid rgba(249,115,22,0.4)' : '1px solid #1E293B', position:'relative' }}>
+                  {plan.highlight && <div style={{ position:'absolute', top:-12, left:'50%', transform:'translateX(-50%)', background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:10, fontWeight:700, padding:'4px 14px', borderRadius:20 }}>MOST POPULAR</div>}
+                  <div style={{ fontSize:28, marginBottom:12 }}>{plan.icon}</div>
+                  <div style={{ fontSize:18, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif", marginBottom:6 }}>{plan.title}</div>
+                  <div style={{ fontSize:12, color:'#94A3B8', lineHeight:1.6, marginBottom:16 }}>{plan.desc}</div>
+                  <div style={{ fontSize:10, color:'#64748B', fontWeight:600 }}>{plan.tag}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ padding:'24px 32px', background:'rgba(249,115,22,0.05)', border:'1px solid rgba(249,115,22,0.2)', borderRadius:16, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16 }}>
+              <div style={{ textAlign:'left' }}>
+                <div style={{ fontSize:16, fontWeight:700, color:'#F8FAFC' }}>Get a personalised quote for your operation</div>
+                <div style={{ fontSize:13, color:'#64748B', marginTop:4 }}>Most companies find XPLORIX pays for itself within the first month</div>
+              </div>
+              <a href="#contact" className="btn-primary">Contact Us for Pricing →</a>
+            </div>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════
+          FAQ
+      ══════════════════════════════════════════════════ */}
+      <section style={{ background:'#0D1117', padding:'100px 60px', borderTop:'1px solid #1E293B' }}>
+        <div style={{ maxWidth:800, margin:'0 auto' }}>
+          <FadeIn>
+            <div style={{ textAlign:'center', marginBottom:52 }}>
+              <Tag>FAQ</Tag>
+              <h2 style={{ fontSize:'clamp(30px,4vw,48px)', fontFamily:"'Space Grotesk',sans-serif", fontWeight:900 }}>
+                Common <span style={{ color:'#F97316' }}>questions answered.</span>
+              </h2>
+            </div>
+          </FadeIn>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {faqs.map((faq,i)=>(
+              <FadeIn key={i} delay={i*0.05}>
+                <div className="faq-item" style={{ background:'#080B10', border:`1px solid ${activeFaq===i ? 'rgba(249,115,22,0.3)' : '#1E293B'}`, borderRadius:14, overflow:'hidden' }}>
+                  <button onClick={()=>setActiveFaq(activeFaq===i ? null : i)}
+                    style={{ width:'100%', padding:'18px 22px', display:'flex', alignItems:'center', justifyContent:'space-between', background:'none', border:'none', cursor:'pointer', color:'#F8FAFC', fontSize:14, fontWeight:600, textAlign:'left', gap:12 }}>
+                    <span>{faq.q}</span>
+                    <span style={{ color:activeFaq===i ? '#F97316' : '#64748B', fontSize:18, flexShrink:0, transition:'transform 0.3s', transform:activeFaq===i?'rotate(45deg)':'rotate(0deg)' }}>+</span>
+                  </button>
+                  {activeFaq===i && (
+                    <div style={{ padding:'0 22px 18px', fontSize:14, color:'#94A3B8', lineHeight:1.7 }}>{faq.a}</div>
+                  )}
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════
+          CTA + CONTACT FORM
+      ══════════════════════════════════════════════════ */}
+      <section id="contact" style={{ padding:'100px 60px', background:'linear-gradient(135deg,rgba(249,115,22,0.04),transparent,rgba(59,130,246,0.04))', borderTop:'1px solid #1E293B' }}>
+        <div style={{ maxWidth:1300, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1.2fr', gap:80, alignItems:'start' }}>
+          <FadeIn>
+            <Tag>Get Started</Tag>
+            <h2 style={{ fontSize:'clamp(30px,3.5vw,48px)', fontFamily:"'Space Grotesk',sans-serif", fontWeight:900, lineHeight:1.1, marginBottom:16 }}>
+              Transform your drilling operations with <span style={{ color:'#F97316' }}>AI.</span>
+            </h2>
+            <p style={{ fontSize:15, color:'#94A3B8', lineHeight:1.7, marginBottom:32 }}>
+              Book a personalised 15-minute walkthrough. We'll show you how teams cut downtime, boost productivity and digitise drill logs in under 30 days.
+            </p>
+            {[
+              { icon:'🌍', title:'Deployed across 30+ countries', sub:'Global infrastructure, local support teams' },
+              { icon:'⚡', title:'Live in under 30 minutes',       sub:'No IT team needed — just your login' },
+              { icon:'🛡', title:'Enterprise security & SSO',      sub:'SOC 2 compliant, end-to-end encrypted' },
+              { icon:'🤖', title:'AI insights from day one',       sub:'No training — insights start immediately' },
+            ].map((pt,i)=>(
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:14, marginBottom:16 }}>
+                <div style={{ width:42, height:42, borderRadius:11, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>{pt.icon}</div>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:600, color:'#F8FAFC' }}>{pt.title}</div>
+                  <div style={{ fontSize:12, color:'#64748B', marginTop:1 }}>{pt.sub}</div>
+                </div>
+              </div>
+            ))}
+          </FadeIn>
+
+          {/* Form */}
+          <FadeIn delay={0.2}>
+            <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:22, padding:36 }}>
+              <div style={{ fontSize:16, fontWeight:700, color:'#F8FAFC', marginBottom:24, fontFamily:"'Space Grotesk',sans-serif" }}>Book a Free Demo</div>
+              {[
+                [{ label:'Name', ph:'Jane Doe', type:'text' }, { label:'Company', ph:'Acme Drilling Co.', type:'text' }],
+                [{ label:'Email', ph:'jane@acme.com', type:'email' }, { label:'Phone', ph:'+1 555 000 1234', type:'tel' }],
+              ].map((row,ri)=>(
+                <div key={ri} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:0 }}>
+                  {row.map((f,fi)=>(
+                    <div key={fi} style={{ marginBottom:14 }}>
+                      <label style={{ fontSize:11, fontWeight:700, color:'#64748B', letterSpacing:'0.1em', textTransform:'uppercase', display:'block', marginBottom:6 }}>{f.label}</label>
+                      <input type={f.type} placeholder={f.ph}
+                        style={{ width:'100%', padding:'12px 14px', borderRadius:10, border:'1px solid #1E293B', background:'rgba(255,255,255,0.03)', color:'#F8FAFC', fontFamily:'inherit', fontSize:13, outline:'none', transition:'all 0.2s' }}
+                        onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,0.4)';e.target.style.boxShadow='0 0 0 3px rgba(249,115,22,0.08)'}}
+                        onBlur={e=>{e.target.style.borderColor='#1E293B';e.target.style.boxShadow=''}} />
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {[
+                { label:'Country', opts:['Australia','United States','India','Canada','Saudi Arabia','South Africa','United Kingdom','Other'] },
+                { label:'Role',    opts:['Operations Manager','Drilling Supervisor','Project Manager','CEO / Director','IT / Admin','Other'] },
+              ].map((f,i)=>(
+                <div key={i} style={{ marginBottom:14 }}>
+                  <label style={{ fontSize:11, fontWeight:700, color:'#64748B', letterSpacing:'0.1em', textTransform:'uppercase', display:'block', marginBottom:6 }}>{f.label}</label>
+                  <select style={{ width:'100%', padding:'12px 14px', borderRadius:10, border:'1px solid #1E293B', background:'rgba(255,255,255,0.03)', color:'#F8FAFC', fontFamily:'inherit', fontSize:13, outline:'none', cursor:'pointer', appearance:'none' }}>
+                    {f.opts.map(o=><option key={o} style={{ background:'#0D1117' }}>{o}</option>)}
+                  </select>
+                </div>
+              ))}
+              <div style={{ marginBottom:20 }}>
+                <label style={{ fontSize:11, fontWeight:700, color:'#64748B', letterSpacing:'0.1em', textTransform:'uppercase', display:'block', marginBottom:6 }}>Message</label>
+                <textarea placeholder="Tell us about your fleet size and current challenges..." rows={3}
+                  style={{ width:'100%', padding:'12px 14px', borderRadius:10, border:'1px solid #1E293B', background:'rgba(255,255,255,0.03)', color:'#F8FAFC', fontFamily:'inherit', fontSize:13, outline:'none', resize:'vertical', transition:'all 0.2s' }}
+                  onFocus={e=>{e.target.style.borderColor='rgba(249,115,22,0.4)';e.target.style.boxShadow='0 0 0 3px rgba(249,115,22,0.08)'}}
+                  onBlur={e=>{e.target.style.borderColor='#1E293B';e.target.style.boxShadow=''}} />
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button className="btn-ghost" style={{ flex:1, justifyContent:'center' }}>Contact Sales</button>
+                <button className="btn-primary" style={{ flex:1, justifyContent:'center' }}>Book Demo →</button>
+              </div>
+              <p style={{ fontSize:11, color:'#64748B', textAlign:'center', marginTop:14 }}>By submitting, you agree to our terms & privacy policy.</p>
+            </div>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════
+          FOOTER
+      ══════════════════════════════════════════════════ */}
+      <footer style={{ background:'#0D1117', borderTop:'1px solid #1E293B', padding:'60px 60px 32px' }}>
+        <div className="footer-grid" style={{ maxWidth:1400, margin:'0 auto', display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:48, marginBottom:48 }}>
+          {/* Brand */}
+          <div>
+            <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
+              <XLogo size={36} />
+              <div>
+                <div style={{ fontSize:16, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>XPLORIX</div>
+                <div style={{ fontSize:9, color:'#64748B', letterSpacing:'0.15em', textTransform:'uppercase' }}>Drilling Intelligence</div>
+              </div>
+            </div>
+            <p style={{ fontSize:13, color:'#64748B', lineHeight:1.7, maxWidth:260, marginBottom:20 }}>
+              The world's most advanced drilling intelligence platform. Built for exploration drilling contractors who demand more.
+            </p>
+            <div style={{ display:'flex', gap:10 }}>
+              {['LinkedIn','Twitter','YouTube'].map(s=>(
+                <div key={s} style={{ width:34, height:34, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, color:'#64748B', cursor:'pointer', transition:'all 0.2s' }}
+                  onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.3)';(e.currentTarget as HTMLElement).style.color='#F97316'}}
+                  onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor='#1E293B';(e.currentTarget as HTMLElement).style.color='#64748B'}}>
+                  {s[0]}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Product */}
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color:'#F8FAFC', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:16 }}>Product</div>
+            {['Operations Dashboard','Maintenance Dashboard','Driller Performance','AI Insights','Inventory Management','Finance & Costing'].map(l=>(
+              <div key={l} style={{ fontSize:13, color:'#64748B', marginBottom:9, cursor:'pointer', transition:'color 0.2s' }}
+                onMouseEnter={e=>(e.currentTarget.style.color='#F8FAFC')} onMouseLeave={e=>(e.currentTarget.style.color='#64748B')}>{l}</div>
+            ))}
+          </div>
+
+          {/* Company */}
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color:'#F8FAFC', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:16 }}>Company</div>
+            {['About Us','Careers','Blog','Press','Partners','Contact Us'].map(l=>(
+              <div key={l} style={{ fontSize:13, color:'#64748B', marginBottom:9, cursor:'pointer', transition:'color 0.2s' }}
+                onMouseEnter={e=>(e.currentTarget.style.color='#F8FAFC')} onMouseLeave={e=>(e.currentTarget.style.color='#64748B')}>{l}</div>
+            ))}
+          </div>
+
+          {/* Industries */}
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color:'#F8FAFC', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:16 }}>Industries</div>
+            {['Mining','Exploration Drilling','Geotechnical','Blast Hole Drilling','RC Drilling','Diamond Core'].map(l=>(
+              <div key={l} style={{ fontSize:13, color:'#64748B', marginBottom:9, cursor:'pointer', transition:'color 0.2s' }}
+                onMouseEnter={e=>(e.currentTarget.style.color='#F8FAFC')} onMouseLeave={e=>(e.currentTarget.style.color='#64748B')}>{l}</div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom bar */}
+        <div style={{ borderTop:'1px solid #1E293B', paddingTop:24, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+          <p style={{ fontSize:13, color:'#64748B' }}>© 2026 Xplorix. All rights reserved. Built with ❤️ for the drilling industry.</p>
+          <div style={{ display:'flex', gap:24 }}>
+            {['Privacy Policy','Terms of Service','Cookie Policy'].map(l=>(
+              <span key={l} style={{ fontSize:12, color:'#64748B', cursor:'pointer', transition:'color 0.2s' }}
+                onMouseEnter={e=>(e.currentTarget.style.color='#F8FAFC')} onMouseLeave={e=>(e.currentTarget.style.color='#64748B')}>{l}</span>
+            ))}
+          </div>
+        </div>
+      </footer>
+
+    </div>
   )
 }
 
