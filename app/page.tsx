@@ -34,6 +34,146 @@ function useCounter({ target, suffix = '', prefix = '', duration = 2000 }: Count
   return { value: `${prefix}${value.toLocaleString()}${suffix}`, ref }
 }
 
+// ── ECOSYSTEM DIAGRAM ──────────────────────────────────────────────────────
+function EcosystemDiagram() {
+  const [activeNode, setActiveNode] = useState<string|null>(null)
+  const nodes: Record<string,{icon:string;title:string;color:string;desc:string;feats:string[]}> = {
+    ops:      { icon:'⚡', title:'Operations Dashboard',  color:'#F97316', desc:'Live ROP trending, meters drilled, downtime analysis and bit performance across all rigs.', feats:['Live ROP & downtime alerts','Meters drilled vs target','Bit performance & cost/m','Formation comparison'] },
+    maint:    { icon:'🔧', title:'Maintenance Dashboard', color:'#3B82F6', desc:'Component health tracking and predictive maintenance — know what will fail before it fails.', feats:['Component failure analysis','MTBF by rig','Oil consumption trend','Maintenance cost tracking'] },
+    driller:  { icon:'👷', title:'Driller & Crew',        color:'#10B981', desc:'Individual driller leaderboard handling 70+ drillers with search, sort, pagination and medals.', feats:['70+ driller leaderboard','ROP vs downtime scatter','Crew hours & utilisation','Performance radar chart'] },
+    consm:    { icon:'📦', title:'Consumables Dashboard', color:'#8B5CF6', desc:'Full resource tracking — fuel, water, additives, accessories. Every cost broken down.', feats:['Fluid consumption breakdown','Accessories by cost (ranked)','Inventory level alerts','Supplier performance'] },
+    hsc:      { icon:'🛡', title:'HSC & Safety',          color:'#EF4444', desc:'Incident tracking, PPE compliance, near-misses and safety training completion.', feats:['Incident type & severity','PPE compliance per item','Near-miss resolution','Safety training progress'] },
+    finance:  { icon:'💰', title:'Finance & Costing',     color:'#F59E0B', desc:'Full cost visibility per project, per rig, per meter. Pricing tables and cost reports.', feats:['Cost per meter analysis','Master pricing data','Hole-by-hole cost reports','Multi-currency support'] },
+    logs:     { icon:'📋', title:'Digital Drill Logs',    color:'#60A5FA', desc:'Supervisor shift log replacing all paper. Captures every data point from engine HMR to bit usage.', feats:['10h/12h shift toggle','Downtime reason tracking','Bit usage per hole','Incidents & attachments'] },
+    reports:  { icon:'📄', title:'Performance Reports',   color:'#F97316', desc:'Admin generates official 4-page PDF certificates for any driller or supervisor.', feats:['4-page PDF certificate','Career lifetime stats','Industry comparison','XPLORIX verified badge'] },
+    inv:      { icon:'🗄', title:'Inventory Management',  color:'#10B981', desc:'Per-site stock with purchase orders, auto-deduction from drill logs and low-stock alerts.', feats:['Excel import/export catalogue','Per-site stock levels','Purchase order management','Auto stock deduction'] },
+    rigs:     { icon:'🔩', title:'Projects & Rigs',       color:'#8B5CF6', desc:'Manage all projects and rigs across every site. Configure, activate and assign.', feats:['Multi-project management','Rig activation & billing','Site assignment','Unlimited projects & rigs'] },
+    users:    { icon:'👥', title:'User Management',       color:'#06B6D4', desc:'Create and manage logins for admins, supervisors and drillers. Each company isolated.', feats:['3 role types','Company isolation','Login credentials','Activity tracking'] },
+    notif:    { icon:'🔔', title:'Alerts & Notifications',color:'#F59E0B', desc:'Real-time alerts for low stock, AI anomalies, pending approvals and system events.', feats:['Low stock alerts','AI anomaly alerts','Maintenance reminders','PO delivery tracking'] },
+    currency: { icon:'💱', title:'Multi-Currency',        color:'#EC4899', desc:'Switch between currencies in real-time. All values convert instantly across the platform.', feats:['USD · INR · AUD','EUR · SAR','Live conversion everywhere','Finance integration'] },
+    ai:       { icon:'🧠', title:'AI Insights Engine',    color:'#F97316', desc:'Monitors every data point, detects patterns, predicts failures and delivers daily recommendations.', feats:['Predictive failure detection','ROP optimisation tips','Cost/m opportunities','Daily summaries'] },
+  }
+  const active = activeNode ? nodes[activeNode] : null
+
+  return (
+    <div style={{ position:'relative', width:'100%' }}>
+      <svg viewBox="0 0 360 360" width="100%" style={{ display:'block' }}>
+        <defs>
+          <style>{`
+            @keyframes pr1{0%{r:30;opacity:.5}100%{r:52;opacity:0}}
+            @keyframes pr2{0%{r:30;opacity:.3}100%{r:58;opacity:0}}
+            @keyframes od{from{stroke-dashoffset:0}to{stroke-dashoffset:-80}}
+            @keyframes aidot{0%,100%{opacity:1}50%{opacity:.3}}
+            .epr1{animation:pr1 2s ease-out infinite}
+            .epr2{animation:pr2 2s ease-out infinite .8s}
+            .eod1{animation:od 6s linear infinite}
+            .eod2{animation:od 10s linear infinite}
+            .eaidot{animation:aidot 1.5s ease-in-out infinite}
+            .eng:hover circle,.eng:hover rect{filter:brightness(1.25);cursor:pointer}
+          `}</style>
+        </defs>
+        {/* Orbit rings */}
+        <circle cx="180" cy="180" r="72"  fill="none" stroke="#1E293B" strokeWidth="0.5" strokeDasharray="4 4"/>
+        <circle cx="180" cy="180" r="128" fill="none" stroke="#1E293B" strokeWidth="0.5" strokeDasharray="2 6"/>
+        {/* Animated dots */}
+        <circle r="2.5" fill="#F97316" opacity="0.5" className="eod1"><animateMotion dur="7s" repeatCount="indefinite"><mpath href="#er1"/></animateMotion></circle>
+        <circle r="2" fill="#3B82F6" opacity="0.4" className="eod2"><animateMotion dur="13s" repeatCount="indefinite"><mpath href="#er2"/></animateMotion></circle>
+        <path id="er1" d="M252 180 A72 72 0 1 1 251.99 180" fill="none"/>
+        <path id="er2" d="M308 180 A128 128 0 1 1 307.99 180" fill="none"/>
+        {/* Center → inner lines */}
+        <g stroke="#1E293B" strokeWidth="0.75" opacity="0.7">
+          <line x1="180" y1="180" x2="180" y2="108"/><line x1="180" y1="180" x2="242" y2="142"/>
+          <line x1="180" y1="180" x2="242" y2="218"/><line x1="180" y1="180" x2="180" y2="252"/>
+          <line x1="180" y1="180" x2="118" y2="218"/><line x1="180" y1="180" x2="118" y2="142"/>
+        </g>
+        {/* Inner → outer lines */}
+        <g stroke="#1E293B" strokeWidth="0.5" opacity="0.4">
+          <line x1="180" y1="108" x2="180" y2="52"/><line x1="242" y1="142" x2="288" y2="112"/>
+          <line x1="242" y1="218" x2="288" y2="248"/><line x1="180" y1="252" x2="180" y2="308"/>
+          <line x1="118" y1="218" x2="72" y2="248"/><line x1="118" y1="142" x2="72" y2="112"/>
+          <line x1="308" y1="180" x2="244" y2="180"/><line x1="52"  y1="180" x2="116" y2="180"/>
+        </g>
+        {/* Center X logo */}
+        <circle cx="180" cy="180" r="36" fill="#080B10" stroke="rgba(249,115,22,0.35)" strokeWidth="1.5"/>
+        <circle className="epr1" cx="180" cy="180" r="30" fill="none" stroke="rgba(249,115,22,0.25)" strokeWidth="1"/>
+        <circle className="epr2" cx="180" cy="180" r="30" fill="none" stroke="rgba(249,115,22,0.15)" strokeWidth="1"/>
+        <polygon points="180,180 158,158 158,202" fill="#2a2a2a"/>
+        <polygon points="180,180 158,158 168,158" fill="#3a3a3a"/>
+        <polygon points="180,180 158,202 168,202" fill="#3a3a3a"/>
+        <polygon points="180,180 202,158 202,202" fill="#F97316"/>
+        <polygon points="180,180 202,158 192,158" fill="#EA580C"/>
+        <polygon points="180,180 202,202 192,202" fill="#EA580C"/>
+        {/* Inner ring nodes */}
+        {([
+          { id:'ops',    cx:180, cy:108, icon:'⚡', color:'#F97316' },
+          { id:'maint',  cx:242, cy:142, icon:'🔧', color:'#3B82F6' },
+          { id:'driller',cx:242, cy:218, icon:'👷', color:'#10B981' },
+          { id:'consm',  cx:180, cy:252, icon:'📦', color:'#8B5CF6' },
+          { id:'hsc',    cx:118, cy:218, icon:'🛡', color:'#EF4444' },
+          { id:'finance',cx:118, cy:142, icon:'💰', color:'#F59E0B' },
+        ] as const).map(n=>(
+          <g key={n.id} className="eng" onClick={()=>setActiveNode(activeNode===n.id?null:n.id)} style={{ cursor:'pointer' }}>
+            <circle cx={n.cx} cy={n.cy} r="24" fill="#0D1117" stroke={activeNode===n.id?n.color:'#1E293B'} strokeWidth={activeNode===n.id?2:1}/>
+            <text x={n.cx} y={n.cy-4} textAnchor="middle" fontSize="13" fill={n.color}>{n.icon}</text>
+            <text x={n.cx} y={n.cy+10} textAnchor="middle" fontSize="7" fill="#94A3B8" fontFamily="Inter,sans-serif">{nodes[n.id].title.split(' ')[0]}</text>
+          </g>
+        ))}
+        {/* Outer ring nodes */}
+        {([
+          { id:'logs',     x:158, y:34,  icon:'📋', color:'#60A5FA', label:'Drill Logs'   },
+          { id:'reports',  x:265, y:96,  icon:'📄', color:'#F97316', label:'Reports'      },
+          { id:'inv',      x:290, y:165, icon:'🗄',  color:'#10B981', label:'Inventory'    },
+          { id:'rigs',     x:265, y:234, icon:'🔩', color:'#8B5CF6', label:'Projects'     },
+          { id:'users',    x:158, y:296, icon:'👥', color:'#06B6D4', label:'Users'        },
+          { id:'notif',    x:29,  y:234, icon:'🔔', color:'#F59E0B', label:'Alerts'       },
+          { id:'currency', x:28,  y:165, icon:'💱', color:'#EC4899', label:'Currency'     },
+          { id:'ai',       x:29,  y:96,  icon:'🧠', color:'#F97316', label:'AI Insights', glow:true },
+        ] as const).map(n=>(
+          <g key={n.id} className="eng" onClick={()=>setActiveNode(activeNode===n.id?null:n.id)} style={{ cursor:'pointer' }}>
+            <rect x={n.x} y={n.y} width="44" height="30" rx="7" fill="#0D1117"
+              stroke={activeNode===n.id ? n.color : n.glow ? 'rgba(249,115,22,0.4)' : '#1E293B'}
+              strokeWidth={activeNode===n.id ? 2 : n.glow ? 1.2 : 0.75}/>
+            <text x={n.x+22} y={n.y+12} textAnchor="middle" fontSize="11" fill={n.color}>{n.icon}</text>
+            <text x={n.x+22} y={n.y+24} textAnchor="middle" fontSize="6.5" fill={n.glow?n.color:'#64748B'} fontFamily="Inter,sans-serif" fontWeight={n.glow?700:400}>{n.label}</text>
+          </g>
+        ))}
+        {/* AI pulse dot */}
+        <circle className="eaidot" cx="29" cy="96" r="3" fill="#F97316" opacity="0.8"/>
+      </svg>
+
+      {/* Detail tooltip */}
+      {active && (
+        <div style={{ marginTop:8, background:'rgba(13,17,23,0.97)', border:`1px solid ${active.color}40`, borderRadius:14, padding:'14px 16px', backdropFilter:'blur(20px)' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+            <span style={{ fontSize:18 }}>{active.icon}</span>
+            <span style={{ fontSize:13, fontWeight:700, color:active.color }}>{active.title}</span>
+          </div>
+          <p style={{ fontSize:11, color:'#94A3B8', lineHeight:1.6, marginBottom:10 }}>{active.desc}</p>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+            {active.feats.map((f,i)=>(
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:5, fontSize:10, color:'#94A3B8' }}>
+                <span style={{ width:4, height:4, borderRadius:'50%', background:active.color, display:'inline-block', flexShrink:0 }}/>
+                {f}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div style={{ display:'flex', flexWrap:'wrap', gap:10, justifyContent:'center', marginTop:10 }}>
+        {[{c:'#F97316',l:'Dashboards'},{c:'#10B981',l:'Management'},{c:'#F97316',l:'AI Powered'}].map((l,i)=>(
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:5, fontSize:10, color:'#64748B' }}>
+            <div style={{ width:7, height:7, borderRadius:'50%', background:l.c }}/>
+            {l.l}
+          </div>
+        ))}
+      </div>
+      <div style={{ textAlign:'center', fontSize:10, color:'#334155', marginTop:4 }}>Click any module to explore</div>
+    </div>
+  )
+}
+
 // ── XPLORIX LOGO SVG ───────────────────────────────────────────────────────
 function XLogo({ size = 40, className = '' }: { size?: number; className?: string }) {
   return (
@@ -354,60 +494,9 @@ export default function LandingPage() {
             </FadeIn>
           </div>
 
-          {/* Right — Dashboard */}
-          <div className="hero-visual xpl-float" style={{ position:'relative' }}>
-            {/* Floating card 1 */}
-            <div className="xpl-float2" style={{ position:'absolute', top:-24, right:-16, background:'rgba(13,17,23,0.95)', border:'1px solid #1E293B', borderRadius:12, padding:'12px 16px', backdropFilter:'blur(20px)', boxShadow:'0 20px 40px rgba(0,0,0,0.4)', zIndex:2 }}>
-              <div style={{ fontSize:11, color:'#10B981', fontWeight:700 }}>▲ +23% ROP this week</div>
-              <div style={{ fontSize:10, color:'#64748B', marginTop:2 }}>AI Insight · Pilbara Site</div>
-            </div>
-            {/* Floating card 2 */}
-            <div className="xpl-float3" style={{ position:'absolute', bottom:16, left:-24, background:'rgba(13,17,23,0.95)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:12, padding:'12px 16px', backdropFilter:'blur(20px)', boxShadow:'0 20px 40px rgba(0,0,0,0.4)', zIndex:2 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <span style={{ fontSize:10, background:'rgba(239,68,68,0.1)', color:'#EF4444', padding:'2px 7px', borderRadius:5, fontWeight:700 }}>⚠ Alert</span>
-              </div>
-              <div style={{ fontSize:12, fontWeight:700, color:'#F8FAFC', marginTop:4 }}>RIG-003 Hydraulic</div>
-              <div style={{ fontSize:10, color:'#64748B' }}>Inspect in 48hrs</div>
-            </div>
-
-            {/* Main dashboard card */}
-            <div style={{ background:'rgba(13,17,23,0.95)', border:'1px solid #1E293B', borderRadius:20, padding:22, backdropFilter:'blur(20px)', boxShadow:'0 40px 80px rgba(0,0,0,0.5)' }}>
-              {/* Card header */}
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
-                <div>
-                  <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>Rig 07 · Pilbara</div>
-                  <div style={{ fontSize:11, color:'#64748B', marginTop:1 }}>Live Operations · Day Shift</div>
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#F97316', background:'rgba(249,115,22,0.1)', padding:'4px 10px', borderRadius:20, border:'1px solid rgba(249,115,22,0.2)' }}>
-                  <span className="xpl-pulse" style={{ width:6, height:6, borderRadius:'50%', background:'#F97316', display:'inline-block' }} />
-                  Drilling
-                </div>
-              </div>
-              {/* KPIs */}
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
-                {[
-                  { icon:'⚡', val:'9.8', unit:'m/hr', label:'Avg ROP',       color:'#F8FAFC', change:'+2.1%' },
-                  { icon:'📊', val:'34.9K',unit:'m',  label:'Meters',        color:'#60A5FA', change:'+1%'   },
-                  { icon:'🎯', val:'92%',  unit:'',   label:'Productivity',  color:'#F97316', change:'+3%'   },
-                  { icon:'💎', val:'97.4%',unit:'',   label:'Core Recovery', color:'#10B981', change:'+0.8%' },
-                ].map((k,i)=>(
-                  <div key={i} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid #1E293B', borderRadius:11, padding:13 }}>
-                    <div style={{ fontSize:14, marginBottom:7 }}>{k.icon}</div>
-                    <div style={{ fontSize:20, fontWeight:800, fontFamily:"'Space Grotesk',sans-serif", color:k.color }}>{k.val}<span style={{ fontSize:11, color:'#64748B', fontWeight:400 }}> {k.unit}</span></div>
-                    <div style={{ fontSize:10, color:'#64748B', marginTop:2 }}>{k.label}</div>
-                    <div style={{ fontSize:10, color:'#10B981', marginTop:3 }}>▲ {k.change}</div>
-                  </div>
-                ))}
-              </div>
-              {/* Chart */}
-              <div style={{ background:'rgba(255,255,255,0.02)', border:'1px solid #1E293B', borderRadius:11, padding:13 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:9 }}>
-                  <span style={{ color:'#94A3B8' }}>ROP Trend · 24h</span>
-                  <span style={{ color:'#F97316', fontWeight:600 }}>↗ Optimal</span>
-                </div>
-                <div id="heroBars" style={{ display:'flex', alignItems:'flex-end', gap:3, height:48 }} />
-              </div>
-            </div>
+          {/* Right — Ecosystem Diagram */}
+          <div className="hero-visual" style={{ position:'relative', width:'100%' }}>
+            <EcosystemDiagram />
           </div>
         </div>
       </section>
