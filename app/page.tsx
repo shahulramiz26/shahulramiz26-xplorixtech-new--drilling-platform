@@ -111,7 +111,7 @@ function EcosystemDiagram() {
           { id:'consm',  cx:180, cy:252, icon:'📦', color:'#8B5CF6' },
           { id:'hsc',    cx:118, cy:218, icon:'🛡', color:'#EF4444' },
           { id:'finance',cx:118, cy:142, icon:'💰', color:'#F59E0B' },
-        ] as const).map(n=>(
+        ]).map(n=>(
           <g key={n.id} className="eng" onClick={()=>setActiveNode(activeNode===n.id?null:n.id)} style={{ cursor:'pointer' }}>
             <circle cx={n.cx} cy={n.cy} r="24" fill="#0D1117" stroke={activeNode===n.id?n.color:'#1E293B'} strokeWidth={activeNode===n.id?2:1}/>
             <text x={n.cx} y={n.cy-4} textAnchor="middle" fontSize="13" fill={n.color}>{n.icon}</text>
@@ -120,15 +120,15 @@ function EcosystemDiagram() {
         ))}
         {/* Outer ring nodes */}
         {([
-          { id:'logs',     x:158, y:34,  icon:'📋', color:'#60A5FA', label:'Drill Logs'   },
-          { id:'reports',  x:265, y:96,  icon:'📄', color:'#F97316', label:'Reports'      },
-          { id:'inv',      x:290, y:165, icon:'🗄',  color:'#10B981', label:'Inventory'    },
-          { id:'rigs',     x:265, y:234, icon:'🔩', color:'#8B5CF6', label:'Projects'     },
-          { id:'users',    x:158, y:296, icon:'👥', color:'#06B6D4', label:'Users'        },
-          { id:'notif',    x:29,  y:234, icon:'🔔', color:'#F59E0B', label:'Alerts'       },
-          { id:'currency', x:28,  y:165, icon:'💱', color:'#EC4899', label:'Currency'     },
-          { id:'ai',       x:29,  y:96,  icon:'🧠', color:'#F97316', label:'AI Insights', glow:true },
-        ] as const).map(n=>(
+          { id:'logs',     x:158, y:34,  icon:'📋', color:'#60A5FA', label:'Drill Logs',  glow:false },
+          { id:'reports',  x:265, y:96,  icon:'📄', color:'#F97316', label:'Reports',     glow:false },
+          { id:'inv',      x:290, y:165, icon:'🗄',  color:'#10B981', label:'Inventory',   glow:false },
+          { id:'rigs',     x:265, y:234, icon:'🔩', color:'#8B5CF6', label:'Projects',    glow:false },
+          { id:'users',    x:158, y:296, icon:'👥', color:'#06B6D4', label:'Users',       glow:false },
+          { id:'notif',    x:29,  y:234, icon:'🔔', color:'#F59E0B', label:'Alerts',      glow:false },
+          { id:'currency', x:28,  y:165, icon:'💱', color:'#EC4899', label:'Currency',    glow:false },
+          { id:'ai',       x:29,  y:96,  icon:'🧠', color:'#F97316', label:'AI Insights', glow:true  },
+        ]).map(n=>(
           <g key={n.id} className="eng" onClick={()=>setActiveNode(activeNode===n.id?null:n.id)} style={{ cursor:'pointer' }}>
             <rect x={n.x} y={n.y} width="44" height="30" rx="7" fill="#0D1117"
               stroke={activeNode===n.id ? n.color : n.glow ? 'rgba(249,115,22,0.4)' : '#1E293B'}
