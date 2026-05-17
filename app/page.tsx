@@ -524,7 +524,7 @@ export default function LandingPage() {
       <section style={{ minHeight:'100vh',display:'flex',alignItems:'center',padding:'120px max(24px, calc(50vw - 600px)) 60px',position:'relative',overflow:'hidden' }}>
         <div style={{ position:'absolute',inset:0,background:'radial-gradient(ellipse 80% 60% at 50% -10%,rgba(249,115,22,0.08) 0%,transparent 60%),#080B10' }}/>
         <div style={{ position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(30,41,59,0.1) 1px,transparent 1px),linear-gradient(90deg,rgba(30,41,59,0.1) 1px,transparent 1px)',backgroundSize:'60px 60px',WebkitMaskImage:'radial-gradient(ellipse 100% 80% at 50% 0%,black 0%,transparent 70%)' }}/>
-        <div className="hero-grid" style={{ position:'relative',zIndex:2,width:'100%',maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:60,alignItems:'center' }}>
+        <div className="hero-grid" style={{ position:'relative',zIndex:2,width:'100%',maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'1.2fr 0.8fr',gap:48,alignItems:'center' }}>
           <div>
             <SR anim="dropDown">
               <div style={{ display:'inline-flex',alignItems:'center',gap:8,padding:'6px 16px',borderRadius:100,border:'1px solid rgba(249,115,22,0.3)',background:'rgba(249,115,22,0.06)',fontSize:11,fontWeight:700,color:'#F97316',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:28 }}>
@@ -566,7 +566,7 @@ export default function LandingPage() {
               </div>
             </SR>
           </div>
-          <div className="hero-right" style={{ animation:'xplFloat 6s ease-in-out infinite' }}>
+          <div className="hero-right" style={{ animation:'xplFloat 6s ease-in-out infinite', maxWidth:440, margin:'0 auto' }}>
             <EcosystemDiagram/>
           </div>
         </div>
@@ -618,7 +618,7 @@ export default function LandingPage() {
               </h2>
               <p style={{ fontSize:13,color:'#64748B',marginTop:8 }}>Four steps — no IT team, no spreadsheets, no paper.</p>
             </div>
-            <div style={{ position:'relative',maxWidth:840,margin:'0 auto' }}>
+            <div style={{ position:'relative',maxWidth:700,margin:'0 auto' }}>
               <div style={{ position:'absolute',left:'50%',top:0,bottom:0,width:1,background:'linear-gradient(180deg,transparent,rgba(249,115,22,0.3) 5%,rgba(249,115,22,0.3) 95%,transparent)',transform:'translateX(-50%)',zIndex:0 }}/>
               {howItWorks.map((step,i)=>(
                 <SR key={i} anim={step.side==='left'?'slideLeft':'slideRight'} delay={i*100}>
@@ -677,13 +677,13 @@ export default function LandingPage() {
       {/* ── FEATURES ── */}
       <section id="features" style={{ padding:'70px max(24px, calc(50vw - 600px))' }}>
         <SR anim="unfold">
-          <div style={{ maxWidth:900,margin:'0 auto' }}>
+          <div style={{ maxWidth:600,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:32 }}>
               <Tag>Platform</Tag>
               <h2 className="syne" style={{ fontSize:'clamp(28px,3vw,42px)',fontWeight:800,letterSpacing:'-0.02em' }}>
                 Everything your operation needs — <span style={{ background:'linear-gradient(135deg,#3B82F6,#60A5FA)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>one platform.</span>
               </h2>
-              <p style={{ fontSize:14,color:'#64748B',marginTop:10,marginBottom:8 }}>Click any card to pause · Use arrows or dots to navigate · Upload real screenshots with "+ Screenshot"</p>
+              <p style={{ fontSize:14,color:'#64748B',marginTop:10,marginBottom:8 }}>Auto-advances every 5s · Click to pause · Add your screenshots</p>
             </div>
             <FeaturesSection/>
           </div>
