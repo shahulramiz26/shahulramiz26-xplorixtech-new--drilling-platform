@@ -477,7 +477,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div style={{ fontFamily:"'DM Sans',sans-serif", background:'#080B10', color:'#F8FAFC', overflowX:'hidden' }}>
+    <div style={{ fontFamily:"'DM Sans',sans-serif", background:'#080B10', color:'#F8FAFC', overflowX:'hidden', maxWidth:'100vw' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -524,7 +524,7 @@ export default function LandingPage() {
       <section style={{ minHeight:'100vh',display:'flex',alignItems:'center',padding:'120px 60px 60px',position:'relative',overflow:'hidden' }}>
         <div style={{ position:'absolute',inset:0,background:'radial-gradient(ellipse 80% 60% at 50% -10%,rgba(249,115,22,0.08) 0%,transparent 60%),#080B10' }}/>
         <div style={{ position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(30,41,59,0.1) 1px,transparent 1px),linear-gradient(90deg,rgba(30,41,59,0.1) 1px,transparent 1px)',backgroundSize:'60px 60px',WebkitMaskImage:'radial-gradient(ellipse 100% 80% at 50% 0%,black 0%,transparent 70%)' }}/>
-        <div className="hero-grid" style={{ position:'relative',zIndex:2,width:'100%',maxWidth:1400,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:60,alignItems:'center' }}>
+        <div className="hero-grid" style={{ position:'relative',zIndex:2,width:'100%',maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:60,alignItems:'center' }}>
           <div>
             <SR anim="dropDown">
               <div style={{ display:'inline-flex',alignItems:'center',gap:8,padding:'6px 16px',borderRadius:100,border:'1px solid rgba(249,115,22,0.3)',background:'rgba(249,115,22,0.06)',fontSize:11,fontWeight:700,color:'#F97316',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:28 }}>
@@ -533,7 +533,7 @@ export default function LandingPage() {
               </div>
             </SR>
             <SR anim="slideLeft" delay={100}>
-              <h1 className="syne" style={{ fontSize:'clamp(24px,2.4vw,38px)',lineHeight:1.1,fontWeight:700,marginBottom:8,letterSpacing:'-0.02em' }}>
+              <h1 className="syne" style={{ fontSize:'clamp(38px,4.5vw,64px)',lineHeight:1.05,fontWeight:900,marginBottom:8,letterSpacing:'-0.02em' }}>
                 Drilling Intelligence<br/>
                 <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>{displayText}</span>
                 <span style={{ borderRight:'3px solid #F97316',marginLeft:2,animation:'xplPulse 1s infinite' }}/>
@@ -576,12 +576,12 @@ export default function LandingPage() {
       <SR anim="slideLeft"><AITicker/></SR>
 
       {/* ── ABOUT ── */}
-      <section id="about" style={{ padding:'100px 60px' }}>
+      <section id="about" style={{ padding:'80px 5vw' }}>
         <SR anim="flipX">
-          <div className="about-grid" style={{ maxWidth:1400,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1.1fr',gap:80,alignItems:'center' }}>
+          <div className="about-grid" style={{ maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1.1fr',gap:80,alignItems:'center' }}>
             <div>
               <Tag>About Xplorix</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(20px,2vw,30px)',fontWeight:700,lineHeight:1.1,marginBottom:18,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,lineHeight:1.1,marginBottom:18,letterSpacing:'-0.02em' }}>
                 Performance intelligence for <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>exploration drilling.</span>
               </h2>
               <p style={{ fontSize:13,color:'#94A3B8',lineHeight:1.8,marginBottom:14 }}>
@@ -608,12 +608,12 @@ export default function LandingPage() {
       </section>
 
       {/* ── HOW IT WORKS ── */}
-      <section id="how" style={{ background:'#0D1117',padding:'80px 60px',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
+      <section id="how" style={{ background:'#0D1117',padding:'70px 5vw',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
         <SR anim="zoomDeep">
-          <div style={{ maxWidth:1400,margin:'0 auto' }}>
+          <div style={{ maxWidth:1200,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:44 }}>
               <Tag>How It Works</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(20px,2vw,30px)',fontWeight:700,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,letterSpacing:'-0.02em' }}>
                 From signup to full <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>intelligence</span> in 30 min.
               </h2>
               <p style={{ fontSize:13,color:'#64748B',marginTop:8 }}>Four steps — no IT team, no spreadsheets, no paper.</p>
@@ -675,12 +675,12 @@ export default function LandingPage() {
       </section>
 
       {/* ── FEATURES ── */}
-      <section id="features" style={{ padding:'100px 60px' }}>
+      <section id="features" style={{ padding:'80px 5vw' }}>
         <SR anim="unfold">
           <div style={{ maxWidth:900,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:32 }}>
               <Tag>Platform</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(20px,2vw,30px)',fontWeight:700,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,letterSpacing:'-0.02em' }}>
                 Everything your operation needs — <span style={{ background:'linear-gradient(135deg,#3B82F6,#60A5FA)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>one platform.</span>
               </h2>
               <p style={{ fontSize:14,color:'#64748B',marginTop:10,marginBottom:8 }}>Click any card to pause · Use arrows or dots to navigate · Upload real screenshots with "+ Screenshot"</p>
@@ -691,12 +691,12 @@ export default function LandingPage() {
       </section>
 
       {/* ── AI INSIGHTS ── */}
-      <section id="ai" style={{ background:'#0D1117',padding:'100px 60px',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
+      <section id="ai" style={{ background:'#0D1117',padding:'80px 5vw',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
         <SR anim="slideRight">
-          <div className="ai-grid" style={{ maxWidth:1400,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:72,alignItems:'center' }}>
+          <div className="ai-grid" style={{ maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:72,alignItems:'center' }}>
             <div>
               <Tag>AI-Powered Insights</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(20px,2vw,30px)',fontWeight:700,lineHeight:1.1,marginBottom:16,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,lineHeight:1.1,marginBottom:16,letterSpacing:'-0.02em' }}>
                 Intelligence that <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>acts</span> before you <span style={{ background:'linear-gradient(135deg,#3B82F6,#60A5FA)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>ask.</span>
               </h2>
               <p style={{ fontSize:13,color:'#94A3B8',lineHeight:1.7,marginBottom:24 }}>
@@ -745,11 +745,11 @@ export default function LandingPage() {
       </section>
 
       {/* ── INDUSTRIES ── */}
-      <section id="industries" style={{ padding:'100px 60px' }}>
+      <section id="industries" style={{ padding:'80px 5vw' }}>
         <SR anim="dropDown">
-          <div style={{ maxWidth:1400,margin:'0 auto' }}>
+          <div style={{ maxWidth:1200,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:52 }}>
-              <h2 className="syne" style={{ fontSize:'clamp(20px,2vw,30px)',fontWeight:700,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,letterSpacing:'-0.02em' }}>
                 Built for the toughest <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>operations on earth.</span>
               </h2>
             </div>
@@ -778,12 +778,12 @@ export default function LandingPage() {
       </section>
 
       {/* ── PRICING ── */}
-      <section style={{ background:'#0D1117',padding:'100px 60px',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
+      <section style={{ background:'#0D1117',padding:'80px 5vw',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
         <SR anim="flipY">
-          <div style={{ maxWidth:1400,margin:'0 auto' }}>
+          <div style={{ maxWidth:1200,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:44 }}>
               <Tag>Pricing</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(20px,2vw,30px)',fontWeight:700,marginBottom:10,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,marginBottom:10,letterSpacing:'-0.02em' }}>
                 XPLORIX <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>Plans</span>
               </h2>
               <p style={{ fontSize:14,color:'#64748B' }}>Powerful insights. Smarter operations. Maximum uptime.</p>
@@ -831,12 +831,12 @@ export default function LandingPage() {
       </section>
 
       {/* ── FAQ ── */}
-      <section style={{ padding:'100px 60px' }}>
+      <section style={{ padding:'80px 5vw' }}>
         <SR anim="spinIn">
           <div style={{ maxWidth:760,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:40 }}>
               <Tag>FAQ</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(20px,2vw,28px)',fontWeight:700,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(22px,2.2vw,32px)',fontWeight:700,letterSpacing:'-0.02em' }}>
                 Common <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>questions answered.</span>
               </h2>
             </div>
@@ -859,16 +859,16 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA + CONTACT ── */}
-      <section id="contact" style={{ padding:'100px 60px',background:'radial-gradient(ellipse 80% 60% at 50% 100%,rgba(249,115,22,0.06) 0%,transparent 60%),#080B10',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
+      <section id="contact" style={{ padding:'80px 5vw',background:'radial-gradient(ellipse 80% 60% at 50% 100%,rgba(249,115,22,0.06) 0%,transparent 60%),#080B10',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
         <SR anim="riseUp">
-          <div className="contact-grid" style={{ maxWidth:1300,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1.2fr',gap:72,alignItems:'start' }}>
+          <div className="contact-grid" style={{ maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1.2fr',gap:72,alignItems:'start' }}>
             <div>
               <Tag>Get Started</Tag>
               <div style={{ display:'inline-flex',alignItems:'center',gap:8,padding:'7px 16px',borderRadius:9,background:'rgba(249,115,22,0.06)',border:'1px solid rgba(249,115,22,0.2)',marginBottom:16 }}>
                 <span style={{ fontSize:16 }}>⛏</span>
                 <span className="syne" style={{ fontSize:13,fontWeight:700,color:'#F97316',fontStyle:'italic' }}>"Built by drillers, for drillers."</span>
               </div>
-              <h2 className="syne" style={{ fontSize:'clamp(20px,2vw,30px)',fontWeight:700,lineHeight:1.1,marginBottom:14,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,lineHeight:1.1,marginBottom:14,letterSpacing:'-0.02em' }}>
                 Transform your drilling with <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>AI.</span>
               </h2>
               <p style={{ fontSize:14,color:'#94A3B8',lineHeight:1.7,marginBottom:28 }}>
@@ -938,8 +938,8 @@ export default function LandingPage() {
       </section>
 
       {/* ── FOOTER ── */}
-      <footer style={{ background:'#0D1117',borderTop:'1px solid rgba(255,255,255,0.06)',padding:'48px 60px 24px' }}>
-        <div className="footer-grid" style={{ maxWidth:1400,margin:'0 auto',display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:36,marginBottom:36 }}>
+      <footer style={{ background:'#0D1117',borderTop:'1px solid rgba(255,255,255,0.06)',padding:'48px 5vw 24px' }}>
+        <div className="footer-grid" style={{ maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:36,marginBottom:36 }}>
           <div>
             <div style={{ display:'flex',alignItems:'center',gap:11,marginBottom:12 }}>
               <XLogo size={32}/>
