@@ -428,9 +428,9 @@ export default function LandingPage() {
   },[])
 
   const navLinks = [
-    {label:'About',href:'#about'},{label:'Platform',href:'#features'},
-    {label:'How it Works',href:'#how'},{label:'AI Insights',href:'#ai'},
-    {label:'Industries',href:'#industries'},{label:'Contact',href:'#contact'},
+    {label:'About',href:'#about'},{label:'How it Works',href:'#how'},
+    {label:'AI Insights',href:'#ai'},{label:'Industries',href:'#industries'},
+    {label:'Contact',href:'#contact'},
   ]
 
   const howItWorks = [
@@ -547,7 +547,7 @@ export default function LandingPage() {
             <SR anim="riseUp" delay={300}>
               <div style={{ display:'flex',gap:12,flexWrap:'wrap',marginBottom:32 }}>
                 <a href="#contact" className="btn-primary">Schedule Demo →</a>
-                <a href="#features" className="btn-ghost">▷ Explore Platform</a>
+                <a href="#how" className="btn-ghost">▷ How It Works</a>
               </div>
             </SR>
             <SR anim="riseUp" delay={400}>
@@ -674,21 +674,7 @@ export default function LandingPage() {
         </SR>
       </section>
 
-      {/* ── FEATURES ── */}
-      <section id="features" style={{ padding:'70px max(24px, calc(50vw - 600px))' }}>
-        <SR anim="unfold">
-          <div style={{ maxWidth:600,margin:'0 auto' }}>
-            <div style={{ textAlign:'center',marginBottom:32 }}>
-              <Tag>Platform</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(28px,3vw,42px)',fontWeight:800,letterSpacing:'-0.02em' }}>
-                Everything your operation needs — <span style={{ background:'linear-gradient(135deg,#3B82F6,#60A5FA)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>one platform.</span>
-              </h2>
-              <p style={{ fontSize:14,color:'#64748B',marginTop:10,marginBottom:8 }}>Auto-advances every 5s · Click to pause · Add your screenshots</p>
-            </div>
-            <FeaturesSection/>
-          </div>
-        </SR>
-      </section>
+
 
       {/* ── AI INSIGHTS ── */}
       <section id="ai" style={{ background:'#0D1117',padding:'70px max(24px, calc(50vw - 600px))',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
