@@ -533,14 +533,14 @@ export default function LandingPage() {
               </div>
             </SR>
             <SR anim="slideLeft" delay={100}>
-              <h1 className="syne" style={{ fontSize:'clamp(38px,4.5vw,64px)',lineHeight:1.05,fontWeight:900,marginBottom:8,letterSpacing:'-0.02em' }}>
+              <h1 className="syne" style={{ fontSize:'clamp(44px,5.5vw,72px)',lineHeight:1.0,fontWeight:900,marginBottom:8,letterSpacing:'-0.02em' }}>
                 Drilling Intelligence<br/>
                 <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>{displayText}</span>
                 <span style={{ borderRight:'3px solid #F97316',marginLeft:2,animation:'xplPulse 1s infinite' }}/>
               </h1>
             </SR>
             <SR anim="riseUp" delay={200}>
-              <p style={{ fontSize:14,lineHeight:1.7,color:'#94A3B8',maxWidth:500,marginBottom:32,marginTop:14 }}>
+              <p style={{ fontSize:16,lineHeight:1.8,color:'#94A3B8',maxWidth:500,marginBottom:32,marginTop:14 }}>
                 AI-powered performance intelligence for exploration drilling — real-time analytics, digital logging, and smarter decisions. Built for the toughest operations on earth.
               </p>
             </SR>
@@ -581,7 +581,7 @@ export default function LandingPage() {
           <div className="about-grid" style={{ maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1.1fr',gap:80,alignItems:'center' }}>
             <div>
               <Tag>About Xplorix</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,lineHeight:1.1,marginBottom:18,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(28px,3vw,42px)',fontWeight:800,lineHeight:1.1,marginBottom:18,letterSpacing:'-0.02em' }}>
                 Performance intelligence for <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>exploration drilling.</span>
               </h2>
               <p style={{ fontSize:13,color:'#94A3B8',lineHeight:1.8,marginBottom:14 }}>
@@ -613,7 +613,7 @@ export default function LandingPage() {
           <div style={{ maxWidth:1200,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:44 }}>
               <Tag>How It Works</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(28px,3vw,42px)',fontWeight:800,letterSpacing:'-0.02em' }}>
                 From signup to full <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>intelligence</span> in 30 min.
               </h2>
               <p style={{ fontSize:13,color:'#64748B',marginTop:8 }}>Four steps — no IT team, no spreadsheets, no paper.</p>
@@ -680,7 +680,7 @@ export default function LandingPage() {
           <div style={{ maxWidth:900,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:32 }}>
               <Tag>Platform</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(28px,3vw,42px)',fontWeight:800,letterSpacing:'-0.02em' }}>
                 Everything your operation needs — <span style={{ background:'linear-gradient(135deg,#3B82F6,#60A5FA)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>one platform.</span>
               </h2>
               <p style={{ fontSize:14,color:'#64748B',marginTop:10,marginBottom:8 }}>Click any card to pause · Use arrows or dots to navigate · Upload real screenshots with "+ Screenshot"</p>
@@ -696,7 +696,7 @@ export default function LandingPage() {
           <div className="ai-grid" style={{ maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:72,alignItems:'center' }}>
             <div>
               <Tag>AI-Powered Insights</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,lineHeight:1.1,marginBottom:16,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(28px,3vw,42px)',fontWeight:800,lineHeight:1.1,marginBottom:16,letterSpacing:'-0.02em' }}>
                 Intelligence that <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>acts</span> before you <span style={{ background:'linear-gradient(135deg,#3B82F6,#60A5FA)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>ask.</span>
               </h2>
               <p style={{ fontSize:13,color:'#94A3B8',lineHeight:1.7,marginBottom:24 }}>
@@ -749,7 +749,7 @@ export default function LandingPage() {
         <SR anim="dropDown">
           <div style={{ maxWidth:1200,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:52 }}>
-              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(28px,3vw,42px)',fontWeight:800,letterSpacing:'-0.02em' }}>
                 Built for the toughest <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>operations on earth.</span>
               </h2>
             </div>
@@ -783,7 +783,7 @@ export default function LandingPage() {
           <div style={{ maxWidth:1200,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:44 }}>
               <Tag>Pricing</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,marginBottom:10,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(28px,3vw,42px)',fontWeight:800,marginBottom:10,letterSpacing:'-0.02em' }}>
                 XPLORIX <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>Plans</span>
               </h2>
               <p style={{ fontSize:14,color:'#64748B' }}>Powerful insights. Smarter operations. Maximum uptime.</p>
@@ -836,7 +836,7 @@ export default function LandingPage() {
           <div style={{ maxWidth:760,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:40 }}>
               <Tag>FAQ</Tag>
-              <h2 className="syne" style={{ fontSize:'clamp(22px,2.2vw,32px)',fontWeight:700,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(26px,2.8vw,38px)',fontWeight:800,letterSpacing:'-0.02em' }}>
                 Common <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>questions answered.</span>
               </h2>
             </div>
@@ -868,7 +868,7 @@ export default function LandingPage() {
                 <span style={{ fontSize:16 }}>⛏</span>
                 <span className="syne" style={{ fontSize:13,fontWeight:700,color:'#F97316',fontStyle:'italic' }}>"Built by drillers, for drillers."</span>
               </div>
-              <h2 className="syne" style={{ fontSize:'clamp(24px,2.5vw,36px)',fontWeight:700,lineHeight:1.1,marginBottom:14,letterSpacing:'-0.02em' }}>
+              <h2 className="syne" style={{ fontSize:'clamp(28px,3vw,42px)',fontWeight:800,lineHeight:1.1,marginBottom:14,letterSpacing:'-0.02em' }}>
                 Transform your drilling with <span style={{ background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent' }}>AI.</span>
               </h2>
               <p style={{ fontSize:14,color:'#94A3B8',lineHeight:1.7,marginBottom:28 }}>
