@@ -33,12 +33,13 @@ function SR({children,anim='riseUp',delay=0,style={},className=''}:{children:Rea
 }
 
 // ── TILT CARD ─────────────────────────────────────────────────────────────
-function TiltCard({children,style,className=''}:{children:React.ReactNode;style?:React.CSSProperties;className?:string}) {
+function TiltCard({children,style,className='',onMouseEnter,onMouseLeave}:{children:React.ReactNode;style?:React.CSSProperties;className?:string;onMouseEnter?:(e:React.MouseEvent<HTMLDivElement>)=>void;onMouseLeave?:(e:React.MouseEvent<HTMLDivElement>)=>void}) {
   const ref = useRef<HTMLDivElement>(null)
   return (
     <div ref={ref} className={className}
       onMouseMove={e=>{if(!ref.current) return;const r=ref.current.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-0.5,y=(e.clientY-r.top)/r.height-0.5;ref.current.style.transform=`perspective(800px) rotateY(${x*8}deg) rotateX(${-y*8}deg) scale(1.02)`}}
-      onMouseLeave={()=>{if(ref.current) ref.current.style.transform='perspective(800px) rotateY(0deg) rotateX(0deg) scale(1)'}}
+      onMouseLeave={e=>{if(ref.current) ref.current.style.transform='perspective(800px) rotateY(0deg) rotateX(0deg) scale(1)';onMouseLeave?.(e)}}
+      onMouseEnter={onMouseEnter}
       style={{transition:'transform 0.15s ease',transformStyle:'preserve-3d',...style}}>
       {children}
     </div>
@@ -717,8 +718,8 @@ export default function LandingPage() {
             ].map((ind,i)=>(
               <SR key={i} anim="riseUp" delay={i*80}>
                 <TiltCard style={{background:'rgba(13,17,23,0.8)',border:'1px solid rgba(255,255,255,0.06)',borderRadius:14,padding:'20px 16px',height:'100%',transition:'border-color 0.3s'}}
-                  onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${ind.color}30`}
-                  onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='rgba(255,255,255,0.06)'}>
+                  onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor=`${ind.color}30`}}
+                  onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor='rgba(255,255,255,0.06)'}}>
                   <div style={{width:40,height:40,borderRadius:10,background:`${ind.color}15`,border:`1px solid ${ind.color}25`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,marginBottom:12}}>{ind.icon}</div>
                   <h3 style={{fontSize:14,fontWeight:700,color:'#F8FAFC',marginBottom:6,fontFamily:"'Space Grotesk',sans-serif"}}>{ind.title}</h3>
                   <p style={{fontSize:12,color:'#94A3B8',lineHeight:1.6,marginBottom:10}}>{ind.desc}</p>
