@@ -503,7 +503,7 @@ export default function LandingPage() {
       `}</style>
 
       {/* ── NAV ── */}
-      <nav style={{ position:'fixed',top:0,left:0,right:0,zIndex:900,padding:'14px 60px',display:'flex',alignItems:'center',justifyContent:'space-between',transition:'all 0.3s',background:scrolled?'rgba(8,11,16,0.97)':'rgba(8,11,16,0.6)',backdropFilter:'blur(24px)',borderBottom:scrolled?'1px solid rgba(249,115,22,0.1)':'1px solid transparent' }}>
+      <nav style={{ position:'fixed',top:0,left:0,right:0,zIndex:900,padding:`14px max(24px, calc(50vw - 600px))`,display:'flex',alignItems:'center',justifyContent:'space-between',transition:'all 0.3s',background:scrolled?'rgba(8,11,16,0.97)':'rgba(8,11,16,0.6)',backdropFilter:'blur(24px)',borderBottom:scrolled?'1px solid rgba(249,115,22,0.1)':'1px solid transparent' }}>
         <a href="/" style={{ display:'flex',alignItems:'center',gap:12,textDecoration:'none' }}>
           <XLogo size={36}/>
           <div>
@@ -521,7 +521,7 @@ export default function LandingPage() {
       </nav>
 
       {/* ── HERO ── */}
-      <section style={{ minHeight:'100vh',display:'flex',alignItems:'center',padding:'120px 60px 60px',position:'relative',overflow:'hidden' }}>
+      <section style={{ minHeight:'100vh',display:'flex',alignItems:'center',padding:'120px max(24px, calc(50vw - 600px)) 60px',position:'relative',overflow:'hidden' }}>
         <div style={{ position:'absolute',inset:0,background:'radial-gradient(ellipse 80% 60% at 50% -10%,rgba(249,115,22,0.08) 0%,transparent 60%),#080B10' }}/>
         <div style={{ position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(30,41,59,0.1) 1px,transparent 1px),linear-gradient(90deg,rgba(30,41,59,0.1) 1px,transparent 1px)',backgroundSize:'60px 60px',WebkitMaskImage:'radial-gradient(ellipse 100% 80% at 50% 0%,black 0%,transparent 70%)' }}/>
         <div className="hero-grid" style={{ position:'relative',zIndex:2,width:'100%',maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:60,alignItems:'center' }}>
@@ -576,7 +576,7 @@ export default function LandingPage() {
       <SR anim="slideLeft"><AITicker/></SR>
 
       {/* ── ABOUT ── */}
-      <section id="about" style={{ padding:'80px 5vw' }}>
+      <section id="about" style={{ padding:'70px max(24px, calc(50vw - 600px))' }}>
         <SR anim="flipX">
           <div className="about-grid" style={{ maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1.1fr',gap:80,alignItems:'center' }}>
             <div>
@@ -608,7 +608,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── HOW IT WORKS ── */}
-      <section id="how" style={{ background:'#0D1117',padding:'70px 5vw',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
+      <section id="how" style={{ background:'#0D1117',padding:'70px max(24px, calc(50vw - 600px))',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
         <SR anim="zoomDeep">
           <div style={{ maxWidth:1200,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:44 }}>
@@ -675,7 +675,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── FEATURES ── */}
-      <section id="features" style={{ padding:'80px 5vw' }}>
+      <section id="features" style={{ padding:'70px max(24px, calc(50vw - 600px))' }}>
         <SR anim="unfold">
           <div style={{ maxWidth:900,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:32 }}>
@@ -691,7 +691,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── AI INSIGHTS ── */}
-      <section id="ai" style={{ background:'#0D1117',padding:'80px 5vw',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
+      <section id="ai" style={{ background:'#0D1117',padding:'70px max(24px, calc(50vw - 600px))',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
         <SR anim="slideRight">
           <div className="ai-grid" style={{ maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:72,alignItems:'center' }}>
             <div>
@@ -745,7 +745,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── INDUSTRIES ── */}
-      <section id="industries" style={{ padding:'80px 5vw' }}>
+      <section id="industries" style={{ padding:'70px max(24px, calc(50vw - 600px))' }}>
         <SR anim="dropDown">
           <div style={{ maxWidth:1200,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:52 }}>
@@ -778,7 +778,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── PRICING ── */}
-      <section style={{ background:'#0D1117',padding:'80px 5vw',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
+      <section style={{ background:'#0D1117',padding:'70px max(24px, calc(50vw - 600px))',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
         <SR anim="flipY">
           <div style={{ maxWidth:1200,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:44 }}>
@@ -831,7 +831,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── FAQ ── */}
-      <section style={{ padding:'80px 5vw' }}>
+      <section style={{ padding:'70px max(24px, calc(50vw - 600px))' }}>
         <SR anim="spinIn">
           <div style={{ maxWidth:760,margin:'0 auto' }}>
             <div style={{ textAlign:'center',marginBottom:40 }}>
@@ -859,7 +859,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA + CONTACT ── */}
-      <section id="contact" style={{ padding:'80px 5vw',background:'radial-gradient(ellipse 80% 60% at 50% 100%,rgba(249,115,22,0.06) 0%,transparent 60%),#080B10',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
+      <section id="contact" style={{ padding:'70px max(24px, calc(50vw - 600px))',background:'radial-gradient(ellipse 80% 60% at 50% 100%,rgba(249,115,22,0.06) 0%,transparent 60%),#080B10',borderTop:'1px solid rgba(249,115,22,0.06)' }}>
         <SR anim="riseUp">
           <div className="contact-grid" style={{ maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1.2fr',gap:72,alignItems:'start' }}>
             <div>
@@ -938,7 +938,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── FOOTER ── */}
-      <footer style={{ background:'#0D1117',borderTop:'1px solid rgba(255,255,255,0.06)',padding:'48px 5vw 24px' }}>
+      <footer style={{ background:'#0D1117',borderTop:'1px solid rgba(255,255,255,0.06)',padding:'48px max(24px, calc(50vw - 600px)) 24px' }}>
         <div className="footer-grid" style={{ maxWidth:1200,margin:'0 auto',display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr',gap:36,marginBottom:36 }}>
           <div>
             <div style={{ display:'flex',alignItems:'center',gap:11,marginBottom:12 }}>
