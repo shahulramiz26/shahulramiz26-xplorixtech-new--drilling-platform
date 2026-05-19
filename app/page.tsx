@@ -926,11 +926,16 @@ export default function LandingPage() {
           ))}
         </div>
         <div style={{borderTop:'1px solid rgba(255,255,255,0.06)',paddingTop:16,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:9}}>
-          <p style={{fontSize:12,color:'#64748B'}}>© 2026 Xplorix. All rights reserved. Built with ❤️ for the drilling industry.</p>
-          <div style={{display:'flex',gap:16}}>
-            {['Privacy Policy','Terms of Service','Cookie Policy'].map(l=>(
-              <span key={l} style={{fontSize:11,color:'#64748B',cursor:'pointer',transition:'color 0.2s'}}
-                onMouseEnter={e=>(e.currentTarget.style.color='#F8FAFC')} onMouseLeave={e=>(e.currentTarget.style.color='#64748B')}>{l}</span>
+          <p style={{fontSize:11,color:'#64748B'}}>© 2026 XPLORIX · ANMAK CONSULTANCY SERVICES PRIVATE LIMITED</p>
+          <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+            {[
+              {l:'Privacy Policy',   h:'/privacy-policy'},
+              {l:'Terms of Service', h:'/terms-of-service'},
+              {l:'Cookie Policy',    h:'/cookie-policy'},
+              {l:'Refund Policy',    h:'/refund-policy'},
+            ].map(link=>(
+              <a key={link.h} href={link.h} style={{fontSize:11,color:'#64748B',textDecoration:'none',transition:'color 0.2s'}}
+                onMouseEnter={e=>(e.currentTarget.style.color='#F97316')} onMouseLeave={e=>(e.currentTarget.style.color='#64748B')}>{link.l}</a>
             ))}
           </div>
         </div>
