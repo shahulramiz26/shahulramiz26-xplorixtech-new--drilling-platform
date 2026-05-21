@@ -236,7 +236,7 @@ function FeaturesSection() {
     const canvas = canvasRef.current; if(!canvas) return
     const ctx = canvas.getContext('2d')!
     let W = canvas.parentElement!.clientWidth || 900
-    let H = 560
+    let H = 620
     canvas.width = W; canvas.height = H
     let raf: number, t = 0, intro = 0
     const N = features.length
@@ -279,9 +279,9 @@ function FeaturesSection() {
       // Vertical: panels spread across full height, cycle from bottom to top
       const yNorm = 1 - tt  // 0=top 1=bottom
       const cx = W * 0.5
-      const spreadX = Math.min(W*0.28, 220)
+      const spreadX = Math.min(W*0.32, 260)
       const x = cx + rx * spreadX
-      const y = H * 0.08 + yNorm * H * 0.84
+      const y = H * 0.06 + yNorm * H * 0.88
       const z = rz  // -1=back, 1=front
       return {x, y, z, tt, angle}
     }
@@ -292,7 +292,7 @@ function FeaturesSection() {
       px: number, py: number, pz: number,
       scale: number, alpha: number, rot: number
     ) => {
-      const W_card = 200 * scale, H_card = 250 * scale
+      const W_card = 220 * scale, H_card = 275 * scale
       const depth = (pz + 1) / 2  // 0..1
 
       ctx.save()
@@ -515,45 +515,32 @@ function FeaturesSection() {
       pathPts.forEach(p=>ctx.lineTo(p.x,p.y))
       ctx.stroke(); ctx.setLineDash([]); ctx.restore()
 
-      // Intro overlay
-      if(intro<1) drawIntro(intro)
-
-      // Section label
-      ctx.save()
-      ctx.globalAlpha=intro*0.9
-      ctx.fillStyle='rgba(249,115,22,0.9)'
-      ctx.font=`bold 10px 'Space Grotesk',sans-serif`
-      ctx.letterSpacing='0.15em' as any
-      ctx.textAlign='center'
-      ctx.shadowBlur=10; ctx.shadowColor='#F97316'
-      ctx.fillText('• PLATFORM', W/2, 28)
-      ctx.shadowBlur=0
-      ctx.fillStyle='#F8FAFC'
-      ctx.font=`bold ${Math.min(22,W*0.025)}px 'Space Grotesk',sans-serif`
-      ctx.fillText('Everything your operation needs — one platform.', W/2, 54)
-      ctx.restore()
-
+      // Intro overlay — removed
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
 
     const resize = () => {
       W = canvas.parentElement!.clientWidth || 900
-      canvas.width = W; canvas.height = H
+      canvas.width = W; canvas.height = 620
     }
     window.addEventListener('resize', resize)
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize',resize) }
   },[])
 
   return (
-    <div style={{position:'relative',width:'100%',height:560,background:'#000005',borderRadius:20,overflow:'hidden',border:'1px solid rgba(249,115,22,0.1)'}}>
+    <div style={{position:'relative',width:'100%',height:620,background:'#000005',overflow:'hidden'}}>
       <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'100%'}}/>
       {/* Scanlines */}
       <div style={{position:'absolute',inset:0,backgroundImage:'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.03) 3px,rgba(0,0,0,0.03) 6px)',pointerEvents:'none',zIndex:2}}/>
       {/* Vignette */}
-      <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse 100% 100% at 50% 50%,transparent 50%,rgba(0,0,10,0.6) 100%)',pointerEvents:'none',zIndex:3}}/>
+      <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse 100% 100% at 50% 50%,transparent 40%,rgba(0,0,10,0.7) 100%)',pointerEvents:'none',zIndex:3}}/>
+      {/* Top fade into section */}
+      <div style={{position:'absolute',top:0,left:0,right:0,height:60,background:'linear-gradient(180deg,#000005,transparent)',pointerEvents:'none',zIndex:4}}/>
+      {/* Bottom fade */}
+      <div style={{position:'absolute',bottom:0,left:0,right:0,height:80,background:'linear-gradient(0deg,#000005,transparent)',pointerEvents:'none',zIndex:4}}/>
       {/* Floor glow */}
-      <div style={{position:'absolute',bottom:0,left:0,right:0,height:80,background:'linear-gradient(0deg,rgba(249,115,22,0.04),transparent)',pointerEvents:'none',zIndex:4}}/>
+      <div style={{position:'absolute',bottom:0,left:0,right:0,height:120,background:'linear-gradient(0deg,rgba(249,115,22,0.05),transparent)',pointerEvents:'none',zIndex:5}}/>
     </div>
   )
 }
@@ -829,7 +816,19 @@ export default function LandingPage() {
       </section>
 
       {/* FEATURES */}
-      <section id="features" style={{padding:`80px ${P}`,background:'#000005',borderTop:'1px solid rgba(249,115,22,0.08)'}}>
+      <section id="features" style={{background:'#000005',borderTop:'1px solid rgba(249,115,22,0.08)',borderBottom:'1px solid rgba(249,115,22,0.08)'}}>
+        {/* Header above canvas */}
+        <div style={{textAlign:'center',padding:`60px ${P} 0`,position:'relative',zIndex:5}}>
+          <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'5px 14px',borderRadius:100,border:'1px solid rgba(249,115,22,0.25)',background:'rgba(249,115,22,0.06)',fontSize:10,fontWeight:700,color:'#F97316',letterSpacing:'0.15em',textTransform:'uppercase',marginBottom:16}}>
+            <span style={{width:5,height:5,borderRadius:'50%',background:'#F97316',display:'inline-block',animation:'xplPulse 1.5s infinite'}}/>Platform
+          </div>
+          <h2 style={{fontSize:'clamp(22px,2.8vw,36px)',fontWeight:800,letterSpacing:'-0.01em',fontFamily:"'Space Grotesk',sans-serif",color:'#F8FAFC',marginBottom:8}}>
+            Everything your operation needs —{' '}
+            <span style={{background:'linear-gradient(135deg,#3B82F6,#60A5FA)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>one platform.</span>
+          </h2>
+          <p style={{fontSize:13,color:'#64748B',marginBottom:0}}>9 intelligent modules. All connected. All live.</p>
+        </div>
+        {/* Cinematic canvas — full width */}
         <SR anim="unfold">
           <FeaturesSection/>
         </SR>
