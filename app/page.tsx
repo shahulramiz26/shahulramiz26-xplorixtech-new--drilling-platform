@@ -217,146 +217,166 @@ function EcosystemDiagram() {
   )
 }
 
-// ── FEATURES FLY-IN ───────────────────────────────────────────────────────
+// ── FEATURES — SPLIT LAYOUT ────────────────────────────────────────────────
 function FeaturesSection() {
   const features = [
-    {icon:'⚡',color:'#F97316',title:'Operations Dashboard',   desc:'Live ROP trending, downtime analysis and bit performance across all rigs.',stat:'+23%',sl:'ROP Improvement', pts:['Live ROP & alerts','Meters vs target','Downtime by reason','Bit cost/meter'],kv:['9.8','92%'],kl:['Avg ROP','Efficiency'],  bars:[35,48,42,60,52,68,58,75,65,82,72,88,78,92,85,95]},
-    {icon:'🔧',color:'#3B82F6',title:'Maintenance Dashboard',  desc:'Predictive component health tracking. Fix failures before they cause downtime.',stat:'-35%',sl:'Downtime Reduced',pts:['Component failure','MTBF by rig','Oil consumption','Maintenance cost'],kv:['4.2','87%'],kl:['MTBF(days)','Uptime'],     bars:[80,65,72,58,75,62,68,55,72,60,65,52,70,58,75,80]},
-    {icon:'👷',color:'#10B981',title:'Driller & Crew',         desc:'70+ driller leaderboard with search, sort, pagination and performance medals.',stat:'+18%',sl:'Productivity',    pts:['70+ leaderboard','Shift comparison','Crew utilisation','Certificates'],kv:['#1','94%'],kl:['Top Rank','PPE Comp.'],  bars:[60,72,65,80,70,85,75,88,80,90,85,88,82,92,88,95]},
-    {icon:'🛡',color:'#EF4444',title:'HSC & Safety',           desc:'Track incidents, PPE compliance, near-misses and safety training.',stat:'98%',sl:'Safety Score',    pts:['Incident tracking','PPE compliance','Near-miss','Training'],            kv:['186','100%'],kl:['Safe Days','PPE Comp.'],bars:[90,88,92,86,94,90,96,92,95,90,97,94,96,92,98,95]},
-    {icon:'💰',color:'#F59E0B',title:'Finance & Costing',      desc:'Full cost visibility per project, per rig, per meter in real time.',stat:'-18%',sl:'Cost Savings',     pts:['Cost per meter','Master pricing','Budget vs actual','Multi-currency'],kv:['$8.2','-18%'],kl:['Cost/m','Savings'],bars:[72,65,68,60,64,58,62,55,60,52,55,48,52,45,50,44]},
-    {icon:'🗄',color:'#8B5CF6',title:'Inventory Management',   desc:'Per-site stock with purchase orders and auto-deduction from drill logs.',stat:'99%',sl:'Stock Accuracy',  pts:['Parts catalogue','Per-site stock','Purchase orders','Auto deduction'],kv:['247','99%'],kl:['Parts','Accuracy'],   bars:[85,88,82,90,86,92,88,94,90,96,92,94,90,96,94,98]},
-    {icon:'📄',color:'#EC4899',title:'Performance Reports',    desc:'Official verified 4-page PDF certificates for drillers and supervisors.',stat:'100%',sl:'Verified',        pts:['4-page PDF','Lifetime stats','Industry compare','QR verified'],       kv:['4pg','100%'],kl:['Pages','Verified'],     bars:[95,92,96,90,94,92,96,94,98,95,96,94,98,96,100,98]},
-    {icon:'📊',color:'#60A5FA',title:'Performance Dashboard',  desc:'Meter-by-meter hole analytics across every formation.',stat:'360°',sl:'Full Visibility', pts:['Hole analytics','Meter tracking','Formation compare','Bit life'],      kv:['9.8','97%'],kl:['Avg ROP','Core Rec.'],  bars:[40,52,48,62,55,70,63,76,68,80,73,84,78,86,80,88]},
-    {icon:'📋',color:'#A78BFA',title:'Digital Logging',        desc:'Replace paper completely. Structured digital shift logs on any device.',stat:'100%',sl:'Paper Gone',      pts:['10h/12h shift','Auto-calculate','Downtime log','Offline ready'],      kv:['<5m','100%'],kl:['Per Log','Paper Gone'],bars:[88,90,86,92,88,94,90,96,92,95,94,96,93,97,95,98]},
+    {icon:'⚡',color:'#F97316',title:'Operations Dashboard',  desc:'Live ROP trending, downtime and bit performance across all rigs.',   kv:[['9.8','ROP m/hr'],['92%','Efficiency']],  bars:[35,48,42,60,52,68,58,75,65,82,72,88,78,92,85,95]},
+    {icon:'🔧',color:'#3B82F6',title:'Maintenance Dashboard', desc:'Predictive health tracking. Fix failures before they cause downtime.', kv:[['4.2','MTBF days'],['87%','Uptime']],      bars:[80,65,72,58,75,62,68,55,72,60,65,52,70,58,75,80]},
+    {icon:'👷',color:'#10B981',title:'Driller & Crew',        desc:'70+ driller leaderboard with medals and certificates.',               kv:[['#1','Top Rank'],['94%','PPE Comp.']],    bars:[60,72,65,80,70,85,75,88,80,90,85,88,82,92,88,95]},
+    {icon:'🛡',color:'#EF4444',title:'HSC & Safety',          desc:'Track incidents, PPE compliance and safety training.',                kv:[['186','Safe Days'],['100%','PPE Comp.']], bars:[90,88,92,86,94,90,96,92,95,90,97,94,96,92,98,95]},
+    {icon:'💰',color:'#F59E0B',title:'Finance & Costing',     desc:'Full cost visibility per project, per rig and per meter.',           kv:[['$8.2','Cost/m'],['−18%','Savings']],    bars:[72,65,68,60,64,58,62,55,60,52,55,48,52,45,50,44]},
+    {icon:'🗄',color:'#8B5CF6',title:'Inventory Management',  desc:'Per-site stock with purchase orders and auto-deduction.',            kv:[['247','Parts'],['99%','Accuracy']],      bars:[85,88,82,90,86,92,88,94,90,96,92,94,90,96,94,98]},
+    {icon:'📄',color:'#EC4899',title:'Performance Reports',   desc:'Verified 4-page PDF certificates for drillers and supervisors.',    kv:[['4pg','Pages'],['100%','Verified']],     bars:[95,92,96,90,94,92,96,94,98,95,96,94,98,96,100,98]},
+    {icon:'📊',color:'#60A5FA',title:'Performance Dashboard', desc:'Hole-by-hole analytics across every project and formation.',         kv:[['9.8','Avg ROP'],['97%','Core Rec.']],   bars:[40,52,48,62,55,70,63,76,68,80,73,84,78,86,80,88]},
+    {icon:'📋',color:'#A78BFA',title:'Digital Logging',       desc:'Replace paper completely. Digital shift logs offline.',             kv:[['<5m','Per Log'],['100%','Paper Gone']], bars:[88,90,86,92,88,94,90,96,92,95,94,96,93,97,95,98]},
   ]
-  const enterAnims=['flyL','flyR','flyT','flyB','flyTL','flyTR','flyBL','flyBR','flyDeep']
-  const exitAnims =['exitL','exitR','exitT','exitB','exitDeep','exitL','exitR','exitT','exitB']
-  const [current,setCurrent]=useState(0)
-  const [progress,setProgress]=useState(0)
-  const [paused,setPaused]=useState(false)
-  const [images,setImages]=useState<Record<number,string>>({})
-  const cardRef=useRef<HTMLDivElement>(null)
-  const curRef=useRef(0)
-  const pausedRef=useRef(false)
-  useEffect(()=>{curRef.current=current},[current])
-  useEffect(()=>{pausedRef.current=paused},[paused])
+  const N = features.length
+  const [current, setCurrent] = useState(0)
+  const offsetRef = useRef(0)
+  const animRef = useRef<number>(0)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const panelsRef = useRef<HTMLDivElement[]>([])
+  const pausedRef = useRef(false)
+  const currentRef = useRef(0)
+  useEffect(()=>{ currentRef.current=current },[current])
 
-  const goTo=(next:number,exitIdx?:number)=>{
-    const N=features.length,ni=((next%N)+N)%N,ei=exitIdx!==undefined?exitIdx:curRef.current%exitAnims.length
-    const card=cardRef.current
-    if(card){
-      card.style.animation=`${exitAnims[ei]} 0.45s cubic-bezier(0.4,0,1,1) forwards`
-      setTimeout(()=>{setCurrent(ni);setProgress(0);if(card) card.style.animation=`${enterAnims[ni%enterAnims.length]} 0.7s cubic-bezier(0.16,1,0.3,1) forwards`},460)
-    }
-  }
+  const buildPanel = (f: typeof features[0]) => `
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,${f.color},transparent)"></div>
+    <div style="display:flex;align-items:center;gap:3px;padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.05)">
+      <div style="width:5px;height:5px;border-radius:50%;background:#EF4444"></div>
+      <div style="width:5px;height:5px;border-radius:50%;background:#F59E0B"></div>
+      <div style="width:5px;height:5px;border-radius:50%;background:#10B981"></div>
+      <span style="font-size:7px;color:rgba(255,255,255,0.3);margin-left:4px;font-family:inherit">XPLORIX › ${f.title}</span>
+    </div>
+    <div style="padding:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:7px">
+        ${f.kv.map(([v,l])=>`<div style="background:${f.color}12;border:1px solid ${f.color}20;border-radius:6px;padding:6px 8px"><div style="font-family:JetBrains Mono,monospace;font-size:14px;font-weight:700;color:${f.color};line-height:1">${v}</div><div style="font-size:7px;color:rgba(255,255,255,0.3);margin-top:2px">${l}</div></div>`).join('')}
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:2px;height:44px;margin-bottom:7px">
+        ${f.bars.map((h,bi)=>`<div style="flex:1;height:${h}%;border-radius:2px 2px 0 0;background:${bi>=12?f.color:f.color+'40'}"></div>`).join('')}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${[0,1,2].map(ri=>`<div style="display:flex;align-items:center;gap:6px;padding:5px 7px;background:rgba(255,255,255,0.025);border-radius:5px;border:1px solid rgba(255,255,255,0.04)"><div style="width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9px;background:${f.color}20;flex-shrink:0">${f.icon}</div><div style="flex:1"><div style="height:4px;border-radius:2px;background:${f.color}50;margin-bottom:3px;width:${65+ri*11}%"></div><div style="height:3px;border-radius:2px;background:${f.color}30;width:${40+ri*8}%;opacity:0.4"></div></div><div style="font-family:JetBrains Mono,monospace;font-size:9px;font-weight:700;color:${f.color}">${['98%','✓','A+'][ri]}</div></div>`).join('')}
+      </div>
+    </div>
+    <div style="position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;color:${f.color};letter-spacing:0.1em;text-transform:uppercase">${f.icon} ${f.title}</div>
+  `
+
   useEffect(()=>{
-    let p=0
-    const id=setInterval(()=>{
-      if(pausedRef.current) return
-      p+=0.35;setProgress(p)
-      if(p>=100){p=0;goTo(curRef.current+1)}
-    },20)
-    return ()=>clearInterval(id)
+    if(!stageRef.current) return
+    const stage = stageRef.current
+    stage.innerHTML=''
+    panelsRef.current=[]
+    features.forEach((f,i)=>{
+      const p = document.createElement('div')
+      p.style.cssText=`position:absolute;width:200px;height:260px;left:50%;top:50%;margin-left:-100px;margin-top:-130px;border-radius:14px;overflow:hidden;cursor:pointer;background:linear-gradient(135deg,rgba(255,255,255,0.05) 0%,rgba(255,255,255,0.02) 50%,rgba(0,0,0,0.3) 100%);border:1px solid rgba(255,255,255,0.1);box-shadow:0 0 0 0.5px rgba(255,255,255,0.06) inset;will-change:transform,opacity;transition:transform 0.7s cubic-bezier(0.25,0.46,0.45,0.94),opacity 0.6s ease,border-color 0.3s,box-shadow 0.3s`
+      p.innerHTML=buildPanel(f)
+      p.addEventListener('click',()=>goTo(i))
+      stage.appendChild(p)
+      panelsRef.current.push(p)
+    })
+  },[])
+
+  useEffect(()=>{
+    const canvas=canvasRef.current; if(!canvas) return
+    const ctx=canvas.getContext('2d')!
+    canvas.width=520;canvas.height=480
+    const pts=Array.from({length:80},()=>({x:Math.random()*520,y:Math.random()*480,sy:-(Math.random()*0.3+0.08),sx:(Math.random()-0.5)*0.15,s:Math.random()*1.2+0.2,o:Math.random()*0.4+0.1,c:Math.random()>0.7?'#F97316':Math.random()>0.5?'#3B82F6':'#ffffff'}))
+    let raf:number
+    const draw=()=>{
+      ctx.clearRect(0,0,520,480)
+      pts.forEach(p=>{ctx.save();ctx.globalAlpha=p.o*0.5;ctx.fillStyle=p.c;ctx.shadowBlur=p.s*3;ctx.shadowColor=p.c;ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,Math.PI*2);ctx.fill();ctx.restore();p.y+=p.sy;p.x+=p.sx;if(p.y<-5){p.y=485;p.x=Math.random()*520}if(p.x<0||p.x>520)p.x=Math.random()*520})
+      raf=requestAnimationFrame(draw)
+    }
+    draw()
+    return ()=>cancelAnimationFrame(raf)
+  },[])
+
+  const updatePanels=()=>{
+    const off=offsetRef.current
+    let frontI=0,frontZ=-9999
+    panelsRef.current.forEach((panel,i)=>{
+      const t=((i/N+off)%1+1)%1
+      const angle=t*Math.PI*2
+      const hx=Math.sin(angle)*130,hz=Math.cos(angle)*130
+      const rawY=(t*200)-100
+      const dep=(hz+130+40)/(260+40)
+      const scale=0.45+dep*0.65,opacity=0.15+dep*0.85,zi=Math.round(dep*100)
+      const rotZ=Math.sin(angle)*6,sx=hx-100,sy=rawY-130+(1-dep)*25
+      panel.style.transform=`translate(${sx}px,${sy}px) scale(${scale}) rotateZ(${rotZ}deg)`
+      panel.style.opacity=String(opacity);panel.style.zIndex=String(zi)
+      const f=features[i]
+      if(hz>frontZ){frontZ=hz;frontI=i}
+      panel.style.borderColor=hz>80?`${f.color}50`:'rgba(255,255,255,0.08)'
+      panel.style.boxShadow=hz>80?`0 0 25px ${f.color}20,0 0 0 0.5px ${f.color}25 inset`:'0 0 0 0.5px rgba(255,255,255,0.06) inset'
+    })
+    if(frontI!==currentRef.current) setCurrent(frontI)
+  }
+
+  const goTo=(i:number)=>{
+    const target=i/N,curr=((-offsetRef.current%1)+1)%1
+    let diff=target-curr
+    if(diff>0.5)diff-=1;if(diff<-0.5)diff+=1
+    offsetRef.current-=diff;updatePanels()
+    pausedRef.current=true;setTimeout(()=>{pausedRef.current=false},5000)
+  }
+
+  useEffect(()=>{
+    let last=0
+    const loop=(ts:number)=>{
+      const dt=Math.min((ts-last)/1000,0.05);last=ts
+      if(!pausedRef.current) offsetRef.current+=dt*0.05
+      updatePanels()
+      animRef.current=requestAnimationFrame(loop)
+    }
+    animRef.current=requestAnimationFrame(loop)
+    return ()=>cancelAnimationFrame(animRef.current)
   },[])
 
   const f=features[current]
-  const handleImg=(e:React.ChangeEvent<HTMLInputElement>)=>{
-    const file=e.target.files?.[0];if(!file) return
-    const reader=new FileReader()
-    reader.onload=ev=>setImages(prev=>({...prev,[current]:ev.target?.result as string}))
-    reader.readAsDataURL(file)
-  }
 
   return (
-    <div>
-      <style>{`
-        @keyframes flyL{0%{transform:translate(-700px,0) translateZ(-400px) rotateY(50deg) scale(0.3);opacity:0}100%{transform:translate(-50%,-50%) translateZ(0) rotateY(0) scale(1);opacity:1}}
-        @keyframes flyR{0%{transform:translate(700px,0) translateZ(-400px) rotateY(-50deg) scale(0.3);opacity:0}100%{transform:translate(-50%,-50%) translateZ(0) rotateY(0) scale(1);opacity:1}}
-        @keyframes flyT{0%{transform:translate(0,-600px) translateZ(-300px) rotateX(50deg) scale(0.3);opacity:0}100%{transform:translate(-50%,-50%) translateZ(0) rotateX(0) scale(1);opacity:1}}
-        @keyframes flyB{0%{transform:translate(0,600px) translateZ(-300px) rotateX(-50deg) scale(0.3);opacity:0}100%{transform:translate(-50%,-50%) translateZ(0) rotateX(0) scale(1);opacity:1}}
-        @keyframes flyTL{0%{transform:translate(-500px,-500px) translateZ(-500px) rotate(-25deg) scale(0.2);opacity:0}100%{transform:translate(-50%,-50%) translateZ(0) rotate(0) scale(1);opacity:1}}
-        @keyframes flyTR{0%{transform:translate(500px,-500px) translateZ(-500px) rotate(25deg) scale(0.2);opacity:0}100%{transform:translate(-50%,-50%) translateZ(0) rotate(0) scale(1);opacity:1}}
-        @keyframes flyBL{0%{transform:translate(-500px,500px) translateZ(-500px) rotate(25deg) scale(0.2);opacity:0}100%{transform:translate(-50%,-50%) translateZ(0) rotate(0) scale(1);opacity:1}}
-        @keyframes flyBR{0%{transform:translate(500px,500px) translateZ(-500px) rotate(-25deg) scale(0.2);opacity:0}100%{transform:translate(-50%,-50%) translateZ(0) rotate(0) scale(1);opacity:1}}
-        @keyframes flyDeep{0%{transform:translate(-50%,-50%) translateZ(-1400px) scale(0.05);opacity:0}60%{opacity:1}100%{transform:translate(-50%,-50%) translateZ(0) scale(1);opacity:1}}
-        @keyframes exitL{0%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(-700px,-50%) scale(0.2);opacity:0}}
-        @keyframes exitR{0%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(600px,-50%) scale(0.2);opacity:0}}
-        @keyframes exitT{0%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(-50%,-600px) scale(0.2);opacity:0}}
-        @keyframes exitB{0%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(-50%,600px) scale(0.2);opacity:0}}
-        @keyframes exitDeep{0%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(-50%,-50%) translateZ(-1400px) scale(0.05);opacity:0}}
-      `}</style>
-      {/* Progress */}
-      <div style={{height:2,background:'rgba(255,255,255,0.05)',borderRadius:1,overflow:'hidden',marginBottom:10}}>
-        <div style={{height:'100%',width:`${Math.min(progress,100)}%`,background:'linear-gradient(90deg,#F97316,#F59E0B)',borderRadius:1,transition:'width 0.05s linear'}}/>
-      </div>
-      {/* Feature name */}
-      <div style={{textAlign:'center',fontSize:13,fontWeight:700,color:f.color,letterSpacing:'0.04em',marginBottom:14,height:20}}>{f.icon} {f.title}</div>
-      {/* Stage */}
-      <div style={{position:'relative',height:460,perspective:1400,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-        {/* Arrows */}
-        {(['left','right'] as const).map((side,i)=>(
-          <div key={side} onClick={()=>{goTo(side==='left'?current-1:current+1,(current+(side==='left'?3:0))%exitAnims.length);setPaused(true)}}
-            style={{position:'absolute',[side]:8,top:'50%',transform:'translateY(-50%)',width:36,height:36,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'#F8FAFC',fontSize:16,zIndex:20,transition:'all 0.2s'}}
-            onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.4)';(e.currentTarget as HTMLElement).style.background='rgba(249,115,22,0.08)'}}
-            onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor='rgba(255,255,255,0.1)';(e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.04)'}}>
-            {side==='left'?'‹':'›'}
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:48,alignItems:'center'}}>
+      {/* LEFT */}
+      <div>
+        <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'5px 14px',borderRadius:100,border:'1px solid rgba(249,115,22,0.25)',background:'rgba(249,115,22,0.05)',fontSize:10,fontWeight:700,color:'#F97316',letterSpacing:'0.15em',textTransform:'uppercase' as const,marginBottom:20}}>
+          <span style={{width:5,height:5,borderRadius:'50%',background:'#F97316',display:'inline-block',animation:'xplPulse 1.5s infinite'}}/>Platform
+        </div>
+        <h2 style={{fontSize:'clamp(22px,2.8vw,36px)',fontWeight:800,letterSpacing:'-0.01em',fontFamily:"'Space Grotesk',sans-serif",lineHeight:1.15,marginBottom:16}}>
+          Everything your operation needs —{' '}
+          <span style={{background:'linear-gradient(135deg,#3B82F6,#60A5FA)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>one platform.</span>
+        </h2>
+        <div style={{padding:'14px 16px',background:`${f.color}08`,border:`1px solid ${f.color}25`,borderRadius:12,marginBottom:20,transition:'all 0.4s ease',minHeight:80}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+            <span style={{fontSize:18}}>{f.icon}</span>
+            <span style={{fontSize:14,fontWeight:700,color:f.color,fontFamily:"'Space Grotesk',sans-serif"}}>{f.title}</span>
           </div>
-        ))}
-        {/* Card */}
-        <div ref={cardRef} style={{position:'absolute',left:'50%',top:'50%',width:300,borderRadius:18,background:'rgba(13,17,23,0.98)',border:`1px solid ${f.color}35`,boxShadow:`0 0 40px ${f.color}12,0 20px 50px rgba(0,0,0,0.6)`,overflow:'hidden',animation:`${enterAnims[current%enterAnims.length]} 0.7s cubic-bezier(0.16,1,0.3,1) forwards`,cursor:'pointer'}}
-          onClick={()=>{if(paused) goTo((current+1)%features.length)}}>
-          <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${f.color},transparent)`,zIndex:2}}/>
-          {/* Image area */}
-          <div style={{width:'100%',height:160,position:'relative',overflow:'hidden',background:`linear-gradient(135deg,${f.color}08,rgba(8,11,16,0.95))`,borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
-            {images[current] ? (
-              <img src={images[current]} alt={f.title} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
-            ) : (
-              <div style={{padding:12,height:'100%',display:'flex',flexDirection:'column',gap:6}}>
-                <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
-                  {['#EF4444','#F59E0B','#10B981'].map((c,i)=><div key={i} style={{width:6,height:6,borderRadius:'50%',background:c}}/>)}
-                  <span style={{fontSize:8,color:'#64748B',marginLeft:6}}>XPLORIX › {f.title}</span>
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:5}}>
-                  {f.kv.map((v,i)=>(
-                    <div key={i} style={{background:`${f.color}10`,border:`1px solid ${f.color}20`,borderRadius:6,padding:'6px 8px'}}>
-                      <div style={{fontFamily:'JetBrains Mono,monospace',fontSize:13,fontWeight:700,color:f.color}}>{v}</div>
-                      <div style={{fontSize:8,color:'#64748B',marginTop:1}}>{f.kl[i]}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{display:'flex',alignItems:'flex-end',gap:2,height:36,flex:1}}>
-                  {f.bars.map((h,i)=><div key={i} style={{flex:1,height:`${h}%`,borderRadius:'2px 2px 0 0',background:i>=12?f.color:`${f.color}35`}}/>)}
-                </div>
-              </div>
-            )}
-            <label style={{position:'absolute',bottom:6,right:6,display:'flex',alignItems:'center',gap:3,padding:'3px 7px',background:'rgba(8,11,16,0.75)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:5,cursor:'pointer',zIndex:3,fontSize:9,color:'rgba(255,255,255,0.4)'}}
-              onClick={e=>e.stopPropagation()}>
-              + Screenshot<input type="file" accept="image/*" style={{display:'none'}} onChange={handleImg}/>
-            </label>
-          </div>
-          {/* Content */}
-          <div style={{padding:16}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-              <div style={{display:'flex',alignItems:'center',gap:6,padding:'3px 9px',borderRadius:20,background:`${f.color}12`,border:`1px solid ${f.color}25`,fontSize:10,fontWeight:700,color:f.color}}>{f.icon} {f.title}</div>
-              <div style={{fontFamily:'JetBrains Mono,monospace',fontSize:11,fontWeight:700,padding:'3px 7px',borderRadius:7,background:`${f.color}12`,border:`1px solid ${f.color}25`,color:f.color}}>{f.stat}</div>
+          <p style={{fontSize:12,color:'#94A3B8',lineHeight:1.6}}>{f.desc}</p>
+        </div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap' as const,marginBottom:20}}>
+          {features.map((_,i)=>(
+            <div key={i} onClick={()=>goTo(i)} style={{width:i===current?20:6,height:6,borderRadius:3,background:i===current?features[i].color:'rgba(255,255,255,0.15)',cursor:'pointer',transition:'all 0.25s'}}/>
+          ))}
+        </div>
+        <div style={{display:'flex',flexDirection:'column' as const,gap:7}}>
+          {features.slice(0,5).map((feat,i)=>(
+            <div key={i} onClick={()=>goTo(i)}
+              style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:9,border:`1px solid ${current===i?feat.color+'40':'rgba(255,255,255,0.05)'}`,background:current===i?`${feat.color}08`:'rgba(255,255,255,0.02)',cursor:'pointer',transition:'all 0.2s'}}>
+              <span style={{fontSize:16,flexShrink:0}}>{feat.icon}</span>
+              <span style={{fontSize:12,fontWeight:current===i?700:500,color:current===i?feat.color:'#94A3B8',fontFamily:"'Space Grotesk',sans-serif"}}>{feat.title}</span>
+              {current===i&&<span style={{marginLeft:'auto',fontSize:10,fontWeight:700,color:feat.color}}>→</span>}
             </div>
-            <div style={{fontSize:11,color:'#94A3B8',lineHeight:1.5,marginBottom:10}}>{f.desc}</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4}}>
-              {f.pts.map((p,i)=>(
-                <div key={i} style={{display:'flex',alignItems:'center',gap:5,fontSize:10,color:'#94A3B8'}}>
-                  <span style={{color:f.color,fontSize:10,flexShrink:0}}>✓</span>{p}
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
+          <div style={{fontSize:11,color:'#64748B',paddingLeft:12,marginTop:2}}>+ {features.length-5} more modules</div>
         </div>
       </div>
-      {/* Dots */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginTop:12}}>
-        {features.map((_,i)=>(
-          <div key={i} onClick={()=>{goTo(i);setPaused(true)}} style={{width:i===current?20:6,height:6,borderRadius:3,background:i===current?f.color:'rgba(255,255,255,0.15)',cursor:'pointer',transition:'all 0.25s'}}/>
-        ))}
+      {/* RIGHT — holographic helix */}
+      <div style={{position:'relative',height:480,overflow:'hidden'}}>
+        <div style={{position:'absolute',inset:0,backgroundImage:'repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px)',zIndex:10,pointerEvents:'none'}}/>
+        <div style={{position:'absolute',bottom:0,left:0,right:0,height:100,background:`linear-gradient(0deg,${f.color}06,transparent)`,zIndex:2,pointerEvents:'none',transition:'background 0.4s'}}/>
+        <canvas ref={canvasRef} style={{position:'absolute',inset:0,zIndex:1,pointerEvents:'none'}}/>
+        <div ref={stageRef} style={{position:'absolute',inset:0,zIndex:5,perspective:'900px',perspectiveOrigin:'50% 45%'}}/>
       </div>
     </div>
   )
@@ -633,17 +653,9 @@ export default function LandingPage() {
       </section>
 
       {/* FEATURES */}
-      <section id="features" style={{padding:`80px ${P}`}}>
+      <section id="features" style={{padding:`80px ${P}`,background:'#0D1117',borderTop:'1px solid rgba(249,115,22,0.06)'}}>
         <SR anim="unfold">
-          <div style={{textAlign:'center',marginBottom:28}}>
-            <Tag>Platform</Tag>
-            <h2 style={{fontSize:'clamp(22px,2.8vw,36px)',fontWeight:800,letterSpacing:'-0.01em',fontFamily:"'Space Grotesk',sans-serif"}}>
-              Everything your operation needs — <span style={{background:'linear-gradient(135deg,#3B82F6,#60A5FA)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>one platform.</span>
-            </h2>
-          </div>
-          <div style={{maxWidth:560,margin:'0 auto'}}>
-            <FeaturesSection/>
-          </div>
+          <FeaturesSection/>
         </SR>
       </section>
 
