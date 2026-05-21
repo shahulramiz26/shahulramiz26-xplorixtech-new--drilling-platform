@@ -217,167 +217,343 @@ function EcosystemDiagram() {
   )
 }
 
-// ── FEATURES — SPLIT LAYOUT ────────────────────────────────────────────────
+// ── FEATURES — CINEMATIC HOLOGRAPHIC UNIVERSE ─────────────────────────────
 function FeaturesSection() {
-  const features = [
-    {icon:'⚡',color:'#F97316',title:'Operations Dashboard',  desc:'Live ROP trending, downtime and bit performance across all rigs.',   kv:[['9.8','ROP m/hr'],['92%','Efficiency']],  bars:[35,48,42,60,52,68,58,75,65,82,72,88,78,92,85,95]},
-    {icon:'🔧',color:'#3B82F6',title:'Maintenance Dashboard', desc:'Predictive health tracking. Fix failures before they cause downtime.', kv:[['4.2','MTBF days'],['87%','Uptime']],      bars:[80,65,72,58,75,62,68,55,72,60,65,52,70,58,75,80]},
-    {icon:'👷',color:'#10B981',title:'Driller & Crew',        desc:'70+ driller leaderboard with medals and certificates.',               kv:[['#1','Top Rank'],['94%','PPE Comp.']],    bars:[60,72,65,80,70,85,75,88,80,90,85,88,82,92,88,95]},
-    {icon:'🛡',color:'#EF4444',title:'HSC & Safety',          desc:'Track incidents, PPE compliance and safety training.',                kv:[['186','Safe Days'],['100%','PPE Comp.']], bars:[90,88,92,86,94,90,96,92,95,90,97,94,96,92,98,95]},
-    {icon:'💰',color:'#F59E0B',title:'Finance & Costing',     desc:'Full cost visibility per project, per rig and per meter.',           kv:[['$8.2','Cost/m'],['−18%','Savings']],    bars:[72,65,68,60,64,58,62,55,60,52,55,48,52,45,50,44]},
-    {icon:'🗄',color:'#8B5CF6',title:'Inventory Management',  desc:'Per-site stock with purchase orders and auto-deduction.',            kv:[['247','Parts'],['99%','Accuracy']],      bars:[85,88,82,90,86,92,88,94,90,96,92,94,90,96,94,98]},
-    {icon:'📄',color:'#EC4899',title:'Performance Reports',   desc:'Verified 4-page PDF certificates for drillers and supervisors.',    kv:[['4pg','Pages'],['100%','Verified']],     bars:[95,92,96,90,94,92,96,94,98,95,96,94,98,96,100,98]},
-    {icon:'📊',color:'#60A5FA',title:'Performance Dashboard', desc:'Hole-by-hole analytics across every project and formation.',         kv:[['9.8','Avg ROP'],['97%','Core Rec.']],   bars:[40,52,48,62,55,70,63,76,68,80,73,84,78,86,80,88]},
-    {icon:'📋',color:'#A78BFA',title:'Digital Logging',       desc:'Replace paper completely. Digital shift logs offline.',             kv:[['<5m','Per Log'],['100%','Paper Gone']], bars:[88,90,86,92,88,94,90,96,92,95,94,96,93,97,95,98]},
-  ]
-  const N = features.length
-  const [current, setCurrent] = useState(0)
-  const offsetRef = useRef(0)
-  const animRef = useRef<number>(0)
-  const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const panelsRef = useRef<HTMLDivElement[]>([])
-  const pausedRef = useRef(false)
-  const currentRef = useRef(0)
-  useEffect(()=>{ currentRef.current=current },[current])
-
-  const buildPanel = (f: typeof features[0]) => `
-    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,${f.color},transparent)"></div>
-    <div style="display:flex;align-items:center;gap:3px;padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.05)">
-      <div style="width:5px;height:5px;border-radius:50%;background:#EF4444"></div>
-      <div style="width:5px;height:5px;border-radius:50%;background:#F59E0B"></div>
-      <div style="width:5px;height:5px;border-radius:50%;background:#10B981"></div>
-      <span style="font-size:7px;color:rgba(255,255,255,0.3);margin-left:4px;font-family:inherit">XPLORIX › ${f.title}</span>
-    </div>
-    <div style="padding:10px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:7px">
-        ${f.kv.map(([v,l])=>`<div style="background:${f.color}12;border:1px solid ${f.color}20;border-radius:6px;padding:6px 8px"><div style="font-family:JetBrains Mono,monospace;font-size:14px;font-weight:700;color:${f.color};line-height:1">${v}</div><div style="font-size:7px;color:rgba(255,255,255,0.3);margin-top:2px">${l}</div></div>`).join('')}
-      </div>
-      <div style="display:flex;align-items:flex-end;gap:2px;height:44px;margin-bottom:7px">
-        ${f.bars.map((h,bi)=>`<div style="flex:1;height:${h}%;border-radius:2px 2px 0 0;background:${bi>=12?f.color:f.color+'40'}"></div>`).join('')}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px">
-        ${[0,1,2].map(ri=>`<div style="display:flex;align-items:center;gap:6px;padding:5px 7px;background:rgba(255,255,255,0.025);border-radius:5px;border:1px solid rgba(255,255,255,0.04)"><div style="width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9px;background:${f.color}20;flex-shrink:0">${f.icon}</div><div style="flex:1"><div style="height:4px;border-radius:2px;background:${f.color}50;margin-bottom:3px;width:${65+ri*11}%"></div><div style="height:3px;border-radius:2px;background:${f.color}30;width:${40+ri*8}%;opacity:0.4"></div></div><div style="font-family:JetBrains Mono,monospace;font-size:9px;font-weight:700;color:${f.color}">${['98%','✓','A+'][ri]}</div></div>`).join('')}
-      </div>
-    </div>
-    <div style="position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;color:${f.color};letter-spacing:0.1em;text-transform:uppercase">${f.icon} ${f.title}</div>
-  `
+  const features = [
+    {icon:'⚡',color:'#F97316',title:'Operations Dashboard',  desc:'Live ROP trending, downtime and bit performance',     kv:[['9.8','ROP m/hr'],['92%','Efficiency']]},
+    {icon:'🔧',color:'#3B82F6',title:'Maintenance Dashboard', desc:'Predictive health. Fix failures before downtime',     kv:[['4.2','MTBF days'],['87%','Uptime']]},
+    {icon:'👷',color:'#10B981',title:'Driller & Crew',        desc:'70+ driller leaderboard with medals',                kv:[['#1','Top Rank'],['94%','PPE']]},
+    {icon:'🛡',color:'#EF4444',title:'HSC & Safety',          desc:'Incidents, PPE compliance and training',             kv:[['186','Safe Days'],['100%','PPE']]},
+    {icon:'💰',color:'#F59E0B',title:'Finance & Costing',     desc:'Full cost visibility per project and meter',         kv:[['$8.2','Cost/m'],['−18%','Savings']]},
+    {icon:'🗄',color:'#8B5CF6',title:'Inventory',             desc:'Per-site stock with purchase orders',                kv:[['247','Parts'],['99%','Accuracy']]},
+    {icon:'📄',color:'#EC4899',title:'Performance Reports',   desc:'Verified 4-page PDF certificates',                  kv:[['4pg','PDF'],['100%','Verified']]},
+    {icon:'📊',color:'#60A5FA',title:'Performance Dashboard', desc:'Hole-by-hole analytics across formations',           kv:[['9.8','Avg ROP'],['97%','Recovery']]},
+    {icon:'📋',color:'#A78BFA',title:'Digital Logging',       desc:'Replace paper. Digital shift logs offline',         kv:[['<5m','Per Log'],['100%','Paper Gone']]},
+  ]
 
   useEffect(()=>{
-    if(!stageRef.current) return
-    const stage = stageRef.current
-    stage.innerHTML=''
-    panelsRef.current=[]
-    features.forEach((f,i)=>{
-      const p = document.createElement('div')
-      p.style.cssText=`position:absolute;width:200px;height:260px;left:50%;top:50%;margin-left:-100px;margin-top:-130px;border-radius:14px;overflow:hidden;cursor:pointer;background:linear-gradient(135deg,rgba(255,255,255,0.05) 0%,rgba(255,255,255,0.02) 50%,rgba(0,0,0,0.3) 100%);border:1px solid rgba(255,255,255,0.1);box-shadow:0 0 0 0.5px rgba(255,255,255,0.06) inset;will-change:transform,opacity;transition:transform 0.7s cubic-bezier(0.25,0.46,0.45,0.94),opacity 0.6s ease,border-color 0.3s,box-shadow 0.3s`
-      p.innerHTML=buildPanel(f)
-      p.addEventListener('click',()=>goTo(i))
-      stage.appendChild(p)
-      panelsRef.current.push(p)
-    })
-  },[])
+    const canvas = canvasRef.current; if(!canvas) return
+    const ctx = canvas.getContext('2d')!
+    let W = canvas.parentElement!.clientWidth || 900
+    let H = 560
+    canvas.width = W; canvas.height = H
+    let raf: number, t = 0, intro = 0
+    const N = features.length
 
-  useEffect(()=>{
-    const canvas=canvasRef.current; if(!canvas) return
-    const ctx=canvas.getContext('2d')!
-    canvas.width=520;canvas.height=480
-    const pts=Array.from({length:80},()=>({x:Math.random()*520,y:Math.random()*480,sy:-(Math.random()*0.3+0.08),sx:(Math.random()-0.5)*0.15,s:Math.random()*1.2+0.2,o:Math.random()*0.4+0.1,c:Math.random()>0.7?'#F97316':Math.random()>0.5?'#3B82F6':'#ffffff'}))
-    let raf:number
-    const draw=()=>{
-      ctx.clearRect(0,0,520,480)
-      pts.forEach(p=>{ctx.save();ctx.globalAlpha=p.o*0.5;ctx.fillStyle=p.c;ctx.shadowBlur=p.s*3;ctx.shadowColor=p.c;ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,Math.PI*2);ctx.fill();ctx.restore();p.y+=p.sy;p.x+=p.sx;if(p.y<-5){p.y=485;p.x=Math.random()*520}if(p.x<0||p.x>520)p.x=Math.random()*520})
-      raf=requestAnimationFrame(draw)
+    // Panels in helix
+    type Panel = {
+      idx: number; helixT: number; x: number; y: number; z: number
+      vx: number; vy: number; rot: number; rotV: number
+      alpha: number; scale: number; trail: {x:number;y:number;a:number}[]
+      pulse: number
     }
-    draw()
-    return ()=>cancelAnimationFrame(raf)
-  },[])
+    const panels: Panel[] = features.map((_, i) => ({
+      idx: i, helixT: i / N,
+      x: 0, y: 0, z: 0,
+      vx: 0, vy: 0,
+      rot: (Math.random()-0.5)*0.3,
+      rotV: (Math.random()-0.5)*0.002,
+      alpha: 0, scale: 1,
+      trail: [],
+      pulse: Math.random()*Math.PI*2
+    }))
 
-  const updatePanels=()=>{
-    const off=offsetRef.current
-    let frontI=0,frontZ=-9999
-    panelsRef.current.forEach((panel,i)=>{
-      const t=((i/N+off)%1+1)%1
-      const angle=t*Math.PI*2
-      const hx=Math.sin(angle)*130,hz=Math.cos(angle)*130
-      const rawY=(t*200)-100
-      const dep=(hz+130+40)/(260+40)
-      const scale=0.45+dep*0.65,opacity=0.15+dep*0.85,zi=Math.round(dep*100)
-      const rotZ=Math.sin(angle)*6,sx=hx-100,sy=rawY-130+(1-dep)*25
-      panel.style.transform=`translate(${sx}px,${sy}px) scale(${scale}) rotateZ(${rotZ}deg)`
-      panel.style.opacity=String(opacity);panel.style.zIndex=String(zi)
-      const f=features[i]
-      if(hz>frontZ){frontZ=hz;frontI=i}
-      panel.style.borderColor=hz>80?`${f.color}50`:'rgba(255,255,255,0.08)'
-      panel.style.boxShadow=hz>80?`0 0 25px ${f.color}20,0 0 0 0.5px ${f.color}25 inset`:'0 0 0 0.5px rgba(255,255,255,0.06) inset'
-    })
-    if(frontI!==currentRef.current) setCurrent(frontI)
-  }
+    // Particles
+    const NPAR = 160
+    const pars = Array.from({length:NPAR},()=>({
+      x: Math.random()*W, y: Math.random()*H,
+      vx:(Math.random()-0.5)*0.3, vy:-(Math.random()*0.5+0.1),
+      s: Math.random()*1.8+0.3,
+      o: Math.random()*0.6+0.1,
+      c: Math.random()>0.6?'#F97316':Math.random()>0.4?'#8B5CF6':'#3B82F6',
+      life: Math.random()
+    }))
 
-  const goTo=(i:number)=>{
-    const target=i/N,curr=((-offsetRef.current%1)+1)%1
-    let diff=target-curr
-    if(diff>0.5)diff-=1;if(diff<-0.5)diff+=1
-    offsetRef.current-=diff;updatePanels()
-    pausedRef.current=true;setTimeout(()=>{pausedRef.current=false},5000)
-  }
-
-  useEffect(()=>{
-    let last=0
-    const loop=(ts:number)=>{
-      const dt=Math.min((ts-last)/1000,0.05);last=ts
-      if(!pausedRef.current) offsetRef.current+=dt*0.05
-      updatePanels()
-      animRef.current=requestAnimationFrame(loop)
+    // Helix position: returns screen x,y,z for panel at time t+offset
+    const helixPos = (helixT: number, time: number) => {
+      const tt = ((helixT + time*0.04) % 1 + 1) % 1
+      const angle = tt * Math.PI * 2 - Math.PI/2
+      const rx = Math.sin(angle)  // -1..1
+      const rz = Math.cos(angle)  // -1..1  (depth)
+      // Vertical: panels spread across full height, cycle from bottom to top
+      const yNorm = 1 - tt  // 0=top 1=bottom
+      const cx = W * 0.5
+      const spreadX = Math.min(W*0.28, 220)
+      const x = cx + rx * spreadX
+      const y = H * 0.08 + yNorm * H * 0.84
+      const z = rz  // -1=back, 1=front
+      return {x, y, z, tt, angle}
     }
-    animRef.current=requestAnimationFrame(loop)
-    return ()=>cancelAnimationFrame(animRef.current)
-  },[])
 
-  const f=features[current]
+    const drawPanel = (
+      ctx: CanvasRenderingContext2D,
+      f: typeof features[0],
+      px: number, py: number, pz: number,
+      scale: number, alpha: number, rot: number
+    ) => {
+      const W_card = 200 * scale, H_card = 250 * scale
+      const depth = (pz + 1) / 2  // 0..1
+
+      ctx.save()
+      ctx.translate(px, py)
+      ctx.rotate(rot)
+      ctx.globalAlpha = alpha * (0.3 + depth * 0.7)
+
+      // Glass panel
+      const grd = ctx.createLinearGradient(-W_card/2, -H_card/2, W_card/2, H_card/2)
+      grd.addColorStop(0, `rgba(255,255,255,${0.06*depth})`)
+      grd.addColorStop(0.5, `rgba(10,10,20,${0.85})`)
+      grd.addColorStop(1, `rgba(${hexToRgb(f.color)},${0.04*depth})`)
+      ctx.fillStyle = grd
+      roundRect(ctx, -W_card/2, -H_card/2, W_card, H_card, 14*scale)
+      ctx.fill()
+
+      // Border glow
+      ctx.strokeStyle = `rgba(${hexToRgb(f.color)},${0.3+depth*0.4})`
+      ctx.lineWidth = (depth>0.5 ? 1.5 : 0.8) * scale
+      roundRect(ctx, -W_card/2, -H_card/2, W_card, H_card, 14*scale)
+      ctx.stroke()
+
+      // Top accent bar
+      const barGrd = ctx.createLinearGradient(-W_card/2, 0, W_card/2, 0)
+      barGrd.addColorStop(0, f.color)
+      barGrd.addColorStop(1, 'transparent')
+      ctx.fillStyle = barGrd
+      ctx.globalAlpha = alpha * (0.5 + depth*0.5)
+      roundRect(ctx, -W_card/2, -H_card/2, W_card, 2*scale, 2)
+      ctx.fill()
+
+      // Glass shine
+      const shineGrd = ctx.createLinearGradient(-W_card/2, -H_card/2, -W_card/2, -H_card/2 + H_card*0.35)
+      shineGrd.addColorStop(0, `rgba(255,255,255,${0.08*depth})`)
+      shineGrd.addColorStop(1, 'transparent')
+      ctx.fillStyle = shineGrd
+      ctx.globalAlpha = alpha
+      roundRect(ctx, -W_card/2, -H_card/2, W_card, H_card*0.35, 14*scale)
+      ctx.fill()
+
+      // Content — only draw clearly for front-facing cards
+      if (depth > 0.3) {
+        ctx.globalAlpha = alpha * depth
+        // Chrome dots
+        const dotY = -H_card/2 + 12*scale
+        const dotX = -W_card/2 + 10*scale
+        ;['#EF4444','#F59E0B','#10B981'].forEach((dc,di)=>{
+          ctx.fillStyle = dc
+          ctx.beginPath()
+          ctx.arc(dotX + di*9*scale, dotY, 2.5*scale, 0, Math.PI*2)
+          ctx.fill()
+        })
+
+        // Title
+        ctx.fillStyle = f.color
+        ctx.font = `${Math.round(700)} ${10*scale}px 'Space Grotesk',sans-serif`
+        ctx.textAlign = 'left'
+        ctx.fillText(f.title, -W_card/2+10*scale, -H_card/2+28*scale)
+
+        // KV pairs
+        f.kv.forEach(([v,l],ki)=>{
+          const kx = -W_card/2 + 10*scale + ki*(W_card/2-5*scale)
+          const ky = -H_card/2 + 48*scale
+          const kw = W_card/2 - 15*scale, kh = 36*scale
+          ctx.fillStyle = `rgba(${hexToRgb(f.color)},0.1)`
+          roundRect(ctx, kx, ky, kw, kh, 6*scale)
+          ctx.fill()
+          ctx.fillStyle = f.color
+          ctx.font = `bold ${13*scale}px 'JetBrains Mono',monospace`
+          ctx.fillText(v, kx+6*scale, ky+16*scale)
+          ctx.fillStyle = 'rgba(255,255,255,0.3)'
+          ctx.font = `${7*scale}px 'Space Grotesk',sans-serif`
+          ctx.fillText(l, kx+6*scale, ky+28*scale)
+        })
+
+        // Mini bar chart
+        const bars = [35,48,42,60,52,68,58,75,65,82,72,88,78,92,85,95]
+        const bw = (W_card-20*scale)/bars.length
+        const bh = 40*scale
+        const by = -H_card/2 + 95*scale
+        bars.forEach((h,bi)=>{
+          const bx = -W_card/2 + 10*scale + bi*bw
+          ctx.fillStyle = bi>=12 ? f.color : `rgba(${hexToRgb(f.color)},0.35)`
+          const barH = (h/100)*bh
+          ctx.fillRect(bx, by+bh-barH, bw-1*scale, barH)
+        })
+
+        // Desc text
+        ctx.fillStyle = 'rgba(255,255,255,0.45)'
+        ctx.font = `${9*scale}px 'Space Grotesk',sans-serif`
+        const words = f.desc.split(' '), lineH = 11*scale
+        let line='', ly=by+bh+14*scale
+        words.forEach(w=>{
+          const test=line+w+' '
+          if(ctx.measureText(test).width > W_card-20*scale && line) {
+            ctx.fillText(line,-W_card/2+10*scale,ly); line=w+' '; ly+=lineH
+          } else line=test
+        })
+        if(line) ctx.fillText(line,-W_card/2+10*scale,ly)
+
+        // Bottom label glow
+        ctx.shadowBlur = 8; ctx.shadowColor = f.color
+        ctx.fillStyle = f.color
+        ctx.font = `bold ${8*scale}px 'Space Grotesk',sans-serif`
+        ctx.textAlign = 'center'
+        ctx.fillText(`${f.icon} ${f.title.toUpperCase()}`, 0, H_card/2-10*scale)
+        ctx.shadowBlur = 0
+      }
+      ctx.restore()
+    }
+
+    const hexToRgb = (hex: string) => {
+      const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16)
+      return `${r},${g},${b}`
+    }
+    const roundRect=(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,h:number,r:number)=>{
+      ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath()
+    }
+
+    // Nebula layer
+    const drawNebula = (t:number) => {
+      const cx=W*0.5, cy=H*0.5
+      const g1=ctx.createRadialGradient(cx+Math.sin(t*0.1)*80,cy+Math.cos(t*0.07)*60,0,cx,cy,W*0.6)
+      g1.addColorStop(0,'rgba(249,115,22,0.025)');g1.addColorStop(0.4,'rgba(139,92,246,0.015)');g1.addColorStop(1,'transparent')
+      ctx.fillStyle=g1;ctx.fillRect(0,0,W,H)
+      const g2=ctx.createRadialGradient(cx+Math.cos(t*0.13)*100,H*0.7,0,cx,H*0.7,W*0.4)
+      g2.addColorStop(0,'rgba(59,130,246,0.02)');g2.addColorStop(1,'transparent')
+      ctx.fillStyle=g2;ctx.fillRect(0,0,W,H)
+    }
+
+    // Intro: logo builds from particles
+    const drawIntro = (progress: number) => {
+      if(progress >= 1) return
+      const a = Math.max(0, 1-progress*2)
+      if(a<=0) return
+      ctx.save()
+      ctx.globalAlpha = a
+      // "XPLORIX" text emerging
+      ctx.fillStyle = '#F97316'
+      ctx.font = `bold ${Math.round(32+progress*8)}px 'Space Grotesk',sans-serif`
+      ctx.textAlign = 'center'
+      ctx.shadowBlur = 30+progress*20; ctx.shadowColor='#F97316'
+      ctx.fillText('DRILLING INTELLIGENCE REIMAGINED', W/2, H/2-20)
+      ctx.shadowBlur=0
+      ctx.restore()
+    }
+
+    // Grid lines (subtle)
+    const drawGrid = () => {
+      ctx.save(); ctx.globalAlpha=0.03; ctx.strokeStyle='#94A3B8'; ctx.lineWidth=0.5
+      for(let gx=0;gx<W;gx+=60){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke()}
+      for(let gy=0;gy<H;gy+=60){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke()}
+      ctx.restore()
+    }
+
+    const loop = (ts: number) => {
+      t = ts * 0.001
+      intro = Math.min(intro + 0.008, 1)
+
+      // Background
+      ctx.fillStyle = '#000005'
+      ctx.fillRect(0,0,W,H)
+      drawGrid()
+      drawNebula(t)
+
+      // Particles
+      ctx.save()
+      pars.forEach(p=>{
+        p.life+=0.003; if(p.life>1){p.life=0;p.y=H+5;p.x=Math.random()*W}
+        p.x+=p.vx; p.y+=p.vy
+        if(p.y<-5){p.y=H+5;p.x=Math.random()*W}
+        const a=p.o*(1-Math.pow(p.life-0.5,2)*4)
+        ctx.globalAlpha=Math.max(0,a)*0.7
+        ctx.fillStyle=p.c; ctx.shadowBlur=p.s*3; ctx.shadowColor=p.c
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.s,0,Math.PI*2); ctx.fill()
+      })
+      ctx.shadowBlur=0; ctx.restore()
+
+      // Sort panels back to front by z
+      const sorted = panels.map((panel,i)=>{
+        const {x,y,z,tt} = helixPos(panel.helixT, t)
+        panel.pulse += 0.02
+        const dep=(z+1)/2
+        const sc = 0.5 + dep*0.65
+        // Trail
+        panel.trail.unshift({x,y,a:0.15*dep})
+        if(panel.trail.length>6) panel.trail.pop()
+        panel.rot += panel.rotV
+        return {...panel, px:x, py:y, pz:z, dep, sc, tt}
+      }).sort((a,b)=>a.pz-b.pz)
+
+      // Draw trails
+      sorted.forEach(p=>{
+        p.trail.forEach((tr,ti)=>{
+          if(ti===0) return
+          const f=features[p.idx]
+          ctx.save(); ctx.globalAlpha=tr.a*(1-ti/p.trail.length)*0.4
+          ctx.fillStyle=f.color; ctx.shadowBlur=4; ctx.shadowColor=f.color
+          ctx.beginPath(); ctx.arc(tr.x,tr.y,2*(1-ti/p.trail.length),0,Math.PI*2); ctx.fill()
+          ctx.restore()
+        })
+      })
+
+      // Draw panels
+      sorted.forEach(p=>{
+        const f=features[p.idx]
+        const pulseAlpha = 0.8 + Math.sin(p.pulse)*0.2
+        drawPanel(ctx,f,p.px,p.py,p.pz,p.sc,intro*pulseAlpha,p.rot)
+      })
+
+      // Energy path lines connecting panels
+      ctx.save(); ctx.globalAlpha=0.06; ctx.strokeStyle='#F97316'
+      ctx.lineWidth=1; ctx.setLineDash([4,12])
+      ctx.beginPath()
+      const pathPts = Array.from({length:20},(_,i)=>{
+        const {x,y}=helixPos(i/20,t)
+        return {x,y}
+      })
+      ctx.moveTo(pathPts[0].x,pathPts[0].y)
+      pathPts.forEach(p=>ctx.lineTo(p.x,p.y))
+      ctx.stroke(); ctx.setLineDash([]); ctx.restore()
+
+      // Intro overlay
+      if(intro<1) drawIntro(intro)
+
+      // Section label
+      ctx.save()
+      ctx.globalAlpha=intro*0.9
+      ctx.fillStyle='rgba(249,115,22,0.9)'
+      ctx.font=`bold 10px 'Space Grotesk',sans-serif`
+      ctx.letterSpacing='0.15em' as any
+      ctx.textAlign='center'
+      ctx.shadowBlur=10; ctx.shadowColor='#F97316'
+      ctx.fillText('• PLATFORM', W/2, 28)
+      ctx.shadowBlur=0
+      ctx.fillStyle='#F8FAFC'
+      ctx.font=`bold ${Math.min(22,W*0.025)}px 'Space Grotesk',sans-serif`
+      ctx.fillText('Everything your operation needs — one platform.', W/2, 54)
+      ctx.restore()
+
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+
+    const resize = () => {
+      W = canvas.parentElement!.clientWidth || 900
+      canvas.width = W; canvas.height = H
+    }
+    window.addEventListener('resize', resize)
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize',resize) }
+  },[])
 
   return (
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:48,alignItems:'center'}}>
-      {/* LEFT */}
-      <div>
-        <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'5px 14px',borderRadius:100,border:'1px solid rgba(249,115,22,0.25)',background:'rgba(249,115,22,0.05)',fontSize:10,fontWeight:700,color:'#F97316',letterSpacing:'0.15em',textTransform:'uppercase' as const,marginBottom:20}}>
-          <span style={{width:5,height:5,borderRadius:'50%',background:'#F97316',display:'inline-block',animation:'xplPulse 1.5s infinite'}}/>Platform
-        </div>
-        <h2 style={{fontSize:'clamp(22px,2.8vw,36px)',fontWeight:800,letterSpacing:'-0.01em',fontFamily:"'Space Grotesk',sans-serif",lineHeight:1.15,marginBottom:16}}>
-          Everything your operation needs —{' '}
-          <span style={{background:'linear-gradient(135deg,#3B82F6,#60A5FA)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>one platform.</span>
-        </h2>
-        <div style={{padding:'14px 16px',background:`${f.color}08`,border:`1px solid ${f.color}25`,borderRadius:12,marginBottom:20,transition:'all 0.4s ease',minHeight:80}}>
-          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-            <span style={{fontSize:18}}>{f.icon}</span>
-            <span style={{fontSize:14,fontWeight:700,color:f.color,fontFamily:"'Space Grotesk',sans-serif"}}>{f.title}</span>
-          </div>
-          <p style={{fontSize:12,color:'#94A3B8',lineHeight:1.6}}>{f.desc}</p>
-        </div>
-        <div style={{display:'flex',gap:6,flexWrap:'wrap' as const,marginBottom:20}}>
-          {features.map((_,i)=>(
-            <div key={i} onClick={()=>goTo(i)} style={{width:i===current?20:6,height:6,borderRadius:3,background:i===current?features[i].color:'rgba(255,255,255,0.15)',cursor:'pointer',transition:'all 0.25s'}}/>
-          ))}
-        </div>
-        <div style={{display:'flex',flexDirection:'column' as const,gap:7}}>
-          {features.slice(0,5).map((feat,i)=>(
-            <div key={i} onClick={()=>goTo(i)}
-              style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:9,border:`1px solid ${current===i?feat.color+'40':'rgba(255,255,255,0.05)'}`,background:current===i?`${feat.color}08`:'rgba(255,255,255,0.02)',cursor:'pointer',transition:'all 0.2s'}}>
-              <span style={{fontSize:16,flexShrink:0}}>{feat.icon}</span>
-              <span style={{fontSize:12,fontWeight:current===i?700:500,color:current===i?feat.color:'#94A3B8',fontFamily:"'Space Grotesk',sans-serif"}}>{feat.title}</span>
-              {current===i&&<span style={{marginLeft:'auto',fontSize:10,fontWeight:700,color:feat.color}}>→</span>}
-            </div>
-          ))}
-          <div style={{fontSize:11,color:'#64748B',paddingLeft:12,marginTop:2}}>+ {features.length-5} more modules</div>
-        </div>
-      </div>
-      {/* RIGHT — holographic helix */}
-      <div style={{position:'relative',height:480,overflow:'hidden'}}>
-        <div style={{position:'absolute',inset:0,backgroundImage:'repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px)',zIndex:10,pointerEvents:'none'}}/>
-        <div style={{position:'absolute',bottom:0,left:0,right:0,height:100,background:`linear-gradient(0deg,${f.color}06,transparent)`,zIndex:2,pointerEvents:'none',transition:'background 0.4s'}}/>
-        <canvas ref={canvasRef} style={{position:'absolute',inset:0,zIndex:1,pointerEvents:'none'}}/>
-        <div ref={stageRef} style={{position:'absolute',inset:0,zIndex:5,perspective:'900px',perspectiveOrigin:'50% 45%'}}/>
-      </div>
+    <div style={{position:'relative',width:'100%',height:560,background:'#000005',borderRadius:20,overflow:'hidden',border:'1px solid rgba(249,115,22,0.1)'}}>
+      <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'100%'}}/>
+      {/* Scanlines */}
+      <div style={{position:'absolute',inset:0,backgroundImage:'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.03) 3px,rgba(0,0,0,0.03) 6px)',pointerEvents:'none',zIndex:2}}/>
+      {/* Vignette */}
+      <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse 100% 100% at 50% 50%,transparent 50%,rgba(0,0,10,0.6) 100%)',pointerEvents:'none',zIndex:3}}/>
+      {/* Floor glow */}
+      <div style={{position:'absolute',bottom:0,left:0,right:0,height:80,background:'linear-gradient(0deg,rgba(249,115,22,0.04),transparent)',pointerEvents:'none',zIndex:4}}/>
     </div>
   )
 }
@@ -653,7 +829,7 @@ export default function LandingPage() {
       </section>
 
       {/* FEATURES */}
-      <section id="features" style={{padding:`80px ${P}`,background:'#0D1117',borderTop:'1px solid rgba(249,115,22,0.06)'}}>
+      <section id="features" style={{padding:`80px ${P}`,background:'#000005',borderTop:'1px solid rgba(249,115,22,0.08)'}}>
         <SR anim="unfold">
           <FeaturesSection/>
         </SR>
