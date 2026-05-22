@@ -289,14 +289,12 @@ function FeaturesSection() {
       ctx.transform(1,skewV,skewH,cosT,0,0)
       ctx.globalAlpha=alpha
 
-      // Shadow/depth glow
       if(alpha>0.28){
         ctx.shadowColor=`rgba(${rgb},${0.38*alpha})`
         ctx.shadowBlur=32*scale
         ctx.shadowOffsetY=7*scale
       }
 
-      // Card body
       const bg=ctx.createLinearGradient(-CW/2,-CH/2,CW/2,CH/2)
       bg.addColorStop(0,'rgba(8,10,28,0.99)')
       bg.addColorStop(0.55,'rgba(12,14,34,0.97)')
@@ -305,25 +303,21 @@ function FeaturesSection() {
       rr(-CW/2,-CH/2,CW,CH,13*s); ctx.fill()
       ctx.shadowBlur=0; ctx.shadowOffsetY=0
 
-      // Glowing border
       ctx.strokeStyle=`rgba(${rgb},${0.22+alpha*0.32})`
       ctx.lineWidth=1.1*s
       rr(-CW/2,-CH/2,CW,CH,13*s); ctx.stroke()
 
-      // Top accent bar
       const tb=ctx.createLinearGradient(-CW/2,0,CW/2,0)
       tb.addColorStop(0,'transparent'); tb.addColorStop(0.2,card.color)
       tb.addColorStop(0.8,card.color); tb.addColorStop(1,'transparent')
       ctx.fillStyle=tb
       ctx.fillRect(-CW/2,-CH/2,CW,2.2*s)
 
-      // Glass shine
       const shine=ctx.createLinearGradient(-CW/2,-CH/2,CW/2*0.5,CH/2*0.35)
       shine.addColorStop(0,`rgba(255,255,255,${0.045*alpha})`); shine.addColorStop(1,'transparent')
       ctx.fillStyle=shine
       rr(-CW/2,-CH/2,CW,CH*0.48,13*s); ctx.fill()
 
-      // Corner brackets
       const bL=22*s
       ctx.strokeStyle=`rgba(${rgb},0.82)`
       ctx.lineWidth=2*s
@@ -333,12 +327,10 @@ function FeaturesSection() {
         ctx.stroke()
       })
 
-      // XPX / num
       ctx.font=`${9*s}px 'Courier New',monospace`
       ctx.fillStyle='#2D4060'; ctx.textAlign='left'; ctx.textBaseline='top'
       ctx.fillText(`XPX / ${card.num}`,-CW/2+16*s,-CH/2+13*s)
 
-      // LIVE indicator
       ctx.fillStyle='#10B981'
       ctx.shadowBlur=7; ctx.shadowColor='#10B981'
       ctx.beginPath(); ctx.arc(CW/2-28*s,-CH/2+18*s,3.5*s,0,Math.PI*2); ctx.fill()
@@ -347,7 +339,6 @@ function FeaturesSection() {
       ctx.fillStyle='#10B981'; ctx.textAlign='right'; ctx.textBaseline='middle'
       ctx.fillText('LIVE',CW/2-11*s,-CH/2+18*s)
 
-      // Title
       ctx.textAlign='left'; ctx.textBaseline='top'
       ctx.font=`800 ${16*s}px 'Space Grotesk',sans-serif`
       ctx.fillStyle='#F8FAFC'
@@ -355,12 +346,10 @@ function FeaturesSection() {
       ctx.fillText(card.title,-CW/2+16*s,-CH/2+31*s)
       ctx.shadowBlur=0
 
-      // Sub
       ctx.font=`${9.5*s}px 'Space Grotesk',sans-serif`
       ctx.fillStyle='#3D5068'
       ctx.fillText(card.sub,-CW/2+16*s,-CH/2+52*s)
 
-      // Divider
       const dv=ctx.createLinearGradient(-CW/2,0,CW/2,0)
       dv.addColorStop(0,'transparent'); dv.addColorStop(0.25,`rgba(${rgb},0.28)`)
       dv.addColorStop(0.75,`rgba(${rgb},0.28)`); dv.addColorStop(1,'transparent')
@@ -369,7 +358,6 @@ function FeaturesSection() {
       ctx.moveTo(-CW/2+16*s,-CH/2+66*s); ctx.lineTo(CW/2-16*s,-CH/2+66*s)
       ctx.stroke()
 
-      // Data fields — 3 columns
       const colW=(CW-32*s)/3
       card.fields.forEach((f,fi)=>{
         const fx=-CW/2+16*s+fi*colW
@@ -397,7 +385,6 @@ function FeaturesSection() {
       ctx.clearRect(0,0,W,H)
       ctx.fillStyle='#000008'; ctx.fillRect(0,0,W,H)
 
-      // Nebula
       ;[
         {x:0.5,y:0.45,r:0.56,c:'249,115,22',a:0.022},
         {x:0.33,y:0.62,r:0.42,c:'139,92,246',a:0.016},
@@ -409,7 +396,6 @@ function FeaturesSection() {
         ctx.fillStyle=g; ctx.fillRect(0,0,W,H)
       })
 
-      // Stars
       STARS.forEach(s=>{
         s.x+=s.drift; s.tw+=s.ts
         if(s.x>1)s.x=0; if(s.x<0)s.x=1
@@ -440,7 +426,6 @@ function FeaturesSection() {
       visible.sort((a,b)=>a.scale-b.scale)
       visible.forEach(v=>drawCard(v.card,v.cx,v.cy,v.normDist,v.scale,v.alpha))
 
-      // Vignettes top/bottom
       const tg=ctx.createLinearGradient(0,0,0,H*0.2)
       tg.addColorStop(0,'rgba(0,0,8,1)'); tg.addColorStop(1,'transparent')
       ctx.fillStyle=tg; ctx.fillRect(0,0,W,H*0.2)
@@ -460,190 +445,13 @@ function FeaturesSection() {
   return (
     <div style={{position:'relative',width:'100%',height:640,background:'#000008',overflow:'hidden'}}>
       <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'100%'}}/>
-      {/* Side vignettes */}
       <div style={{position:'absolute',inset:0,background:'linear-gradient(90deg,rgba(0,0,8,0.5) 0%,transparent 16%,transparent 84%,rgba(0,0,8,0.5) 100%)',pointerEvents:'none',zIndex:2}}/>
-    </div>
-  )
-}
-
-// ── INTRO SPLASH — 4 SECOND CINEMATIC REVEAL ─────────────────────────────
-function IntroSplash({onDone}:{onDone:()=>void}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  useEffect(()=>{
-    const canvas = canvasRef.current; if(!canvas) return
-    const ctx = canvas.getContext('2d')!
-    let W = window.innerWidth, H = window.innerHeight
-    canvas.width=W; canvas.height=H
-    let raf:number, phase=0
-
-    // ── 260 spark particles ──────────────────────────────────────────────
-    const NPAR=260
-    const pars=Array.from({length:NPAR},()=>{
-      const angle=Math.random()*Math.PI*2
-      const speed=Math.random()*3.4+0.9
-      return {
-        x:W/2,y:H/2,
-        vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
-        s:Math.random()*2.2+0.4,
-        c:Math.random()>0.55?'#F97316':Math.random()>0.5?'#F59E0B':'#ffffff',
-        o:Math.random()*0.7+0.3,
-        tw:Math.random()*Math.PI*2, ts:0.04+Math.random()*0.06,
-      }
-    })
-
-    const clamp=(v:number,a:number,b:number)=>Math.max(a,Math.min(b,v))
-    const easeOut=(t:number)=>1-Math.pow(1-t,3)
-    const easeInOut=(t:number)=>t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2
-    const lerp=(a:number,b:number,t:number)=>a+(b-a)*t
-
-    // ── DURATION: 4000 ms — increment per ~60fps frame ───────────────────
-    const FRAME_INC = 1000/60/4000
-
-    const loop=(ts:number)=>{
-      phase=Math.min(phase+FRAME_INC,1)
-
-      // Trail fade
-      ctx.fillStyle=`rgba(0,0,5,${phase<0.15?0.25:0.14})`
-      ctx.fillRect(0,0,W,H)
-
-      const p1       = clamp(phase/0.28,0,1)            // particle expand
-      const burstP   = clamp(phase/0.22,0,1)            // center orb burst
-      const textP    = clamp((phase-0.28)/0.38,0,1)     // XPLORIX letters
-      const tagP     = clamp((phase-0.52)/0.22,0,1)     // tagline
-      const exitP    = clamp((phase-0.82)/0.18,0,1)     // fade out
-      const globalFade = 1-exitP
-
-      // ── Seed dot ────────────────────────────────────────────────────────
-      if(phase<0.18){
-        const da=phase<0.07?phase/0.07:1-(phase-0.07)/0.11
-        ctx.save()
-        ctx.globalAlpha=clamp(da,0,1)*globalFade
-        ctx.shadowBlur=18; ctx.shadowColor='#F97316'
-        ctx.fillStyle='#F97316'
-        ctx.beginPath(); ctx.arc(W/2,H/2,5+phase*10,0,Math.PI*2); ctx.fill()
-        ctx.shadowBlur=0; ctx.restore()
-      }
-
-      // ── Burst orb ───────────────────────────────────────────────────────
-      const burstR=easeOut(burstP)*W*0.52
-      const burstAlpha=burstP<0.14?burstP/0.14:1-(burstP-0.14)/0.86
-      if(burstAlpha>0){
-        const g=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,burstR*0.38)
-        g.addColorStop(0,`rgba(249,140,50,${0.5*burstAlpha*globalFade})`)
-        g.addColorStop(0.35,`rgba(234,88,12,${0.22*burstAlpha*globalFade})`)
-        g.addColorStop(1,'rgba(0,0,0,0)')
-        ctx.fillStyle=g
-        ctx.beginPath(); ctx.arc(W/2,H/2,burstR*0.38,0,Math.PI*2); ctx.fill()
-      }
-
-      // ── Particles explode outward ────────────────────────────────────────
-      const expandP=clamp((phase-0.04)/0.30,0,1)
-      pars.forEach(p=>{
-        p.tw+=p.ts
-        p.x=W/2+p.vx*easeOut(expandP)*W*0.54
-        p.y=H/2+p.vy*easeOut(expandP)*H*0.54
-        const twk=0.5+0.5*Math.sin(p.tw)
-        const a=p.o*clamp(expandP/0.2,0,1)*twk*globalFade*0.65
-        if(a<=0) return
-        ctx.save()
-        ctx.globalAlpha=a
-        ctx.fillStyle=p.c
-        ctx.shadowBlur=p.s*4; ctx.shadowColor=p.c
-        ctx.beginPath(); ctx.arc(p.x,p.y,p.s,0,Math.PI*2); ctx.fill()
-        ctx.shadowBlur=0; ctx.restore()
-      })
-
-      // ── Drifting amber orb follows text ──────────────────────────────────
-      const orbMoveP=easeInOut(clamp((phase-0.22)/0.32,0,1))
-      const orbX=lerp(W/2,W*0.58,orbMoveP)
-      const orbY=lerp(H/2,H*0.44,orbMoveP)
-      const orbR=lerp(W*0.05,W*0.30,easeOut(clamp((phase-0.06)/0.32,0,1)))
-      const orbAlpha=clamp((phase-0.06)/0.15,0,1)*globalFade
-      if(orbAlpha>0){
-        const og=ctx.createRadialGradient(orbX,orbY,0,orbX,orbY,orbR)
-        og.addColorStop(0,`rgba(249,130,40,${0.52*orbAlpha})`)
-        og.addColorStop(0.4,`rgba(234,88,12,${0.18*orbAlpha})`)
-        og.addColorStop(1,'rgba(0,0,0,0)')
-        ctx.fillStyle=og
-        ctx.beginPath(); ctx.arc(orbX,orbY,orbR,0,Math.PI*2); ctx.fill()
-      }
-
-      // ── XPLORIX letters — left-aligned, one by one ───────────────────────
-      if(textP>0){
-        const LETTERS='XPLORIX'
-        const startX=W*0.115
-        const baseY=H*0.42
-        const fontSize=Math.min(H*0.145,W*0.075)
-        ctx.font=`900 ${Math.round(fontSize)}px 'Space Grotesk','Arial Black',sans-serif`
-        ctx.textBaseline='middle'; ctx.textAlign='left'
-
-        for(let i=0;i<LETTERS.length;i++){
-          const delay=(i/LETTERS.length)*0.44
-          const lP=clamp((textP-delay)/0.56,0,1)
-          const ep=easeOut(lP)
-          const charAlpha=ep*globalFade
-          if(charAlpha<=0) continue
-          const charX=startX+i*(fontSize*0.72)
-          const charY=baseY+(1-ep)*22
-
-          // Glow layer
-          ctx.save()
-          ctx.globalAlpha=charAlpha*0.15
-          ctx.fillStyle='#F97316'
-          ctx.fillText(LETTERS[i],charX+2,charY+2)
-
-          // Main letter
-          ctx.globalAlpha=charAlpha
-          ctx.fillStyle='#F8FAFC'
-          ctx.shadowBlur=14*ep; ctx.shadowColor='rgba(249,115,22,0.55)'
-          ctx.fillText(LETTERS[i],charX,charY)
-          ctx.shadowBlur=0; ctx.restore()
-        }
-      }
-
-      // ── Tagline ──────────────────────────────────────────────────────────
-      if(tagP>0){
-        const tA=easeOut(tagP)*globalFade
-        const tagFontSize=Math.min(H*0.028,W*0.014)
-        const tagY=H*0.42+H*0.095
-        ctx.save()
-        ctx.globalAlpha=tA
-        ctx.fillStyle='#94A3B8'
-        ctx.font=`500 ${Math.round(tagFontSize)}px 'Space Grotesk',Arial,sans-serif`
-        ctx.textAlign='left'; ctx.textBaseline='middle'
-        ;(ctx as any).letterSpacing='0.22em'
-        ctx.fillText('DRILLING  INTELLIGENCE  REIMAGINED',W*0.117,tagY)
-        ctx.restore()
-      }
-
-      // ── Exit fade ────────────────────────────────────────────────────────
-      if(exitP>0){
-        ctx.save()
-        ctx.globalAlpha=easeInOut(exitP)
-        ctx.fillStyle='#080B10'; ctx.fillRect(0,0,W,H)
-        ctx.restore()
-        if(exitP>=0.92){cancelAnimationFrame(raf);onDone();return}
-      }
-
-      raf=requestAnimationFrame(loop)
-    }
-    raf=requestAnimationFrame(loop)
-
-    const onResize=()=>{W=window.innerWidth;H=window.innerHeight;canvas.width=W;canvas.height=H}
-    window.addEventListener('resize',onResize)
-    return()=>{cancelAnimationFrame(raf);window.removeEventListener('resize',onResize)}
-  },[onDone])
-
-  return (
-    <div style={{position:'fixed',inset:0,zIndex:9999,background:'#000005'}}>
-      <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'100%'}}/>
     </div>
   )
 }
 
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────
 export default function LandingPage() {
-  const [showIntro, setShowIntro] = useState(true)
   const [activeFaq,setActiveFaq]=useState<number|null>(null)
   const [scrolled,setScrolled]=useState(false)
   const [typeIndex,setTypeIndex]=useState(0)
@@ -716,7 +524,6 @@ export default function LandingPage() {
 
   return (
     <div style={{fontFamily:"'Space Grotesk',sans-serif",background:'#080B10',color:'#F8FAFC',overflowX:'hidden'}}>
-      {showIntro && <IntroSplash onDone={()=>setShowIntro(false)}/>}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -915,7 +722,6 @@ export default function LandingPage() {
 
       {/* FEATURES — 3D CONVEYOR */}
       <section id="features" style={{background:'#000005',borderTop:'1px solid rgba(249,115,22,0.08)',borderBottom:'1px solid rgba(249,115,22,0.08)'}}>
-        {/* Headline */}
         <div style={{textAlign:'center',padding:`60px ${P} 0`,position:'relative',zIndex:5}}>
           <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'5px 14px',borderRadius:100,border:'1px solid rgba(249,115,22,0.25)',background:'rgba(249,115,22,0.06)',fontSize:10,fontWeight:700,color:'#F97316',letterSpacing:'0.15em',textTransform:'uppercase',marginBottom:16}}>
             <span style={{width:5,height:5,borderRadius:'50%',background:'#F97316',display:'inline-block',animation:'xplPulse 1.5s infinite'}}/>Platform
@@ -926,7 +732,6 @@ export default function LandingPage() {
           </h2>
           <p style={{fontSize:13,color:'#64748B',marginBottom:0}}>9 intelligent modules. All connected. All live.</p>
         </div>
-        {/* 3D Conveyor — no SR wrapper so it renders immediately on scroll */}
         <FeaturesSection/>
       </section>
 
