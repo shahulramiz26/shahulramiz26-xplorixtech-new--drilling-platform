@@ -252,7 +252,8 @@ function FeaturesSection() {
     }))
 
     function resize(){
-      const r=canvas.parentElement!.getBoundingClientRect()
+      if(!canvas) return
+      const r=(canvas.parentElement||document.body).getBoundingClientRect()
       const dpr=window.devicePixelRatio||1
       canvas.width=r.width*dpr; canvas.height=r.height*dpr
       ctx.setTransform(dpr,0,0,dpr,0,0)
