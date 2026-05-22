@@ -217,267 +217,255 @@ function EcosystemDiagram() {
   )
 }
 
-// ── FEATURES — SCATTERED 3D FLOATING CARDS ────────────────────────────────
+// ── FEATURES — 3D VERTICAL CONVEYOR ──────────────────────────────────────
 function FeaturesSection() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const features = [
-    {color:'#F97316',title:'Operations Dashboard',  desc:'Live ROP trending & downtime',       kv:[['9.8','ROP'],['92%','Uptime']],    bars:[35,48,60,75,82,92,85,95,78,88]},
-    {color:'#3B82F6',title:'Maintenance Dashboard', desc:'Predictive health tracking',         kv:[['4.2','MTBF'],['87%','Health']],   bars:[80,65,55,52,58,70,75,80,65,72]},
-    {color:'#10B981',title:'Driller & Crew',        desc:'70+ driller leaderboard',            kv:[['#1','Rank'],['94%','PPE']],       bars:[60,72,80,85,88,90,88,92,85,95]},
-    {color:'#EF4444',title:'HSC & Safety',          desc:'Incidents & PPE compliance',         kv:[['186','Days'],['100%','Safe']],    bars:[90,92,86,94,90,96,92,95,90,98]},
-    {color:'#F59E0B',title:'Finance & Costing',     desc:'Full cost per meter visibility',     kv:[['$8.2','Cost/m'],['−18%','Save']], bars:[72,65,60,55,52,48,45,50,44,52]},
-    {color:'#8B5CF6',title:'Inventory',             desc:'Per-site stock & purchase orders',   kv:[['247','Parts'],['99%','Acc']],     bars:[85,88,90,92,94,96,94,90,96,98]},
-    {color:'#EC4899',title:'Performance Reports',   desc:'Verified 4-page PDF certificates',  kv:[['4pg','PDF'],['100%','Verified']], bars:[95,96,90,94,92,96,94,98,96,100]},
-    {color:'#60A5FA',title:'Performance Dashboard', desc:'Hole-by-hole analytics',             kv:[['9.8','ROP'],['97%','Rec']],       bars:[40,52,62,70,76,80,84,86,80,88]},
-    {color:'#A78BFA',title:'Digital Logging',       desc:'Replace paper, log offline',        kv:[['<5m','Log'],['100%','Digital']],  bars:[88,90,92,94,90,96,93,97,95,98]},
+  const MODULES = [
+    {num:'01',title:'OPERATIONS',           sub:'LIVE RIG TELEMETRY',       color:'#F97316',fields:[['ROP AVG','18.4 m/h'],['DOWNTIME','2.1 %'],   ['RIGS ONLINE','27 / 28']]},
+    {num:'02',title:'MAINTENANCE',          sub:'PREDICTIVE HEALTH',        color:'#3B82F6',fields:[['HEALTH SCORE','94'],   ['FAILURES PREV.','41'],['OPEN ALERTS','3']]},
+    {num:'03',title:'DRILLER & CREW',       sub:'PERFORMANCE RANKED',       color:'#10B981',fields:[['DRILLERS','72'],        ['CERTIFICATES','1,284'],['TOP BOARD','R. Mendez']]},
+    {num:'04',title:'HSC & SAFETY',         sub:'ZERO-INCIDENT WORKFLOW',   color:'#EF4444',fields:[['INCIDENT-FREE','184 d'],['PPE COMPLIANCE','99.2 %'],['NEAR-MISSES','12']]},
+    {num:'05',title:'FINANCE & COSTING',    sub:'COST PER METER',           color:'#F59E0B',fields:[['COST / METER','$184'],  ['MARGIN','31 %'],      ['PROJECTS','14']]},
+    {num:'06',title:'INVENTORY',            sub:'AUTO-DEDUCTED STOCK',      color:'#8B5CF6',fields:[['SKUS','3,841'],          ['OPEN POS','27'],       ['OUT RISK','Low']]},
+    {num:'07',title:'PERFORMANCE REPORTS',  sub:'SIGNED PDF CERTIFICATES',  color:'#EC4899',fields:[['CERTS ISSUED','1,284'], ['PG / REPORT','4'],     ['VERIFY','Blockchain']]},
+    {num:'08',title:'PERFORMANCE DASHBOARD',sub:'HOLE-BY-HOLE ANALYTICS',   color:'#60A5FA',fields:[['HOLES','9,412'],          ['ROP GAIN','+18 %'],    ['FORMATIONS','23']]},
+    {num:'09',title:'DIGITAL LOGGING',      sub:'OFFLINE-FIRST SYNC',       color:'#A78BFA',fields:[['LOGS','8,203'],           ['SYNC LAG','< 2 s'],    ['PAPER GONE','100 %']]},
   ]
 
-  useEffect(() => {
-    const canvas = canvasRef.current; if (!canvas) return
+  useEffect(()=>{
+    const canvas = canvasRef.current; if(!canvas) return
     const ctx = canvas.getContext('2d')!
-    let W = canvas.parentElement!.clientWidth || 1000
-    const H = 600
-    canvas.width = W; canvas.height = H
-    let raf: number, t = 0
+    let W:number, H:number, raf:number
+    let scrollY = 0
 
-    // ── Card definitions ── each card has fixed 3D position + motion params
-    type Card = {
-      idx: number
-      // base position (normalized 0-1)
-      bx: number; by: number
-      // 3D rotation angles
-      rx: number; ry: number; rz: number
-      // rotation speeds
-      vrx: number; vry: number; vrz: number
-      // floating motion
-      phase: number; amp: number; freq: number
-      // visual
-      scale: number; alpha: number
-      // glow pulse
-      pulse: number; pulseV: number
-    }
+    const CARD_H = 158, CARD_GAP = 34, STEP = CARD_H + CARD_GAP
+    const TOTAL = MODULES.length * STEP
 
-    const cards: Card[] = [
-      // Bottom-left cluster — large, close
-      {idx:1,bx:0.18,by:0.72,rx:-12,ry:15,rz:-8, vrx:0.008,vry:0.012,vrz:0.006, phase:0,amp:8,freq:0.4, scale:1.0,alpha:1.0, pulse:0,pulseV:0.02},
-      {idx:3,bx:0.32,by:0.68,rx:-8, ry:20,rz:5,  vrx:0.006,vry:0.01, vrz:0.008, phase:1,amp:6,freq:0.35,scale:0.95,alpha:0.95,pulse:1,pulseV:0.018},
-      {idx:4,bx:0.46,by:0.64,rx:-15,ry:12,rz:-3, vrx:0.01, vry:0.008,vrz:0.005, phase:2,amp:10,freq:0.3,scale:0.92,alpha:0.9, pulse:2,pulseV:0.022},
-      {idx:5,bx:0.62,by:0.58,rx:-5, ry:18,rz:8,  vrx:0.007,vry:0.015,vrz:0.009, phase:0.5,amp:7,freq:0.45,scale:1.05,alpha:1.0,pulse:3,pulseV:0.016},
-      // Mid right — slightly back
-      {idx:6,bx:0.72,by:0.44,rx:-10,ry:8, rz:4,  vrx:0.009,vry:0.011,vrz:0.007, phase:1.5,amp:9,freq:0.38,scale:0.88,alpha:0.85,pulse:4,pulseV:0.02},
-      // Upper area — further back, darker
-      {idx:0,bx:0.28,by:0.32,rx:-20,ry:25,rz:-12,vrx:0.005,vry:0.008,vrz:0.004, phase:0.8,amp:12,freq:0.25,scale:0.72,alpha:0.65,pulse:5,pulseV:0.015},
-      {idx:2,bx:0.45,by:0.26,rx:-18,ry:22,rz:6,  vrx:0.006,vry:0.009,vrz:0.005, phase:2.2,amp:11,freq:0.28,scale:0.68,alpha:0.6, pulse:0.5,pulseV:0.017},
-      {idx:7,bx:0.62,by:0.3, rx:-22,ry:18,rz:-8, vrx:0.004,vry:0.007,vrz:0.006, phase:1.8,amp:10,freq:0.32,scale:0.65,alpha:0.55,pulse:1.5,pulseV:0.014},
-      {idx:8,bx:0.75,by:0.22,rx:-25,ry:28,rz:10, vrx:0.003,vry:0.006,vrz:0.004, phase:3,  amp:14,freq:0.22,scale:0.55,alpha:0.45,pulse:2.5,pulseV:0.012},
-    ]
-
-    // Particles
-    const NPAR = 120
-    const pars = Array.from({length:NPAR},()=>({
-      x:Math.random()*1000,y:Math.random()*H,
-      vx:(Math.random()-0.5)*0.2,vy:-(Math.random()*0.4+0.05),
-      s:Math.random()*1.5+0.2,o:Math.random()*0.5+0.1,
-      c:Math.random()>0.55?'#F97316':Math.random()>0.4?'#8B5CF6':'#3B82F6'
+    const STARS = Array.from({length:230},()=>({
+      x:Math.random(),y:Math.random(),
+      s:Math.random()*1.8+0.25,
+      o:Math.random()*0.55+0.05,
+      c:Math.random()>0.78?'#F97316':Math.random()>0.62?'#F59E0B':Math.random()>0.5?'#6366F1':'#1E293B',
+      drift:(Math.random()-0.5)*0.000055,
+      tw:Math.random()*Math.PI*2,ts:0.012+Math.random()*0.02,
     }))
 
-    const hexRgb = (h:string)=>{
-      const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16)
-      return `${r},${g},${b}`
+    function resize(){
+      const r=canvas.parentElement!.getBoundingClientRect()
+      const dpr=window.devicePixelRatio||1
+      canvas.width=r.width*dpr; canvas.height=r.height*dpr
+      ctx.setTransform(dpr,0,0,dpr,0,0)
+      W=r.width; H=r.height
     }
 
-    const rr=(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,h:number,r:number)=>{
-      ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath()
+    function hexRgb(h:string){
+      return `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}`
     }
 
-    // Project 3D card to 2D with perspective
-    const project3D = (card: Card, time: number) => {
-      // Floating motion
-      const fy = Math.sin(time * card.freq + card.phase) * card.amp
-      const fx = Math.cos(time * card.freq * 0.7 + card.phase) * card.amp * 0.4
-
-      const px = (card.bx + fx/W) * W
-      const py = (card.by + fy/H) * H
-
-      // Accumulated rotation
-      const rx = card.rx + Math.sin(time*0.3+card.phase)*3
-      const ry = card.ry + Math.sin(time*0.25+card.phase*1.3)*4
-      const rz = card.rz + Math.sin(time*0.2+card.phase*0.7)*2
-
-      return {px, py, rx, ry, rz}
+    function rr(x:number,y:number,w:number,h:number,r:number){
+      ctx.beginPath()
+      ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r)
+      ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r)
+      ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r)
+      ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r)
+      ctx.closePath()
     }
 
-    const drawCard = (card: Card, time: number) => {
-      const f = features[card.idx]
-      const {px,py,rx,ry,rz} = project3D(card, time)
-      const CW = 220*card.scale, CH = 270*card.scale
+    function drawCard(card:typeof MODULES[0],cx:number,cy:number,normDist:number,scale:number,alpha:number){
+      const CW=440*scale, CH=CARD_H*scale, s=scale
+      const rgb=hexRgb(card.color)
 
-      // Perspective skew from rotation angles
-      const skewY = ry * 0.018  // horizontal rotation → skew
-      const skewX = rx * 0.012  // vertical rotation → vertical skew
-      const cosA = Math.cos(rz*Math.PI/180)
-      const sinA = Math.sin(rz*Math.PI/180)
+      const tiltDeg=normDist*60
+      const cosT=Math.cos(tiltDeg*Math.PI/180)
+      const sinT=Math.sin(Math.abs(tiltDeg)*Math.PI/180)
+      const lateralX=normDist*20*scale
+      const skewH=normDist*0.042
+      const skewV=sinT*0.09*(normDist>0?1:-1)
 
       ctx.save()
-      ctx.translate(px, py)
-      ctx.rotate(rz * Math.PI/180)
-      ctx.transform(1, skewX, skewY, 1, 0, 0)
-      ctx.globalAlpha = card.alpha * (0.85 + Math.sin(card.pulse)*0.15)
+      ctx.translate(cx+lateralX,cy)
+      ctx.transform(1,skewV,skewH,cosT,0,0)
+      ctx.globalAlpha=alpha
 
-      // Glow behind card
-      const glow = ctx.createRadialGradient(0,0,0,0,0,CW*0.8)
-      glow.addColorStop(0, `rgba(${hexRgb(f.color)},${0.12*card.alpha})`)
-      glow.addColorStop(1, 'transparent')
-      ctx.fillStyle = glow
-      ctx.fillRect(-CW*0.7,-CH*0.5,CW*1.4,CH*1.1)
+      // Shadow/depth glow
+      if(alpha>0.28){
+        ctx.shadowColor=`rgba(${rgb},${0.38*alpha})`
+        ctx.shadowBlur=32*scale
+        ctx.shadowOffsetY=7*scale
+      }
 
-      // Glass body
-      const bg = ctx.createLinearGradient(-CW/2,-CH/2,CW/2,CH/2)
-      bg.addColorStop(0,`rgba(255,255,255,0.07)`)
-      bg.addColorStop(0.3,`rgba(8,8,20,0.88)`)
-      bg.addColorStop(1,`rgba(${hexRgb(f.color)},0.05)`)
-      ctx.fillStyle = bg
-      rr(ctx,-CW/2,-CH/2,CW,CH,14*card.scale)
-      ctx.fill()
+      // Card body
+      const bg=ctx.createLinearGradient(-CW/2,-CH/2,CW/2,CH/2)
+      bg.addColorStop(0,'rgba(8,10,28,0.99)')
+      bg.addColorStop(0.55,'rgba(12,14,34,0.97)')
+      bg.addColorStop(1,`rgba(${rgb},0.11)`)
+      ctx.fillStyle=bg
+      rr(-CW/2,-CH/2,CW,CH,13*s); ctx.fill()
+      ctx.shadowBlur=0; ctx.shadowOffsetY=0
 
-      // Border with glow
-      ctx.strokeStyle = `rgba(${hexRgb(f.color)},${0.5+Math.sin(card.pulse)*0.3})`
-      ctx.lineWidth = 1.2
-      rr(ctx,-CW/2,-CH/2,CW,CH,14*card.scale)
-      ctx.stroke()
+      // Glowing border
+      ctx.strokeStyle=`rgba(${rgb},${0.22+alpha*0.32})`
+      ctx.lineWidth=1.1*s
+      rr(-CW/2,-CH/2,CW,CH,13*s); ctx.stroke()
 
       // Top accent bar
-      const bar = ctx.createLinearGradient(-CW/2,0,CW/2,0)
-      bar.addColorStop(0,f.color); bar.addColorStop(0.7,f.color+'80'); bar.addColorStop(1,'transparent')
-      ctx.fillStyle=bar
-      rr(ctx,-CW/2,-CH/2,CW,2.5*card.scale,2)
-      ctx.fill()
+      const tb=ctx.createLinearGradient(-CW/2,0,CW/2,0)
+      tb.addColorStop(0,'transparent'); tb.addColorStop(0.2,card.color)
+      tb.addColorStop(0.8,card.color); tb.addColorStop(1,'transparent')
+      ctx.fillStyle=tb
+      ctx.fillRect(-CW/2,-CH/2,CW,2.2*s)
 
       // Glass shine
-      const shine = ctx.createLinearGradient(-CW/2,-CH/2,-CW/2,-CH/2+CH*0.3)
-      shine.addColorStop(0,`rgba(255,255,255,${0.08*card.alpha})`); shine.addColorStop(1,'transparent')
+      const shine=ctx.createLinearGradient(-CW/2,-CH/2,CW/2*0.5,CH/2*0.35)
+      shine.addColorStop(0,`rgba(255,255,255,${0.045*alpha})`); shine.addColorStop(1,'transparent')
       ctx.fillStyle=shine
-      rr(ctx,-CW/2,-CH/2,CW,CH*0.3,14*card.scale)
-      ctx.fill()
+      rr(-CW/2,-CH/2,CW,CH*0.48,13*s); ctx.fill()
 
-      // Content
-      const s = card.scale
-      // Chrome dots
-      ;['#EF4444','#F59E0B','#10B981'].forEach((c,i)=>{
-        ctx.fillStyle=c; ctx.beginPath()
-        ctx.arc(-CW/2+10*s+i*9*s,-CH/2+12*s,2.5*s,0,Math.PI*2); ctx.fill()
+      // Corner brackets
+      const bL=22*s
+      ctx.strokeStyle=`rgba(${rgb},0.82)`
+      ctx.lineWidth=2*s
+      ;[[-CW/2,-CH/2,1,1],[CW/2,-CH/2,-1,1],[-CW/2,CH/2,1,-1],[CW/2,CH/2,-1,-1]].forEach(([x,y,dx,dy])=>{
+        ctx.beginPath()
+        ctx.moveTo(x+dx*bL,y); ctx.lineTo(x,y); ctx.lineTo(x,y+dy*bL)
+        ctx.stroke()
       })
+
+      // XPX / num
+      ctx.font=`${9*s}px 'Courier New',monospace`
+      ctx.fillStyle='#2D4060'; ctx.textAlign='left'; ctx.textBaseline='top'
+      ctx.fillText(`XPX / ${card.num}`,-CW/2+16*s,-CH/2+13*s)
+
+      // LIVE indicator
+      ctx.fillStyle='#10B981'
+      ctx.shadowBlur=7; ctx.shadowColor='#10B981'
+      ctx.beginPath(); ctx.arc(CW/2-28*s,-CH/2+18*s,3.5*s,0,Math.PI*2); ctx.fill()
+      ctx.shadowBlur=0
+      ctx.font=`bold ${8.5*s}px 'Space Grotesk',sans-serif`
+      ctx.fillStyle='#10B981'; ctx.textAlign='right'; ctx.textBaseline='middle'
+      ctx.fillText('LIVE',CW/2-11*s,-CH/2+18*s)
 
       // Title
-      ctx.fillStyle=f.color; ctx.font=`bold ${10*s}px 'Space Grotesk',sans-serif`
-      ctx.textAlign='left'
-      ctx.shadowBlur=6; ctx.shadowColor=f.color
-      ctx.fillText(f.title,-CW/2+10*s,-CH/2+26*s)
+      ctx.textAlign='left'; ctx.textBaseline='top'
+      ctx.font=`800 ${16*s}px 'Space Grotesk',sans-serif`
+      ctx.fillStyle='#F8FAFC'
+      if(alpha>0.55){ctx.shadowBlur=16;ctx.shadowColor=card.color}
+      ctx.fillText(card.title,-CW/2+16*s,-CH/2+31*s)
       ctx.shadowBlur=0
 
-      // KV pairs
-      f.kv.forEach(([v,l],ki)=>{
-        const kx=-CW/2+10*s+(CW/2-8*s)*ki, ky=-CH/2+34*s
-        const kw=CW/2-14*s, kh=34*s
-        ctx.fillStyle=`rgba(${hexRgb(f.color)},0.12)`
-        rr(ctx,kx,ky,kw,kh,5*s); ctx.fill()
-        ctx.fillStyle=f.color; ctx.font=`bold ${12*s}px 'JetBrains Mono',monospace`
-        ctx.fillText(v,kx+5*s,ky+14*s)
-        ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font=`${7*s}px 'Space Grotesk',sans-serif`
-        ctx.fillText(l,kx+5*s,ky+26*s)
-      })
+      // Sub
+      ctx.font=`${9.5*s}px 'Space Grotesk',sans-serif`
+      ctx.fillStyle='#3D5068'
+      ctx.fillText(card.sub,-CW/2+16*s,-CH/2+52*s)
 
-      // Bar chart
-      const bars=f.bars; const bw=(CW-20*s)/bars.length; const bH=38*s
-      const by=-CH/2+78*s
-      bars.forEach((h,bi)=>{
-        ctx.fillStyle=bi>=7?f.color:`rgba(${hexRgb(f.color)},0.3)`
-        const bh=(h/100)*bH
-        ctx.fillRect(-CW/2+10*s+bi*bw,by+bH-bh,bw-1.5*s,bh)
-      })
+      // Divider
+      const dv=ctx.createLinearGradient(-CW/2,0,CW/2,0)
+      dv.addColorStop(0,'transparent'); dv.addColorStop(0.25,`rgba(${rgb},0.28)`)
+      dv.addColorStop(0.75,`rgba(${rgb},0.28)`); dv.addColorStop(1,'transparent')
+      ctx.strokeStyle=dv; ctx.lineWidth=0.7
+      ctx.beginPath()
+      ctx.moveTo(-CW/2+16*s,-CH/2+66*s); ctx.lineTo(CW/2-16*s,-CH/2+66*s)
+      ctx.stroke()
 
-      // Desc
-      ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font=`${8.5*s}px 'Space Grotesk',sans-serif`
-      const words=f.desc.split(' '); let line='',lY=by+bH+13*s,lH=11*s
-      words.forEach(w=>{
-        const test=line+w+' '
-        if(ctx.measureText(test).width>CW-20*s&&line){ctx.fillText(line,-CW/2+10*s,lY);line=w+' ';lY+=lH}else line=test
+      // Data fields — 3 columns
+      const colW=(CW-32*s)/3
+      card.fields.forEach((f,fi)=>{
+        const fx=-CW/2+16*s+fi*colW
+        const fy=-CH/2+75*s
+        ctx.fillStyle=`rgba(${rgb},${fi===0?0.10:0.04})`
+        rr(fx-4*s,fy-3*s,colW-10*s,44*s,6*s); ctx.fill()
+        ctx.font=`${8*s}px 'Space Grotesk',sans-serif`
+        ctx.fillStyle='#2D4060'; ctx.textAlign='left'; ctx.textBaseline='top'
+        ctx.fillText(f[0],fx,fy)
+        ctx.font=`800 ${15*s}px 'Space Grotesk',monospace`
+        ctx.fillStyle=fi===0?card.color:'#CBD5E1'
+        if(fi===0&&alpha>0.55){ctx.shadowBlur=9;ctx.shadowColor=card.color}
+        ctx.fillText(f[1],fx,fy+14*s)
+        ctx.shadowBlur=0
       })
-      if(line) ctx.fillText(line,-CW/2+10*s,lY)
-
-      // Bottom title glow
-      ctx.shadowBlur=8; ctx.shadowColor=f.color
-      ctx.fillStyle=f.color; ctx.font=`bold ${8*s}px 'Space Grotesk',sans-serif`
-      ctx.textAlign='center'
-      ctx.fillText(f.title.toUpperCase(),0,CH/2-10*s)
-      ctx.shadowBlur=0
 
       ctx.restore()
-      card.pulse += card.pulseV
     }
 
-    const loop = (ts:number) => {
-      t = ts*0.001
+    function loop(ts:number){
+      const t=ts*0.001
+      scrollY+=0.5
+      if(scrollY>=TOTAL) scrollY-=TOTAL
+
       ctx.clearRect(0,0,W,H)
+      ctx.fillStyle='#000008'; ctx.fillRect(0,0,W,H)
 
-      // Deep background
-      ctx.fillStyle='#020008'; ctx.fillRect(0,0,W,H)
-
-      // Nebula clouds
+      // Nebula
       ;[
-        {x:W*0.3,y:H*0.6,r:W*0.4,c:'249,115,22',a:0.018},
-        {x:W*0.7,y:H*0.4,r:W*0.35,c:'139,92,246',a:0.015},
-        {x:W*0.5,y:H*0.3,r:W*0.3, c:'59,130,246',a:0.012},
+        {x:0.5,y:0.45,r:0.56,c:'249,115,22',a:0.022},
+        {x:0.33,y:0.62,r:0.42,c:'139,92,246',a:0.016},
+        {x:0.66,y:0.34,r:0.36,c:'59,130,246',a:0.013},
       ].forEach(n=>{
-        const g=ctx.createRadialGradient(n.x+Math.sin(t*0.08)*30,n.y+Math.cos(t*0.06)*20,0,n.x,n.y,n.r)
+        const ox=Math.sin(t*0.07+n.x)*28, oy=Math.cos(t*0.05+n.y)*20
+        const g=ctx.createRadialGradient(W*n.x+ox,H*n.y+oy,0,W*n.x,H*n.y,W*n.r)
         g.addColorStop(0,`rgba(${n.c},${n.a})`); g.addColorStop(1,'transparent')
         ctx.fillStyle=g; ctx.fillRect(0,0,W,H)
       })
 
-      // Grid
-      ctx.save(); ctx.globalAlpha=0.025; ctx.strokeStyle='#94A3B8'; ctx.lineWidth=0.5
-      for(let x=0;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
-      for(let y=0;y<H;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
-      ctx.restore()
-
-      // Particles
-      ctx.save()
-      pars.forEach(p=>{
-        p.x+=p.vx; p.y+=p.vy
-        if(p.y<-5){p.y=H+5;p.x=Math.random()*W}
-        ctx.globalAlpha=p.o*0.55; ctx.fillStyle=p.c
-        ctx.shadowBlur=p.s*3; ctx.shadowColor=p.c
-        ctx.beginPath(); ctx.arc(p.x,p.y,p.s,0,Math.PI*2); ctx.fill()
+      // Stars
+      STARS.forEach(s=>{
+        s.x+=s.drift; s.tw+=s.ts
+        if(s.x>1)s.x=0; if(s.x<0)s.x=1
+        ctx.globalAlpha=s.o*(0.4+0.6*Math.sin(s.tw))
+        ctx.fillStyle=s.c
+        ctx.beginPath(); ctx.arc(s.x*W,s.y*H,s.s,0,Math.PI*2); ctx.fill()
       })
-      ctx.shadowBlur=0; ctx.restore()
+      ctx.globalAlpha=1
 
-      // Sort back-to-front by scale (smaller=further back)
-      const sorted=[...cards].sort((a,b)=>a.scale-b.scale)
-      sorted.forEach(card=>drawCard(card,t))
+      const centerX=W*0.5, centerY=H*0.5, visH=H*0.9
+      const visible:Array<{card:typeof MODULES[0];cx:number;cy:number;normDist:number;scale:number;alpha:number}>=[]
+
+      for(let lp=-1;lp<=1;lp++){
+        for(let i=0;i<MODULES.length;i++){
+          const baseY=i*STEP-scrollY+lp*TOTAL
+          const relY=baseY-(centerY-visH/2)
+          const cy=centerY-visH/2+relY+CARD_H/2
+          if(cy<-CARD_H*1.6||cy>H+CARD_H*1.6) continue
+          const normDist=(cy-centerY)/(visH/2)
+          const absDist=Math.abs(normDist)
+          const scale=Math.max(0.44,1.0-absDist*0.44)
+          const alpha=Math.max(0,1.0-absDist*1.08)
+          if(alpha<0.02) continue
+          visible.push({card:MODULES[i],cx:centerX,cy,normDist,scale,alpha})
+        }
+      }
+
+      visible.sort((a,b)=>a.scale-b.scale)
+      visible.forEach(v=>drawCard(v.card,v.cx,v.cy,v.normDist,v.scale,v.alpha))
+
+      // Vignettes top/bottom
+      const tg=ctx.createLinearGradient(0,0,0,H*0.2)
+      tg.addColorStop(0,'rgba(0,0,8,1)'); tg.addColorStop(1,'transparent')
+      ctx.fillStyle=tg; ctx.fillRect(0,0,W,H*0.2)
+      const bg2=ctx.createLinearGradient(0,H*0.8,0,H)
+      bg2.addColorStop(0,'transparent'); bg2.addColorStop(1,'rgba(0,0,8,1)')
+      ctx.fillStyle=bg2; ctx.fillRect(0,H*0.8,W,H*0.2)
 
       raf=requestAnimationFrame(loop)
     }
-    raf=requestAnimationFrame(loop)
 
-    const resize=()=>{W=canvas.parentElement!.clientWidth||1000;canvas.width=W;canvas.height=H}
+    resize()
     window.addEventListener('resize',resize)
+    raf=requestAnimationFrame(loop)
     return()=>{cancelAnimationFrame(raf);window.removeEventListener('resize',resize)}
   },[])
 
   return (
-    <div style={{position:'relative',width:'100%',height:600,background:'#020008',overflow:'hidden'}}>
+    <div style={{position:'relative',width:'100%',height:640,background:'#000008',overflow:'hidden'}}>
       <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'100%'}}/>
-      <div style={{position:'absolute',inset:0,backgroundImage:'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.025) 3px,rgba(0,0,0,0.025) 6px)',pointerEvents:'none',zIndex:2}}/>
-      <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse 90% 100% at 50% 50%,transparent 45%,rgba(0,0,8,0.65) 100%)',pointerEvents:'none',zIndex:3}}/>
-      <div style={{position:'absolute',top:0,left:0,right:0,height:80,background:'linear-gradient(180deg,#020008,transparent)',pointerEvents:'none',zIndex:4}}/>
-      <div style={{position:'absolute',bottom:0,left:0,right:0,height:80,background:'linear-gradient(0deg,#020008,transparent)',pointerEvents:'none',zIndex:4}}/>
+      {/* Side vignettes */}
+      <div style={{position:'absolute',inset:0,background:'linear-gradient(90deg,rgba(0,0,8,0.5) 0%,transparent 16%,transparent 84%,rgba(0,0,8,0.5) 100%)',pointerEvents:'none',zIndex:2}}/>
     </div>
   )
 }
 
-
-// ── INTRO SPLASH ──────────────────────────────────────────────────────────
+// ── INTRO SPLASH — 4 SECOND CINEMATIC REVEAL ─────────────────────────────
 function IntroSplash({onDone}:{onDone:()=>void}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   useEffect(()=>{
@@ -485,94 +473,165 @@ function IntroSplash({onDone}:{onDone:()=>void}) {
     const ctx = canvas.getContext('2d')!
     let W = window.innerWidth, H = window.innerHeight
     canvas.width=W; canvas.height=H
-    let raf:number, t=0, phase=0
+    let raf:number, phase=0
 
-    // Particles forming logo
-    const NPAR=200
-    const pars = Array.from({length:NPAR},()=>({
-      x:Math.random()*W, y:Math.random()*H,
-      tx:W/2+(Math.random()-0.5)*120, ty:H/2+(Math.random()-0.5)*80,
-      vx:0,vy:0,
-      s:Math.random()*2+0.5,
-      c:Math.random()>0.5?'#F97316':Math.random()>0.5?'#8B5CF6':'#ffffff',
-      o:Math.random()*0.8+0.2
-    }))
+    // ── 260 spark particles ──────────────────────────────────────────────
+    const NPAR=260
+    const pars=Array.from({length:NPAR},()=>{
+      const angle=Math.random()*Math.PI*2
+      const speed=Math.random()*3.4+0.9
+      return {
+        x:W/2,y:H/2,
+        vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
+        s:Math.random()*2.2+0.4,
+        c:Math.random()>0.55?'#F97316':Math.random()>0.5?'#F59E0B':'#ffffff',
+        o:Math.random()*0.7+0.3,
+        tw:Math.random()*Math.PI*2, ts:0.04+Math.random()*0.06,
+      }
+    })
+
+    const clamp=(v:number,a:number,b:number)=>Math.max(a,Math.min(b,v))
+    const easeOut=(t:number)=>1-Math.pow(1-t,3)
+    const easeInOut=(t:number)=>t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2
+    const lerp=(a:number,b:number,t:number)=>a+(b-a)*t
+
+    // ── DURATION: 4000 ms — increment per ~60fps frame ───────────────────
+    const FRAME_INC = 1000/60/4000
 
     const loop=(ts:number)=>{
-      t=ts*0.001; phase=Math.min(phase+0.012,1)
-      ctx.fillStyle=`rgba(0,0,5,${phase<0.15?0.3:0.15})`
+      phase=Math.min(phase+FRAME_INC,1)
+
+      // Trail fade
+      ctx.fillStyle=`rgba(0,0,5,${phase<0.15?0.25:0.14})`
       ctx.fillRect(0,0,W,H)
 
-      // Phase 0-0.3: particles drift in
-      // Phase 0.3-0.6: logo + text appear
-      // Phase 0.6-0.85: hold
-      // Phase 0.85-1.0: fade out → call onDone
+      const p1       = clamp(phase/0.28,0,1)            // particle expand
+      const burstP   = clamp(phase/0.22,0,1)            // center orb burst
+      const textP    = clamp((phase-0.28)/0.38,0,1)     // XPLORIX letters
+      const tagP     = clamp((phase-0.52)/0.22,0,1)     // tagline
+      const exitP    = clamp((phase-0.82)/0.18,0,1)     // fade out
+      const globalFade = 1-exitP
 
-      const p1=Math.min(phase/0.3,1)
-      const p2=Math.max(0,Math.min((phase-0.3)/0.3,1))
-      const p3=Math.max(0,(phase-0.85)/0.15)
-
-      // Particles
-      pars.forEach(p=>{
-        if(p1<1){
-          p.vx+=(p.tx-p.x)*0.04*p1; p.vy+=(p.ty-p.y)*0.04*p1
-          p.vx*=0.85; p.vy*=0.85
-        }
-        p.x+=p.vx+(Math.sin(t*2+p.o)*0.3)
-        p.y+=p.vy+(Math.cos(t*1.5+p.o)*0.3)
+      // ── Seed dot ────────────────────────────────────────────────────────
+      if(phase<0.18){
+        const da=phase<0.07?phase/0.07:1-(phase-0.07)/0.11
         ctx.save()
-        ctx.globalAlpha=p.o*p1*(1-p3*1.5)*0.7
-        ctx.fillStyle=p.c; ctx.shadowBlur=p.s*4; ctx.shadowColor=p.c
+        ctx.globalAlpha=clamp(da,0,1)*globalFade
+        ctx.shadowBlur=18; ctx.shadowColor='#F97316'
+        ctx.fillStyle='#F97316'
+        ctx.beginPath(); ctx.arc(W/2,H/2,5+phase*10,0,Math.PI*2); ctx.fill()
+        ctx.shadowBlur=0; ctx.restore()
+      }
+
+      // ── Burst orb ───────────────────────────────────────────────────────
+      const burstR=easeOut(burstP)*W*0.52
+      const burstAlpha=burstP<0.14?burstP/0.14:1-(burstP-0.14)/0.86
+      if(burstAlpha>0){
+        const g=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,burstR*0.38)
+        g.addColorStop(0,`rgba(249,140,50,${0.5*burstAlpha*globalFade})`)
+        g.addColorStop(0.35,`rgba(234,88,12,${0.22*burstAlpha*globalFade})`)
+        g.addColorStop(1,'rgba(0,0,0,0)')
+        ctx.fillStyle=g
+        ctx.beginPath(); ctx.arc(W/2,H/2,burstR*0.38,0,Math.PI*2); ctx.fill()
+      }
+
+      // ── Particles explode outward ────────────────────────────────────────
+      const expandP=clamp((phase-0.04)/0.30,0,1)
+      pars.forEach(p=>{
+        p.tw+=p.ts
+        p.x=W/2+p.vx*easeOut(expandP)*W*0.54
+        p.y=H/2+p.vy*easeOut(expandP)*H*0.54
+        const twk=0.5+0.5*Math.sin(p.tw)
+        const a=p.o*clamp(expandP/0.2,0,1)*twk*globalFade*0.65
+        if(a<=0) return
+        ctx.save()
+        ctx.globalAlpha=a
+        ctx.fillStyle=p.c
+        ctx.shadowBlur=p.s*4; ctx.shadowColor=p.c
         ctx.beginPath(); ctx.arc(p.x,p.y,p.s,0,Math.PI*2); ctx.fill()
-        ctx.restore()
+        ctx.shadowBlur=0; ctx.restore()
       })
 
-      if(p2>0){
-        const alpha=p2*(1-p3)
-        // Logo X — centered
-        const lx=W/2, ly=H/2-60, ls=50
-        ctx.save(); ctx.globalAlpha=alpha
-        // Left dark half
-        ctx.fillStyle='#1a1a1a'
-        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx-ls*0.9,ly-ls*0.9);ctx.lineTo(lx-ls*0.9,ly+ls*0.9);ctx.closePath();ctx.fill()
-        ctx.fillStyle='#2a2a2a'
-        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx-ls*0.9,ly-ls*0.9);ctx.lineTo(lx-ls*0.45,ly-ls*0.9);ctx.closePath();ctx.fill()
-        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx-ls*0.9,ly+ls*0.9);ctx.lineTo(lx-ls*0.45,ly+ls*0.9);ctx.closePath();ctx.fill()
-        // Right orange half
-        ctx.fillStyle='#F97316'
-        ctx.shadowBlur=40; ctx.shadowColor='#F97316'
-        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+ls*0.9,ly-ls*0.9);ctx.lineTo(lx+ls*0.9,ly+ls*0.9);ctx.closePath();ctx.fill()
-        ctx.fillStyle='#EA580C'
-        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+ls*0.9,ly-ls*0.9);ctx.lineTo(lx+ls*0.45,ly-ls*0.9);ctx.closePath();ctx.fill()
-        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+ls*0.9,ly+ls*0.9);ctx.lineTo(lx+ls*0.45,ly+ls*0.9);ctx.closePath();ctx.fill()
-        ctx.shadowBlur=0
+      // ── Drifting amber orb follows text ──────────────────────────────────
+      const orbMoveP=easeInOut(clamp((phase-0.22)/0.32,0,1))
+      const orbX=lerp(W/2,W*0.58,orbMoveP)
+      const orbY=lerp(H/2,H*0.44,orbMoveP)
+      const orbR=lerp(W*0.05,W*0.30,easeOut(clamp((phase-0.06)/0.32,0,1)))
+      const orbAlpha=clamp((phase-0.06)/0.15,0,1)*globalFade
+      if(orbAlpha>0){
+        const og=ctx.createRadialGradient(orbX,orbY,0,orbX,orbY,orbR)
+        og.addColorStop(0,`rgba(249,130,40,${0.52*orbAlpha})`)
+        og.addColorStop(0.4,`rgba(234,88,12,${0.18*orbAlpha})`)
+        og.addColorStop(1,'rgba(0,0,0,0)')
+        ctx.fillStyle=og
+        ctx.beginPath(); ctx.arc(orbX,orbY,orbR,0,Math.PI*2); ctx.fill()
+      }
 
-        // XPLORIX text
-        ctx.fillStyle='#F8FAFC'; ctx.font=`800 ${Math.min(36,W*0.038)}px 'Space Grotesk',sans-serif`
-        ctx.textAlign='center'; ctx.letterSpacing='0.15em' as any
-        ctx.shadowBlur=0; ctx.fillText('XPLORIX',W/2,H/2+20)
+      // ── XPLORIX letters — left-aligned, one by one ───────────────────────
+      if(textP>0){
+        const LETTERS='XPLORIX'
+        const startX=W*0.115
+        const baseY=H*0.42
+        const fontSize=Math.min(H*0.145,W*0.075)
+        ctx.font=`900 ${Math.round(fontSize)}px 'Space Grotesk','Arial Black',sans-serif`
+        ctx.textBaseline='middle'; ctx.textAlign='left'
 
-        // Tagline
-        ctx.fillStyle='#F97316'; ctx.font=`600 ${Math.min(13,W*0.013)}px 'Space Grotesk',sans-serif`
-        ctx.shadowBlur=10; ctx.shadowColor='#F97316'
-        ctx.fillText('DRILLING INTELLIGENCE REIMAGINED',W/2,H/2+48)
-        ctx.shadowBlur=0
+        for(let i=0;i<LETTERS.length;i++){
+          const delay=(i/LETTERS.length)*0.44
+          const lP=clamp((textP-delay)/0.56,0,1)
+          const ep=easeOut(lP)
+          const charAlpha=ep*globalFade
+          if(charAlpha<=0) continue
+          const charX=startX+i*(fontSize*0.72)
+          const charY=baseY+(1-ep)*22
+
+          // Glow layer
+          ctx.save()
+          ctx.globalAlpha=charAlpha*0.15
+          ctx.fillStyle='#F97316'
+          ctx.fillText(LETTERS[i],charX+2,charY+2)
+
+          // Main letter
+          ctx.globalAlpha=charAlpha
+          ctx.fillStyle='#F8FAFC'
+          ctx.shadowBlur=14*ep; ctx.shadowColor='rgba(249,115,22,0.55)'
+          ctx.fillText(LETTERS[i],charX,charY)
+          ctx.shadowBlur=0; ctx.restore()
+        }
+      }
+
+      // ── Tagline ──────────────────────────────────────────────────────────
+      if(tagP>0){
+        const tA=easeOut(tagP)*globalFade
+        const tagFontSize=Math.min(H*0.028,W*0.014)
+        const tagY=H*0.42+H*0.095
+        ctx.save()
+        ctx.globalAlpha=tA
+        ctx.fillStyle='#94A3B8'
+        ctx.font=`500 ${Math.round(tagFontSize)}px 'Space Grotesk',Arial,sans-serif`
+        ctx.textAlign='left'; ctx.textBaseline='middle'
+        ;(ctx as any).letterSpacing='0.22em'
+        ctx.fillText('DRILLING  INTELLIGENCE  REIMAGINED',W*0.117,tagY)
         ctx.restore()
       }
 
-      // Outer fade overlay when exiting
-      if(p3>0){
-        ctx.save(); ctx.globalAlpha=p3
+      // ── Exit fade ────────────────────────────────────────────────────────
+      if(exitP>0){
+        ctx.save()
+        ctx.globalAlpha=easeInOut(exitP)
         ctx.fillStyle='#080B10'; ctx.fillRect(0,0,W,H)
         ctx.restore()
-        if(p3>=0.9) { cancelAnimationFrame(raf); onDone(); return }
+        if(exitP>=0.92){cancelAnimationFrame(raf);onDone();return}
       }
 
       raf=requestAnimationFrame(loop)
     }
     raf=requestAnimationFrame(loop)
-    return()=>cancelAnimationFrame(raf)
-  },[])
+
+    const onResize=()=>{W=window.innerWidth;H=window.innerHeight;canvas.width=W;canvas.height=H}
+    window.addEventListener('resize',onResize)
+    return()=>{cancelAnimationFrame(raf);window.removeEventListener('resize',onResize)}
+  },[onDone])
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:9999,background:'#000005'}}>
@@ -853,9 +912,9 @@ export default function LandingPage() {
         </SR>
       </section>
 
-      {/* FEATURES */}
+      {/* FEATURES — 3D CONVEYOR */}
       <section id="features" style={{background:'#000005',borderTop:'1px solid rgba(249,115,22,0.08)',borderBottom:'1px solid rgba(249,115,22,0.08)'}}>
-        {/* Header above canvas */}
+        {/* Headline */}
         <div style={{textAlign:'center',padding:`60px ${P} 0`,position:'relative',zIndex:5}}>
           <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'5px 14px',borderRadius:100,border:'1px solid rgba(249,115,22,0.25)',background:'rgba(249,115,22,0.06)',fontSize:10,fontWeight:700,color:'#F97316',letterSpacing:'0.15em',textTransform:'uppercase',marginBottom:16}}>
             <span style={{width:5,height:5,borderRadius:'50%',background:'#F97316',display:'inline-block',animation:'xplPulse 1.5s infinite'}}/>Platform
@@ -866,10 +925,8 @@ export default function LandingPage() {
           </h2>
           <p style={{fontSize:13,color:'#64748B',marginBottom:0}}>9 intelligent modules. All connected. All live.</p>
         </div>
-        {/* Cinematic canvas — full width */}
-        <SR anim="unfold">
-          <FeaturesSection/>
-        </SR>
+        {/* 3D Conveyor — no SR wrapper so it renders immediately on scroll */}
+        <FeaturesSection/>
       </section>
 
       {/* AI INSIGHTS */}
