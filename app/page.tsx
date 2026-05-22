@@ -217,336 +217,373 @@ function EcosystemDiagram() {
   )
 }
 
-// ── FEATURES — CINEMATIC HOLOGRAPHIC UNIVERSE ─────────────────────────────
+// ── FEATURES — SCATTERED 3D FLOATING CARDS ────────────────────────────────
 function FeaturesSection() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+
   const features = [
-    {icon:'⚡',color:'#F97316',title:'Operations Dashboard',  desc:'Live ROP trending, downtime and bit performance',     kv:[['9.8','ROP m/hr'],['92%','Efficiency']]},
-    {icon:'🔧',color:'#3B82F6',title:'Maintenance Dashboard', desc:'Predictive health. Fix failures before downtime',     kv:[['4.2','MTBF days'],['87%','Uptime']]},
-    {icon:'👷',color:'#10B981',title:'Driller & Crew',        desc:'70+ driller leaderboard with medals',                kv:[['#1','Top Rank'],['94%','PPE']]},
-    {icon:'🛡',color:'#EF4444',title:'HSC & Safety',          desc:'Incidents, PPE compliance and training',             kv:[['186','Safe Days'],['100%','PPE']]},
-    {icon:'💰',color:'#F59E0B',title:'Finance & Costing',     desc:'Full cost visibility per project and meter',         kv:[['$8.2','Cost/m'],['−18%','Savings']]},
-    {icon:'🗄',color:'#8B5CF6',title:'Inventory',             desc:'Per-site stock with purchase orders',                kv:[['247','Parts'],['99%','Accuracy']]},
-    {icon:'📄',color:'#EC4899',title:'Performance Reports',   desc:'Verified 4-page PDF certificates',                  kv:[['4pg','PDF'],['100%','Verified']]},
-    {icon:'📊',color:'#60A5FA',title:'Performance Dashboard', desc:'Hole-by-hole analytics across formations',           kv:[['9.8','Avg ROP'],['97%','Recovery']]},
-    {icon:'📋',color:'#A78BFA',title:'Digital Logging',       desc:'Replace paper. Digital shift logs offline',         kv:[['<5m','Per Log'],['100%','Paper Gone']]},
+    {color:'#F97316',title:'Operations Dashboard',  desc:'Live ROP trending & downtime',       kv:[['9.8','ROP'],['92%','Uptime']],    bars:[35,48,60,75,82,92,85,95,78,88]},
+    {color:'#3B82F6',title:'Maintenance Dashboard', desc:'Predictive health tracking',         kv:[['4.2','MTBF'],['87%','Health']],   bars:[80,65,55,52,58,70,75,80,65,72]},
+    {color:'#10B981',title:'Driller & Crew',        desc:'70+ driller leaderboard',            kv:[['#1','Rank'],['94%','PPE']],       bars:[60,72,80,85,88,90,88,92,85,95]},
+    {color:'#EF4444',title:'HSC & Safety',          desc:'Incidents & PPE compliance',         kv:[['186','Days'],['100%','Safe']],    bars:[90,92,86,94,90,96,92,95,90,98]},
+    {color:'#F59E0B',title:'Finance & Costing',     desc:'Full cost per meter visibility',     kv:[['$8.2','Cost/m'],['−18%','Save']], bars:[72,65,60,55,52,48,45,50,44,52]},
+    {color:'#8B5CF6',title:'Inventory',             desc:'Per-site stock & purchase orders',   kv:[['247','Parts'],['99%','Acc']],     bars:[85,88,90,92,94,96,94,90,96,98]},
+    {color:'#EC4899',title:'Performance Reports',   desc:'Verified 4-page PDF certificates',  kv:[['4pg','PDF'],['100%','Verified']], bars:[95,96,90,94,92,96,94,98,96,100]},
+    {color:'#60A5FA',title:'Performance Dashboard', desc:'Hole-by-hole analytics',             kv:[['9.8','ROP'],['97%','Rec']],       bars:[40,52,62,70,76,80,84,86,80,88]},
+    {color:'#A78BFA',title:'Digital Logging',       desc:'Replace paper, log offline',        kv:[['<5m','Log'],['100%','Digital']],  bars:[88,90,92,94,90,96,93,97,95,98]},
   ]
 
-  useEffect(()=>{
-    const canvas = canvasRef.current; if(!canvas) return
+  useEffect(() => {
+    const canvas = canvasRef.current; if (!canvas) return
     const ctx = canvas.getContext('2d')!
-    let W = canvas.parentElement!.clientWidth || 900
-    let H = 620
+    let W = canvas.parentElement!.clientWidth || 1000
+    const H = 600
     canvas.width = W; canvas.height = H
-    let raf: number, t = 0, intro = 0
-    const N = features.length
+    let raf: number, t = 0
 
-    // Panels in helix
-    type Panel = {
-      idx: number; helixT: number; x: number; y: number; z: number
-      vx: number; vy: number; rot: number; rotV: number
-      alpha: number; scale: number; trail: {x:number;y:number;a:number}[]
-      pulse: number
+    // ── Card definitions ── each card has fixed 3D position + motion params
+    type Card = {
+      idx: number
+      // base position (normalized 0-1)
+      bx: number; by: number
+      // 3D rotation angles
+      rx: number; ry: number; rz: number
+      // rotation speeds
+      vrx: number; vry: number; vrz: number
+      // floating motion
+      phase: number; amp: number; freq: number
+      // visual
+      scale: number; alpha: number
+      // glow pulse
+      pulse: number; pulseV: number
     }
-    const panels: Panel[] = features.map((_, i) => ({
-      idx: i, helixT: i / N,
-      x: 0, y: 0, z: 0,
-      vx: 0, vy: 0,
-      rot: (Math.random()-0.5)*0.3,
-      rotV: (Math.random()-0.5)*0.002,
-      alpha: 0, scale: 1,
-      trail: [],
-      pulse: Math.random()*Math.PI*2
-    }))
+
+    const cards: Card[] = [
+      // Bottom-left cluster — large, close
+      {idx:1,bx:0.18,by:0.72,rx:-12,ry:15,rz:-8, vrx:0.008,vry:0.012,vrz:0.006, phase:0,amp:8,freq:0.4, scale:1.0,alpha:1.0, pulse:0,pulseV:0.02},
+      {idx:3,bx:0.32,by:0.68,rx:-8, ry:20,rz:5,  vrx:0.006,vry:0.01, vrz:0.008, phase:1,amp:6,freq:0.35,scale:0.95,alpha:0.95,pulse:1,pulseV:0.018},
+      {idx:4,bx:0.46,by:0.64,rx:-15,ry:12,rz:-3, vrx:0.01, vry:0.008,vrz:0.005, phase:2,amp:10,freq:0.3,scale:0.92,alpha:0.9, pulse:2,pulseV:0.022},
+      {idx:5,bx:0.62,by:0.58,rx:-5, ry:18,rz:8,  vrx:0.007,vry:0.015,vrz:0.009, phase:0.5,amp:7,freq:0.45,scale:1.05,alpha:1.0,pulse:3,pulseV:0.016},
+      // Mid right — slightly back
+      {idx:6,bx:0.72,by:0.44,rx:-10,ry:8, rz:4,  vrx:0.009,vry:0.011,vrz:0.007, phase:1.5,amp:9,freq:0.38,scale:0.88,alpha:0.85,pulse:4,pulseV:0.02},
+      // Upper area — further back, darker
+      {idx:0,bx:0.28,by:0.32,rx:-20,ry:25,rz:-12,vrx:0.005,vry:0.008,vrz:0.004, phase:0.8,amp:12,freq:0.25,scale:0.72,alpha:0.65,pulse:5,pulseV:0.015},
+      {idx:2,bx:0.45,by:0.26,rx:-18,ry:22,rz:6,  vrx:0.006,vry:0.009,vrz:0.005, phase:2.2,amp:11,freq:0.28,scale:0.68,alpha:0.6, pulse:0.5,pulseV:0.017},
+      {idx:7,bx:0.62,by:0.3, rx:-22,ry:18,rz:-8, vrx:0.004,vry:0.007,vrz:0.006, phase:1.8,amp:10,freq:0.32,scale:0.65,alpha:0.55,pulse:1.5,pulseV:0.014},
+      {idx:8,bx:0.75,by:0.22,rx:-25,ry:28,rz:10, vrx:0.003,vry:0.006,vrz:0.004, phase:3,  amp:14,freq:0.22,scale:0.55,alpha:0.45,pulse:2.5,pulseV:0.012},
+    ]
 
     // Particles
-    const NPAR = 160
+    const NPAR = 120
     const pars = Array.from({length:NPAR},()=>({
-      x: Math.random()*W, y: Math.random()*H,
-      vx:(Math.random()-0.5)*0.3, vy:-(Math.random()*0.5+0.1),
-      s: Math.random()*1.8+0.3,
-      o: Math.random()*0.6+0.1,
-      c: Math.random()>0.6?'#F97316':Math.random()>0.4?'#8B5CF6':'#3B82F6',
-      life: Math.random()
+      x:Math.random()*1000,y:Math.random()*H,
+      vx:(Math.random()-0.5)*0.2,vy:-(Math.random()*0.4+0.05),
+      s:Math.random()*1.5+0.2,o:Math.random()*0.5+0.1,
+      c:Math.random()>0.55?'#F97316':Math.random()>0.4?'#8B5CF6':'#3B82F6'
     }))
 
-    // Helix position: returns screen x,y,z for panel at time t+offset
-    const helixPos = (helixT: number, time: number) => {
-      const tt = ((helixT + time*0.04) % 1 + 1) % 1
-      const angle = tt * Math.PI * 2 - Math.PI/2
-      const rx = Math.sin(angle)  // -1..1
-      const rz = Math.cos(angle)  // -1..1  (depth)
-      // Vertical: panels spread across full height, cycle from bottom to top
-      const yNorm = 1 - tt  // 0=top 1=bottom
-      const cx = W * 0.5
-      const spreadX = Math.min(W*0.32, 260)
-      const x = cx + rx * spreadX
-      const y = H * 0.06 + yNorm * H * 0.88
-      const z = rz  // -1=back, 1=front
-      return {x, y, z, tt, angle}
-    }
-
-    const drawPanel = (
-      ctx: CanvasRenderingContext2D,
-      f: typeof features[0],
-      px: number, py: number, pz: number,
-      scale: number, alpha: number, rot: number
-    ) => {
-      const W_card = 220 * scale, H_card = 275 * scale
-      const depth = (pz + 1) / 2  // 0..1
-
-      ctx.save()
-      ctx.translate(px, py)
-      ctx.rotate(rot)
-      ctx.globalAlpha = alpha * (0.3 + depth * 0.7)
-
-      // Glass panel
-      const grd = ctx.createLinearGradient(-W_card/2, -H_card/2, W_card/2, H_card/2)
-      grd.addColorStop(0, `rgba(255,255,255,${0.06*depth})`)
-      grd.addColorStop(0.5, `rgba(10,10,20,${0.85})`)
-      grd.addColorStop(1, `rgba(${hexToRgb(f.color)},${0.04*depth})`)
-      ctx.fillStyle = grd
-      roundRect(ctx, -W_card/2, -H_card/2, W_card, H_card, 14*scale)
-      ctx.fill()
-
-      // Border glow
-      ctx.strokeStyle = `rgba(${hexToRgb(f.color)},${0.3+depth*0.4})`
-      ctx.lineWidth = (depth>0.5 ? 1.5 : 0.8) * scale
-      roundRect(ctx, -W_card/2, -H_card/2, W_card, H_card, 14*scale)
-      ctx.stroke()
-
-      // Top accent bar
-      const barGrd = ctx.createLinearGradient(-W_card/2, 0, W_card/2, 0)
-      barGrd.addColorStop(0, f.color)
-      barGrd.addColorStop(1, 'transparent')
-      ctx.fillStyle = barGrd
-      ctx.globalAlpha = alpha * (0.5 + depth*0.5)
-      roundRect(ctx, -W_card/2, -H_card/2, W_card, 2*scale, 2)
-      ctx.fill()
-
-      // Glass shine
-      const shineGrd = ctx.createLinearGradient(-W_card/2, -H_card/2, -W_card/2, -H_card/2 + H_card*0.35)
-      shineGrd.addColorStop(0, `rgba(255,255,255,${0.08*depth})`)
-      shineGrd.addColorStop(1, 'transparent')
-      ctx.fillStyle = shineGrd
-      ctx.globalAlpha = alpha
-      roundRect(ctx, -W_card/2, -H_card/2, W_card, H_card*0.35, 14*scale)
-      ctx.fill()
-
-      // Content — only draw clearly for front-facing cards
-      if (depth > 0.3) {
-        ctx.globalAlpha = alpha * depth
-        // Chrome dots
-        const dotY = -H_card/2 + 12*scale
-        const dotX = -W_card/2 + 10*scale
-        ;['#EF4444','#F59E0B','#10B981'].forEach((dc,di)=>{
-          ctx.fillStyle = dc
-          ctx.beginPath()
-          ctx.arc(dotX + di*9*scale, dotY, 2.5*scale, 0, Math.PI*2)
-          ctx.fill()
-        })
-
-        // Title
-        ctx.fillStyle = f.color
-        ctx.font = `${Math.round(700)} ${10*scale}px 'Space Grotesk',sans-serif`
-        ctx.textAlign = 'left'
-        ctx.fillText(f.title, -W_card/2+10*scale, -H_card/2+28*scale)
-
-        // KV pairs
-        f.kv.forEach(([v,l],ki)=>{
-          const kx = -W_card/2 + 10*scale + ki*(W_card/2-5*scale)
-          const ky = -H_card/2 + 48*scale
-          const kw = W_card/2 - 15*scale, kh = 36*scale
-          ctx.fillStyle = `rgba(${hexToRgb(f.color)},0.1)`
-          roundRect(ctx, kx, ky, kw, kh, 6*scale)
-          ctx.fill()
-          ctx.fillStyle = f.color
-          ctx.font = `bold ${13*scale}px 'JetBrains Mono',monospace`
-          ctx.fillText(v, kx+6*scale, ky+16*scale)
-          ctx.fillStyle = 'rgba(255,255,255,0.3)'
-          ctx.font = `${7*scale}px 'Space Grotesk',sans-serif`
-          ctx.fillText(l, kx+6*scale, ky+28*scale)
-        })
-
-        // Mini bar chart
-        const bars = [35,48,42,60,52,68,58,75,65,82,72,88,78,92,85,95]
-        const bw = (W_card-20*scale)/bars.length
-        const bh = 40*scale
-        const by = -H_card/2 + 95*scale
-        bars.forEach((h,bi)=>{
-          const bx = -W_card/2 + 10*scale + bi*bw
-          ctx.fillStyle = bi>=12 ? f.color : `rgba(${hexToRgb(f.color)},0.35)`
-          const barH = (h/100)*bh
-          ctx.fillRect(bx, by+bh-barH, bw-1*scale, barH)
-        })
-
-        // Desc text
-        ctx.fillStyle = 'rgba(255,255,255,0.45)'
-        ctx.font = `${9*scale}px 'Space Grotesk',sans-serif`
-        const words = f.desc.split(' '), lineH = 11*scale
-        let line='', ly=by+bh+14*scale
-        words.forEach(w=>{
-          const test=line+w+' '
-          if(ctx.measureText(test).width > W_card-20*scale && line) {
-            ctx.fillText(line,-W_card/2+10*scale,ly); line=w+' '; ly+=lineH
-          } else line=test
-        })
-        if(line) ctx.fillText(line,-W_card/2+10*scale,ly)
-
-        // Bottom label glow
-        ctx.shadowBlur = 8; ctx.shadowColor = f.color
-        ctx.fillStyle = f.color
-        ctx.font = `bold ${8*scale}px 'Space Grotesk',sans-serif`
-        ctx.textAlign = 'center'
-        ctx.fillText(`${f.icon} ${f.title.toUpperCase()}`, 0, H_card/2-10*scale)
-        ctx.shadowBlur = 0
-      }
-      ctx.restore()
-    }
-
-    const hexToRgb = (hex: string) => {
-      const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16)
+    const hexRgb = (h:string)=>{
+      const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16)
       return `${r},${g},${b}`
     }
-    const roundRect=(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,h:number,r:number)=>{
+
+    const rr=(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,h:number,r:number)=>{
       ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath()
     }
 
-    // Nebula layer
-    const drawNebula = (t:number) => {
-      const cx=W*0.5, cy=H*0.5
-      const g1=ctx.createRadialGradient(cx+Math.sin(t*0.1)*80,cy+Math.cos(t*0.07)*60,0,cx,cy,W*0.6)
-      g1.addColorStop(0,'rgba(249,115,22,0.025)');g1.addColorStop(0.4,'rgba(139,92,246,0.015)');g1.addColorStop(1,'transparent')
-      ctx.fillStyle=g1;ctx.fillRect(0,0,W,H)
-      const g2=ctx.createRadialGradient(cx+Math.cos(t*0.13)*100,H*0.7,0,cx,H*0.7,W*0.4)
-      g2.addColorStop(0,'rgba(59,130,246,0.02)');g2.addColorStop(1,'transparent')
-      ctx.fillStyle=g2;ctx.fillRect(0,0,W,H)
+    // Project 3D card to 2D with perspective
+    const project3D = (card: Card, time: number) => {
+      // Floating motion
+      const fy = Math.sin(time * card.freq + card.phase) * card.amp
+      const fx = Math.cos(time * card.freq * 0.7 + card.phase) * card.amp * 0.4
+
+      const px = (card.bx + fx/W) * W
+      const py = (card.by + fy/H) * H
+
+      // Accumulated rotation
+      const rx = card.rx + Math.sin(time*0.3+card.phase)*3
+      const ry = card.ry + Math.sin(time*0.25+card.phase*1.3)*4
+      const rz = card.rz + Math.sin(time*0.2+card.phase*0.7)*2
+
+      return {px, py, rx, ry, rz}
     }
 
-    // Intro: logo builds from particles
-    const drawIntro = (progress: number) => {
-      if(progress >= 1) return
-      const a = Math.max(0, 1-progress*2)
-      if(a<=0) return
+    const drawCard = (card: Card, time: number) => {
+      const f = features[card.idx]
+      const {px,py,rx,ry,rz} = project3D(card, time)
+      const CW = 220*card.scale, CH = 270*card.scale
+
+      // Perspective skew from rotation angles
+      const skewY = ry * 0.018  // horizontal rotation → skew
+      const skewX = rx * 0.012  // vertical rotation → vertical skew
+      const cosA = Math.cos(rz*Math.PI/180)
+      const sinA = Math.sin(rz*Math.PI/180)
+
       ctx.save()
-      ctx.globalAlpha = a
-      // "XPLORIX" text emerging
-      ctx.fillStyle = '#F97316'
-      ctx.font = `bold ${Math.round(32+progress*8)}px 'Space Grotesk',sans-serif`
-      ctx.textAlign = 'center'
-      ctx.shadowBlur = 30+progress*20; ctx.shadowColor='#F97316'
-      ctx.fillText('DRILLING INTELLIGENCE REIMAGINED', W/2, H/2-20)
+      ctx.translate(px, py)
+      ctx.rotate(rz * Math.PI/180)
+      ctx.transform(1, skewX, skewY, 1, 0, 0)
+      ctx.globalAlpha = card.alpha * (0.85 + Math.sin(card.pulse)*0.15)
+
+      // Glow behind card
+      const glow = ctx.createRadialGradient(0,0,0,0,0,CW*0.8)
+      glow.addColorStop(0, `rgba(${hexRgb(f.color)},${0.12*card.alpha})`)
+      glow.addColorStop(1, 'transparent')
+      ctx.fillStyle = glow
+      ctx.fillRect(-CW*0.7,-CH*0.5,CW*1.4,CH*1.1)
+
+      // Glass body
+      const bg = ctx.createLinearGradient(-CW/2,-CH/2,CW/2,CH/2)
+      bg.addColorStop(0,`rgba(255,255,255,0.07)`)
+      bg.addColorStop(0.3,`rgba(8,8,20,0.88)`)
+      bg.addColorStop(1,`rgba(${hexRgb(f.color)},0.05)`)
+      ctx.fillStyle = bg
+      rr(ctx,-CW/2,-CH/2,CW,CH,14*card.scale)
+      ctx.fill()
+
+      // Border with glow
+      ctx.strokeStyle = `rgba(${hexRgb(f.color)},${0.5+Math.sin(card.pulse)*0.3})`
+      ctx.lineWidth = 1.2
+      rr(ctx,-CW/2,-CH/2,CW,CH,14*card.scale)
+      ctx.stroke()
+
+      // Top accent bar
+      const bar = ctx.createLinearGradient(-CW/2,0,CW/2,0)
+      bar.addColorStop(0,f.color); bar.addColorStop(0.7,f.color+'80'); bar.addColorStop(1,'transparent')
+      ctx.fillStyle=bar
+      rr(ctx,-CW/2,-CH/2,CW,2.5*card.scale,2)
+      ctx.fill()
+
+      // Glass shine
+      const shine = ctx.createLinearGradient(-CW/2,-CH/2,-CW/2,-CH/2+CH*0.3)
+      shine.addColorStop(0,`rgba(255,255,255,${0.08*card.alpha})`); shine.addColorStop(1,'transparent')
+      ctx.fillStyle=shine
+      rr(ctx,-CW/2,-CH/2,CW,CH*0.3,14*card.scale)
+      ctx.fill()
+
+      // Content
+      const s = card.scale
+      // Chrome dots
+      ;['#EF4444','#F59E0B','#10B981'].forEach((c,i)=>{
+        ctx.fillStyle=c; ctx.beginPath()
+        ctx.arc(-CW/2+10*s+i*9*s,-CH/2+12*s,2.5*s,0,Math.PI*2); ctx.fill()
+      })
+
+      // Title
+      ctx.fillStyle=f.color; ctx.font=`bold ${10*s}px 'Space Grotesk',sans-serif`
+      ctx.textAlign='left'
+      ctx.shadowBlur=6; ctx.shadowColor=f.color
+      ctx.fillText(f.title,-CW/2+10*s,-CH/2+26*s)
       ctx.shadowBlur=0
+
+      // KV pairs
+      f.kv.forEach(([v,l],ki)=>{
+        const kx=-CW/2+10*s+(CW/2-8*s)*ki, ky=-CH/2+34*s
+        const kw=CW/2-14*s, kh=34*s
+        ctx.fillStyle=`rgba(${hexRgb(f.color)},0.12)`
+        rr(ctx,kx,ky,kw,kh,5*s); ctx.fill()
+        ctx.fillStyle=f.color; ctx.font=`bold ${12*s}px 'JetBrains Mono',monospace`
+        ctx.fillText(v,kx+5*s,ky+14*s)
+        ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font=`${7*s}px 'Space Grotesk',sans-serif`
+        ctx.fillText(l,kx+5*s,ky+26*s)
+      })
+
+      // Bar chart
+      const bars=f.bars; const bw=(CW-20*s)/bars.length; const bH=38*s
+      const by=-CH/2+78*s
+      bars.forEach((h,bi)=>{
+        ctx.fillStyle=bi>=7?f.color:`rgba(${hexRgb(f.color)},0.3)`
+        const bh=(h/100)*bH
+        ctx.fillRect(-CW/2+10*s+bi*bw,by+bH-bh,bw-1.5*s,bh)
+      })
+
+      // Desc
+      ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font=`${8.5*s}px 'Space Grotesk',sans-serif`
+      const words=f.desc.split(' '); let line='',lY=by+bH+13*s,lH=11*s
+      words.forEach(w=>{
+        const test=line+w+' '
+        if(ctx.measureText(test).width>CW-20*s&&line){ctx.fillText(line,-CW/2+10*s,lY);line=w+' ';lY+=lH}else line=test
+      })
+      if(line) ctx.fillText(line,-CW/2+10*s,lY)
+
+      // Bottom title glow
+      ctx.shadowBlur=8; ctx.shadowColor=f.color
+      ctx.fillStyle=f.color; ctx.font=`bold ${8*s}px 'Space Grotesk',sans-serif`
+      ctx.textAlign='center'
+      ctx.fillText(f.title.toUpperCase(),0,CH/2-10*s)
+      ctx.shadowBlur=0
+
       ctx.restore()
+      card.pulse += card.pulseV
     }
 
-    // Grid lines (subtle)
-    const drawGrid = () => {
-      ctx.save(); ctx.globalAlpha=0.03; ctx.strokeStyle='#94A3B8'; ctx.lineWidth=0.5
-      for(let gx=0;gx<W;gx+=60){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke()}
-      for(let gy=0;gy<H;gy+=60){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke()}
+    const loop = (ts:number) => {
+      t = ts*0.001
+      ctx.clearRect(0,0,W,H)
+
+      // Deep background
+      ctx.fillStyle='#020008'; ctx.fillRect(0,0,W,H)
+
+      // Nebula clouds
+      ;[
+        {x:W*0.3,y:H*0.6,r:W*0.4,c:'249,115,22',a:0.018},
+        {x:W*0.7,y:H*0.4,r:W*0.35,c:'139,92,246',a:0.015},
+        {x:W*0.5,y:H*0.3,r:W*0.3, c:'59,130,246',a:0.012},
+      ].forEach(n=>{
+        const g=ctx.createRadialGradient(n.x+Math.sin(t*0.08)*30,n.y+Math.cos(t*0.06)*20,0,n.x,n.y,n.r)
+        g.addColorStop(0,`rgba(${n.c},${n.a})`); g.addColorStop(1,'transparent')
+        ctx.fillStyle=g; ctx.fillRect(0,0,W,H)
+      })
+
+      // Grid
+      ctx.save(); ctx.globalAlpha=0.025; ctx.strokeStyle='#94A3B8'; ctx.lineWidth=0.5
+      for(let x=0;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+      for(let y=0;y<H;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
       ctx.restore()
-    }
-
-    const loop = (ts: number) => {
-      t = ts * 0.001
-      intro = Math.min(intro + 0.008, 1)
-
-      // Background
-      ctx.fillStyle = '#000005'
-      ctx.fillRect(0,0,W,H)
-      drawGrid()
-      drawNebula(t)
 
       // Particles
       ctx.save()
       pars.forEach(p=>{
-        p.life+=0.003; if(p.life>1){p.life=0;p.y=H+5;p.x=Math.random()*W}
         p.x+=p.vx; p.y+=p.vy
         if(p.y<-5){p.y=H+5;p.x=Math.random()*W}
-        const a=p.o*(1-Math.pow(p.life-0.5,2)*4)
-        ctx.globalAlpha=Math.max(0,a)*0.7
-        ctx.fillStyle=p.c; ctx.shadowBlur=p.s*3; ctx.shadowColor=p.c
+        ctx.globalAlpha=p.o*0.55; ctx.fillStyle=p.c
+        ctx.shadowBlur=p.s*3; ctx.shadowColor=p.c
         ctx.beginPath(); ctx.arc(p.x,p.y,p.s,0,Math.PI*2); ctx.fill()
       })
       ctx.shadowBlur=0; ctx.restore()
 
-      // Sort panels back to front by z
-      const sorted = panels.map((panel,i)=>{
-        const {x,y,z,tt} = helixPos(panel.helixT, t)
-        panel.pulse += 0.02
-        const dep=(z+1)/2
-        const sc = 0.5 + dep*0.65
-        // Trail
-        panel.trail.unshift({x,y,a:0.15*dep})
-        if(panel.trail.length>6) panel.trail.pop()
-        panel.rot += panel.rotV
-        return {...panel, px:x, py:y, pz:z, dep, sc, tt}
-      }).sort((a,b)=>a.pz-b.pz)
+      // Sort back-to-front by scale (smaller=further back)
+      const sorted=[...cards].sort((a,b)=>a.scale-b.scale)
+      sorted.forEach(card=>drawCard(card,t))
 
-      // Draw trails
-      sorted.forEach(p=>{
-        p.trail.forEach((tr,ti)=>{
-          if(ti===0) return
-          const f=features[p.idx]
-          ctx.save(); ctx.globalAlpha=tr.a*(1-ti/p.trail.length)*0.4
-          ctx.fillStyle=f.color; ctx.shadowBlur=4; ctx.shadowColor=f.color
-          ctx.beginPath(); ctx.arc(tr.x,tr.y,2*(1-ti/p.trail.length),0,Math.PI*2); ctx.fill()
-          ctx.restore()
-        })
-      })
-
-      // Draw panels
-      sorted.forEach(p=>{
-        const f=features[p.idx]
-        const pulseAlpha = 0.8 + Math.sin(p.pulse)*0.2
-        drawPanel(ctx,f,p.px,p.py,p.pz,p.sc,intro*pulseAlpha,p.rot)
-      })
-
-      // Energy path lines connecting panels
-      ctx.save(); ctx.globalAlpha=0.06; ctx.strokeStyle='#F97316'
-      ctx.lineWidth=1; ctx.setLineDash([4,12])
-      ctx.beginPath()
-      const pathPts = Array.from({length:20},(_,i)=>{
-        const {x,y}=helixPos(i/20,t)
-        return {x,y}
-      })
-      ctx.moveTo(pathPts[0].x,pathPts[0].y)
-      pathPts.forEach(p=>ctx.lineTo(p.x,p.y))
-      ctx.stroke(); ctx.setLineDash([]); ctx.restore()
-
-      // Intro overlay — removed
-      raf = requestAnimationFrame(loop)
+      raf=requestAnimationFrame(loop)
     }
-    raf = requestAnimationFrame(loop)
+    raf=requestAnimationFrame(loop)
 
-    const resize = () => {
-      W = canvas.parentElement!.clientWidth || 900
-      canvas.width = W; canvas.height = 620
-    }
-    window.addEventListener('resize', resize)
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize',resize) }
+    const resize=()=>{W=canvas.parentElement!.clientWidth||1000;canvas.width=W;canvas.height=H}
+    window.addEventListener('resize',resize)
+    return()=>{cancelAnimationFrame(raf);window.removeEventListener('resize',resize)}
   },[])
 
   return (
-    <div style={{position:'relative',width:'100%',height:620,background:'#000005',overflow:'hidden'}}>
+    <div style={{position:'relative',width:'100%',height:600,background:'#020008',overflow:'hidden'}}>
       <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'100%'}}/>
-      {/* Scanlines */}
-      <div style={{position:'absolute',inset:0,backgroundImage:'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.03) 3px,rgba(0,0,0,0.03) 6px)',pointerEvents:'none',zIndex:2}}/>
-      {/* Vignette */}
-      <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse 100% 100% at 50% 50%,transparent 40%,rgba(0,0,10,0.7) 100%)',pointerEvents:'none',zIndex:3}}/>
-      {/* Top fade into section */}
-      <div style={{position:'absolute',top:0,left:0,right:0,height:60,background:'linear-gradient(180deg,#000005,transparent)',pointerEvents:'none',zIndex:4}}/>
-      {/* Bottom fade */}
-      <div style={{position:'absolute',bottom:0,left:0,right:0,height:80,background:'linear-gradient(0deg,#000005,transparent)',pointerEvents:'none',zIndex:4}}/>
-      {/* Floor glow */}
-      <div style={{position:'absolute',bottom:0,left:0,right:0,height:120,background:'linear-gradient(0deg,rgba(249,115,22,0.05),transparent)',pointerEvents:'none',zIndex:5}}/>
+      <div style={{position:'absolute',inset:0,backgroundImage:'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.025) 3px,rgba(0,0,0,0.025) 6px)',pointerEvents:'none',zIndex:2}}/>
+      <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse 90% 100% at 50% 50%,transparent 45%,rgba(0,0,8,0.65) 100%)',pointerEvents:'none',zIndex:3}}/>
+      <div style={{position:'absolute',top:0,left:0,right:0,height:80,background:'linear-gradient(180deg,#020008,transparent)',pointerEvents:'none',zIndex:4}}/>
+      <div style={{position:'absolute',bottom:0,left:0,right:0,height:80,background:'linear-gradient(0deg,#020008,transparent)',pointerEvents:'none',zIndex:4}}/>
+    </div>
+  )
+}
+
+
+// ── INTRO SPLASH ──────────────────────────────────────────────────────────
+function IntroSplash({onDone}:{onDone:()=>void}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  useEffect(()=>{
+    const canvas = canvasRef.current; if(!canvas) return
+    const ctx = canvas.getContext('2d')!
+    let W = window.innerWidth, H = window.innerHeight
+    canvas.width=W; canvas.height=H
+    let raf:number, t=0, phase=0
+
+    // Particles forming logo
+    const NPAR=200
+    const pars = Array.from({length:NPAR},()=>({
+      x:Math.random()*W, y:Math.random()*H,
+      tx:W/2+(Math.random()-0.5)*120, ty:H/2+(Math.random()-0.5)*80,
+      vx:0,vy:0,
+      s:Math.random()*2+0.5,
+      c:Math.random()>0.5?'#F97316':Math.random()>0.5?'#8B5CF6':'#ffffff',
+      o:Math.random()*0.8+0.2
+    }))
+
+    const loop=(ts:number)=>{
+      t=ts*0.001; phase=Math.min(phase+0.012,1)
+      ctx.fillStyle=`rgba(0,0,5,${phase<0.15?0.3:0.15})`
+      ctx.fillRect(0,0,W,H)
+
+      // Phase 0-0.3: particles drift in
+      // Phase 0.3-0.6: logo + text appear
+      // Phase 0.6-0.85: hold
+      // Phase 0.85-1.0: fade out → call onDone
+
+      const p1=Math.min(phase/0.3,1)
+      const p2=Math.max(0,Math.min((phase-0.3)/0.3,1))
+      const p3=Math.max(0,(phase-0.85)/0.15)
+
+      // Particles
+      pars.forEach(p=>{
+        if(p1<1){
+          p.vx+=(p.tx-p.x)*0.04*p1; p.vy+=(p.ty-p.y)*0.04*p1
+          p.vx*=0.85; p.vy*=0.85
+        }
+        p.x+=p.vx+(Math.sin(t*2+p.o)*0.3)
+        p.y+=p.vy+(Math.cos(t*1.5+p.o)*0.3)
+        ctx.save()
+        ctx.globalAlpha=p.o*p1*(1-p3*1.5)*0.7
+        ctx.fillStyle=p.c; ctx.shadowBlur=p.s*4; ctx.shadowColor=p.c
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.s,0,Math.PI*2); ctx.fill()
+        ctx.restore()
+      })
+
+      if(p2>0){
+        const alpha=p2*(1-p3)
+        // Logo X — centered
+        const lx=W/2, ly=H/2-60, ls=50
+        ctx.save(); ctx.globalAlpha=alpha
+        // Left dark half
+        ctx.fillStyle='#1a1a1a'
+        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx-ls*0.9,ly-ls*0.9);ctx.lineTo(lx-ls*0.9,ly+ls*0.9);ctx.closePath();ctx.fill()
+        ctx.fillStyle='#2a2a2a'
+        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx-ls*0.9,ly-ls*0.9);ctx.lineTo(lx-ls*0.45,ly-ls*0.9);ctx.closePath();ctx.fill()
+        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx-ls*0.9,ly+ls*0.9);ctx.lineTo(lx-ls*0.45,ly+ls*0.9);ctx.closePath();ctx.fill()
+        // Right orange half
+        ctx.fillStyle='#F97316'
+        ctx.shadowBlur=40; ctx.shadowColor='#F97316'
+        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+ls*0.9,ly-ls*0.9);ctx.lineTo(lx+ls*0.9,ly+ls*0.9);ctx.closePath();ctx.fill()
+        ctx.fillStyle='#EA580C'
+        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+ls*0.9,ly-ls*0.9);ctx.lineTo(lx+ls*0.45,ly-ls*0.9);ctx.closePath();ctx.fill()
+        ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+ls*0.9,ly+ls*0.9);ctx.lineTo(lx+ls*0.45,ly+ls*0.9);ctx.closePath();ctx.fill()
+        ctx.shadowBlur=0
+
+        // XPLORIX text
+        ctx.fillStyle='#F8FAFC'; ctx.font=`800 ${Math.min(36,W*0.038)}px 'Space Grotesk',sans-serif`
+        ctx.textAlign='center'; ctx.letterSpacing='0.15em' as any
+        ctx.shadowBlur=0; ctx.fillText('XPLORIX',W/2,H/2+20)
+
+        // Tagline
+        ctx.fillStyle='#F97316'; ctx.font=`600 ${Math.min(13,W*0.013)}px 'Space Grotesk',sans-serif`
+        ctx.shadowBlur=10; ctx.shadowColor='#F97316'
+        ctx.fillText('DRILLING INTELLIGENCE REIMAGINED',W/2,H/2+48)
+        ctx.shadowBlur=0
+        ctx.restore()
+      }
+
+      // Outer fade overlay when exiting
+      if(p3>0){
+        ctx.save(); ctx.globalAlpha=p3
+        ctx.fillStyle='#080B10'; ctx.fillRect(0,0,W,H)
+        ctx.restore()
+        if(p3>=0.9) { cancelAnimationFrame(raf); onDone(); return }
+      }
+
+      raf=requestAnimationFrame(loop)
+    }
+    raf=requestAnimationFrame(loop)
+    return()=>cancelAnimationFrame(raf)
+  },[])
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:9999,background:'#000005'}}>
+      <canvas ref={canvasRef} style={{display:'block',width:'100%',height:'100%'}}/>
     </div>
   )
 }
 
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────
 export default function LandingPage() {
+  const [showIntro, setShowIntro] = useState(true)
   const [activeFaq,setActiveFaq]=useState<number|null>(null)
   const [scrolled,setScrolled]=useState(false)
   const [typeIndex,setTypeIndex]=useState(0)
@@ -619,6 +656,7 @@ export default function LandingPage() {
 
   return (
     <div style={{fontFamily:"'Space Grotesk',sans-serif",background:'#080B10',color:'#F8FAFC',overflowX:'hidden'}}>
+      {showIntro && <IntroSplash onDone={()=>setShowIntro(false)}/>}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
