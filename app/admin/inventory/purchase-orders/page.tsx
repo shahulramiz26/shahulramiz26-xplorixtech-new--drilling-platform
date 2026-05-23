@@ -167,14 +167,18 @@ function StatusBadge({ status }: { status: POStatus }) {
 }
 
 // ── RECEIVE CONFIRMATION MODAL ─────────────────────────────────────────────
-function ReceiveModal({ po, onClose, onConfirm }: { po: PurchaseOrder; onClose:()=>void; onConfirm:(receivedBy:string)=>void }) {
+function ReceiveModal({ po, onClose, onConfirm }: { po: PurchaseOrder; onClose:()=>void; onConfirm:(receivedBy:string, onTime:boolean, daysLate:number, qualityIssue:'none'|'minor'|'rejected')=>void }) {
   const [receivedBy, setReceivedBy] = useState('')
+  const [onTime, setOnTime] = useState<boolean|null>(null)
+  const [daysLate, setDaysLate] = useState(0)
+  const [qualityIssue, setQualityIssue] = useState<'none'|'minor'|'rejected'>('none')
   const [error, setError] = useState(false)
   const { format } = useCurrency()
 
   const handleConfirm = () => {
     if (!receivedBy.trim()) { setError(true); return }
-    onConfirm(receivedBy.trim())
+    if (onTime === null) { setError(true); return }
+    onConfirm(receivedBy.trim(), onTime, daysLate, qualityIssue)
   }
 
   return (
@@ -221,12 +225,64 @@ function ReceiveModal({ po, onClose, onConfirm }: { po: PurchaseOrder; onClose:(
           <div style={{ fontSize:11, fontWeight:700, color:'#64748B', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:8 }}>Received By *</div>
           <div style={{ position:'relative' }}>
             <User size={14} style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'#64748B' }} />
-            <input value={receivedBy} onChange={e=>{setReceivedBy(e.target.value);setError(false)}} placeholder="Enter your full name..." onKeyDown={e=>e.key==='Enter'&&handleConfirm()}
-              style={{ width:'100%', padding:'11px 12px 11px 34px', background:'#080B10', border:`1px solid ${error?'#EF4444':'#1E293B'}`, borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none', fontFamily:'inherit' }} />
+            <input value={receivedBy} onChange={e=>{setReceivedBy(e.target.value);setError(false)}} placeholder="Enter your full name..."
+              style={{ width:'100%', padding:'11px 12px 11px 34px', background:'#080B10', border:`1px solid ${error&&!receivedBy?'#EF4444':'#1E293B'}`, borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none', fontFamily:'inherit' }} />
           </div>
-          {error && <div style={{ fontSize:11, color:'#EF4444', marginTop:6 }}>⚠ Please enter the name of the person receiving this stock.</div>}
           <div style={{ fontSize:11, color:'#64748B', marginTop:6 }}>Date: {new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })} · This will be recorded on the PO</div>
         </div>
+
+        {/* Q1 — On time? */}
+        <div style={{ marginBottom:20 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'#64748B', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:8 }}>Was this delivered on time? *</div>
+          <div style={{ display:'flex', gap:10 }}>
+            <button onClick={()=>{setOnTime(true);setDaysLate(0)}}
+              style={{ flex:1, padding:'11px', borderRadius:10, cursor:'pointer', transition:'all 0.2s', fontWeight:700, fontSize:13,
+                background: onTime===true ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${onTime===true ? 'rgba(16,185,129,0.4)' : error&&onTime===null ? '#EF4444' : '#1E293B'}`,
+                color: onTime===true ? '#10B981' : '#94A3B8',
+              }}>✅ Yes, on time</button>
+            <button onClick={()=>setOnTime(false)}
+              style={{ flex:1, padding:'11px', borderRadius:10, cursor:'pointer', transition:'all 0.2s', fontWeight:700, fontSize:13,
+                background: onTime===false ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${onTime===false ? 'rgba(239,68,68,0.35)' : error&&onTime===null ? '#EF4444' : '#1E293B'}`,
+                color: onTime===false ? '#EF4444' : '#94A3B8',
+              }}>❌ No, delayed</button>
+          </div>
+          {onTime===false && (
+            <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:10 }}>
+              <div style={{ fontSize:12, color:'#94A3B8', whiteSpace:'nowrap' }}>Delayed by:</div>
+              <input type="number" min={1} value={daysLate} onChange={e=>setDaysLate(parseInt(e.target.value)||0)}
+                style={{ width:80, padding:'8px 12px', background:'#080B10', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none', textAlign:'center' }} />
+              <div style={{ fontSize:12, color:'#64748B' }}>days</div>
+            </div>
+          )}
+        </div>
+
+        {/* Q2 — Quality */}
+        <div style={{ marginBottom:20 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'#64748B', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:8 }}>Quality of items received?</div>
+          <div style={{ display:'flex', gap:8 }}>
+            {([
+              { value:'none'     as const, label:'✅ No Issues',     activeColor:'#10B981', activeBg:'rgba(16,185,129,0.12)', activeBorder:'rgba(16,185,129,0.4)'  },
+              { value:'minor'    as const, label:'⚠️ Minor Issues',  activeColor:'#F59E0B', activeBg:'rgba(245,158,11,0.12)', activeBorder:'rgba(245,158,11,0.4)'  },
+              { value:'rejected' as const, label:'❌ Items Rejected', activeColor:'#EF4444', activeBg:'rgba(239,68,68,0.1)',  activeBorder:'rgba(239,68,68,0.35)'  },
+            ]).map(opt=>(
+              <button key={opt.value} onClick={()=>setQualityIssue(opt.value)}
+                style={{ flex:1, padding:'10px 6px', borderRadius:10, cursor:'pointer', transition:'all 0.2s', fontWeight:600, fontSize:11,
+                  background: qualityIssue===opt.value ? opt.activeBg : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${qualityIssue===opt.value ? opt.activeBorder : '#1E293B'}`,
+                  color: qualityIssue===opt.value ? opt.activeColor : '#94A3B8',
+                }}>{opt.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Supplier score note */}
+        <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(245,158,11,0.05)', border:'1px solid rgba(245,158,11,0.15)', marginBottom:20 }}>
+          <div style={{ fontSize:11, color:'#F59E0B', fontWeight:600 }}>⭐ Your answers update the supplier performance score automatically</div>
+        </div>
+
+        {error && <div style={{ fontSize:11, color:'#EF4444', marginBottom:12 }}>⚠ Please fill in all required fields before confirming.</div>}
 
         <div style={{ display:'flex', gap:10 }}>
           <button onClick={onClose} style={{ flex:1, padding:'12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:13, fontWeight:600, cursor:'pointer' }}>Cancel</button>
@@ -526,7 +582,7 @@ export default function PurchaseOrdersPage() {
     (search==='' || po.poNumber.toLowerCase().includes(search.toLowerCase()) || po.supplier.toLowerCase().includes(search.toLowerCase()))
   )
 
-  const handleReceiveConfirm = (poId: string, receivedBy: string) => {
+  const handleReceiveConfirm = (poId: string, receivedBy: string, onTime: boolean, daysLate: number, qualityIssue: 'none'|'minor'|'rejected') => {
     setPos(prev => prev.map(po => po.id===poId ? {
       ...po, status:'Received' as POStatus,
       lineItems: po.lineItems.map(item => ({...item, qtyReceived:item.qtyOrdered})),
@@ -733,7 +789,7 @@ ${po.notes ? `<div style="margin-top:10px"><strong>Notes:</strong> ${po.notes}</
 
       {/* Modals */}
       {showNewPO && <NewPOModal onClose={()=>setShowNewPO(false)} onSave={po=>setPos(prev=>[po,...prev])} companyProfile={companyProfile} />}
-      {receiveTarget && <ReceiveModal po={receiveTarget} onClose={()=>setReceiveTarget(null)} onConfirm={(receivedBy)=>handleReceiveConfirm(receiveTarget.id, receivedBy)} />}
+      {receiveTarget && <ReceiveModal po={receiveTarget} onClose={()=>setReceiveTarget(null)} onConfirm={(receivedBy, onTime, daysLate, qualityIssue)=>handleReceiveConfirm(receiveTarget.id, receivedBy, onTime, daysLate, qualityIssue)} />}
       {showCompanyProfile && <CompanyProfileModal profile={companyProfile} onClose={()=>setShowCompanyProfile(false)} onSave={setCompanyProfile} />}
 
     </div>
