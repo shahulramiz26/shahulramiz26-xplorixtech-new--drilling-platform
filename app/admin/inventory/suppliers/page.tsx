@@ -679,7 +679,7 @@ export default function SuppliersPage() {
           const perf = calcPerformance(supplier)
           const spend = totalSpend(supplier)
           const sc = statusColors[supplier.status]
-          const projects = [...new Set(supplier.poHistory.map(p => p.project))]
+          const projects = Array.from(new Set(supplier.poHistory.map(p => p.project)))
 
           return (
             <div key={supplier.id}
