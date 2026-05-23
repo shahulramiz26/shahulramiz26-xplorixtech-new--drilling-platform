@@ -220,6 +220,7 @@ const subNav = [
   { href: '/admin/inventory/catalogue',       label: 'Parts Catalogue'  },
   { href: '/admin/inventory/stock',           label: 'Stock Management' },
   { href: '/admin/inventory/purchase-orders', label: 'Purchase Orders'  },
+  { href: '/admin/inventory/suppliers',       label: 'Suppliers'        },
 ]
 
 function SubNav({ active }: { active: string }) {
