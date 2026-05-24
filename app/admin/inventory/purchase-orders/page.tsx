@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import Link from 'next/link'
 import {
   Plus, Search, ChevronDown, X, Check, Truck,
-  FileText, Clock, Package, ChevronRight, AlertCircle, Download, Building2, User
+  FileText, Clock, Package, ChevronRight, AlertCircle, Download, Building2, User, Bell
 } from 'lucide-react'
 import { useCurrency } from '../../../components/currency-context'
 
@@ -356,6 +356,7 @@ function NewPOModal({ onClose, onSave, companyProfile }: { onClose:()=>void; onS
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<POLineItem[]>([{ id:'new1', partNumber:'', partName:'', qtyOrdered:1, qtyReceived:0, unitCost:0, unit:'Each' }])
   const [priceUpdatePrompt, setPriceUpdatePrompt] = useState<{id:string; partNumber:string; oldPrice:number; newPrice:number}|null>(null)
+  const [taxData, setTaxData] = useState({ cgst:0, sgst:0, igst:0, tds:0, freight:0, other:0 })
 
   const addItem = () => setItems(i => [...i, { id:`new${Date.now()}`, partNumber:'', partName:'', qtyOrdered:1, qtyReceived:0, unitCost:0, unit:'Each' }])
   const removeItem = (id: string) => setItems(i => i.filter(x => x.id !== id))
@@ -491,7 +492,7 @@ ${notes ? `<div style="margin-top:20px"><strong>Notes:</strong> ${notes}</div>` 
                     </td>
                     <td style={{ padding:'8px 12px' }}>
                       <select value={item.unit} onChange={e=>setItems(i=>i.map(x=>x.id===item.id?{...x,unit:e.target.value}:x))} style={{...selectS,fontSize:11,padding:'6px 8px',width:80}}>
-                        {['Each','Kg','Litre','Set','Metre','Box','Bucket','Roll','MTR'].map(u=><option key={u}>{u}</option>)}
+                        {['Each','Kg','Litre','Set','Metre','Box','Bucket','Roll','MTR','NOS'].map(u=><option key={u}>{u}</option>)}
                       </select>
                     </td>
                     <td style={{ padding:'8px 12px' }}>
@@ -523,6 +524,9 @@ ${notes ? `<div style="margin-top:20px"><strong>Notes:</strong> ${notes}</div>` 
             </table>
           </div>
         </div>
+
+        {/* Tax & Freight Section — Change 7 */}
+        <TaxSection subtotal={totalValue} onTaxChange={setTaxData} />
 
         {/* Actions */}
         <div style={{ display:'flex', gap:10 }}>
@@ -564,6 +568,141 @@ ${notes ? `<div style="margin-top:20px"><strong>Notes:</strong> ${notes}</div>` 
   )
 }
 
+
+// ── TAX SECTION COMPONENT (Change 7) ─────────────────────────────────────
+interface TaxData { cgst:number; sgst:number; igst:number; tds:number; freight:number; other:number }
+function TaxSection({ subtotal, onTaxChange }: { subtotal:number; onTaxChange:(t:TaxData)=>void }) {
+  const { format } = useCurrency()
+  const [tax, setTax] = useState<TaxData>({ cgst:0, sgst:0, igst:0, tds:0, freight:0, other:0 })
+  const [useIGST, setUseIGST] = useState(false)
+
+  const update = (field:keyof TaxData, val:number) => {
+    const newTax = {...tax, [field]:val}
+    // If IGST is set, clear CGST+SGST and vice versa
+    if (field==='igst' && val>0) { newTax.cgst=0; newTax.sgst=0; setUseIGST(true) }
+    if ((field==='cgst'||field==='sgst') && val>0) { newTax.igst=0; setUseIGST(false) }
+    setTax(newTax)
+    onTaxChange(newTax)
+  }
+
+  const cgstAmt   = (subtotal * tax.cgst) / 100
+  const sgstAmt   = (subtotal * tax.sgst) / 100
+  const igstAmt   = (subtotal * tax.igst) / 100
+  const tdsAmt    = (subtotal * tax.tds)  / 100
+  const totalTax  = cgstAmt + sgstAmt + igstAmt
+  const totalDeductions = tdsAmt
+  const totalWithTax = subtotal + totalTax + tax.freight + tax.other - totalDeductions
+
+  const iStyle2: React.CSSProperties = { width:'100%', padding:'8px 10px', background:'#080B10', border:'1px solid #1E293B', borderRadius:7, color:'#F8FAFC', fontSize:12, outline:'none', textAlign:'right' as any }
+
+  return (
+    <div style={{ border:'1px solid #1E293B', borderRadius:14, overflow:'hidden', marginBottom:20 }}>
+      {/* Header */}
+      <div style={{ padding:'12px 16px', background:'rgba(249,115,22,0.05)', borderBottom:'1px solid #1E293B', display:'flex', alignItems:'center', gap:8 }}>
+        <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC' }}>Tax & Charges</span>
+        <div style={{ marginLeft:'auto', display:'flex', gap:8, alignItems:'center' }}>
+          <span style={{ fontSize:11, color:'#64748B' }}>Inter-state (IGST)?</span>
+          <button onClick={()=>{ setUseIGST(!useIGST); if (!useIGST) update('igst',0); else { update('cgst',0); update('sgst',0) } }}
+            style={{ width:36, height:20, borderRadius:10, cursor:'pointer', border:'none', transition:'all 0.2s', position:'relative',
+              background: useIGST ? '#F97316' : '#1E293B' }}>
+            <div style={{ width:14, height:14, borderRadius:'50%', background:'#fff', position:'absolute', top:3, transition:'all 0.2s', left: useIGST ? 19 : 3 }} />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ padding:'16px' }}>
+        {/* Tax fields */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10, marginBottom:12 }}>
+          {!useIGST ? (
+            <>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:5 }}>CGST %</div>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <input type="number" min={0} max={100} step={0.5} value={tax.cgst} onChange={e=>update('cgst',parseFloat(e.target.value)||0)} style={iStyle2} />
+                  <span style={{ fontSize:12, color:'#10B981', fontWeight:600, whiteSpace:'nowrap' }}>{format(cgstAmt)}</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:5 }}>SGST %</div>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <input type="number" min={0} max={100} step={0.5} value={tax.sgst} onChange={e=>update('sgst',parseFloat(e.target.value)||0)} style={iStyle2} />
+                  <span style={{ fontSize:12, color:'#10B981', fontWeight:600, whiteSpace:'nowrap' }}>{format(sgstAmt)}</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ gridColumn:'1/-1' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:5 }}>IGST %</div>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <input type="number" min={0} max={100} step={0.5} value={tax.igst} onChange={e=>update('igst',parseFloat(e.target.value)||0)} style={iStyle2} />
+                <span style={{ fontSize:12, color:'#10B981', fontWeight:600, whiteSpace:'nowrap' }}>{format(igstAmt)}</span>
+              </div>
+            </div>
+          )}
+          <div>
+            <div style={{ fontSize:10, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:5 }}>TDS % (Deduction)</div>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <input type="number" min={0} max={100} step={0.5} value={tax.tds} onChange={e=>update('tds',parseFloat(e.target.value)||0)} style={iStyle2} />
+              <span style={{ fontSize:12, color:'#EF4444', fontWeight:600, whiteSpace:'nowrap' }}>-{format(tdsAmt)}</span>
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize:10, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:5 }}>Freight / Transport (₹)</div>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <input type="number" min={0} value={tax.freight} onChange={e=>update('freight',parseFloat(e.target.value)||0)} style={iStyle2} />
+              <span style={{ fontSize:12, color:'#F59E0B', fontWeight:600, whiteSpace:'nowrap' }}>{format(tax.freight)}</span>
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize:10, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:5 }}>Other Charges (₹)</div>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <input type="number" min={0} value={tax.other} onChange={e=>update('other',parseFloat(e.target.value)||0)} style={iStyle2} />
+              <span style={{ fontSize:12, color:'#F59E0B', fontWeight:600, whiteSpace:'nowrap' }}>{format(tax.other)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary */}
+        <div style={{ borderTop:'1px solid #1E293B', paddingTop:12 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+            <span style={{ fontSize:12, color:'#64748B' }}>Subtotal (without tax)</span>
+            <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC' }}>{format(subtotal)}</span>
+          </div>
+          {(cgstAmt+sgstAmt+igstAmt) > 0 && (
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+              <span style={{ fontSize:12, color:'#64748B' }}>Total Tax</span>
+              <span style={{ fontSize:13, fontWeight:600, color:'#10B981' }}>+{format(cgstAmt+sgstAmt+igstAmt)}</span>
+            </div>
+          )}
+          {(tax.freight+tax.other) > 0 && (
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+              <span style={{ fontSize:12, color:'#64748B' }}>Freight & Other</span>
+              <span style={{ fontSize:13, fontWeight:600, color:'#F59E0B' }}>+{format(tax.freight+tax.other)}</span>
+            </div>
+          )}
+          {tdsAmt > 0 && (
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+              <span style={{ fontSize:12, color:'#64748B' }}>TDS Deduction</span>
+              <span style={{ fontSize:13, fontWeight:600, color:'#EF4444' }}>-{format(tdsAmt)}</span>
+            </div>
+          )}
+          <div style={{ borderTop:'1px solid #1E293B', paddingTop:10, display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid #1E293B', textAlign:'center' }}>
+              <div style={{ fontSize:10, color:'#64748B', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:4 }}>Without Tax</div>
+              <div style={{ fontSize:16, fontWeight:800, color:'#94A3B8', fontFamily:"'Space Grotesk',sans-serif" }}>{format(subtotal + tax.freight + tax.other)}</div>
+            </div>
+            <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.2)', textAlign:'center' }}>
+              <div style={{ fontSize:10, color:'#F97316', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:4 }}>Total with Tax</div>
+              <div style={{ fontSize:16, fontWeight:800, color:'#F97316', fontFamily:"'Space Grotesk',sans-serif" }}>{format(totalWithTax)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── PART REQUESTS BANNER (shown at top of PO page) ────────────────────────
 // ── PAGE ───────────────────────────────────────────────────────────────────
 export default function PurchaseOrdersPage() {
   const { format } = useCurrency()
@@ -576,6 +715,12 @@ export default function PurchaseOrdersPage() {
   const [receiveTarget, setReceiveTarget] = useState<PurchaseOrder|null>(null)
   const [showCompanyProfile, setShowCompanyProfile] = useState(false)
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(defaultCompanyProfile)
+  // Part requests from Stock Management (Change 6)
+  const pendingRequests = [
+    { id:'1', partName:'NQ Core Bit SR-06', partNumber:'NQ-CB-SR06', qty:4, unit:'NOS', project:'DGMIL-BHK - Bhalukona', rig:'KEM-5', urgency:'Urgent', requestedBy:'Anil Sharma', reason:'Bits worn out', date:'24-05-2026' },
+    { id:'2', partName:'Fuel Water Separator', partNumber:'FLT-FWS-01', qty:6, unit:'NOS', project:'RS-01 - Chhindwara', rig:'KEM-1', urgency:'Normal', requestedBy:'Ravi Kumar', reason:'Monthly replacement', date:'23-05-2026' },
+    { id:'3', partName:'ADDRILL EA-20 KG', partNumber:'ADD-EA-20', qty:60, unit:'Kg', project:'CMPDI-DAM - Bokaro', rig:'KEM-6', urgency:'Critical', requestedBy:'Suresh Patil', reason:'Running low', date:'22-05-2026' },
+  ]
 
   const filtered = pos.filter(po =>
     (filterStatus==='All' || po.status===filterStatus) &&
@@ -651,6 +796,37 @@ ${po.notes ? `<div style="margin-top:10px"><strong>Notes:</strong> ${po.notes}</
             </button>
           )
         })}
+      </div>
+
+      {/* Part Requests Banner — from Stock Management (Change 6) */}
+      <div style={{ padding:'14px 20px', borderRadius:14, background:'rgba(249,115,22,0.05)', border:'1px solid rgba(249,115,22,0.2)' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, marginBottom:12 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <Bell size={16} style={{ color:'#F97316' }} />
+            <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC' }}>3 Part Requests pending — convert to Purchase Order</span>
+          </div>
+          <span style={{ fontSize:11, color:'#64748B' }}>Raised from Stock Management</span>
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {pendingRequests.map((r,i)=>(
+            <div key={r.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid #1E293B' }}>
+              <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:20, whiteSpace:'nowrap',
+                background: r.urgency==='Critical'?'rgba(239,68,68,0.1)':r.urgency==='Urgent'?'rgba(245,158,11,0.1)':'rgba(16,185,129,0.1)',
+                color: r.urgency==='Critical'?'#EF4444':r.urgency==='Urgent'?'#F59E0B':'#10B981',
+                border: `1px solid ${r.urgency==='Critical'?'rgba(239,68,68,0.2)':r.urgency==='Urgent'?'rgba(245,158,11,0.2)':'rgba(16,185,129,0.2)'}`,
+              }}>{r.urgency}</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:600, color:'#F8FAFC' }}>{r.partName} × {r.qty} {r.unit}</div>
+                <div style={{ fontSize:10, color:'#64748B', marginTop:1 }}>Requested by {r.requestedBy} · {r.project.split(' - ')[0]} · {r.rig} · {r.reason}</div>
+              </div>
+              <div style={{ fontSize:10, color:'#64748B', whiteSpace:'nowrap' }}>{r.date}</div>
+              <button onClick={()=>setShowNewPO(true)}
+                style={{ padding:'6px 14px', borderRadius:7, background:'rgba(249,115,22,0.15)', border:'1px solid rgba(249,115,22,0.3)', color:'#F97316', fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>
+                Create PO →
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Filters + Actions */}
