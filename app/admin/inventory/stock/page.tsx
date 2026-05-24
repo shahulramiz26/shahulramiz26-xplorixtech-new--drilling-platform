@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import {
-  Plus, Trash2, Search, ChevronDown, ArrowLeftRight,
-  AlertTriangle, Package, History, X, Check, Upload, FileSpreadsheet, Download
+  Plus, Search, ArrowLeftRight, AlertTriangle,
+  History, X, Check, Upload, Clock, Package,
+  Bell, ChevronDown, Filter
 } from 'lucide-react'
 import { useCurrency } from '../../../components/currency-context'
 
@@ -12,95 +13,118 @@ import { useCurrency } from '../../../components/currency-context'
 interface StockItem {
   id: string; partNumber: string; name: string; category: string
   currentQty: number; reorderLevel: number; unit: string
-  unitCost: number; lastMovement: string; lastMovementType: 'auto' | 'manual' | 'transfer' | 'po'
+  unitCost: number; lastMovement: string; lastMovementType: 'manual' | 'transfer' | 'po'
 }
 interface Movement {
-  id: string; date: string; type: 'in' | 'out' | 'transfer'; part: string
-  qty: number; rig?: string; from?: string; to?: string; note: string; value: number
+  id: string; date: string; type: 'in' | 'out' | 'transfer'
+  part: string; qty: number; rig?: string
+  from?: string; to?: string; note: string; value: number
+  by?: string
+}
+interface TransferItem { id: string; partName: string; partNumber: string; qty: number; unit: string }
+interface PartRequest {
+  id: string; requestedBy: string; partName: string; partNumber: string
+  qty: number; unit: string; project: string; rig: string
+  urgency: 'Normal' | 'Urgent' | 'Critical'; reason: string
+  date: string; status: 'Pending' | 'Converted' | 'Rejected'
 }
 
-// ── PROJECT DATA — Real customer projects ──────────────────────────────────
+// ── DATA ───────────────────────────────────────────────────────────────────
 const projectOptions = [
-  'RS-01 - Chhindwara',
-  'CMP-MAD - Madheri',
-  'CMPDI-DAM - Bokaro',
-  'DGMIL-BHK - Bhalukona',
-  'PAT-CMPDI - Pathakuri',
-  'MECL-HIN - Bazar Gaon',
+  'RS-01 - Chhindwara', 'CMP-MAD - Madheri', 'CMPDI-DAM - Bokaro',
+  'DGMIL-BHK - Bhalukona', 'PAT-CMPDI - Pathakuri', 'MECL-HIN - Bazar Gaon',
+]
+const rigOptions = ['KEM-1','KEM-4','KEM-5','KEM-6','KEM-8','KEM-9']
+const unitOptions = ['Each','Kg','Litre','Set','Metre','Box','Barrel','Gallon','Bucket','Roll','MTR','NOS']
+
+const partsCatalogueList = [
+  { name:'NQ Core Bit SR-06', partNumber:'NQ-CB-SR06', unit:'NOS', unitCost:11500 },
+  { name:'HQ Core Bit SR-08', partNumber:'HQ-CB-SR08', unit:'NOS', unitCost:22000 },
+  { name:'MATEX DD955 Liquid', partNumber:'MTX-DD955', unit:'Bucket', unitCost:12151 },
+  { name:'MATEX Sand Drill', partNumber:'MTX-SD-PPL', unit:'Bucket', unitCost:16886 },
+  { name:'ADDRILL EA-20 KG', partNumber:'ADD-EA-20', unit:'Kg', unitCost:3200 },
+  { name:'ADDRILL PAB 25 KG', partNumber:'ADD-PAB-25', unit:'Kg', unitCost:4375 },
+  { name:'NQ Core Lifter', partNumber:'NQ-CL-001', unit:'NOS', unitCost:400 },
+  { name:'HQ Core Lifter', partNumber:'HQ-CL-001', unit:'NOS', unitCost:646 },
+  { name:'Fuel Water Separator', partNumber:'FLT-FWS-01', unit:'NOS', unitCost:2374 },
+  { name:'Lube Filter B7125', partNumber:'FLT-LB-B71', unit:'NOS', unitCost:1990 },
+  { name:'Air Filter Primary', partNumber:'FLT-AIR-P', unit:'NOS', unitCost:5000 },
+  { name:'Bearing 61830 MA SKF', partNumber:'BRG-SKF-61830', unit:'NOS', unitCost:41074 },
+  { name:'V-Packing W/S 25K', partNumber:'SEL-VP-25K', unit:'NOS', unitCost:780 },
+  { name:'TCZ-50 Grease 25 KG', partNumber:'LUB-TCZ50', unit:'Kg', unitCost:12500 },
+  { name:'NQ Reaming Shell Spiral', partNumber:'NQ-RS-SPR', unit:'NOS', unitCost:13455 },
 ]
 
-const rigOptions = ['All Rigs', 'KEM-1', 'KEM-4', 'KEM-5', 'KEM-6', 'KEM-8', 'KEM-9']
-
-// Real stock data for RS-01 Chhindwara (from April 2026 Excel)
 const projectStockData: Record<string, StockItem[]> = {
   'RS-01 - Chhindwara': [
-    { id:'1',  partNumber:'NQ-CB-SR06',  name:'NQ Core Bit SR-06',         category:'Core Bits',                   currentQty:8,   reorderLevel:10, unit:'Each',   unitCost:11500, lastMovement:'2026-04-30', lastMovementType:'auto'   },
-    { id:'2',  partNumber:'HQ-CB-SR08',  name:'HQ Core Bit SR-08',         category:'Core Bits',                   currentQty:12,  reorderLevel:8,  unit:'Each',   unitCost:22000, lastMovement:'2026-04-29', lastMovementType:'po'     },
-    { id:'3',  partNumber:'MTX-DD955',   name:'MATEX DD955 Liquid',        category:'Drilling Fluids & Chemicals', currentQty:18,  reorderLevel:15, unit:'Bucket', unitCost:12151, lastMovement:'2026-04-30', lastMovementType:'auto'   },
-    { id:'4',  partNumber:'MTX-SD-PPL',  name:'MATEX Sand Drill Poly Pail',category:'Drilling Fluids & Chemicals', currentQty:14,  reorderLevel:15, unit:'Bucket', unitCost:16886, lastMovement:'2026-04-30', lastMovementType:'auto'   },
-    { id:'5',  partNumber:'ADD-EA-20',   name:'ADDRILL EA-20 KG',          category:'Drilling Fluids & Chemicals', currentQty:22,  reorderLevel:20, unit:'Kg',     unitCost:3200,  lastMovement:'2026-04-30', lastMovementType:'auto'   },
-    { id:'6',  partNumber:'ADD-PAB-25',  name:'ADDRILL PAB 25 KG',         category:'Drilling Fluids & Chemicals', currentQty:18,  reorderLevel:20, unit:'Kg',     unitCost:4375,  lastMovement:'2026-04-28', lastMovementType:'auto'   },
-    { id:'7',  partNumber:'FLT-FWS-01',  name:'Fuel Water Separator',      category:'Filtration',                  currentQty:3,   reorderLevel:12, unit:'Each',   unitCost:2374,  lastMovement:'2026-04-25', lastMovementType:'manual' },
-    { id:'8',  partNumber:'FLT-LB-B71',  name:'Lube Filter B7125',         category:'Filtration',                  currentQty:2,   reorderLevel:8,  unit:'Each',   unitCost:1990,  lastMovement:'2026-04-24', lastMovementType:'manual' },
-    { id:'9',  partNumber:'FLT-AIR-P',   name:'Air Filter Primary',        category:'Filtration',                  currentQty:4,   reorderLevel:6,  unit:'Each',   unitCost:5000,  lastMovement:'2026-04-27', lastMovementType:'manual' },
-    { id:'10', partNumber:'NQ-CL-001',   name:'NQ Core Lifter',            category:'Core Barrel Assembly',        currentQty:28,  reorderLevel:20, unit:'Each',   unitCost:400,   lastMovement:'2026-04-30', lastMovementType:'auto'   },
-    { id:'11', partNumber:'HQ-CL-001',   name:'HQ Core Lifter',            category:'Core Barrel Assembly',        currentQty:14,  reorderLevel:15, unit:'Each',   unitCost:646,   lastMovement:'2026-04-30', lastMovementType:'auto'   },
-    { id:'12', partNumber:'NQ-RS-SPR',   name:'NQ Reaming Shell Spiral',   category:'Reaming Shells',              currentQty:6,   reorderLevel:4,  unit:'Each',   unitCost:13455, lastMovement:'2026-04-23', lastMovementType:'auto'   },
-    { id:'13', partNumber:'SEL-VP-25K',  name:'V-Packing W/S 25K',        category:'Seals & Packings',            currentQty:15,  reorderLevel:10, unit:'Each',   unitCost:780,   lastMovement:'2026-04-22', lastMovementType:'manual' },
-    { id:'14', partNumber:'BRG-SKF-61830',name:'Bearing 61830 MA SKF',     category:'Bearings & Seals',            currentQty:1,   reorderLevel:2,  unit:'Each',   unitCost:41074, lastMovement:'2026-04-28', lastMovementType:'manual' },
-    { id:'15', partNumber:'LUB-TCZ50',   name:'TCZ-50 Grease 25 KG',      category:'Lubricants & Greases',        currentQty:3,   reorderLevel:4,  unit:'Kg',     unitCost:12500, lastMovement:'2026-04-20', lastMovementType:'manual' },
+    { id:'1', partNumber:'NQ-CB-SR06', name:'NQ Core Bit SR-06', category:'Core Bits', currentQty:6, reorderLevel:10, unit:'NOS', unitCost:11500, lastMovement:'2026-05-24', lastMovementType:'manual' },
+    { id:'2', partNumber:'HQ-CB-SR08', name:'HQ Core Bit SR-08', category:'Core Bits', currentQty:12, reorderLevel:8, unit:'NOS', unitCost:22000, lastMovement:'2026-04-29', lastMovementType:'po' },
+    { id:'3', partNumber:'MTX-DD955', name:'MATEX DD955 Liquid', category:'Drilling Fluids & Chemicals', currentQty:18, reorderLevel:15, unit:'Bucket', unitCost:12151, lastMovement:'2026-04-30', lastMovementType:'manual' },
+    { id:'4', partNumber:'MTX-SD-PPL', name:'MATEX Sand Drill', category:'Drilling Fluids & Chemicals', currentQty:14, reorderLevel:15, unit:'Bucket', unitCost:16886, lastMovement:'2026-04-30', lastMovementType:'manual' },
+    { id:'5', partNumber:'ADD-EA-20', name:'ADDRILL EA-20 KG', category:'Drilling Fluids & Chemicals', currentQty:22, reorderLevel:20, unit:'Kg', unitCost:3200, lastMovement:'2026-04-30', lastMovementType:'manual' },
+    { id:'6', partNumber:'ADD-PAB-25', name:'ADDRILL PAB 25 KG', category:'Drilling Fluids & Chemicals', currentQty:18, reorderLevel:20, unit:'Kg', unitCost:4375, lastMovement:'2026-04-28', lastMovementType:'manual' },
+    { id:'7', partNumber:'FLT-FWS-01', name:'Fuel Water Separator', category:'Filtration', currentQty:3, reorderLevel:12, unit:'NOS', unitCost:2374, lastMovement:'2026-04-25', lastMovementType:'manual' },
+    { id:'8', partNumber:'FLT-LB-B71', name:'Lube Filter B7125', category:'Filtration', currentQty:2, reorderLevel:8, unit:'NOS', unitCost:1990, lastMovement:'2026-04-24', lastMovementType:'manual' },
+    { id:'9', partNumber:'FLT-AIR-P', name:'Air Filter Primary', category:'Filtration', currentQty:4, reorderLevel:6, unit:'NOS', unitCost:5000, lastMovement:'2026-04-27', lastMovementType:'manual' },
+    { id:'10', partNumber:'NQ-CL-001', name:'NQ Core Lifter', category:'Core Barrel Assembly', currentQty:28, reorderLevel:20, unit:'NOS', unitCost:400, lastMovement:'2026-04-30', lastMovementType:'manual' },
+    { id:'11', partNumber:'HQ-CL-001', name:'HQ Core Lifter', category:'Core Barrel Assembly', currentQty:14, reorderLevel:15, unit:'NOS', unitCost:646, lastMovement:'2026-04-30', lastMovementType:'manual' },
+    { id:'12', partNumber:'NQ-RS-SPR', name:'NQ Reaming Shell Spiral', category:'Reaming Shells', currentQty:6, reorderLevel:4, unit:'NOS', unitCost:13455, lastMovement:'2026-04-23', lastMovementType:'manual' },
+    { id:'13', partNumber:'SEL-VP-25K', name:'V-Packing W/S 25K', category:'Seals & Packings', currentQty:15, reorderLevel:10, unit:'NOS', unitCost:780, lastMovement:'2026-04-22', lastMovementType:'manual' },
+    { id:'14', partNumber:'BRG-SKF-61830', name:'Bearing 61830 MA SKF', category:'Bearings & Seals', currentQty:1, reorderLevel:2, unit:'NOS', unitCost:41074, lastMovement:'2026-04-28', lastMovementType:'manual' },
+    { id:'15', partNumber:'LUB-TCZ50', name:'TCZ-50 Grease 25 KG', category:'Lubricants & Greases', currentQty:3, reorderLevel:4, unit:'Kg', unitCost:12500, lastMovement:'2026-04-20', lastMovementType:'manual' },
   ],
   'CMP-MAD - Madheri': [
-    { id:'16', partNumber:'NQ-CB-SR06',  name:'NQ Core Bit SR-06',         category:'Core Bits',                   currentQty:14,  reorderLevel:10, unit:'Each',   unitCost:11500, lastMovement:'2026-04-29', lastMovementType:'auto'   },
-    { id:'17', partNumber:'MTX-DD955',   name:'MATEX DD955 Liquid',        category:'Drilling Fluids & Chemicals', currentQty:20,  reorderLevel:15, unit:'Bucket', unitCost:12151, lastMovement:'2026-04-30', lastMovementType:'auto'   },
-    { id:'18', partNumber:'FLT-AIR-P',   name:'Air Filter Primary',        category:'Filtration',                  currentQty:1,   reorderLevel:6,  unit:'Each',   unitCost:5000,  lastMovement:'2026-04-20', lastMovementType:'manual' },
-    { id:'19', partNumber:'ADD-PAB-25',  name:'ADDRILL PAB 25 KG',         category:'Drilling Fluids & Chemicals', currentQty:18,  reorderLevel:20, unit:'Kg',     unitCost:4375,  lastMovement:'2026-04-28', lastMovementType:'auto'   },
+    { id:'16', partNumber:'NQ-CB-SR06', name:'NQ Core Bit SR-06', category:'Core Bits', currentQty:14, reorderLevel:10, unit:'NOS', unitCost:11500, lastMovement:'2026-04-29', lastMovementType:'manual' },
+    { id:'17', partNumber:'MTX-DD955', name:'MATEX DD955 Liquid', category:'Drilling Fluids & Chemicals', currentQty:20, reorderLevel:15, unit:'Bucket', unitCost:12151, lastMovement:'2026-04-30', lastMovementType:'manual' },
+    { id:'18', partNumber:'FLT-AIR-P', name:'Air Filter Primary', category:'Filtration', currentQty:1, reorderLevel:6, unit:'NOS', unitCost:5000, lastMovement:'2026-04-20', lastMovementType:'manual' },
+    { id:'19', partNumber:'ADD-PAB-25', name:'ADDRILL PAB 25 KG', category:'Drilling Fluids & Chemicals', currentQty:18, reorderLevel:20, unit:'Kg', unitCost:4375, lastMovement:'2026-04-28', lastMovementType:'manual' },
   ],
   'CMPDI-DAM - Bokaro': [
-    { id:'20', partNumber:'NQ-CB-SR06',  name:'NQ Core Bit SR-06',         category:'Core Bits',                   currentQty:2,   reorderLevel:10, unit:'Each',   unitCost:11500, lastMovement:'2026-04-27', lastMovementType:'transfer'},
-    { id:'21', partNumber:'HQ-CL-001',   name:'HQ Core Lifter',            category:'Core Barrel Assembly',        currentQty:4,   reorderLevel:10, unit:'Each',   unitCost:646,   lastMovement:'2026-04-26', lastMovementType:'auto'   },
-    { id:'22', partNumber:'MTX-DD955',   name:'MATEX DD955 Liquid',        category:'Drilling Fluids & Chemicals', currentQty:5,   reorderLevel:15, unit:'Bucket', unitCost:12151, lastMovement:'2026-04-28', lastMovementType:'auto'   },
-    { id:'23', partNumber:'FLT-FWS-01',  name:'Fuel Water Separator',      category:'Filtration',                  currentQty:3,   reorderLevel:12, unit:'Each',   unitCost:2374,  lastMovement:'2026-04-25', lastMovementType:'manual' },
+    { id:'20', partNumber:'NQ-CB-SR06', name:'NQ Core Bit SR-06', category:'Core Bits', currentQty:2, reorderLevel:10, unit:'NOS', unitCost:11500, lastMovement:'2026-04-27', lastMovementType:'transfer' },
+    { id:'21', partNumber:'HQ-CL-001', name:'HQ Core Lifter', category:'Core Barrel Assembly', currentQty:4, reorderLevel:10, unit:'NOS', unitCost:646, lastMovement:'2026-04-26', lastMovementType:'manual' },
+    { id:'22', partNumber:'MTX-DD955', name:'MATEX DD955 Liquid', category:'Drilling Fluids & Chemicals', currentQty:5, reorderLevel:15, unit:'Bucket', unitCost:12151, lastMovement:'2026-04-28', lastMovementType:'manual' },
   ],
   'DGMIL-BHK - Bhalukona': [
-    { id:'24', partNumber:'NQ-CB-SR06',  name:'NQ Core Bit SR-06',         category:'Core Bits',                   currentQty:10,  reorderLevel:10, unit:'Each',   unitCost:11500, lastMovement:'2026-04-29', lastMovementType:'transfer'},
-    { id:'25', partNumber:'MTX-SD-PPL',  name:'MATEX Sand Drill Poly Pail',category:'Drilling Fluids & Chemicals', currentQty:5,   reorderLevel:15, unit:'Bucket', unitCost:16886, lastMovement:'2026-04-27', lastMovementType:'auto'   },
-    { id:'26', partNumber:'ADD-EA-20',   name:'ADDRILL EA-20 KG',          category:'Drilling Fluids & Chemicals', currentQty:24,  reorderLevel:20, unit:'Kg',     unitCost:3200,  lastMovement:'2026-04-30', lastMovementType:'auto'   },
+    { id:'24', partNumber:'NQ-CB-SR06', name:'NQ Core Bit SR-06', category:'Core Bits', currentQty:10, reorderLevel:10, unit:'NOS', unitCost:11500, lastMovement:'2026-04-29', lastMovementType:'transfer' },
+    { id:'25', partNumber:'MTX-SD-PPL', name:'MATEX Sand Drill', category:'Drilling Fluids & Chemicals', currentQty:5, reorderLevel:15, unit:'Bucket', unitCost:16886, lastMovement:'2026-04-27', lastMovementType:'manual' },
+    { id:'26', partNumber:'ADD-EA-20', name:'ADDRILL EA-20 KG', category:'Drilling Fluids & Chemicals', currentQty:24, reorderLevel:20, unit:'Kg', unitCost:3200, lastMovement:'2026-04-30', lastMovementType:'manual' },
   ],
   'PAT-CMPDI - Pathakuri': [
-    { id:'27', partNumber:'NQ-CB-SR06',  name:'NQ Core Bit SR-06',         category:'Core Bits',                   currentQty:12,  reorderLevel:10, unit:'Each',   unitCost:11500, lastMovement:'2026-04-28', lastMovementType:'auto'   },
-    { id:'28', partNumber:'MTX-DD955',   name:'MATEX DD955 Liquid',        category:'Drilling Fluids & Chemicals', currentQty:16,  reorderLevel:15, unit:'Bucket', unitCost:12151, lastMovement:'2026-04-30', lastMovementType:'auto'   },
+    { id:'27', partNumber:'NQ-CB-SR06', name:'NQ Core Bit SR-06', category:'Core Bits', currentQty:12, reorderLevel:10, unit:'NOS', unitCost:11500, lastMovement:'2026-04-28', lastMovementType:'manual' },
+    { id:'28', partNumber:'MTX-DD955', name:'MATEX DD955 Liquid', category:'Drilling Fluids & Chemicals', currentQty:16, reorderLevel:15, unit:'Bucket', unitCost:12151, lastMovement:'2026-04-30', lastMovementType:'manual' },
   ],
   'MECL-HIN - Bazar Gaon': [
-    { id:'29', partNumber:'NQ-CB-SR06',  name:'NQ Core Bit SR-06',         category:'Core Bits',                   currentQty:8,   reorderLevel:10, unit:'Each',   unitCost:11500, lastMovement:'2026-04-28', lastMovementType:'auto'   },
-    { id:'30', partNumber:'MTX-DD955',   name:'MATEX DD955 Liquid',        category:'Drilling Fluids & Chemicals', currentQty:10,  reorderLevel:15, unit:'Bucket', unitCost:12151, lastMovement:'2026-04-29', lastMovementType:'auto'   },
-    { id:'31', partNumber:'SEL-CUP-001', name:'Cup Plunger',               category:'Seals & Packings',            currentQty:2,   reorderLevel:2,  unit:'Each',   unitCost:6918,  lastMovement:'2026-04-30', lastMovementType:'transfer'},
+    { id:'29', partNumber:'NQ-CB-SR06', name:'NQ Core Bit SR-06', category:'Core Bits', currentQty:8, reorderLevel:10, unit:'NOS', unitCost:11500, lastMovement:'2026-04-28', lastMovementType:'manual' },
+    { id:'30', partNumber:'MTX-DD955', name:'MATEX DD955 Liquid', category:'Drilling Fluids & Chemicals', currentQty:10, reorderLevel:15, unit:'Bucket', unitCost:12151, lastMovement:'2026-04-29', lastMovementType:'manual' },
   ],
 }
 
-const recentMovements: Movement[] = [
-  { id:'1', date:'30 Apr 2026', type:'out',      part:'MATEX DD955',          qty:1,  rig:'KEM-9',   note:'Drill log auto-deduct',    value:12151  },
-  { id:'2', date:'30 Apr 2026', type:'out',      part:'NQ Core Lifter',       qty:2,  rig:'KEM-8',   note:'Drill log auto-deduct',    value:800    },
-  { id:'3', date:'29 Apr 2026', type:'in',       part:'HQ Core Bit SR-08',    qty:8,  note:'PO #56/2627 received — IDP', value:176000 },
-  { id:'4', date:'29 Apr 2026', type:'out',      part:'ADDRILL EA-20 KG',     qty:1,  rig:'KEM-1',   note:'Drill log auto-deduct',    value:3200   },
-  { id:'5', date:'18 Apr 2026', type:'transfer', part:'MATEX DD955 x 6 Buckets', qty:6, from:'RS-01', to:'DGMIL-BHK', note:'Project transfer', value:72906 },
-  { id:'6', date:'18 Apr 2026', type:'transfer', part:'NQ L/H Recover Tape',  qty:1,  from:'RS-01', to:'CMPDI-DAM', note:'Transfer', value:10500 },
-  { id:'7', date:'09 Apr 2026', type:'out',      part:'Top Cover Oil Seal SKF',qty:4, rig:'KEM-9',   note:'Manual issue — maintenance', value:31785 },
-  { id:'8', date:'06 Apr 2026', type:'in',       part:'MATEX DD955 x 10 Buckets',qty:10, note:'PO WFS-NGP-2118 received — Westfields', value:121510 },
+const seedMovements: Movement[] = [
+  { id:'1', date:'24 May 2026', type:'out', part:'NQ Core Bit SR-06', qty:2, rig:'KEM-9', note:'Manual issue to rig', value:23000, by:'Rajesh Kumar' },
+  { id:'2', date:'30 Apr 2026', type:'out', part:'NQ Core Lifter', qty:2, rig:'KEM-8', note:'Manual issue to rig', value:800, by:'Suresh Singh' },
+  { id:'3', date:'29 Apr 2026', type:'in', part:'HQ Core Bit SR-08', qty:8, note:'PO #56/2627 received — IDP', value:176000, by:'Rajesh Kumar' },
+  { id:'4', date:'18 Apr 2026', type:'transfer', part:'MATEX DD955 x 6 Buckets', qty:6, from:'RS-01', to:'DGMIL-BHK', note:'Project transfer', value:72906, by:'Suresh Singh' },
+  { id:'5', date:'09 Apr 2026', type:'out', part:'Top Cover Oil Seal SKF', qty:4, rig:'KEM-9', note:'Manual issue — maintenance', value:31785, by:'Mohan Verma' },
+  { id:'6', date:'06 Apr 2026', type:'in', part:'MATEX DD955 x 10 Buckets', qty:10, note:'PO WFS-NGP-2118 received', value:121510, by:'Rajesh Kumar' },
 ]
 
-// ── SUB-NAV ────────────────────────────────────────────────────────────────
+const seedRequests: PartRequest[] = [
+  { id:'1', requestedBy:'Anil Sharma', partName:'NQ Core Bit SR-06', partNumber:'NQ-CB-SR06', qty:4, unit:'NOS', project:'DGMIL-BHK - Bhalukona', rig:'KEM-5', urgency:'Urgent', reason:'Bits worn out, need replacement', date:'24-05-2026', status:'Pending' },
+  { id:'2', requestedBy:'Ravi Kumar', partName:'Fuel Water Separator', partNumber:'FLT-FWS-01', qty:6, unit:'NOS', project:'RS-01 - Chhindwara', rig:'KEM-1', urgency:'Normal', reason:'Monthly replacement due', date:'23-05-2026', status:'Pending' },
+  { id:'3', requestedBy:'Suresh Patil', partName:'MATEX DD955 Liquid', partNumber:'MTX-DD955', qty:5, unit:'Bucket', project:'CMP-MAD - Madheri', rig:'KEM-4', urgency:'Critical', reason:'Running out of drilling fluid', date:'22-05-2026', status:'Converted' },
+]
+
+// ── SUBNAV ──────────────────────────────────────────────────────────────────
 const subNav = [
-  { href:'/admin/inventory',                 label:'Dashboard'        },
-  { href:'/admin/inventory/catalogue',       label:'Parts Catalogue'  },
-  { href:'/admin/inventory/stock',           label:'Stock Management' },
-  { href:'/admin/inventory/purchase-orders', label:'Purchase Orders'  },
-  { href:'/admin/inventory/suppliers',       label:'Suppliers'        },
+  { href:'/admin/inventory', label:'Dashboard' },
+  { href:'/admin/inventory/catalogue', label:'Parts Catalogue' },
+  { href:'/admin/inventory/stock', label:'Stock Management' },
+  { href:'/admin/inventory/purchase-orders', label:'Purchase Orders' },
+  { href:'/admin/inventory/suppliers', label:'Suppliers' },
 ]
-
 function SubNav({ active }: { active: string }) {
   return (
-    <div style={{ display:'flex', gap:4, background:'#080B10', border:'1px solid #1E293B', borderRadius:12, padding:4 }}>
+    <div style={{ display:'flex', gap:4, background:'#080B10', border:'1px solid #1E293B', borderRadius:12, padding:4, flexWrap:'wrap' }}>
       {subNav.map(n => (
         <Link key={n.href} href={n.href} style={{ padding:'7px 16px', borderRadius:9, fontSize:13, fontWeight:600, textDecoration:'none', transition:'all 0.2s', background:active===n.label?'#F97316':'transparent', color:active===n.label?'#fff':'#94A3B8' }}>{n.label}</Link>
       ))}
@@ -108,27 +132,31 @@ function SubNav({ active }: { active: string }) {
   )
 }
 
-// ── ISSUE MODAL ────────────────────────────────────────────────────────────
-function IssueModal({ part, onClose, onIssue }: { part: StockItem; onClose: ()=>void; onIssue:(qty:number,rig:string,note:string)=>void }) {
+const iStyle: React.CSSProperties = { width:'100%', padding:'10px 12px', background:'#080B10', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none', fontFamily:'inherit' }
+const selStyle: React.CSSProperties = { ...iStyle, cursor:'pointer', appearance:'none' as any }
+
+// ── ISSUE MODAL ─────────────────────────────────────────────────────────────
+function IssueModal({ part, project, onClose, onIssue }: { part: StockItem; project: string; onClose:()=>void; onIssue:(qty:number,rig:string,note:string)=>void }) {
   const [qty, setQty] = useState(1)
-  const [rig, setRig] = useState('KEM-1')
+  const [rig, setRig] = useState(rigOptions[0])
   const [note, setNote] = useState('')
-  const iStyle: React.CSSProperties = { width:'100%', padding:'10px 12px', background:'#080B10', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none' }
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', backdropFilter:'blur(8px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:20, padding:28, width:420 }}>
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:20, padding:28, width:440 }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
           <div style={{ fontSize:16, fontWeight:700, color:'#F8FAFC' }}>Manual Issue to Rig</div>
           <button onClick={onClose} style={{ padding:6, borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#64748B', cursor:'pointer' }}><X size={14} /></button>
         </div>
-        <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(59,130,246,0.05)', border:'1px solid rgba(59,130,246,0.15)', marginBottom:16 }}>
-          <div style={{ fontSize:11, color:'#60A5FA', fontWeight:600 }}>ℹ️ For drilling consumables (bits, fluids), stock auto-deducts from drill log. Use this for maintenance parts only.</div>
+        {/* Project — read only (Change 1) */}
+        <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(249,115,22,0.06)', border:'1px solid rgba(249,115,22,0.15)', marginBottom:16, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <span style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em' }}>Project</span>
+          <span style={{ fontSize:13, fontWeight:700, color:'#F97316' }}>{project.split(' - ')[0]} — {project.split(' - ')[1]}</span>
         </div>
         <div style={{ fontSize:13, fontWeight:600, color:'#F97316', marginBottom:16 }}>{part.name}</div>
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           {[
             { label:'Quantity', content: <input type="number" min={1} max={part.currentQty} value={qty} onChange={e=>setQty(parseInt(e.target.value)||1)} style={iStyle} /> },
-            { label:'Rig', content: <select value={rig} onChange={e=>setRig(e.target.value)} style={{...iStyle, cursor:'pointer', appearance:'none' as any}}>{rigOptions.filter(r=>r!=='All Rigs').map(r=><option key={r}>{r}</option>)}</select> },
+            { label:'Rig', content: <select value={rig} onChange={e=>setRig(e.target.value)} style={selStyle}>{rigOptions.map(r=><option key={r}>{r}</option>)}</select> },
             { label:'Note (Reason)', content: <input value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. Bearing replacement KEM-4..." style={iStyle} /> },
           ].map((f,i)=>(
             <div key={i}>
@@ -146,102 +174,197 @@ function IssueModal({ part, onClose, onIssue }: { part: StockItem; onClose: ()=>
   )
 }
 
-// ── OPENING BALANCE MODAL ──────────────────────────────────────────────────
-function OpeningBalanceModal({ project, onClose }: { project: string; onClose: ()=>void }) {
-  const [mode, setMode] = useState<'manual'|'excel'|null>(null)
-  const fileRef = useState<HTMLInputElement|null>(null)
+// ── TRANSFER MODAL (Change 3 + 4) ───────────────────────────────────────────
+function TransferModal({ onClose, onConfirm, stockData }: { onClose:()=>void; onConfirm:(from:string,to:string,items:TransferItem[],by:string,reason:string)=>void; stockData: Record<string,StockItem[]> }) {
+  const [from, setFrom] = useState(projectOptions[0])
+  const [to, setTo] = useState(projectOptions[1])
+  const [transferredBy, setTransferredBy] = useState('')
+  const [reason, setReason] = useState('')
+  const [items, setItems] = useState<TransferItem[]>([{ id:'t1', partName:'', partNumber:'', qty:1, unit:'NOS' }])
+  const [partSearch, setPartSearch] = useState<Record<string,string>>({})
+  const [showSuggestions, setShowSuggestions] = useState<Record<string,boolean>>({})
+  const [error, setError] = useState('')
+
+  const addItem = () => setItems(i=>[...i,{ id:`t${Date.now()}`, partName:'', partNumber:'', qty:1, unit:'NOS' }])
+  const removeItem = (id:string) => setItems(i=>i.filter(x=>x.id!==id))
+  const updateItem = (id:string, field:keyof TransferItem, val:any) => setItems(i=>i.map(x=>x.id===id?{...x,[field]:val}:x))
+
+  const handlePartSelect = (id:string, part:typeof partsCatalogueList[0]) => {
+    setItems(i=>i.map(x=>x.id===id?{...x,partName:part.name,partNumber:part.partNumber,unit:part.unit}:x))
+    setPartSearch(p=>({...p,[id]:part.name}))
+    setShowSuggestions(s=>({...s,[id]:false}))
+  }
+
+  const handleConfirm = () => {
+    if (!transferredBy.trim()) { setError('Please enter the name of person doing the transfer'); return }
+    if (from === to) { setError('From and To projects cannot be the same'); return }
+    if (items.some(i=>!i.partName || i.qty < 1)) { setError('Please fill in all part details'); return }
+    onConfirm(from, to, items, transferredBy, reason)
+    onClose()
+  }
+
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(10px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-      <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:20, padding:32, width:520 }}>
+      <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:20, padding:28, width:640, maxHeight:'90vh', overflowY:'auto' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
+          <div style={{ fontSize:18, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>Transfer Stock Between Projects</div>
+          <button onClick={onClose} style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#64748B', cursor:'pointer' }}><X size={16} /></button>
+        </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:16 }}>
+          {[
+            { label:'From Project', val:from, set:setFrom },
+            { label:'To Project', val:to, set:setTo },
+          ].map((f,i)=>(
+            <div key={i}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>{f.label}</div>
+              <select value={f.val} onChange={e=>f.set(e.target.value)} style={selStyle}>
+                {projectOptions.map(p=><option key={p}>{p}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+
+        {/* Transferred By */}
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Transferred By *</div>
+          <input value={transferredBy} onChange={e=>setTransferredBy(e.target.value)} placeholder="Enter your full name..." style={iStyle} />
+        </div>
+
+        {/* Line Items */}
+        <div style={{ marginBottom:16 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'#F8FAFC' }}>Parts to Transfer</div>
+            <button onClick={addItem} style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:7, background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)', color:'#F97316', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+              <Plus size={12} /> Add Part
+            </button>
+          </div>
+          <div style={{ border:'1px solid #1E293B', borderRadius:12, overflow:'hidden' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+              <thead>
+                <tr style={{ background:'rgba(255,255,255,0.02)', borderBottom:'1px solid #1E293B' }}>
+                  {['Part Name','Part No','Unit','Qty',''].map(h=>(
+                    <th key={h} style={{ padding:'9px 12px', textAlign:'left', fontSize:10, color:'#64748B', fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item)=>(
+                  <tr key={item.id} style={{ borderBottom:'1px solid rgba(30,41,59,0.5)' }}>
+                    <td style={{ padding:'8px 10px', position:'relative' }}>
+                      <input
+                        value={partSearch[item.id] ?? item.partName}
+                        onChange={e=>{
+                          setPartSearch(p=>({...p,[item.id]:e.target.value}))
+                          setShowSuggestions(s=>({...s,[item.id]:true}))
+                          updateItem(item.id,'partName',e.target.value)
+                        }}
+                        placeholder="Search part name..."
+                        style={{...iStyle,fontSize:11,padding:'6px 8px',minWidth:160}}
+                      />
+                      {showSuggestions[item.id] && partSearch[item.id] && (
+                        <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:100, background:'#0D1117', border:'1px solid #1E293B', borderRadius:8, maxHeight:160, overflowY:'auto' }}>
+                          {partsCatalogueList.filter(p=>p.name.toLowerCase().includes((partSearch[item.id]||'').toLowerCase())).map(p=>(
+                            <div key={p.partNumber} onClick={()=>handlePartSelect(item.id,p)}
+                              style={{ padding:'8px 12px', cursor:'pointer', fontSize:12, color:'#F8FAFC', borderBottom:'1px solid rgba(30,41,59,0.4)' }}
+                              onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(249,115,22,0.08)'}
+                              onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                              <div style={{ fontWeight:600 }}>{p.name}</div>
+                              <div style={{ fontSize:10, color:'#64748B' }}>{p.partNumber}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding:'8px 10px' }}><span style={{ fontSize:11, color:'#64748B', fontFamily:'monospace' }}>{item.partNumber || '—'}</span></td>
+                    <td style={{ padding:'8px 10px' }}>
+                      <select value={item.unit} onChange={e=>updateItem(item.id,'unit',e.target.value)} style={{...selStyle,fontSize:11,padding:'5px 8px',width:70}}>
+                        {unitOptions.map(u=><option key={u}>{u}</option>)}
+                      </select>
+                    </td>
+                    <td style={{ padding:'8px 10px' }}>
+                      <input type="number" min={1} value={item.qty} onChange={e=>updateItem(item.id,'qty',parseInt(e.target.value)||1)} style={{...iStyle,fontSize:11,padding:'6px 8px',width:60,textAlign:'center'}} />
+                    </td>
+                    <td style={{ padding:'8px 10px' }}>
+                      {items.length > 1 && <button onClick={()=>removeItem(item.id)} style={{ padding:4, borderRadius:5, background:'rgba(239,68,68,0.05)', border:'none', color:'rgba(239,68,68,0.5)', cursor:'pointer' }}><X size={12} /></button>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Reason for Transfer</div>
+          <input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Reason for transfer..." style={iStyle} />
+        </div>
+
+        {error && <div style={{ fontSize:11, color:'#EF4444', marginBottom:12, padding:'8px 12px', background:'rgba(239,68,68,0.05)', borderRadius:8, border:'1px solid rgba(239,68,68,0.15)' }}>{error}</div>}
+
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={onClose} style={{ flex:1, padding:'12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:13, fontWeight:600, cursor:'pointer' }}>Cancel</button>
+          <button onClick={handleConfirm} style={{ flex:1, padding:'12px', borderRadius:10, background:'linear-gradient(135deg,#8B5CF6,#7C3AED)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none' }}>
+            Confirm Transfer
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── TRANSFER HISTORY MODAL (Change 5) ───────────────────────────────────────
+function TransferHistoryModal({ project, movements, onClose }: { project:string; movements:Movement[]; onClose:()=>void }) {
+  const [filter, setFilter] = useState<'all'|'in'|'out'>('all')
+  const transfers = movements.filter(m => m.type === 'transfer')
+  const projectName = project.split(' - ')[0]
+  const filtered = transfers.filter(m => {
+    if (filter === 'in') return m.to?.includes(projectName)
+    if (filter === 'out') return m.from?.includes(projectName)
+    return true
+  })
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(10px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:20, padding:28, width:680, maxHeight:'85vh', overflowY:'auto' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
           <div>
-            <div style={{ fontSize:18, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>Set Opening Balance</div>
+            <div style={{ fontSize:18, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>Transfer History</div>
             <div style={{ fontSize:12, color:'#64748B', marginTop:2 }}>{project}</div>
           </div>
           <button onClick={onClose} style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#64748B', cursor:'pointer' }}><X size={16} /></button>
         </div>
-
-        <div style={{ padding:'12px 16px', borderRadius:10, background:'rgba(249,115,22,0.05)', border:'1px solid rgba(249,115,22,0.15)', marginBottom:24 }}>
-          <div style={{ fontSize:12, color:'#F97316', fontWeight:600 }}>📋 One-time setup per project</div>
-          <div style={{ fontSize:11, color:'#94A3B8', marginTop:4 }}>After opening balance is entered, all future stock movements are tracked automatically by Xplorix.</div>
+        <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+          {(['all','in','out'] as const).map(f=>(
+            <button key={f} onClick={()=>setFilter(f)}
+              style={{ padding:'7px 16px', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer',
+                background: filter===f ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${filter===f ? 'rgba(139,92,246,0.3)' : '#1E293B'}`,
+                color: filter===f ? '#8B5CF6' : '#64748B',
+              }}>
+              {f==='all'?'All Transfers':f==='in'?'Transfers IN ↓':'Transfers OUT ↑'}
+            </button>
+          ))}
         </div>
-
-        {!mode && (
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-            <button onClick={()=>setMode('manual')}
-              style={{ padding:'20px 16px', borderRadius:14, background:'rgba(59,130,246,0.08)', border:'2px solid rgba(59,130,246,0.2)', cursor:'pointer', textAlign:'left', transition:'all 0.2s' }}
-              onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor='rgba(59,130,246,0.5)';(e.currentTarget as HTMLElement).style.background='rgba(59,130,246,0.12)'}}
-              onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor='rgba(59,130,246,0.2)';(e.currentTarget as HTMLElement).style.background='rgba(59,130,246,0.08)'}}>
-              <div style={{ fontSize:28, marginBottom:10 }}>✏️</div>
-              <div style={{ fontSize:14, fontWeight:700, color:'#60A5FA' }}>Manual Entry</div>
-              <div style={{ fontSize:11, color:'#64748B', marginTop:4 }}>Enter stock counts item by item from physical count</div>
-            </button>
-            <button onClick={()=>setMode('excel')}
-              style={{ padding:'20px 16px', borderRadius:14, background:'rgba(16,185,129,0.08)', border:'2px solid rgba(16,185,129,0.2)', cursor:'pointer', textAlign:'left', transition:'all 0.2s' }}
-              onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor='rgba(16,185,129,0.5)';(e.currentTarget as HTMLElement).style.background='rgba(16,185,129,0.12)'}}
-              onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor='rgba(16,185,129,0.2)';(e.currentTarget as HTMLElement).style.background='rgba(16,185,129,0.08)'}}>
-              <div style={{ fontSize:28, marginBottom:10 }}>📊</div>
-              <div style={{ fontSize:14, fontWeight:700, color:'#10B981' }}>Upload Excel</div>
-              <div style={{ fontSize:11, color:'#64748B', marginTop:4 }}>Import your existing store sheet directly — no manual entry needed</div>
-            </button>
-          </div>
-        )}
-
-        {mode === 'excel' && (
-          <div>
-            <div style={{ padding:'12px 16px', borderRadius:10, background:'rgba(16,185,129,0.05)', border:'1px solid rgba(16,185,129,0.15)', marginBottom:16 }}>
-              <div style={{ fontSize:12, color:'#10B981', fontWeight:600 }}>✅ We support your existing Excel format</div>
-              <div style={{ fontSize:11, color:'#94A3B8', marginTop:4 }}>Upload your store detail sheet — Xplorix will map the columns automatically.</div>
-            </div>
-            <div style={{ border:'2px dashed #1E293B', borderRadius:12, padding:'32px 20px', textAlign:'center', cursor:'pointer' }}
-              onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor='rgba(16,185,129,0.4)';(e.currentTarget as HTMLElement).style.background='rgba(16,185,129,0.02)'}}
-              onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor='#1E293B';(e.currentTarget as HTMLElement).style.background='transparent'}}>
-              <Upload size={28} style={{ color:'#64748B', margin:'0 auto 12px' }} />
-              <div style={{ fontSize:14, fontWeight:600, color:'#F8FAFC' }}>Click to upload Store Detail Sheet</div>
-              <div style={{ fontSize:12, color:'#64748B', marginTop:4 }}>Supported: .xlsx, .xls, .csv</div>
-            </div>
-            <div style={{ display:'flex', gap:10, marginTop:16 }}>
-              <button onClick={()=>setMode(null)} style={{ flex:1, padding:'10px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:13, fontWeight:600, cursor:'pointer' }}>Back</button>
-              <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:9, background:'linear-gradient(135deg,#10B981,#059669)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none' }}>Upload & Import</button>
-            </div>
-          </div>
-        )}
-
-        {mode === 'manual' && (
-          <div>
-            <div style={{ fontSize:12, color:'#94A3B8', marginBottom:16 }}>Enter current physical stock count for each part. This sets the starting point — all future changes are tracked automatically.</div>
-            <div style={{ maxHeight:280, overflowY:'auto', border:'1px solid #1E293B', borderRadius:10, marginBottom:16 }}>
-              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-                <thead style={{ position:'sticky', top:0, background:'#111827' }}>
-                  <tr>
-                    {['Part Name','Unit','Opening Qty','Unit Cost'].map(h=>(
-                      <th key={h} style={{ padding:'8px 12px', textAlign:'left', fontSize:10, color:'#64748B', fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', borderBottom:'1px solid #1E293B' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    { name:'NQ Core Bit SR-06', unit:'Each', cost:11500 },
-                    { name:'HQ Core Bit SR-08', unit:'Each', cost:22000 },
-                    { name:'MATEX DD955 Liquid', unit:'Bucket', cost:12151 },
-                    { name:'MATEX Sand Drill', unit:'Bucket', cost:16886 },
-                    { name:'ADDRILL EA-20 KG', unit:'Kg', cost:3200 },
-                    { name:'NQ Core Lifter', unit:'Each', cost:400 },
-                  ].map((p,i)=>(
-                    <tr key={i} style={{ borderBottom:'1px solid rgba(30,41,59,0.5)' }}>
-                      <td style={{ padding:'8px 12px', color:'#F8FAFC', fontWeight:600 }}>{p.name}</td>
-                      <td style={{ padding:'8px 12px', color:'#64748B' }}>{p.unit}</td>
-                      <td style={{ padding:'8px 12px' }}><input type="number" defaultValue={0} style={{ width:70, padding:'5px 8px', background:'#080B10', border:'1px solid #1E293B', borderRadius:6, color:'#F8FAFC', fontSize:12, outline:'none', textAlign:'center' }} /></td>
-                      <td style={{ padding:'8px 12px', color:'#10B981' }}>₹{p.cost.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={{ display:'flex', gap:10 }}>
-              <button onClick={()=>setMode(null)} style={{ flex:1, padding:'10px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:13, fontWeight:600, cursor:'pointer' }}>Back</button>
-              <button onClick={onClose} style={{ flex:2, padding:'10px', borderRadius:9, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none' }}>Save Opening Balance</button>
-            </div>
+        {filtered.length === 0 ? (
+          <div style={{ textAlign:'center', padding:'40px', color:'#64748B' }}>No transfer records found.</div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {filtered.map(m=>(
+              <div key={m.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', borderRadius:12, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.12)' }}>
+                <div style={{ width:32, height:32, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.1)', flexShrink:0 }}>
+                  <span style={{ fontSize:14 }}>⇄</span>
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:'#F8FAFC' }}>{m.part}</div>
+                  <div style={{ fontSize:11, color:'#64748B', marginTop:2 }}>{m.from} → {m.to} · {m.note}</div>
+                </div>
+                <div style={{ textAlign:'right', flexShrink:0 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#8B5CF6' }}>{m.qty} units</div>
+                  <div style={{ fontSize:10, color:'#64748B' }}>By: {m.by || '—'}</div>
+                  <div style={{ fontSize:10, color:'#64748B' }}>{m.date}</div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -249,7 +372,187 @@ function OpeningBalanceModal({ project, onClose }: { project: string; onClose: (
   )
 }
 
-// ── PAGE ───────────────────────────────────────────────────────────────────
+// ── OPENING BALANCE MODAL ────────────────────────────────────────────────────
+function OpeningBalanceModal({ project, onClose }: { project:string; onClose:()=>void }) {
+  const [mode, setMode] = useState<'manual'|'excel'|null>(null)
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(10px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:20, padding:32, width:520 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <div>
+            <div style={{ fontSize:18, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>Set Opening Balance</div>
+            <div style={{ fontSize:12, color:'#64748B', marginTop:2 }}>{project}</div>
+          </div>
+          <button onClick={onClose} style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#64748B', cursor:'pointer' }}><X size={16} /></button>
+        </div>
+        <div style={{ padding:'12px 16px', borderRadius:10, background:'rgba(249,115,22,0.05)', border:'1px solid rgba(249,115,22,0.15)', marginBottom:24 }}>
+          <div style={{ fontSize:12, color:'#F97316', fontWeight:600 }}>One-time setup per project</div>
+          <div style={{ fontSize:11, color:'#94A3B8', marginTop:4 }}>After opening balance is entered, all future stock movements are tracked automatically.</div>
+        </div>
+        {!mode && (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+            {[
+              { m:'manual' as const, icon:'✏️', title:'Manual Entry', desc:'Enter stock counts item by item', color:'#3B82F6', bg:'rgba(59,130,246,0.08)', border:'rgba(59,130,246,0.2)' },
+              { m:'excel' as const, icon:'📊', title:'Upload Excel', desc:'Import your existing store sheet directly', color:'#10B981', bg:'rgba(16,185,129,0.08)', border:'rgba(16,185,129,0.2)' },
+            ].map(opt=>(
+              <button key={opt.m} onClick={()=>setMode(opt.m)}
+                style={{ padding:'20px 16px', borderRadius:14, background:opt.bg, border:`2px solid ${opt.border}`, cursor:'pointer', textAlign:'left' }}>
+                <div style={{ fontSize:28, marginBottom:10 }}>{opt.icon}</div>
+                <div style={{ fontSize:14, fontWeight:700, color:opt.color }}>{opt.title}</div>
+                <div style={{ fontSize:11, color:'#64748B', marginTop:4 }}>{opt.desc}</div>
+              </button>
+            ))}
+          </div>
+        )}
+        {mode && (
+          <div style={{ display:'flex', gap:10, marginTop:16 }}>
+            <button onClick={()=>setMode(null)} style={{ flex:1, padding:'10px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:13, fontWeight:600, cursor:'pointer' }}>Back</button>
+            <button onClick={onClose} style={{ flex:2, padding:'10px', borderRadius:9, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none' }}>Save Opening Balance</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── PART REQUEST MODAL (Change 6) ────────────────────────────────────────────
+function PartRequestModal({ onClose, onSave }: { onClose:()=>void; onSave:(r:PartRequest)=>void }) {
+  const [form, setForm] = useState({ requestedBy:'', partName:'', partNumber:'', qty:1, unit:'NOS', project:projectOptions[0], rig:rigOptions[0], urgency:'Normal' as 'Normal'|'Urgent'|'Critical', reason:'' })
+  const [partSearch, setPartSearch] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [error, setError] = useState('')
+
+  const handlePartSelect = (part: typeof partsCatalogueList[0]) => {
+    setForm(f=>({...f, partName:part.name, partNumber:part.partNumber, unit:part.unit}))
+    setPartSearch(part.name)
+    setShowSuggestions(false)
+  }
+
+  const handleSave = () => {
+    if (!form.requestedBy.trim()) { setError('Please enter your name'); return }
+    if (!form.partName.trim()) { setError('Please select a part'); return }
+    if (!form.reason.trim()) { setError('Please enter a reason'); return }
+    onSave({ ...form, id:Date.now().toString(), date:new Date().toLocaleDateString('en-IN'), status:'Pending' })
+    onClose()
+  }
+
+  const urgencyColors = { Normal:{ color:'#10B981', bg:'rgba(16,185,129,0.1)', border:'rgba(16,185,129,0.3)' }, Urgent:{ color:'#F59E0B', bg:'rgba(245,158,11,0.1)', border:'rgba(245,158,11,0.3)' }, Critical:{ color:'#EF4444', bg:'rgba(239,68,68,0.1)', border:'rgba(239,68,68,0.3)' } }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(10px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:20, padding:28, width:520, maxHeight:'90vh', overflowY:'auto' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
+          <div>
+            <div style={{ fontSize:18, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>Raise Part Request</div>
+            <div style={{ fontSize:12, color:'#64748B', marginTop:2 }}>Request will be sent to Purchase Orders for PO creation</div>
+          </div>
+          <button onClick={onClose} style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#64748B', cursor:'pointer' }}><X size={16} /></button>
+        </div>
+
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          {/* Requested By */}
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Requested By *</div>
+            <input value={form.requestedBy} onChange={e=>setForm(f=>({...f,requestedBy:e.target.value}))} placeholder="Enter your full name..." style={iStyle} />
+          </div>
+
+          {/* Part Name with search */}
+          <div style={{ position:'relative' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Part Name *</div>
+            <input value={partSearch||form.partName} onChange={e=>{ setPartSearch(e.target.value); setShowSuggestions(true); setForm(f=>({...f,partName:e.target.value})) }}
+              placeholder="Search and select part..." style={iStyle} />
+            {showSuggestions && partSearch && (
+              <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:100, background:'#0D1117', border:'1px solid #1E293B', borderRadius:8, maxHeight:180, overflowY:'auto' }}>
+                {partsCatalogueList.filter(p=>p.name.toLowerCase().includes(partSearch.toLowerCase())).map(p=>(
+                  <div key={p.partNumber} onClick={()=>handlePartSelect(p)}
+                    style={{ padding:'10px 14px', cursor:'pointer', borderBottom:'1px solid rgba(30,41,59,0.4)' }}
+                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(249,115,22,0.08)'}
+                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                    <div style={{ fontSize:13, fontWeight:600, color:'#F8FAFC' }}>{p.name}</div>
+                    <div style={{ fontSize:11, color:'#64748B', marginTop:2 }}>{p.partNumber} · {p.unit}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Part Number (auto-fill) */}
+          {form.partNumber && (
+            <div style={{ padding:'8px 12px', borderRadius:8, background:'rgba(16,185,129,0.05)', border:'1px solid rgba(16,185,129,0.15)', display:'flex', justifyContent:'space-between' }}>
+              <span style={{ fontSize:11, color:'#64748B' }}>Part Number</span>
+              <span style={{ fontSize:12, fontWeight:700, color:'#10B981', fontFamily:'monospace' }}>{form.partNumber}</span>
+            </div>
+          )}
+
+          {/* Qty + Unit */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Quantity *</div>
+              <input type="number" min={1} value={form.qty} onChange={e=>setForm(f=>({...f,qty:parseInt(e.target.value)||1}))} style={iStyle} />
+            </div>
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Unit</div>
+              <select value={form.unit} onChange={e=>setForm(f=>({...f,unit:e.target.value}))} style={selStyle}>
+                {unitOptions.map(u=><option key={u}>{u}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Project + Rig */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Project *</div>
+              <select value={form.project} onChange={e=>setForm(f=>({...f,project:e.target.value}))} style={selStyle}>
+                {projectOptions.map(p=><option key={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Rig *</div>
+              <select value={form.rig} onChange={e=>setForm(f=>({...f,rig:e.target.value}))} style={selStyle}>
+                {rigOptions.map(r=><option key={r}>{r}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Urgency */}
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Urgency *</div>
+            <div style={{ display:'flex', gap:10 }}>
+              {(['Normal','Urgent','Critical'] as const).map(u=>{
+                const c = urgencyColors[u]
+                return (
+                  <button key={u} onClick={()=>setForm(f=>({...f,urgency:u}))}
+                    style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:13,
+                      background: form.urgency===u ? c.bg : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${form.urgency===u ? c.border : '#1E293B'}`,
+                      color: form.urgency===u ? c.color : '#64748B',
+                    }}>{u}</button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Reason */}
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Reason *</div>
+            <input value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} placeholder="Why do you need this part?" style={iStyle} />
+          </div>
+        </div>
+
+        {error && <div style={{ fontSize:11, color:'#EF4444', marginTop:12, padding:'8px 12px', background:'rgba(239,68,68,0.05)', borderRadius:8, border:'1px solid rgba(239,68,68,0.15)' }}>{error}</div>}
+
+        <div style={{ display:'flex', gap:10, marginTop:20 }}>
+          <button onClick={onClose} style={{ flex:1, padding:'12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:13, fontWeight:600, cursor:'pointer' }}>Cancel</button>
+          <button onClick={handleSave} style={{ flex:2, padding:'12px', borderRadius:10, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none' }}>
+            Submit Request →
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── PAGE ─────────────────────────────────────────────────────────────────────
 export default function StockManagementPage() {
   const { format } = useCurrency()
   const [selectedProject, setSelectedProject] = useState(projectOptions[0])
@@ -257,29 +560,73 @@ export default function StockManagementPage() {
   const [filterStatus, setFilterStatus] = useState<'all'|'low'|'ok'>('all')
   const [issueTarget, setIssueTarget] = useState<StockItem|null>(null)
   const [stockData, setStockData] = useState(projectStockData)
+  const [movements, setMovements] = useState<Movement[]>(seedMovements)
   const [showTransfer, setShowTransfer] = useState(false)
+  const [showTransferHistory, setShowTransferHistory] = useState(false)
   const [showOpeningBalance, setShowOpeningBalance] = useState(false)
-  const [transferForm, setTransferForm] = useState({ part:'', qty:'1', from:projectOptions[0], to:projectOptions[1], note:'' })
+  const [showPartRequest, setShowPartRequest] = useState(false)
+  const [partRequests, setPartRequests] = useState<PartRequest[]>(seedRequests)
 
   const stock = stockData[selectedProject] || []
   const filtered = stock.filter(item =>
     (filterStatus==='all' || (filterStatus==='low' ? item.currentQty <= item.reorderLevel : item.currentQty > item.reorderLevel)) &&
     (search==='' || item.name.toLowerCase().includes(search.toLowerCase()) || item.partNumber.toLowerCase().includes(search.toLowerCase()))
   )
-
   const totalValue = stock.reduce((s,i) => s + i.currentQty * i.unitCost, 0)
   const lowCount = stock.filter(i => i.currentQty <= i.reorderLevel).length
+  const pendingRequests = partRequests.filter(r => r.status === 'Pending').length
 
-  const handleIssue = (qty: number, rig: string, note: string) => {
+  const handleIssue = (qty:number, rig:string, note:string) => {
     if (!issueTarget) return
     setStockData(prev => {
       const updated = {...prev}
       updated[selectedProject] = updated[selectedProject].map(item =>
-        item.id === issueTarget.id ? {...item, currentQty: Math.max(0, item.currentQty - qty), lastMovement: new Date().toISOString().split('T')[0], lastMovementType: 'manual' as const} : item
+        item.id === issueTarget.id ? {...item, currentQty: Math.max(0, item.currentQty - qty), lastMovement: new Date().toISOString().split('T')[0], lastMovementType:'manual' as const} : item
       )
       return updated
     })
+    setMovements(prev => [{
+      id: Date.now().toString(), date: new Date().toLocaleDateString('en-IN'), type:'out' as const,
+      part: issueTarget.name, qty, rig, note: note || 'Manual issue to rig',
+      value: issueTarget.unitCost * qty, by: 'Store Keeper'
+    }, ...prev])
     setIssueTarget(null)
+  }
+
+  // Change 4: Transfer actually works
+  const handleTransfer = (from:string, to:string, items:TransferItem[], by:string, reason:string) => {
+    setStockData(prev => {
+      const updated = { ...prev }
+      items.forEach(item => {
+        // Deduct from source
+        if (updated[from]) {
+          updated[from] = updated[from].map(s =>
+            s.name === item.partName ? { ...s, currentQty: Math.max(0, s.currentQty - item.qty), lastMovement: new Date().toISOString().split('T')[0], lastMovementType: 'transfer' as const } : s
+          )
+        }
+        // Add to destination
+        if (updated[to]) {
+          const exists = updated[to].find(s => s.name === item.partName)
+          if (exists) {
+            updated[to] = updated[to].map(s =>
+              s.name === item.partName ? { ...s, currentQty: s.currentQty + item.qty, lastMovement: new Date().toISOString().split('T')[0], lastMovementType: 'transfer' as const } : s
+            )
+          }
+        }
+      })
+      return updated
+    })
+    // Add to movements
+    const fromShort = from.split(' - ')[0]
+    const toShort = to.split(' - ')[0]
+    items.forEach(item => {
+      setMovements(prev => [{
+        id: Date.now().toString() + item.id, date: new Date().toLocaleDateString('en-IN'),
+        type:'transfer' as const, part: item.partName, qty: item.qty,
+        from: fromShort, to: toShort, note: reason || 'Project transfer',
+        value: 0, by
+      }, ...prev])
+    })
   }
 
   const statusColor = (item: StockItem) => {
@@ -289,14 +636,9 @@ export default function StockManagementPage() {
     return '#10B981'
   }
 
-  const movementTypeBadge = (type: StockItem['lastMovementType']) => {
-    const map: Record<string, { label: string; color: string }> = {
-      auto: { label: '🤖 Auto', color: '#60A5FA' },
-      manual: { label: '✋ Manual', color: '#F59E0B' },
-      transfer: { label: '⇄ Transfer', color: '#8B5CF6' },
-      po: { label: '📦 PO', color: '#10B981' },
-    }
-    return map[type] || map.manual
+  const mvtBadge = (type: StockItem['lastMovementType']) => {
+    const map = { manual:{ label:'✋ Manual', color:'#F59E0B' }, transfer:{ label:'⇄ Transfer', color:'#8B5CF6' }, po:{ label:'📦 PO', color:'#10B981' } }
+    return map[type]
   }
 
   return (
@@ -306,19 +648,18 @@ export default function StockManagementPage() {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16 }}>
         <div>
           <h1 style={{ fontSize:24, fontWeight:800, fontFamily:"'Space Grotesk',sans-serif", color:'#F8FAFC' }}>Stock Management</h1>
-          <p style={{ fontSize:13, color:'#64748B', marginTop:4 }}>Per-project stock levels — auto-deducted from drill logs, manual issue for maintenance parts</p>
+          <p style={{ fontSize:13, color:'#64748B', marginTop:4 }}>Per-project stock levels — issue parts from store to rigs, transfer between projects</p>
         </div>
         <SubNav active="Stock Management" />
       </div>
 
-      {/* How stock works — info banner */}
+      {/* HOW STOCK MOVES banner — Change 2: removed Drill Log */}
       <div style={{ background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.12)', borderRadius:12, padding:'12px 20px', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
-        <div style={{ fontSize:11, fontWeight:700, color:'#60A5FA', textTransform:'uppercase', letterSpacing:'0.08em', whiteSpace:'nowrap' }}>How stock moves:</div>
+        <div style={{ fontSize:11, fontWeight:700, color:'#60A5FA', textTransform:'uppercase', letterSpacing:'0.08em', whiteSpace:'nowrap' }}>How Stock Moves:</div>
         {[
           { icon:'📦', label:'PO Received', desc:'Stock in', color:'#10B981' },
           { icon:'⇄', label:'Transfer', desc:'Between projects', color:'#8B5CF6' },
-          { icon:'🤖', label:'Drill Log', desc:'Auto-deduct', color:'#60A5FA' },
-          { icon:'✋', label:'Manual Issue', desc:'Maintenance parts', color:'#F59E0B' },
+          { icon:'✋', label:'Manual Issue', desc:'Issue to rig from store', color:'#F59E0B' },
         ].map((item,i)=>(
           <div key={i} style={{ display:'flex', alignItems:'center', gap:6 }}>
             <span style={{ fontSize:14 }}>{item.icon}</span>
@@ -326,16 +667,45 @@ export default function StockManagementPage() {
               <div style={{ fontSize:11, fontWeight:700, color:item.color }}>{item.label}</div>
               <div style={{ fontSize:10, color:'#64748B' }}>{item.desc}</div>
             </div>
-            {i < 3 && <div style={{ width:16, height:1, background:'#1E293B', margin:'0 4px' }} />}
+            {i < 2 && <div style={{ width:16, height:1, background:'#1E293B', margin:'0 4px' }} />}
           </div>
         ))}
-        <button onClick={()=>setShowOpeningBalance(true)}
-          style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)', color:'#F97316', fontSize:12, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' }}>
-          <Upload size={13} /> Set Opening Balance
-        </button>
+        <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
+          <button onClick={()=>setShowPartRequest(true)}
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)', color:'#F97316', fontSize:12, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', position:'relative' }}>
+            <Bell size={13} /> Part Request
+            {pendingRequests > 0 && <span style={{ position:'absolute', top:-6, right:-6, background:'#EF4444', color:'#fff', fontSize:9, fontWeight:800, width:16, height:16, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center' }}>{pendingRequests}</span>}
+          </button>
+          <button onClick={()=>setShowOpeningBalance(true)}
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:12, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap' }}>
+            <Upload size={13} /> Set Opening Balance
+          </button>
+        </div>
       </div>
 
-      {/* Project selector + actions */}
+      {/* Pending Part Requests banner */}
+      {pendingRequests > 0 && (
+        <div style={{ padding:'12px 20px', borderRadius:12, background:'rgba(249,115,22,0.05)', border:'1px solid rgba(249,115,22,0.2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <Bell size={16} style={{ color:'#F97316' }} />
+            <span style={{ fontSize:13, fontWeight:600, color:'#F8FAFC' }}>{pendingRequests} pending part request{pendingRequests>1?'s':''} waiting to be converted to Purchase Orders</span>
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            {partRequests.filter(r=>r.status==='Pending').slice(0,3).map(r=>(
+              <span key={r.id} style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:20,
+                background: r.urgency==='Critical'?'rgba(239,68,68,0.1)':r.urgency==='Urgent'?'rgba(245,158,11,0.1)':'rgba(16,185,129,0.1)',
+                color: r.urgency==='Critical'?'#EF4444':r.urgency==='Urgent'?'#F59E0B':'#10B981',
+                border: `1px solid ${r.urgency==='Critical'?'rgba(239,68,68,0.2)':r.urgency==='Urgent'?'rgba(245,158,11,0.2)':'rgba(16,185,129,0.2)'}`,
+              }}>{r.urgency}: {r.partName} × {r.qty}</span>
+            ))}
+            <Link href="/admin/inventory/purchase-orders" style={{ fontSize:11, fontWeight:700, padding:'4px 12px', borderRadius:20, background:'rgba(249,115,22,0.15)', border:'1px solid rgba(249,115,22,0.3)', color:'#F97316', textDecoration:'none' }}>
+              View in Purchase Orders →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Project selector */}
       <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', background:'#0D1117', border:'1px solid #1E293B', borderRadius:14, padding:'12px 20px' }}>
         <div style={{ fontSize:11, fontWeight:700, color:'#64748B', letterSpacing:'0.1em', textTransform:'uppercase' }}>Project:</div>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
@@ -348,19 +718,26 @@ export default function StockManagementPage() {
               }}>{p.split(' - ')[0]}</button>
           ))}
         </div>
-        <button onClick={()=>setShowTransfer(true)}
-          style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:9, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.2)', color:'#8B5CF6', fontSize:13, fontWeight:600, cursor:'pointer' }}>
-          <ArrowLeftRight size={14} /> Transfer Between Projects
-        </button>
+        <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
+          {/* Change 5: Transfer History button */}
+          <button onClick={()=>setShowTransferHistory(true)}
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:9, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', color:'#8B5CF6', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+            <History size={13} /> Transfer History
+          </button>
+          <button onClick={()=>setShowTransfer(true)}
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:9, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.2)', color:'#8B5CF6', fontSize:13, fontWeight:600, cursor:'pointer' }}>
+            <ArrowLeftRight size={14} /> Transfer Between Projects
+          </button>
+        </div>
       </div>
 
-      {/* Project KPIs */}
+      {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
         {[
-          { label:'Total Parts',      value:stock.length,                           color:'#60A5FA', icon:'📦' },
-          { label:'Low Stock',        value:lowCount,                               color: lowCount>0?'#EF4444':'#10B981', icon:'⚠️' },
-          { label:'Total Stock Value',value:format(totalValue),                     color:'#10B981', icon:'💰' },
-          { label:'Project',          value:selectedProject.split(' - ')[0],        color:'#F97316', icon:'📍' },
+          { label:'Total Parts', value:stock.length, color:'#60A5FA', icon:'📦' },
+          { label:'Low Stock', value:lowCount, color:lowCount>0?'#EF4444':'#10B981', icon:'⚠️' },
+          { label:'Total Stock Value', value:format(totalValue), color:'#10B981', icon:'💰' },
+          { label:'Project', value:selectedProject.split(' - ')[0], color:'#F97316', icon:'📍' },
         ].map((k,i)=>(
           <div key={i} style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:14, padding:'16px 18px' }}>
             <div style={{ fontSize:18, marginBottom:8 }}>{k.icon}</div>
@@ -380,9 +757,9 @@ export default function StockManagementPage() {
         {(['all','low','ok'] as const).map(f=>(
           <button key={f} onClick={()=>setFilterStatus(f)}
             style={{ padding:'8px 16px', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', transition:'all 0.2s',
-              background: filterStatus===f ? (f==='low'?'rgba(239,68,68,0.15)':f==='ok'?'rgba(16,185,129,0.15)':'rgba(249,115,22,0.15)') : 'rgba(255,255,255,0.04)',
-              color: filterStatus===f ? (f==='low'?'#EF4444':f==='ok'?'#10B981':'#F97316') : '#94A3B8',
-              border: `1px solid ${filterStatus===f?(f==='low'?'rgba(239,68,68,0.25)':f==='ok'?'rgba(16,185,129,0.25)':'rgba(249,115,22,0.25)'):'#1E293B'}`,
+              background: filterStatus===f?(f==='low'?'rgba(239,68,68,0.15)':f==='ok'?'rgba(16,185,129,0.15)':'rgba(249,115,22,0.15)'):'rgba(255,255,255,0.04)',
+              color: filterStatus===f?(f==='low'?'#EF4444':f==='ok'?'#10B981':'#F97316'):'#94A3B8',
+              border:`1px solid ${filterStatus===f?(f==='low'?'rgba(239,68,68,0.25)':f==='ok'?'rgba(16,185,129,0.25)':'rgba(249,115,22,0.25)'):'#1E293B'}`,
             }}>
             {f==='all'?'All Stock':f==='low'?`⚠ Low Stock (${lowCount})`:'✅ OK Stock'}
           </button>
@@ -407,7 +784,7 @@ export default function StockManagementPage() {
               const pct = Math.min(100, (item.currentQty / Math.max(item.reorderLevel * 2, 1)) * 100)
               const color = statusColor(item)
               const isLow = item.currentQty <= item.reorderLevel
-              const mvt = movementTypeBadge(item.lastMovementType)
+              const mvt = mvtBadge(item.lastMovementType)
               return (
                 <tr key={item.id} style={{ borderBottom:'1px solid rgba(30,41,59,0.5)', background: isLow ? 'rgba(239,68,68,0.02)' : 'transparent' }}
                   onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background=isLow?'rgba(239,68,68,0.04)':'rgba(255,255,255,0.015)'}
@@ -445,7 +822,7 @@ export default function StockManagementPage() {
                   </td>
                   <td style={{ padding:'12px 14px' }}>
                     <button onClick={()=>setIssueTarget(item)}
-                      style={{ padding:'6px 12px', borderRadius:7, background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)', color:'#F97316', fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>
+                      style={{ padding:'6px 14px', borderRadius:7, background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)', color:'#F97316', fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>
                       Issue
                     </button>
                   </td>
@@ -462,27 +839,28 @@ export default function StockManagementPage() {
         </table>
       </div>
 
-      {/* Recent Movements */}
+      {/* Recent Movements — Change 2: removed auto-deduct entries */}
       <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
           <History size={16} style={{ color:'#64748B' }} />
           <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>Recent Stock Movements</div>
-          <span style={{ fontSize:10, color:'#64748B', marginLeft:4 }}>All projects · April 2026</span>
+          <span style={{ fontSize:10, color:'#64748B', marginLeft:4 }}>All projects</span>
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          {recentMovements.map(m => (
+          {movements.slice(0,8).map(m => (
             <div key={m.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid #1E293B' }}>
               <div style={{ width:28, height:28, borderRadius:8, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
-                background: m.type==='in'?'rgba(16,185,129,0.1)':m.type==='out'?'rgba(249,115,22,0.1)':'rgba(139,92,246,0.1)',
-              }}>
+                background: m.type==='in'?'rgba(16,185,129,0.1)':m.type==='out'?'rgba(249,115,22,0.1)':'rgba(139,92,246,0.1)' }}>
                 <span style={{ fontSize:12 }}>{m.type==='in'?'↓':m.type==='out'?'↑':'⇄'}</span>
               </div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:12, fontWeight:600, color:'#F8FAFC', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.part}</div>
-                <div style={{ fontSize:10, color:'#64748B', marginTop:1 }}>{m.note}{m.rig ? ` · ${m.rig}` : ''}{m.from ? ` · ${m.from} → ${m.to}` : ''}</div>
+                <div style={{ fontSize:10, color:'#64748B', marginTop:1 }}>
+                  {m.note}{m.rig ? ` · ${m.rig}` : ''}{m.from ? ` · ${m.from} → ${m.to}` : ''}{m.by ? ` · By: ${m.by}` : ''}
+                </div>
               </div>
               <div style={{ textAlign:'right', flexShrink:0 }}>
-                <div style={{ fontSize:12, fontWeight:700, color: m.type==='in'?'#10B981':'#F97316' }}>{m.type==='in'?'+':'-'}{m.qty}</div>
+                <div style={{ fontSize:12, fontWeight:700, color:m.type==='in'?'#10B981':'#F97316' }}>{m.type==='in'?'+':'-'}{m.qty}</div>
                 <div style={{ fontSize:10, color:'#64748B' }}>{m.date}</div>
               </div>
             </div>
@@ -491,40 +869,11 @@ export default function StockManagementPage() {
       </div>
 
       {/* Modals */}
-      {issueTarget && <IssueModal part={issueTarget} onClose={()=>setIssueTarget(null)} onIssue={handleIssue} />}
+      {issueTarget && <IssueModal part={issueTarget} project={selectedProject} onClose={()=>setIssueTarget(null)} onIssue={handleIssue} />}
+      {showTransfer && <TransferModal onClose={()=>setShowTransfer(false)} onConfirm={handleTransfer} stockData={stockData} />}
+      {showTransferHistory && <TransferHistoryModal project={selectedProject} movements={movements} onClose={()=>setShowTransferHistory(false)} />}
       {showOpeningBalance && <OpeningBalanceModal project={selectedProject} onClose={()=>setShowOpeningBalance(false)} />}
-
-      {/* Transfer Modal */}
-      {showTransfer && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', backdropFilter:'blur(8px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:20, padding:28, width:460 }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-              <div style={{ fontSize:16, fontWeight:700, color:'#F8FAFC' }}>Transfer Stock Between Projects</div>
-              <button onClick={()=>setShowTransfer(false)} style={{ padding:6, borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#64748B', cursor:'pointer' }}><X size={14} /></button>
-            </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-              {[
-                { label:'From Project', content: <select value={transferForm.from} onChange={e=>setTransferForm(f=>({...f,from:e.target.value}))} style={{ width:'100%', padding:'10px 12px', background:'#080B10', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none', cursor:'pointer', appearance:'none' as any }}>{projectOptions.map(p=><option key={p}>{p}</option>)}</select> },
-                { label:'To Project',   content: <select value={transferForm.to}   onChange={e=>setTransferForm(f=>({...f,to:e.target.value}))}   style={{ width:'100%', padding:'10px 12px', background:'#080B10', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none', cursor:'pointer', appearance:'none' as any }}>{projectOptions.map(p=><option key={p}>{p}</option>)}</select> },
-                { label:'Part',         content: <input value={transferForm.part}  onChange={e=>setTransferForm(f=>({...f,part:e.target.value}))}  placeholder="Part name or number" style={{ width:'100%', padding:'10px 12px', background:'#080B10', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none' }} /> },
-                { label:'Quantity',     content: <input type="number" value={transferForm.qty} onChange={e=>setTransferForm(f=>({...f,qty:e.target.value}))} style={{ width:'100%', padding:'10px 12px', background:'#080B10', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none' }} /> },
-                { label:'Reason',       content: <input value={transferForm.note} onChange={e=>setTransferForm(f=>({...f,note:e.target.value}))} placeholder="Reason for transfer..." style={{ width:'100%', padding:'10px 12px', background:'#080B10', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none' }} /> },
-              ].map((f,i)=>(
-                <div key={i}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'#64748B', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:6 }}>{f.label}</div>
-                  {f.content}
-                </div>
-              ))}
-              <div style={{ display:'flex', gap:10, marginTop:4 }}>
-                <button onClick={()=>setShowTransfer(false)} style={{ flex:1, padding:'10px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:13, fontWeight:600, cursor:'pointer' }}>Cancel</button>
-                <button onClick={()=>setShowTransfer(false)} style={{ flex:1, padding:'10px', borderRadius:9, background:'linear-gradient(135deg,#8B5CF6,#7C3AED)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none' }}>
-                  Confirm Transfer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {showPartRequest && <PartRequestModal onClose={()=>setShowPartRequest(false)} onSave={r=>setPartRequests(prev=>[r,...prev])} />}
 
     </div>
   )
