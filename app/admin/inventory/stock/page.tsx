@@ -566,12 +566,17 @@ export default function StockManagementPage() {
   const [showOpeningBalance, setShowOpeningBalance] = useState(false)
   const [showPartRequest, setShowPartRequest] = useState(false)
   const [partRequests, setPartRequests] = useState<PartRequest[]>(seedRequests)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   const stock = stockData[selectedProject] || []
-  const filtered = stock.filter(item =>
-    (filterStatus==='all' || (filterStatus==='low' ? item.currentQty <= item.reorderLevel : item.currentQty > item.reorderLevel)) &&
-    (search==='' || item.name.toLowerCase().includes(search.toLowerCase()) || item.partNumber.toLowerCase().includes(search.toLowerCase()))
-  )
+  const filtered = stock.filter(item => {
+    const matchStatus = filterStatus==='all' || (filterStatus==='low' ? item.currentQty <= item.reorderLevel : item.currentQty > item.reorderLevel)
+    const matchSearch = search==='' || item.name.toLowerCase().includes(search.toLowerCase()) || item.partNumber.toLowerCase().includes(search.toLowerCase())
+    const matchDateFrom = !dateFrom || item.lastMovement >= dateFrom
+    const matchDateTo = !dateTo || item.lastMovement <= dateTo
+    return matchStatus && matchSearch && matchDateFrom && matchDateTo
+  })
   const totalValue = stock.reduce((s,i) => s + i.currentQty * i.unitCost, 0)
   const lowCount = stock.filter(i => i.currentQty <= i.reorderLevel).length
   const pendingRequests = partRequests.filter(r => r.status === 'Pending').length
@@ -747,13 +752,29 @@ export default function StockManagementPage() {
         ))}
       </div>
 
-      {/* Search + filter */}
-      <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
-        <div style={{ position:'relative', flex:1, minWidth:200 }}>
+      {/* Search + filter — with date range */}
+      <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap', background:'#0D1117', border:'1px solid #1E293B', borderRadius:12, padding:'10px 16px' }}>
+        <div style={{ position:'relative', flex:1, minWidth:180 }}>
           <Search size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#64748B' }} />
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search parts..."
-            style={{ width:'100%', padding:'8px 12px 8px 30px', background:'#0D1117', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none' }} />
+            style={{ width:'100%', padding:'8px 12px 8px 30px', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none' }} />
         </div>
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ fontSize:11, fontWeight:700, color:'#64748B', whiteSpace:'nowrap' }}>From:</span>
+          <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
+            style={{ padding:'7px 10px', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:12, outline:'none', cursor:'pointer' }} />
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ fontSize:11, fontWeight:700, color:'#64748B', whiteSpace:'nowrap' }}>To:</span>
+          <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
+            style={{ padding:'7px 10px', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:12, outline:'none', cursor:'pointer' }} />
+        </div>
+        {(dateFrom || dateTo) && (
+          <button onClick={()=>{setDateFrom('');setDateTo('')}}
+            style={{ padding:'7px 12px', borderRadius:8, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#EF4444', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+            Clear
+          </button>
+        )}
         {(['all','low','ok'] as const).map(f=>(
           <button key={f} onClick={()=>setFilterStatus(f)}
             style={{ padding:'8px 16px', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', transition:'all 0.2s',
