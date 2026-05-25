@@ -714,6 +714,9 @@ export default function PurchaseOrdersPage() {
   const [expandedPO, setExpandedPO] = useState<string|null>(null)
   const [receiveTarget, setReceiveTarget] = useState<PurchaseOrder|null>(null)
   const [showCompanyProfile, setShowCompanyProfile] = useState(false)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [filterRig, setFilterRig] = useState('All Rigs')
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(defaultCompanyProfile)
   // Part requests from Stock Management (Change 6)
   const pendingRequests = [
@@ -722,11 +725,14 @@ export default function PurchaseOrdersPage() {
     { id:'3', partName:'ADDRILL EA-20 KG', partNumber:'ADD-EA-20', qty:60, unit:'Kg', project:'CMPDI-DAM - Bokaro', rig:'KEM-6', urgency:'Critical', requestedBy:'Suresh Patil', reason:'Running low', date:'22-05-2026' },
   ]
 
-  const filtered = pos.filter(po =>
-    (filterStatus==='All' || po.status===filterStatus) &&
-    (filterProject==='All' || po.project===filterProject) &&
-    (search==='' || po.poNumber.toLowerCase().includes(search.toLowerCase()) || po.supplier.toLowerCase().includes(search.toLowerCase()))
-  )
+  const filtered = pos.filter(po => {
+    const matchStatus = filterStatus==='All' || po.status===filterStatus
+    const matchProject = filterProject==='All' || po.project===filterProject
+    const matchSearch = search==='' || po.poNumber.toLowerCase().includes(search.toLowerCase()) || po.supplier.toLowerCase().includes(search.toLowerCase())
+    const matchDateFrom = !dateFrom || po.orderDate >= dateFrom.split('-').reverse().join('.')
+    const matchDateTo = !dateTo || po.orderDate <= dateTo.split('-').reverse().join('.')
+    return matchStatus && matchProject && matchSearch && matchDateFrom && matchDateTo
+  })
 
   const handleReceiveConfirm = (poId: string, receivedBy: string, onTime: boolean, daysLate: number, qualityIssue: 'none'|'minor'|'rejected') => {
     setPos(prev => prev.map(po => po.id===poId ? {
@@ -829,9 +835,9 @@ ${po.notes ? `<div style="margin-top:10px"><strong>Notes:</strong> ${po.notes}</
         </div>
       </div>
 
-      {/* Filters + Actions */}
-      <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap', background:'#0D1117', border:'1px solid #1E293B', borderRadius:14, padding:'12px 20px' }}>
-        <div style={{ position:'relative', flex:1, minWidth:180 }}>
+      {/* Filters + Actions — with date + rig filters */}
+      <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap', background:'#0D1117', border:'1px solid #1E293B', borderRadius:14, padding:'12px 16px' }}>
+        <div style={{ position:'relative', flex:1, minWidth:160 }}>
           <Search size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#64748B' }} />
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search PO number, supplier..."
             style={{ width:'100%', padding:'8px 12px 8px 30px', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none' }} />
@@ -844,12 +850,34 @@ ${po.notes ? `<div style="margin-top:10px"><strong>Notes:</strong> ${po.notes}</
           </select>
           <ChevronDown size={12} style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', color:'#64748B', pointerEvents:'none' }} />
         </div>
+        <div style={{ position:'relative' }}>
+          <select value={filterRig} onChange={e=>setFilterRig(e.target.value)}
+            style={{ appearance:'none', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#F8FAFC', fontSize:13, padding:'8px 28px 8px 12px', borderRadius:8, cursor:'pointer', outline:'none' }}>
+            <option value="All Rigs">All Rigs</option>
+            {['KEM-1','KEM-4','KEM-5','KEM-6','KEM-8','KEM-9'].map(r=><option key={r}>{r}</option>)}
+          </select>
+          <ChevronDown size={12} style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', color:'#64748B', pointerEvents:'none' }} />
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ fontSize:11, fontWeight:700, color:'#64748B', whiteSpace:'nowrap' }}>From:</span>
+          <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
+            style={{ padding:'7px 10px', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:12, outline:'none', cursor:'pointer' }} />
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ fontSize:11, fontWeight:700, color:'#64748B', whiteSpace:'nowrap' }}>To:</span>
+          <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
+            style={{ padding:'7px 10px', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:12, outline:'none', cursor:'pointer' }} />
+        </div>
+        {(dateFrom || dateTo) && (
+          <button onClick={()=>{setDateFrom('');setDateTo('')}}
+            style={{ padding:'7px 10px', borderRadius:8, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#EF4444', fontSize:12, fontWeight:600, cursor:'pointer' }}>Clear</button>
+        )}
         <button onClick={()=>setShowCompanyProfile(true)}
-          style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:13, fontWeight:600, cursor:'pointer' }}>
+          style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 12px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:12, fontWeight:600, cursor:'pointer' }}>
           <Building2 size={14} /> Company Profile
         </button>
         <button onClick={()=>setShowNewPO(true)}
-          style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6, padding:'9px 20px', borderRadius:10, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none', boxShadow:'0 4px 20px rgba(249,115,22,0.25)' }}>
+          style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6, padding:'9px 18px', borderRadius:10, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none', boxShadow:'0 4px 20px rgba(249,115,22,0.25)' }}>
           <Plus size={14} /> New Purchase Order
         </button>
       </div>
