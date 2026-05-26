@@ -328,15 +328,20 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
   const [month, setMonth] = useState('May 2026')
   const [meters, setMeters] = useState(624)
   const [standbyDays, setStandbyDays] = useState(3)
+  const [drillingDays, setDrillingDays] = useState(22)
+  const [standbyDaysDay, setStandbyDaysDay] = useState(4)
+  const [repairDays, setRepairDays] = useState(2)
   const [includeMob, setIncludeMob] = useState(false)
   const [preview, setPreview] = useState<Invoice | null>(null)
   const [generated, setGenerated] = useState(false)
 
   const proj = PROJECTS.find(p => p.id === selectedProject)!
+  const isMeterage = proj.type === 'meterage'
+  const isDayRate  = proj.type === 'dayrate'
 
-  // Calculate revenue
+  // Calculate revenue — reacts to contract type
   const calcRevenue = () => {
-    if (proj.type === 'meterage') {
+    if (isMeterage) {
       let rev = 0
       const b1m = Math.min(meters, proj.band1To)
       rev += b1m * proj.band1Rate
@@ -351,7 +356,13 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
       if (includeMob) rev += proj.mobilisation
       return rev
     } else {
-      return (proj as any).drillingDayRate * 26
+      // Day rate: drilling days + standby days + repair days
+      const dr = (proj as any).drillingDayRate || 0
+      const sr = (proj as any).standbyDayRate  || 0
+      const rr = (proj as any).repairDayRate   || 0
+      let rev = (drillingDays * dr) + (standbyDaysDay * sr) + (repairDays * rr)
+      if (includeMob) rev += proj.mobilisation
+      return rev
     }
   }
 
@@ -414,8 +425,8 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
             </div>
           </div>
 
-          {/* Meters (meterage) */}
-          {proj.type === 'meterage' && (
+          {/* Meterage fields */}
+          {isMeterage && (
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
                 Total Meters Drilled
@@ -426,13 +437,35 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
             </div>
           )}
 
-          {/* Standby days */}
-          {proj.type === 'meterage' && (
+          {isMeterage && (
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Standby Days</div>
               <input type="number" value={standbyDays} onChange={e => setStandbyDays(parseInt(e.target.value) || 0)}
                 style={{ ...iStyle, fontSize: 16, fontWeight: 700, color: C.purple }} />
             </div>
+          )}
+
+          {/* Day rate fields */}
+          {isDayRate && (
+            <>
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', fontSize: 12, color: C.muted }}>
+                📅 Day Rate Contract — Drilling ₹{((proj as any).drillingDayRate||0).toLocaleString()}/day · Standby ₹{((proj as any).standbyDayRate||0).toLocaleString()}/day · Repair ₹{((proj as any).repairDayRate||0).toLocaleString()}/day
+              </div>
+              {[
+                { label: 'Drilling Days', val: drillingDays, set: setDrillingDays, color: C.green,  rate: (proj as any).drillingDayRate || 0 },
+                { label: 'Standby Days', val: standbyDaysDay, set: setStandbyDaysDay, color: C.amber, rate: (proj as any).standbyDayRate  || 0 },
+                { label: 'Repair Days',  val: repairDays,  set: setRepairDays,  color: C.red,   rate: (proj as any).repairDayRate   || 0 },
+              ].map((f, i) => (
+                <div key={i}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
+                    {f.label}
+                    <span style={{ fontSize: 9, color: f.color, marginLeft: 8 }}>₹{f.rate.toLocaleString()}/day × {f.val}d = ₹{(f.rate * f.val).toLocaleString()}</span>
+                  </div>
+                  <input type="number" value={f.val} onChange={e => f.set(parseInt(e.target.value) || 0)}
+                    style={{ ...iStyle, fontSize: 16, fontWeight: 700, color: f.color }} />
+                </div>
+              ))}
+            </>
           )}
 
           {/* Include mobilisation */}
@@ -461,8 +494,8 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
             <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(16,185,129,0.1)', color: C.green, border: '1px solid rgba(16,185,129,0.2)' }}>Auto-calculated</span>
           </div>
 
-          {/* Depth band breakdown */}
-          {proj.type === 'meterage' && (
+          {/* Meterage depth band breakdown */}
+          {isMeterage && (
             <div style={{ padding: '14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}` }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Depth Band Breakdown</div>
               {[
@@ -481,6 +514,23 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
                   <span style={{ color: C.purple, fontWeight: 700, fontFamily: 'monospace' }}>₹{(standbyDays * proj.standbyRate).toLocaleString()}</span>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Day rate breakdown */}
+          {isDayRate && (
+            <div style={{ padding: '14px', borderRadius: 10, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.2)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.blue, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Day Rate Breakdown</div>
+              {[
+                { label: `Drilling — ${drillingDays} days × ₹${((proj as any).drillingDayRate||0).toLocaleString()}`, value: drillingDays * ((proj as any).drillingDayRate||0), color: C.green },
+                { label: `Standby — ${standbyDaysDay} days × ₹${((proj as any).standbyDayRate||0).toLocaleString()}`,  value: standbyDaysDay * ((proj as any).standbyDayRate||0),  color: C.amber },
+                { label: `Repair — ${repairDays} days × ₹${((proj as any).repairDayRate||0).toLocaleString()}`,       value: repairDays * ((proj as any).repairDayRate||0),        color: C.red   },
+              ].map((row, i) => row.value > 0 && (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
+                  <span style={{ color: C.muted }}>{row.label}</span>
+                  <span style={{ color: row.color, fontWeight: 700, fontFamily: 'monospace' }}>₹{row.value.toLocaleString()}</span>
+                </div>
+              ))}
             </div>
           )}
 
