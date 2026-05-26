@@ -7,6 +7,8 @@ import {
   ChevronDown, Fuel, Wrench, Users, FileText, X
 } from 'lucide-react'
 
+import { useCostingRates, PROJECTS as CTX_PROJECTS } from './costing-context'
+
 // ── COLOUR TOKENS (matches Inventory orange scheme) ───────────────────────
 const C = {
   bg:        '#080B10',
@@ -217,6 +219,7 @@ function useSaveToast() {
 // TAB 1 — CONTRACT RATES
 // ══════════════════════════════════════════════════════════════════════════
 function ContractRates() {
+  const { rates: ctxRates, updateRate } = useCostingRates()
   const [rates, setRates] = useState(seedContractRates)
   const [selected, setSelected] = useState('RS-01')
   const [editing, setEditing] = useState(false)
@@ -226,7 +229,12 @@ function ContractRates() {
   const update = (field: string, val: any) =>
     setRates(prev => ({ ...prev, [selected]: { ...prev[selected], [field]: val } }))
 
-  const handleSave = () => { setEditing(false); trigger() }
+  const handleSave = () => {
+    // Save to shared context so Invoicing picks up the changes
+    updateRate(selected, rates[selected])
+    setEditing(false)
+    trigger()
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
