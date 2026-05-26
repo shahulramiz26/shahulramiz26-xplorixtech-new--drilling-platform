@@ -7,6 +7,8 @@ import {
   X, Plus, Edit2, Send, FileText, Building2, Eye
 } from 'lucide-react'
 
+import { useCostingRates, PROJECTS as CTX_PROJECTS } from './costing-context'
+
 // ── COLOUR TOKENS ─────────────────────────────────────────────────────────
 const C = {
   bg: '#080B10', card: '#0D1117', border: '#1E293B',
@@ -324,6 +326,7 @@ ${inv.notes ? `<div class="section"><div class="section-title">Notes</div><p sty
 // TAB 1 — GENERATE INVOICE
 // ══════════════════════════════════════════════════════════════════════════
 function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice[]; setInvoices: any; profile: typeof defaultProfile }) {
+  const { getRate } = useCostingRates()
   const [selectedProject, setSelectedProject] = useState('RS-01')
   const [month, setMonth] = useState('May 2026')
   const [meters, setMeters] = useState(624)
@@ -335,9 +338,11 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
   const [preview, setPreview] = useState<Invoice | null>(null)
   const [generated, setGenerated] = useState(false)
 
-  const proj = PROJECTS.find(p => p.id === selectedProject)!
-  const isMeterage = proj.type === 'meterage'
-  const isDayRate  = proj.type === 'dayrate'
+  // Read from shared context — picks up any changes made in Costing page
+  const projInfo = CTX_PROJECTS.find(p => p.id === selectedProject)!
+  const proj = { ...projInfo, ...getRate(selectedProject) }
+  const isMeterage = proj.contractType === 'meterage'
+  const isDayRate  = proj.contractType === 'dayrate'
 
   // Calculate revenue — reacts to contract type
   const calcRevenue = () => {
@@ -357,9 +362,9 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
       return rev
     } else {
       // Day rate: drilling days + standby days + repair days
-      const dr = (proj as any).drillingDayRate || 0
-      const sr = (proj as any).standbyDayRate  || 0
-      const rr = (proj as any).repairDayRate   || 0
+      const dr = proj.drillingDayRate || 0
+      const sr = proj.standbyDayRate  || 0
+      const rr = proj.repairDayRate   || 0
       let rev = (drillingDays * dr) + (standbyDaysDay * sr) + (repairDays * rr)
       if (includeMob) rev += proj.mobilisation
       return rev
@@ -408,7 +413,7 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
             <div style={{ position: 'relative' }}>
               <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)}
                 style={{ ...iStyle, appearance: 'none', cursor: 'pointer' }}>
-                {PROJECTS.map(p => <option key={p.id} value={p.id}>{p.fullName} — {p.client}</option>)}
+                {CTX_PROJECTS.map(p => <option key={p.id} value={p.id}>{p.fullName} — {p.client}</option>)}
               </select>
               <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.faint, pointerEvents: 'none' }} />
             </div>
@@ -449,12 +454,12 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
           {isDayRate && (
             <>
               <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', fontSize: 12, color: C.muted }}>
-                📅 Day Rate Contract — Drilling ₹{((proj as any).drillingDayRate||0).toLocaleString()}/day · Standby ₹{((proj as any).standbyDayRate||0).toLocaleString()}/day · Repair ₹{((proj as any).repairDayRate||0).toLocaleString()}/day
+                📅 Day Rate Contract — Drilling ₹{(proj.drillingDayRate||0).toLocaleString()}/day · Standby ₹{(proj.standbyDayRate||0).toLocaleString()}/day · Repair ₹{(proj.repairDayRate||0).toLocaleString()}/day
               </div>
               {[
-                { label: 'Drilling Days', val: drillingDays, set: setDrillingDays, color: C.green,  rate: (proj as any).drillingDayRate || 0 },
-                { label: 'Standby Days', val: standbyDaysDay, set: setStandbyDaysDay, color: C.amber, rate: (proj as any).standbyDayRate  || 0 },
-                { label: 'Repair Days',  val: repairDays,  set: setRepairDays,  color: C.red,   rate: (proj as any).repairDayRate   || 0 },
+                { label: 'Drilling Days', val: drillingDays, set: setDrillingDays, color: C.green,  rate: proj.drillingDayRate || 0 },
+                { label: 'Standby Days', val: standbyDaysDay, set: setStandbyDaysDay, color: C.amber, rate: proj.standbyDayRate  || 0 },
+                { label: 'Repair Days',  val: repairDays,  set: setRepairDays,  color: C.red,   rate: proj.repairDayRate   || 0 },
               ].map((f, i) => (
                 <div key={i}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
@@ -522,9 +527,9 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
             <div style={{ padding: '14px', borderRadius: 10, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.2)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.blue, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Day Rate Breakdown</div>
               {[
-                { label: `Drilling — ${drillingDays} days × ₹${((proj as any).drillingDayRate||0).toLocaleString()}`, value: drillingDays * ((proj as any).drillingDayRate||0), color: C.green },
-                { label: `Standby — ${standbyDaysDay} days × ₹${((proj as any).standbyDayRate||0).toLocaleString()}`,  value: standbyDaysDay * ((proj as any).standbyDayRate||0),  color: C.amber },
-                { label: `Repair — ${repairDays} days × ₹${((proj as any).repairDayRate||0).toLocaleString()}`,       value: repairDays * ((proj as any).repairDayRate||0),        color: C.red   },
+                { label: `Drilling — ${drillingDays} days × ₹${(proj.drillingDayRate||0).toLocaleString()}`, value: drillingDays * (proj.drillingDayRate||0), color: C.green },
+                { label: `Standby — ${standbyDaysDay} days × ₹${(proj.standbyDayRate||0).toLocaleString()}`,  value: standbyDaysDay * (proj.standbyDayRate||0),  color: C.amber },
+                { label: `Repair — ${repairDays} days × ₹${(proj.repairDayRate||0).toLocaleString()}`,       value: repairDays * (proj.repairDayRate||0),        color: C.red   },
               ].map((row, i) => row.value > 0 && (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
                   <span style={{ color: C.muted }}>{row.label}</span>
