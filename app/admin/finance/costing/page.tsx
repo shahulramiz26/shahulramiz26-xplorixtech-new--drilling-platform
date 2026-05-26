@@ -302,7 +302,15 @@ function ContractRates() {
             <div style={labelStyle}>Contract Type</div>
             <div style={{ display: 'flex', gap: 10 }}>
               {['meterage', 'dayrate'].map(type => (
-                <button key={type} onClick={() => editing && update('contractType', type)} style={{
+                <button key={type} onClick={() => {
+                  if (!editing) return
+                  update('contractType', type)
+                  if (type === 'dayrate') {
+                    if (!r.drillingDayRate) update('drillingDayRate', 28000)
+                    if (!r.standbyDayRate)  update('standbyDayRate',  12000)
+                    if (!r.repairDayRate)   update('repairDayRate',    8000)
+                  }
+                }} style={{
                   padding: '10px 24px', borderRadius: 10, fontSize: 13, fontWeight: 700,
                   cursor: editing ? 'pointer' : 'default', transition: 'all 0.2s',
                   background: r.contractType === type
