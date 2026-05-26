@@ -13,31 +13,17 @@ import {
 } from 'recharts'
 import { useCurrency } from '../../components/currency-context'
 
-// ── DATA ─────────────────────────────────────────────────────────────────────
 const projectOptions = ['All Projects','RS-01 - Chhindwara','CMP-MAD - Madheri','CMPDI-DAM - Bokaro','DGMIL-BHK - Bhalukona','PAT-CMPDI - Pathakuri','MECL-HIN - Bazar Gaon']
 const rigOptions     = ['All Rigs','KEM-1','KEM-4','KEM-5','KEM-6','KEM-8','KEM-9']
 const dateRanges     = ['This Month','Last 30 Days','Last 90 Days','This Quarter','This Year']
 
-// Project P&L data — RS-01 uses real customer data
 const projectPnL = [
   {
     project:'RS-01 - Chhindwara', client:'CMPDI', contractType:'meterage',
     metersDrilled:624, month:'May 2026',
-    revenue:{
-      band1:170000, band2:190000, band3:235200, standby:24000,
-      mobilisation:0, total:619200
-    },
-    costs:{
-      consumables:370673,  // from inventory issues
-      rigOperating:112000, // from rig master
-      labour:84000,
-      fuel:38000,          // from parts catalogue
-      maintenance:29000,
-      total:633673
-    },
-    billing:{
-      invoiced:480000, pending:139200, overdue:240000, overdueDays:45
-    }
+    revenue:{ band1:170000, band2:190000, band3:235200, standby:24000, mobilisation:0, total:619200 },
+    costs:{ consumables:370673, rigOperating:112000, labour:84000, fuel:38000, maintenance:29000, total:633673 },
+    billing:{ invoiced:480000, pending:139200, overdue:240000, overdueDays:45 }
   },
   {
     project:'DGMIL-BHK - Bhalukona', client:'DGML', contractType:'meterage',
@@ -65,8 +51,8 @@ const costTrendData = [
 ]
 
 const costBreakdownData = [
-  { name:'Consumables', value:370673, color:'#F97316' },
-  { name:'Rig Operating', value:112000, color:'#3B82F6' },
+  { name:'Consumables',  value:370673, color:'#F97316' },
+  { name:'Rig Operating',value:112000, color:'#3B82F6' },
   { name:'Labour',       value:84000,  color:'#10B981' },
   { name:'Fuel',         value:38000,  color:'#F59E0B' },
   { name:'Maintenance',  value:29000,  color:'#8B5CF6' },
@@ -90,15 +76,22 @@ const S = {
   label: { fontSize:10, fontWeight:700, color:'#64748B', letterSpacing:'0.1em', textTransform:'uppercase' as const },
 }
 
+// ── UPDATED SUBNAV — orange, new links ────────────────────────────────────
 function SubNav({ active }: { active:string }) {
   return (
     <div style={{ display:'flex', gap:4, background:'#080B10', border:'1px solid #1E293B', borderRadius:12, padding:4 }}>
       {[
-        { href:'/admin/finance', label:'Dashboard' },
-        { href:'/admin/finance/master-data', label:'Master Data' },
-        { href:'/admin/finance/reports', label:'Cost Reports' },
+        { href:'/admin/finance',            label:'Dashboard' },
+        { href:'/admin/finance/costing',    label:'Costing'   },
+        { href:'/admin/finance/invoicing',  label:'Invoicing' },
+        { href:'/admin/finance/reports',    label:'Reports'   },
       ].map(n=>(
-        <Link key={n.href} href={n.href} style={{ padding:'7px 16px', borderRadius:9, fontSize:13, fontWeight:600, textDecoration:'none', transition:'all 0.2s', background:active===n.label?'#3B82F6':'transparent', color:active===n.label?'#fff':'#94A3B8' }}>{n.label}</Link>
+        <Link key={n.href} href={n.href} style={{
+          padding:'7px 16px', borderRadius:9, fontSize:13, fontWeight:600,
+          textDecoration:'none', transition:'all 0.2s',
+          background: active===n.label ? '#F97316' : 'transparent',
+          color: active===n.label ? '#fff' : '#94A3B8',
+        }}>{n.label}</Link>
       ))}
     </div>
   )
@@ -107,19 +100,23 @@ function SubNav({ active }: { active:string }) {
 export default function FinanceDashboard() {
   const { format, formatShort } = useCurrency()
   const [selectedProject, setSelectedProject] = useState('RS-01 - Chhindwara')
-  const [selectedRig, setSelectedRig] = useState('All Rigs')
-  const [dateRange, setDateRange] = useState('This Month')
+  const [selectedRig, setSelectedRig]         = useState('All Rigs')
+  const [dateRange, setDateRange]             = useState('This Month')
 
-  const project = projectPnL.find(p=>p.project===selectedProject) || projectPnL[0]
-  const profit = project.revenue.total - project.costs.total
-  const margin = ((profit / project.revenue.total) * 100).toFixed(1)
+  const project     = projectPnL.find(p=>p.project===selectedProject) || projectPnL[0]
+  const profit      = project.revenue.total - project.costs.total
+  const margin      = ((profit / project.revenue.total) * 100).toFixed(1)
   const totalRevenue = projectPnL.reduce((s,p)=>s+p.revenue.total,0)
   const totalCost    = projectPnL.reduce((s,p)=>s+p.costs.total,0)
   const totalProfit  = totalRevenue - totalCost
   const totalOverdue = projectPnL.reduce((s,p)=>s+p.billing.overdue,0)
   const totalPending = projectPnL.reduce((s,p)=>s+p.billing.pending,0)
 
-  const selStyle: React.CSSProperties = { appearance:'none' as any, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#F8FAFC', fontSize:12, padding:'7px 28px 7px 12px', borderRadius:8, cursor:'pointer', outline:'none' }
+  const selStyle: React.CSSProperties = {
+    appearance:'none' as any, background:'rgba(255,255,255,0.04)',
+    border:'1px solid #1E293B', color:'#F8FAFC', fontSize:12,
+    padding:'7px 28px 7px 12px', borderRadius:8, cursor:'pointer', outline:'none',
+  }
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20, paddingBottom:40 }}>
@@ -127,17 +124,15 @@ export default function FinanceDashboard() {
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16 }}>
         <div>
-          <h1 style={{ fontSize:24, fontWeight:800, fontFamily:"'Space Grotesk',sans-serif", color:'#F8FAFC' }}>Finance &amp; Costing</h1>
+          <h1 style={{ fontSize:24, fontWeight:800, color:'#F8FAFC' }}>Finance &amp; Costing</h1>
           <p style={{ fontSize:13, color:'#64748B', marginTop:4 }}>Revenue, costs and profitability across all drilling operations</p>
         </div>
-        <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-          <SubNav active="Dashboard" />
-        </div>
+        <SubNav active="Dashboard" />
       </div>
 
       {/* Filters */}
       <div style={{ ...S.card, padding:'12px 20px', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-        <span style={{ ...S.label }}>Filter:</span>
+        <span style={S.label}>Filter:</span>
         {[
           { val:selectedProject, set:setSelectedProject, opts:projectOptions },
           { val:selectedRig,     set:setSelectedRig,     opts:rigOptions     },
@@ -152,39 +147,41 @@ export default function FinanceDashboard() {
         ))}
       </div>
 
-      {/* ── TOP KPI ROW ── */}
+      {/* KPI Row */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
         {[
           { label:'Total Revenue',    value:formatShort(totalRevenue), color:'#10B981', icon:'💰', change:'+12%', good:true  },
           { label:'Total Cost',       value:formatShort(totalCost),    color:'#EF4444', icon:'📊', change:'+8%',  good:false },
-          { label:'Gross Profit',     value:formatShort(totalProfit),  color: totalProfit>=0?'#10B981':'#EF4444', icon:'📈', change: totalProfit>=0?'+5%':'-2%', good:totalProfit>=0 },
+          { label:'Gross Profit',     value:formatShort(totalProfit),  color:totalProfit>=0?'#10B981':'#EF4444', icon:'📈', change:totalProfit>=0?'+5%':'-2%', good:totalProfit>=0 },
           { label:'Overdue Invoices', value:formatShort(totalOverdue), color:'#F59E0B', icon:'⏰', change:'45d',  good:false },
         ].map((k,i)=>(
           <div key={i} style={{ ...S.card, padding:'18px 20px' }}>
             <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:12 }}>
               <span style={{ fontSize:20 }}>{k.icon}</span>
               <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:20,
-                background: k.good ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                color: k.good ? '#10B981' : '#EF4444',
+                background:k.good?'rgba(16,185,129,0.1)':'rgba(239,68,68,0.1)',
+                color:k.good?'#10B981':'#EF4444',
               }}>{k.change}</span>
             </div>
             <div style={{ ...S.label, marginBottom:4 }}>{k.label}</div>
-            <div style={{ fontSize:22, fontWeight:800, fontFamily:"'Space Grotesk',sans-serif", color:k.color }}>{k.value}</div>
+            <div style={{ fontSize:22, fontWeight:800, color:k.color }}>{k.value}</div>
           </div>
         ))}
       </div>
 
-      {/* ── PROJECT P&L CARD ── */}
-      <div style={{ ...S.card, overflow:'hidden', background:'linear-gradient(135deg,rgba(59,130,246,0.04),rgba(13,17,23,0.98))', borderColor:'rgba(59,130,246,0.15)' }}>
+      {/* Project P&L — orange accent instead of blue */}
+      <div style={{ ...S.card, overflow:'hidden', background:'linear-gradient(135deg,rgba(249,115,22,0.04),rgba(13,17,23,0.98))', borderColor:'rgba(249,115,22,0.15)' }}>
         <div style={{ padding:'16px 24px', borderBottom:'1px solid #1E293B', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
             <div style={{ fontSize:15, fontWeight:700, color:'#F8FAFC' }}>Project P&amp;L — {project.project}</div>
-            <div style={{ fontSize:11, color:'#64748B', marginTop:2 }}>Client: {project.client} · {project.month} · {project.contractType === 'meterage' ? '📏 Meterage Contract' : '📅 Day Rate Contract'}</div>
+            <div style={{ fontSize:11, color:'#64748B', marginTop:2 }}>
+              Client: {project.client} · {project.month} · {project.contractType==='meterage'?'📏 Meterage Contract':'📅 Day Rate Contract'}
+            </div>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
             <div style={{ textAlign:'right' }}>
               <div style={{ fontSize:11, color:'#64748B' }}>Gross Profit</div>
-              <div style={{ fontSize:20, fontWeight:800, color: profit>=0?'#10B981':'#EF4444', fontFamily:"'Space Grotesk',sans-serif" }}>
+              <div style={{ fontSize:20, fontWeight:800, color:profit>=0?'#10B981':'#EF4444' }}>
                 {profit>=0?'+':''}{formatShort(profit)}
                 <span style={{ fontSize:12, fontWeight:600, marginLeft:6 }}>({margin}%)</span>
               </div>
@@ -195,7 +192,7 @@ export default function FinanceDashboard() {
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:0 }}>
 
-          {/* CONTRACT REVENUE */}
+          {/* Revenue */}
           <div style={{ padding:'20px 24px', borderRight:'1px solid #1E293B' }}>
             <div style={{ fontSize:11, fontWeight:700, color:'#10B981', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>Contract Revenue</div>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -203,47 +200,27 @@ export default function FinanceDashboard() {
                 <span style={{ color:'#64748B' }}>Meters drilled</span>
                 <span style={{ color:'#F8FAFC', fontWeight:600 }}>{project.metersDrilled}m</span>
               </div>
-              {project.revenue.band1 > 0 && (
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
-                  <span style={{ color:'#64748B' }}>0–200m × ₹850</span>
-                  <span style={{ color:'#10B981', fontWeight:600 }}>{format(project.revenue.band1)}</span>
-                </div>
-              )}
-              {project.revenue.band2 > 0 && (
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
-                  <span style={{ color:'#64748B' }}>200–400m × ₹950</span>
-                  <span style={{ color:'#10B981', fontWeight:600 }}>{format(project.revenue.band2)}</span>
-                </div>
-              )}
-              {project.revenue.band3 > 0 && (
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
-                  <span style={{ color:'#64748B' }}>400–624m × ₹1050</span>
-                  <span style={{ color:'#10B981', fontWeight:600 }}>{format(project.revenue.band3)}</span>
-                </div>
-              )}
-              {project.revenue.standby > 0 && (
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
-                  <span style={{ color:'#64748B' }}>Standby charges</span>
-                  <span style={{ color:'#10B981', fontWeight:600 }}>{format(project.revenue.standby)}</span>
-                </div>
-              )}
+              {project.revenue.band1>0 && <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}><span style={{ color:'#64748B' }}>0–200m × ₹850</span><span style={{ color:'#10B981', fontWeight:600 }}>{format(project.revenue.band1)}</span></div>}
+              {project.revenue.band2>0 && <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}><span style={{ color:'#64748B' }}>200–400m × ₹950</span><span style={{ color:'#10B981', fontWeight:600 }}>{format(project.revenue.band2)}</span></div>}
+              {project.revenue.band3>0 && <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}><span style={{ color:'#64748B' }}>400–624m × ₹1050</span><span style={{ color:'#10B981', fontWeight:600 }}>{format(project.revenue.band3)}</span></div>}
+              {project.revenue.standby>0 && <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}><span style={{ color:'#64748B' }}>Standby charges</span><span style={{ color:'#10B981', fontWeight:600 }}>{format(project.revenue.standby)}</span></div>}
               <div style={{ borderTop:'1px solid #1E293B', paddingTop:8, display:'flex', justifyContent:'space-between' }}>
                 <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC' }}>Gross Revenue</span>
-                <span style={{ fontSize:15, fontWeight:800, color:'#10B981', fontFamily:"'Space Grotesk',sans-serif" }}>{format(project.revenue.total)}</span>
+                <span style={{ fontSize:15, fontWeight:800, color:'#10B981' }}>{format(project.revenue.total)}</span>
               </div>
             </div>
           </div>
 
-          {/* DIRECT COSTS */}
+          {/* Costs */}
           <div style={{ padding:'20px 24px', borderRight:'1px solid #1E293B' }}>
             <div style={{ fontSize:11, fontWeight:700, color:'#EF4444', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>Direct Costs</div>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
                 { label:'Consumables issued', value:project.costs.consumables, note:'← from Inventory', color:'#F97316' },
-                { label:'Rig operating cost', value:project.costs.rigOperating, note:'← from Rig Master', color:'#3B82F6' },
-                { label:'Labour / Crew',      value:project.costs.labour,      note:'',                  color:'#10B981' },
-                { label:'Fuel',               value:project.costs.fuel,        note:'← from Catalogue', color:'#F59E0B' },
-                { label:'Maintenance',        value:project.costs.maintenance, note:'',                  color:'#8B5CF6' },
+                { label:'Rig operating cost', value:project.costs.rigOperating, note:'← from Costing',  color:'#3B82F6' },
+                { label:'Labour / Crew',      value:project.costs.labour,       note:'',                color:'#10B981' },
+                { label:'Fuel',               value:project.costs.fuel,         note:'← from Inventory',color:'#F59E0B' },
+                { label:'Maintenance',        value:project.costs.maintenance,  note:'',                color:'#8B5CF6' },
               ].map((c,i)=>(
                 <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:12 }}>
                   <div>
@@ -255,17 +232,15 @@ export default function FinanceDashboard() {
               ))}
               <div style={{ borderTop:'1px solid #1E293B', paddingTop:8, display:'flex', justifyContent:'space-between' }}>
                 <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC' }}>Total Cost</span>
-                <span style={{ fontSize:15, fontWeight:800, color:'#EF4444', fontFamily:"'Space Grotesk',sans-serif" }}>{format(project.costs.total)}</span>
+                <span style={{ fontSize:15, fontWeight:800, color:'#EF4444' }}>{format(project.costs.total)}</span>
               </div>
             </div>
           </div>
 
-          {/* PROFITABILITY + BILLING */}
+          {/* Profitability */}
           <div style={{ padding:'20px 24px' }}>
             <div style={{ fontSize:11, fontWeight:700, color:'#F97316', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14 }}>Profitability &amp; Billing</div>
-
-            {/* Profit summary */}
-            <div style={{ padding:'12px 14px', borderRadius:10, background: profit>=0?'rgba(16,185,129,0.06)':'rgba(239,68,68,0.06)', border:`1px solid ${profit>=0?'rgba(16,185,129,0.2)':'rgba(239,68,68,0.2)'}`, marginBottom:14 }}>
+            <div style={{ padding:'12px 14px', borderRadius:10, background:profit>=0?'rgba(16,185,129,0.06)':'rgba(239,68,68,0.06)', border:`1px solid ${profit>=0?'rgba(16,185,129,0.2)':'rgba(239,68,68,0.2)'}`, marginBottom:14 }}>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
                 <span style={{ fontSize:12, color:'#64748B' }}>Revenue</span>
                 <span style={{ fontSize:12, color:'#10B981', fontWeight:600 }}>{format(project.revenue.total)}</span>
@@ -276,13 +251,11 @@ export default function FinanceDashboard() {
               </div>
               <div style={{ borderTop:'1px solid rgba(255,255,255,0.08)', paddingTop:6, display:'flex', justifyContent:'space-between' }}>
                 <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC' }}>Gross Profit</span>
-                <span style={{ fontSize:15, fontWeight:800, color:profit>=0?'#10B981':'#EF4444', fontFamily:"'Space Grotesk',sans-serif" }}>
+                <span style={{ fontSize:15, fontWeight:800, color:profit>=0?'#10B981':'#EF4444' }}>
                   {profit>=0?'+':''}{format(profit)} <span style={{ fontSize:11 }}>({margin}%)</span>
                 </span>
               </div>
             </div>
-
-            {/* Billing status */}
             <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Billing Status</div>
             {[
               { label:'Invoiced to '+project.client, value:project.billing.invoiced, color:'#10B981', icon:<CheckCircle size={11}/> },
@@ -290,12 +263,10 @@ export default function FinanceDashboard() {
               { label:`Overdue (${project.billing.overdueDays}d)`, value:project.billing.overdue, color:'#EF4444', icon:<AlertTriangle size={11}/> },
             ].map((b,i)=>(
               <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, padding:'6px 10px', borderRadius:8,
-                background: b.value>0 ? `${b.color}08` : 'transparent',
-                border: b.value>0 ? `1px solid ${b.color}20` : '1px solid transparent',
+                background:b.value>0?`${b.color}08`:'transparent',
+                border:b.value>0?`1px solid ${b.color}20`:'1px solid transparent',
               }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, color:b.color, fontSize:11 }}>
-                  {b.icon}<span>{b.label}</span>
-                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:6, color:b.color, fontSize:11 }}>{b.icon}<span>{b.label}</span></div>
                 <span style={{ fontSize:12, fontWeight:700, color:b.color }}>{format(b.value)}</span>
               </div>
             ))}
@@ -303,10 +274,8 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
-      {/* ── CHARTS ROW: Revenue vs Cost Trend + Cost Breakdown ── */}
+      {/* Charts */}
       <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:16 }}>
-
-        {/* Revenue vs Cost Trend */}
         <div style={{ ...S.card, padding:24 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
             <div>
@@ -314,7 +283,7 @@ export default function FinanceDashboard() {
               <div style={{ fontSize:11, color:'#64748B', marginTop:2 }}>Last 6 months — green = profit, red = loss</div>
             </div>
             <div style={{ display:'flex', gap:14, fontSize:11 }}>
-              {[['#10B981','Revenue'],['#EF4444','Cost'],['#3B82F6','Profit']].map(([c,l])=>(
+              {[['#10B981','Revenue'],['#EF4444','Cost'],['#F97316','Profit']].map(([c,l])=>(
                 <span key={l} style={{ display:'flex', alignItems:'center', gap:5 }}>
                   <span style={{ width:18, height:2, background:c, display:'inline-block', borderRadius:2 }} />
                   <span style={{ color:'#94A3B8' }}>{l}</span>
@@ -330,12 +299,10 @@ export default function FinanceDashboard() {
               <Tooltip {...tooltipStyle} formatter={(v:any)=>[`₹${(v/100000).toFixed(2)}L`,'']} />
               <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2} dot={{ fill:'#10B981', r:3 }} name="Revenue" />
               <Line type="monotone" dataKey="cost"    stroke="#EF4444" strokeWidth={2} dot={{ fill:'#EF4444', r:3 }} strokeDasharray="5 4" name="Cost" />
-              <Line type="monotone" dataKey="profit"  stroke="#3B82F6" strokeWidth={2} dot={{ fill:'#3B82F6', r:3 }} name="Profit" />
+              <Line type="monotone" dataKey="profit"  stroke="#F97316" strokeWidth={2} dot={{ fill:'#F97316', r:3 }} name="Profit" />
             </LineChart>
           </ResponsiveContainer>
         </div>
-
-        {/* Cost Breakdown donut */}
         <div style={{ ...S.card, padding:24 }}>
           <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC', marginBottom:16 }}>Cost Breakdown</div>
           <ResponsiveContainer width="100%" height={140}>
@@ -360,7 +327,7 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
-      {/* ── RIG PERFORMANCE TABLE ── */}
+      {/* Rig Performance */}
       <div style={{ ...S.card, overflow:'hidden' }}>
         <div style={{ padding:'16px 24px', borderBottom:'1px solid #1E293B' }}>
           <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>Rig Performance — Revenue vs Cost</div>
@@ -376,7 +343,7 @@ export default function FinanceDashboard() {
           </thead>
           <tbody>
             {rigPerfData.map((r,i)=>{
-              const profit = r.revenue - r.cost
+              const p = r.revenue - r.cost
               return (
                 <tr key={i} style={{ borderBottom:'1px solid rgba(30,41,59,0.5)' }}
                   onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.015)'}
@@ -385,9 +352,7 @@ export default function FinanceDashboard() {
                   <td style={{ padding:'12px 16px', fontSize:13, fontWeight:700, color:'#10B981' }}>{format(r.revenue)}</td>
                   <td style={{ padding:'12px 16px', fontSize:13, fontWeight:600, color:'#EF4444' }}>{format(r.cost)}</td>
                   <td style={{ padding:'12px 16px' }}>
-                    <span style={{ fontSize:13, fontWeight:800, color:profit>=0?'#10B981':'#EF4444', fontFamily:"'Space Grotesk',sans-serif" }}>
-                      {profit>=0?'+':''}{format(profit)}
-                    </span>
+                    <span style={{ fontSize:13, fontWeight:800, color:p>=0?'#10B981':'#EF4444' }}>{p>=0?'+':''}{format(p)}</span>
                   </td>
                   <td style={{ padding:'12px 16px' }}>
                     <span style={{ fontSize:13, fontWeight:700, color:r.costPerMeter<140?'#10B981':r.costPerMeter<160?'#F59E0B':'#EF4444' }}>₹{r.costPerMeter}/m</span>
@@ -408,11 +373,11 @@ export default function FinanceDashboard() {
         </table>
       </div>
 
-      {/* ── BILLING ALERTS ── */}
+      {/* Billing Alerts */}
       <div style={{ ...S.card, padding:24 }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
           <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>Billing &amp; Invoice Status</div>
-          <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.2)', color:'#F59E0B' }}>
+          <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)', color:'#F97316' }}>
             {format(totalOverdue + totalPending)} outstanding
           </span>
         </div>
@@ -424,9 +389,9 @@ export default function FinanceDashboard() {
                 <span style={{ fontSize:10, color:'#64748B' }}>{p.client}</span>
               </div>
               {[
-                { label:'Invoiced',       value:p.billing.invoiced, color:'#10B981' },
-                { label:'Pending',        value:p.billing.pending,  color:'#F59E0B' },
-                { label:`Overdue (${p.billing.overdueDays}d)`, value:p.billing.overdue, color:'#EF4444' },
+                { label:'Invoiced',                              value:p.billing.invoiced, color:'#10B981' },
+                { label:'Pending',                               value:p.billing.pending,  color:'#F59E0B' },
+                { label:`Overdue (${p.billing.overdueDays}d)`,  value:p.billing.overdue,  color:'#EF4444' },
               ].map((b,j)=>(
                 <div key={j} style={{ display:'flex', justifyContent:'space-between', marginBottom:6, fontSize:12 }}>
                   <span style={{ color:'#64748B' }}>{b.label}</span>
