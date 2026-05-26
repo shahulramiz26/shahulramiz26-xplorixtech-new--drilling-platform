@@ -7,7 +7,7 @@ import {
   X, Plus, Edit2, Send, FileText, Building2, Eye
 } from 'lucide-react'
 
-import { useCostingRates, PROJECTS as CTX_PROJECTS } from './costing-context'
+import { useCostingRates, PROJECTS as CTX_PROJECTS } from '../costing-context'
 
 // ── COLOUR TOKENS ─────────────────────────────────────────────────────────
 const C = {
