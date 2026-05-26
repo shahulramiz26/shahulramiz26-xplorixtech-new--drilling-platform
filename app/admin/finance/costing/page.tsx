@@ -7,7 +7,7 @@ import {
   ChevronDown, Fuel, Wrench, Users, FileText, X
 } from 'lucide-react'
 
-import { useCostingRates, PROJECTS as CTX_PROJECTS } from './costing-context'
+import { useCostingRates, PROJECTS as CTX_PROJECTS } from '../costing-context'
 
 // ── COLOUR TOKENS (matches Inventory orange scheme) ───────────────────────
 const C = {
