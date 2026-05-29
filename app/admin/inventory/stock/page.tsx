@@ -22,9 +22,11 @@ interface Movement {
   by?: string
 }
 interface TransferItem { id: string; partName: string; partNumber: string; qty: number; unit: string }
+interface PartRequestItem { partName: string; partNumber: string; qty: number; unit: string }
 interface PartRequest {
-  id: string; requestedBy: string; partName: string; partNumber: string
-  qty: number; unit: string; project: string; rig: string
+  id: string; requestedBy: string
+  items: PartRequestItem[]
+  project: string; rig: string
   urgency: 'Normal' | 'Urgent' | 'Critical'; reason: string
   date: string; status: 'Pending' | 'Converted' | 'Rejected'
 }
@@ -109,9 +111,9 @@ const seedMovements: Movement[] = [
 ]
 
 const seedRequests: PartRequest[] = [
-  { id:'1', requestedBy:'Anil Sharma', partName:'NQ Core Bit SR-06', partNumber:'NQ-CB-SR06', qty:4, unit:'NOS', project:'DGMIL-BHK - Bhalukona', rig:'KEM-5', urgency:'Urgent', reason:'Bits worn out, need replacement', date:'24-05-2026', status:'Pending' },
-  { id:'2', requestedBy:'Ravi Kumar', partName:'Fuel Water Separator', partNumber:'FLT-FWS-01', qty:6, unit:'NOS', project:'RS-01 - Chhindwara', rig:'KEM-1', urgency:'Normal', reason:'Monthly replacement due', date:'23-05-2026', status:'Pending' },
-  { id:'3', requestedBy:'Suresh Patil', partName:'MATEX DD955 Liquid', partNumber:'MTX-DD955', qty:5, unit:'Bucket', project:'CMP-MAD - Madheri', rig:'KEM-4', urgency:'Critical', reason:'Running out of drilling fluid', date:'22-05-2026', status:'Converted' },
+  { id:'1', requestedBy:'Anil Sharma', items:[{partName:'NQ Core Bit SR-06',partNumber:'NQ-CB-SR06',qty:4,unit:'NOS'},{partName:'HQ Core Lifter',partNumber:'HQ-CL-001',qty:10,unit:'NOS'}], project:'DGMIL-BHK - Bhalukona', rig:'KEM-5', urgency:'Urgent', reason:'Bits worn out, need replacement', date:'24-05-2026', status:'Pending' },
+  { id:'2', requestedBy:'Ravi Kumar', items:[{partName:'Fuel Water Separator',partNumber:'FLT-FWS-01',qty:6,unit:'NOS'}], project:'RS-01 - Chhindwara', rig:'KEM-1', urgency:'Normal', reason:'Monthly replacement due', date:'23-05-2026', status:'Pending' },
+  { id:'3', requestedBy:'Suresh Patil', items:[{partName:'MATEX DD955 Liquid',partNumber:'MTX-DD955',qty:5,unit:'Bucket'},{partName:'ADDRILL EA-20 KG',partNumber:'ADD-EA-20',qty:20,unit:'Kg'}], project:'CMP-MAD - Madheri', rig:'KEM-4', urgency:'Critical', reason:'Running out of drilling fluid', date:'22-05-2026', status:'Converted' },
 ]
 
 // ── SUBNAV ──────────────────────────────────────────────────────────────────
@@ -415,32 +417,43 @@ function OpeningBalanceModal({ project, onClose }: { project:string; onClose:()=
   )
 }
 
-// ── PART REQUEST MODAL (Change 6) ────────────────────────────────────────────
+// ── PART REQUEST MODAL (Change 1 — Multiple parts) ──────────────────────────
 function PartRequestModal({ onClose, onSave }: { onClose:()=>void; onSave:(r:PartRequest)=>void }) {
-  const [form, setForm] = useState({ requestedBy:'', partName:'', partNumber:'', qty:1, unit:'NOS', project:projectOptions[0], rig:rigOptions[0], urgency:'Normal' as 'Normal'|'Urgent'|'Critical', reason:'' })
-  const [partSearch, setPartSearch] = useState('')
-  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [requestedBy, setRequestedBy] = useState('')
+  const [project, setProject] = useState(projectOptions[0])
+  const [rig, setRig] = useState(rigOptions[0])
+  const [urgency, setUrgency] = useState<'Normal'|'Urgent'|'Critical'>('Normal')
+  const [reason, setReason] = useState('')
+  const [items, setItems] = useState<(PartRequestItem & {id:string; search:string; showSug:boolean})[]>([
+    { id:'r1', partName:'', partNumber:'', qty:1, unit:'NOS', search:'', showSug:false }
+  ])
   const [error, setError] = useState('')
 
-  const handlePartSelect = (part: typeof partsCatalogueList[0]) => {
-    setForm(f=>({...f, partName:part.name, partNumber:part.partNumber, unit:part.unit}))
-    setPartSearch(part.name)
-    setShowSuggestions(false)
+  const addItem = () => setItems(p=>[...p,{ id:`r${Date.now()}`, partName:'', partNumber:'', qty:1, unit:'NOS', search:'', showSug:false }])
+  const removeItem = (id:string) => setItems(p=>p.filter(x=>x.id!==id))
+  const updateItem = (id:string, field:string, val:any) => setItems(p=>p.map(x=>x.id===id?{...x,[field]:val}:x))
+
+  const selectPart = (id:string, part:typeof partsCatalogueList[0]) => {
+    setItems(p=>p.map(x=>x.id===id?{...x, partName:part.name, partNumber:part.partNumber, unit:part.unit, search:part.name, showSug:false}:x))
   }
 
   const handleSave = () => {
-    if (!form.requestedBy.trim()) { setError('Please enter your name'); return }
-    if (!form.partName.trim()) { setError('Please select a part'); return }
-    if (!form.reason.trim()) { setError('Please enter a reason'); return }
-    onSave({ ...form, id:Date.now().toString(), date:new Date().toLocaleDateString('en-IN'), status:'Pending' })
+    if (!requestedBy.trim()) { setError('Please enter your name'); return }
+    if (items.some(i=>!i.partName)) { setError('Please select all parts'); return }
+    if (!reason.trim()) { setError('Please enter a reason'); return }
+    onSave({ id:Date.now().toString(), requestedBy, items:items.map(({id,search,showSug,...rest})=>rest), project, rig, urgency, reason, date:new Date().toLocaleDateString('en-IN'), status:'Pending' })
     onClose()
   }
 
-  const urgencyColors = { Normal:{ color:'#10B981', bg:'rgba(16,185,129,0.1)', border:'rgba(16,185,129,0.3)' }, Urgent:{ color:'#F59E0B', bg:'rgba(245,158,11,0.1)', border:'rgba(245,158,11,0.3)' }, Critical:{ color:'#EF4444', bg:'rgba(239,68,68,0.1)', border:'rgba(239,68,68,0.3)' } }
+  const urgencyColors = {
+    Normal:  { color:'#10B981', bg:'rgba(16,185,129,0.1)', border:'rgba(16,185,129,0.3)' },
+    Urgent:  { color:'#F59E0B', bg:'rgba(245,158,11,0.1)', border:'rgba(245,158,11,0.3)' },
+    Critical:{ color:'#EF4444', bg:'rgba(239,68,68,0.1)', border:'rgba(239,68,68,0.3)' }
+  }
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(10px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-      <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:20, padding:28, width:520, maxHeight:'90vh', overflowY:'auto' }}>
+      <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:20, padding:28, width:620, maxHeight:'92vh', overflowY:'auto' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
           <div>
             <div style={{ fontSize:18, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>Raise Part Request</div>
@@ -453,64 +466,79 @@ function PartRequestModal({ onClose, onSave }: { onClose:()=>void; onSave:(r:Par
           {/* Requested By */}
           <div>
             <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Requested By *</div>
-            <input value={form.requestedBy} onChange={e=>setForm(f=>({...f,requestedBy:e.target.value}))} placeholder="Enter your full name..." style={iStyle} />
-          </div>
-
-          {/* Part Name with search */}
-          <div style={{ position:'relative' }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Part Name *</div>
-            <input value={partSearch||form.partName} onChange={e=>{ setPartSearch(e.target.value); setShowSuggestions(true); setForm(f=>({...f,partName:e.target.value})) }}
-              placeholder="Search and select part..." style={iStyle} />
-            {showSuggestions && partSearch && (
-              <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:100, background:'#0D1117', border:'1px solid #1E293B', borderRadius:8, maxHeight:180, overflowY:'auto' }}>
-                {partsCatalogueList.filter(p=>p.name.toLowerCase().includes(partSearch.toLowerCase())).map(p=>(
-                  <div key={p.partNumber} onClick={()=>handlePartSelect(p)}
-                    style={{ padding:'10px 14px', cursor:'pointer', borderBottom:'1px solid rgba(30,41,59,0.4)' }}
-                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(249,115,22,0.08)'}
-                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
-                    <div style={{ fontSize:13, fontWeight:600, color:'#F8FAFC' }}>{p.name}</div>
-                    <div style={{ fontSize:11, color:'#64748B', marginTop:2 }}>{p.partNumber} · {p.unit}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Part Number (auto-fill) */}
-          {form.partNumber && (
-            <div style={{ padding:'8px 12px', borderRadius:8, background:'rgba(16,185,129,0.05)', border:'1px solid rgba(16,185,129,0.15)', display:'flex', justifyContent:'space-between' }}>
-              <span style={{ fontSize:11, color:'#64748B' }}>Part Number</span>
-              <span style={{ fontSize:12, fontWeight:700, color:'#10B981', fontFamily:'monospace' }}>{form.partNumber}</span>
-            </div>
-          )}
-
-          {/* Qty + Unit */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <div>
-              <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Quantity *</div>
-              <input type="number" min={1} value={form.qty} onChange={e=>setForm(f=>({...f,qty:parseInt(e.target.value)||1}))} style={iStyle} />
-            </div>
-            <div>
-              <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Unit</div>
-              <select value={form.unit} onChange={e=>setForm(f=>({...f,unit:e.target.value}))} style={selStyle}>
-                {unitOptions.map(u=><option key={u}>{u}</option>)}
-              </select>
-            </div>
+            <input value={requestedBy} onChange={e=>setRequestedBy(e.target.value)} placeholder="Enter your full name..." style={iStyle} />
           </div>
 
           {/* Project + Rig */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
             <div>
               <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Project *</div>
-              <select value={form.project} onChange={e=>setForm(f=>({...f,project:e.target.value}))} style={selStyle}>
+              <select value={project} onChange={e=>setProject(e.target.value)} style={selStyle}>
                 {projectOptions.map(p=><option key={p}>{p}</option>)}
               </select>
             </div>
             <div>
               <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Rig *</div>
-              <select value={form.rig} onChange={e=>setForm(f=>({...f,rig:e.target.value}))} style={selStyle}>
+              <select value={rig} onChange={e=>setRig(e.target.value)} style={selStyle}>
                 {rigOptions.map(r=><option key={r}>{r}</option>)}
               </select>
+            </div>
+          </div>
+
+          {/* Parts Line Items */}
+          <div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em' }}>Parts Required *</div>
+              <button onClick={addItem} style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:7, background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)', color:'#F97316', fontSize:11, fontWeight:600, cursor:'pointer' }}>
+                <Plus size={11}/> Add Part
+              </button>
+            </div>
+            <div style={{ border:'1px solid #1E293B', borderRadius:12, overflow:'hidden' }}>
+              {/* Table Header */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 100px 70px 70px 32px', gap:8, padding:'8px 12px', background:'rgba(255,255,255,0.02)', borderBottom:'1px solid #1E293B' }}>
+                {['Part Name','Part No','Qty','Unit',''].map(h=>(
+                  <div key={h} style={{ fontSize:10, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</div>
+                ))}
+              </div>
+              {/* Rows */}
+              {items.map((item)=>(
+                <div key={item.id} style={{ display:'grid', gridTemplateColumns:'1fr 100px 70px 70px 32px', gap:8, padding:'8px 12px', borderBottom:'1px solid rgba(30,41,59,0.5)', position:'relative', alignItems:'center' }}>
+                  {/* Part Name search */}
+                  <div style={{ position:'relative' }}>
+                    <input value={item.search || item.partName}
+                      onChange={e=>updateItem(item.id,'search',e.target.value) || updateItem(item.id,'showSug',true) || updateItem(item.id,'partName',e.target.value)}
+                      placeholder="Search part..."
+                      style={{...iStyle, fontSize:11, padding:'6px 8px'}} />
+                    {item.showSug && item.search && (
+                      <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:200, background:'#0D1117', border:'1px solid #1E293B', borderRadius:8, maxHeight:160, overflowY:'auto' }}>
+                        {partsCatalogueList.filter(p=>p.name.toLowerCase().includes(item.search.toLowerCase())).map(p=>(
+                          <div key={p.partNumber} onClick={()=>selectPart(item.id,p)}
+                            style={{ padding:'8px 12px', cursor:'pointer', borderBottom:'1px solid rgba(30,41,59,0.4)', fontSize:12 }}
+                            onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(249,115,22,0.08)'}
+                            onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                            <div style={{ fontWeight:600, color:'#F8FAFC' }}>{p.name}</div>
+                            <div style={{ fontSize:10, color:'#64748B' }}>{p.partNumber}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {/* Part Number */}
+                  <div style={{ fontSize:10, color:'#10B981', fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.partNumber || '—'}</div>
+                  {/* Qty */}
+                  <input type="number" min={1} value={item.qty}
+                    onChange={e=>updateItem(item.id,'qty',parseInt(e.target.value)||1)}
+                    style={{...iStyle, fontSize:11, padding:'6px 8px', textAlign:'center'}} />
+                  {/* Unit */}
+                  <select value={item.unit} onChange={e=>updateItem(item.id,'unit',e.target.value)} style={{...selStyle, fontSize:11, padding:'5px 4px'}}>
+                    {unitOptions.map(u=><option key={u}>{u}</option>)}
+                  </select>
+                  {/* Remove */}
+                  {items.length > 1 && (
+                    <button onClick={()=>removeItem(item.id)} style={{ padding:4, borderRadius:5, background:'rgba(239,68,68,0.08)', border:'none', color:'rgba(239,68,68,0.6)', cursor:'pointer' }}><X size={12}/></button>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -521,11 +549,11 @@ function PartRequestModal({ onClose, onSave }: { onClose:()=>void; onSave:(r:Par
               {(['Normal','Urgent','Critical'] as const).map(u=>{
                 const c = urgencyColors[u]
                 return (
-                  <button key={u} onClick={()=>setForm(f=>({...f,urgency:u}))}
+                  <button key={u} onClick={()=>setUrgency(u)}
                     style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:13,
-                      background: form.urgency===u ? c.bg : 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${form.urgency===u ? c.border : '#1E293B'}`,
-                      color: form.urgency===u ? c.color : '#64748B',
+                      background: urgency===u ? c.bg : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${urgency===u ? c.border : '#1E293B'}`,
+                      color: urgency===u ? c.color : '#64748B',
                     }}>{u}</button>
                 )
               })}
@@ -535,7 +563,7 @@ function PartRequestModal({ onClose, onSave }: { onClose:()=>void; onSave:(r:Par
           {/* Reason */}
           <div>
             <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Reason *</div>
-            <input value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} placeholder="Why do you need this part?" style={iStyle} />
+            <input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Why do you need these parts?" style={iStyle} />
           </div>
         </div>
 
@@ -568,6 +596,7 @@ export default function StockManagementPage() {
   const [partRequests, setPartRequests] = useState<PartRequest[]>(seedRequests)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  // Applied filters (only update when Apply is clicked)
 
   const stock = stockData[selectedProject] || []
   const filtered = stock.filter(item => {
@@ -775,6 +804,7 @@ export default function StockManagementPage() {
             Clear
           </button>
         )}
+
         {(['all','low','ok'] as const).map(f=>(
           <button key={f} onClick={()=>setFilterStatus(f)}
             style={{ padding:'8px 16px', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', transition:'all 0.2s',
