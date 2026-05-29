@@ -179,10 +179,19 @@ export default function InventoryDashboard() {
             <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
               style={{ padding:'5px 8px', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:11, outline:'none' }} />
             {(dateFrom||dateTo) && (
-              <button onClick={()=>{setDateFrom('');setDateTo('')}}
+              <button onClick={()=>{setDateFrom('');setDateTo('');setAppliedDateFrom('');setAppliedDateTo('')}}
                 style={{ padding:'4px 10px', borderRadius:8, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#EF4444', fontSize:11, fontWeight:600, cursor:'pointer' }}>Clear</button>
             )}
           </div>
+          <button onClick={()=>{
+            setAppliedProject(selectedProject)
+            setAppliedRig(selectedRig)
+            setAppliedDateFrom(dateFrom)
+            setAppliedDateTo(dateTo)
+          }}
+            style={{ padding:'7px 22px', borderRadius:9, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none', whiteSpace:'nowrap', boxShadow:'0 4px 12px rgba(249,115,22,0.3)' }}>
+            Apply
+          </button>
           <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
             <button style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:8, background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)', color:'#F97316', fontSize:12, fontWeight:600, cursor:'pointer' }}>
               <Download size={13} /> Export
