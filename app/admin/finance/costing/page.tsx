@@ -40,10 +40,7 @@ const STANDARD_CATEGORIES = [
   { label: 'Driller Day Rate',             unit: '₹/day',    defaultPrice: 1500,   group: 'Labour'            },
   { label: 'Helper Day Rate',              unit: '₹/day',    defaultPrice: 800,    group: 'Labour'            },
   { label: 'Supervisor Day Rate',          unit: '₹/day',    defaultPrice: 2000,   group: 'Labour'            },
-  // Consumables
-  { label: 'Core Bit (NQ)',                unit: '₹/bit',    defaultPrice: 11500,  group: 'Consumables'       },
-  { label: 'Core Bit (HQ)',                unit: '₹/bit',    defaultPrice: 22000,  group: 'Consumables'       },
-  { label: 'Drilling Fluid',               unit: '₹/bucket', defaultPrice: 12151,  group: 'Consumables'       },
+  // Consumables removed — pulled from Inventory automatically
   // Fuel
   { label: 'Diesel / Fuel',               unit: '₹/litre',  defaultPrice: 97,     group: 'Fuel'              },
   { label: 'Fuel Lump Sum (monthly)',      unit: '₹/month',  defaultPrice: 38000,  group: 'Fuel'              },
@@ -217,12 +214,22 @@ function AddItemModal({ onAdd, onClose }: { onAdd: (item: LineItem) => void; onC
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Unit</div>
               <div style={{ position: 'relative' }}>
-                <select value={customUnit} onChange={e => setCustomUnit(e.target.value)}
+                <select value={customUnit === 'Other' || !UNITS.includes(customUnit) ? 'Other' : customUnit}
+                  onChange={e => setCustomUnit(e.target.value)}
                   style={{ ...iStyle, appearance: 'none', cursor: 'pointer', paddingRight: 32 }}>
                   {UNITS.map(u => <option key={u}>{u}</option>)}
                 </select>
                 <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.faint, pointerEvents: 'none' }} />
               </div>
+              {(customUnit === 'Other' || !UNITS.slice(0, -1).includes(customUnit)) && (
+                <input
+                  value={customUnit === 'Other' ? '' : customUnit}
+                  onChange={e => setCustomUnit(e.target.value)}
+                  placeholder="Type your unit (e.g. ₹/hole, ₹/sample...)"
+                  style={{ ...iStyle, marginTop: 8, fontSize: 13 }}
+                  autoFocus
+                />
+              )}
             </div>
           </div>
         )}
@@ -785,11 +792,56 @@ export default function CostingPage() {
 
       {/* Empty state */}
       {!selectedProject && (
-        <div style={{ padding: '60px', textAlign: 'center', background: C.card, border: `1px solid ${C.border}`, borderRadius: 16 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 8 }}>Select a project to build its contract</div>
-          <div style={{ fontSize: 13, color: C.faint }}>Each project gets its own contract with custom rates, party details and downloadable PDF</div>
-        </div>
+        <>
+          <div style={{ padding: '60px', textAlign: 'center', background: C.card, border: `1px solid ${C.border}`, borderRadius: 16 }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 8 }}>Select a project to build its contract</div>
+            <div style={{ fontSize: 13, color: C.faint }}>Each project gets its own contract with custom rates, party details and downloadable PDF</div>
+          </div>
+
+          {/* Saved contracts overview */}
+          {Object.keys(contracts).length > 0 && (
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+              <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 700, color: C.text }}>
+                Saved Contracts
+              </div>
+              {Object.entries(contracts).map(([projId, c], i) => {
+                const p = PROJECTS.find(x => x.id === projId)
+                if (!c.lineItems?.length) return null
+                return (
+                  <div key={projId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: `1px solid rgba(30,41,59,0.5)`, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 9, background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📋</div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{p?.fullName || projId}</div>
+                        <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>
+                          {p?.client} · {c.lineItems.length} line items
+                          {c.dateFrom && c.dateTo ? ` · ${c.dateFrom} to ${c.dateTo}` : ''}
+                          · <span style={{ color: C.green }}>✅ Synced to Invoicing</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => setSelectedProject(projId)}
+                        style={{ padding: '7px 16px', borderRadius: 8, background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)', color: C.orange, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                        Edit
+                      </button>
+                      <button onClick={() => {
+                        const html = generateContractHTML(c, p?.fullName || projId)
+                        const blob = new Blob([html], { type: 'text/html' })
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a'); a.href = url; a.download = `Contract_${projId}.html`; a.click()
+                      }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none' }}>
+                        <Download size={13} /> Download
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {/* Add item modal */}
