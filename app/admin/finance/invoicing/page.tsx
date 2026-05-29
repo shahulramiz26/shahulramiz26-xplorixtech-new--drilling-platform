@@ -51,14 +51,8 @@ const INV_TABS = [
   { id: 'tracker',  label: 'Invoice Tracker',  icon: '📊' },
 ]
 
-// ── REAL DATA ─────────────────────────────────────────────────────────────
-const PROJECTS = [
-  { id: 'RS-01',     fullName: 'RS-01 — Chhindwara',     client: 'CMPDI', type: 'meterage', band1Rate: 850, band2Rate: 950, band3Rate: 1050, band1To: 200, band2To: 400, standbyRate: 8000, mobilisation: 250000, gst: 18, tds: 2, retention: 5 },
-  { id: 'CMPDI-DAM', fullName: 'CMPDI-DAM — Bokaro',     client: 'CMPDI', type: 'meterage', band1Rate: 820, band2Rate: 920, band3Rate: 1020, band1To: 200, band2To: 400, standbyRate: 7500, mobilisation: 220000, gst: 18, tds: 2, retention: 5 },
-  { id: 'CMP-MAD',   fullName: 'CMP-MAD — Warora',       client: 'CMPDI', type: 'meterage', band1Rate: 800, band2Rate: 900, band3Rate: 1000, band1To: 200, band2To: 400, standbyRate: 7000, mobilisation: 200000, gst: 18, tds: 2, retention: 5 },
-  { id: 'DGMIL-BHK', fullName: 'DGMIL-BHK — Saraipali', client: 'DGML',  type: 'meterage', band1Rate: 800, band2Rate: 900, band3Rate: 1000, band1To: 200, band2To: 400, standbyRate: 7000, mobilisation: 200000, gst: 18, tds: 2, retention: 5 },
-  { id: 'MECL-HIN',  fullName: 'MECL-HIN — Bazar Gaon', client: 'MECL',  type: 'dayrate',  drillingDayRate: 28000, standbyDayRate: 12000, repairDayRate: 8000, mobilisation: 180000, gst: 18, tds: 2, retention: 5, band1Rate: 0, band2Rate: 0, band3Rate: 0, band1To: 200, band2To: 400, standbyRate: 0 },
-]
+// ── REAL DATA — pulled from costing context, not hardcoded ────────────────
+// Projects and rates come from CTX_PROJECTS and useCostingRates() below
 
 type InvStatus = 'Draft' | 'Raised' | 'MB Pending' | 'Submitted' | 'Partially Paid' | 'Paid' | 'Overdue'
 
@@ -338,9 +332,28 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
   const [preview, setPreview] = useState<Invoice | null>(null)
   const [generated, setGenerated] = useState(false)
 
-  // Read from shared context — picks up any changes made in Costing page
+  // Always read from shared context — reflects whatever was saved in Costing
   const projInfo = CTX_PROJECTS.find(p => p.id === selectedProject)!
-  const proj = { ...projInfo, ...getRate(selectedProject) }
+  const ctxRate  = getRate(selectedProject)
+  const proj = {
+    id:               projInfo.id,
+    fullName:         projInfo.fullName,
+    client:           projInfo.client,
+    contractType:     ctxRate.contractType,
+    band1Rate:        ctxRate.band1Rate,
+    band2Rate:        ctxRate.band2Rate,
+    band3Rate:        ctxRate.band3Rate,
+    band1To:          ctxRate.band1To,
+    band2To:          ctxRate.band2To,
+    standbyRate:      ctxRate.standbyRate,
+    drillingDayRate:  ctxRate.drillingDayRate,
+    standbyDayRate:   ctxRate.standbyDayRate,
+    repairDayRate:    ctxRate.repairDayRate,
+    mobilisation:     ctxRate.mobilisation,
+    gst:              ctxRate.gst,
+    tds:              ctxRate.tds,
+    retention:        ctxRate.retention,
+  }
   const isMeterage = proj.contractType === 'meterage'
   const isDayRate  = proj.contractType === 'dayrate'
 
@@ -413,7 +426,10 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
             <div style={{ position: 'relative' }}>
               <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)}
                 style={{ ...iStyle, appearance: 'none', cursor: 'pointer' }}>
-                {CTX_PROJECTS.map(p => <option key={p.id} value={p.id}>{p.fullName} — {p.client}</option>)}
+                {CTX_PROJECTS.map(p => {
+                  const r = getRate(p.id)
+                  return <option key={p.id} value={p.id}>{p.fullName} — {p.client} ({r.contractType === 'meterage' ? 'Meterage' : 'Day Rate'})</option>
+                })}
               </select>
               <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.faint, pointerEvents: 'none' }} />
             </div>
