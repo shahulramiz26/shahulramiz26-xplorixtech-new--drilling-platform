@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Plus, Trash2, Edit2, Check, X, Download,
@@ -457,8 +457,22 @@ export default function CostingPage() {
   const [editingItem, setEditingItem] = useState<string | null>(null)
   const logoRef = useRef<HTMLInputElement>(null)
 
-  // All contracts stored per project
-  const [contracts, setContracts] = useState<Record<string, ContractData>>({})
+  // Contracts persisted in localStorage so they survive page reloads
+  const [contracts, setContracts] = useState<Record<string, ContractData>>(() => {
+    if (typeof window === 'undefined') return {}
+    try {
+      const saved = localStorage.getItem('xplorix_contracts')
+      return saved ? JSON.parse(saved) : {}
+    } catch { return {} }
+  })
+
+  // Save to localStorage whenever contracts change
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem('xplorix_contracts', JSON.stringify(contracts))
+    } catch {}
+  }, [contracts])
 
   const proj = PROJECTS.find(p => p.id === selectedProject)
 
