@@ -506,7 +506,7 @@ function PartRequestModal({ onClose, onSave }: { onClose:()=>void; onSave:(r:Par
                   {/* Part Name search */}
                   <div style={{ position:'relative' }}>
                     <input value={item.search || item.partName}
-                      onChange={e=>updateItem(item.id,'search',e.target.value) || updateItem(item.id,'showSug',true) || updateItem(item.id,'partName',e.target.value)}
+                      onChange={e=>{ updateItem(item.id,'search',e.target.value); updateItem(item.id,'showSug',true); updateItem(item.id,'partName',e.target.value) }}
                       placeholder="Search part..."
                       style={{...iStyle, fontSize:11, padding:'6px 8px'}} />
                     {item.showSug && item.search && (
