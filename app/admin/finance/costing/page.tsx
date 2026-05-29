@@ -1,171 +1,103 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Link from 'next/link'
 import {
-  Save, Check, Edit2, Plus, Trash2, Info,
-  ChevronDown, Fuel, Wrench, Users, FileText, X
+  Plus, Trash2, Edit2, Check, X, Download,
+  ChevronDown, FileText, Building2, Info,
+  Save, Eye, Package
 } from 'lucide-react'
+import { useCostingRates, PROJECTS } from '../costing-context'
 
-import { useCostingRates, PROJECTS as CTX_PROJECTS } from '../costing-context'
-
-// ── COLOUR TOKENS (matches Inventory orange scheme) ───────────────────────
+// ── COLOURS ───────────────────────────────────────────────────────────────
 const C = {
-  bg:        '#080B10',
-  card:      '#0D1117',
-  border:    '#1E293B',
-  orange:    '#F97316',
-  orangeD:   '#EA580C',
-  green:     '#10B981',
-  red:       '#EF4444',
-  amber:     '#F59E0B',
-  blue:      '#3B82F6',
-  purple:    '#8B5CF6',
-  text:      '#F8FAFC',
-  muted:     '#94A3B8',
-  faint:     '#64748B',
+  bg: '#080B10', card: '#0D1117', border: '#1E293B',
+  orange: '#F97316', orangeD: '#EA580C',
+  green: '#10B981', red: '#EF4444', amber: '#F59E0B',
+  blue: '#3B82F6', purple: '#8B5CF6',
+  text: '#F8FAFC', muted: '#94A3B8', faint: '#64748B',
 }
 
-// ── REAL CUSTOMER DATA ────────────────────────────────────────────────────
-const PROJECTS = [
-  { id: 'RS-01',      name: 'RS-01',      fullName: 'RS-01 — Chhindwara',       client: 'CMPDI', type: 'meterage' },
-  { id: 'CMPDI-DAM',  name: 'CMPDI-DAM',  fullName: 'CMPDI-DAM — Bokaro',       client: 'CMPDI', type: 'meterage' },
-  { id: 'CMP-MAD',    name: 'CMP-MAD',    fullName: 'CMP-MAD — Warora',         client: 'CMPDI', type: 'meterage' },
-  { id: 'DGMIL-BHK',  name: 'DGMIL-BHK',  fullName: 'DGMIL-BHK — Saraipali',   client: 'DGML',  type: 'meterage' },
-  { id: 'PAT-CMPDI',  name: 'PAT-CMPDI',  fullName: 'PAT-CMPDI — Pathakuri',    client: 'CMPDI', type: 'meterage' },
-  { id: 'MECL-HIN',   name: 'MECL-HIN',   fullName: 'MECL-HIN — Bazar Gaon',   client: 'MECL',  type: 'dayrate'  },
+// ── STANDARD LINE ITEM CATEGORIES ─────────────────────────────────────────
+const STANDARD_CATEGORIES = [
+  // Meterage
+  { label: 'Meterage Band 1 (0–200m)',     unit: '₹/meter',  defaultPrice: 850,    group: 'Meterage Rates'    },
+  { label: 'Meterage Band 2 (200–400m)',   unit: '₹/meter',  defaultPrice: 950,    group: 'Meterage Rates'    },
+  { label: 'Meterage Band 3 (400m+)',      unit: '₹/meter',  defaultPrice: 1050,   group: 'Meterage Rates'    },
+  // Day rates
+  { label: 'Drilling Day Rate',            unit: '₹/day',    defaultPrice: 28000,  group: 'Day Rates'         },
+  { label: 'Standby Day Rate',             unit: '₹/day',    defaultPrice: 12000,  group: 'Day Rates'         },
+  { label: 'Repair / Breakdown Day Rate',  unit: '₹/day',    defaultPrice: 8000,   group: 'Day Rates'         },
+  // One-time
+  { label: 'Mobilisation Charges',         unit: '₹ lump sum', defaultPrice: 250000, group: 'One-Time Charges' },
+  { label: 'Demobilisation Charges',       unit: '₹ lump sum', defaultPrice: 150000, group: 'One-Time Charges' },
+  // Statutory
+  { label: 'GST',                          unit: '%',        defaultPrice: 18,     group: 'Statutory'         },
+  { label: 'TDS (Section 194C)',           unit: '%',        defaultPrice: 2,      group: 'Statutory'         },
+  { label: 'Retention Money',             unit: '%',        defaultPrice: 5,      group: 'Statutory'         },
+  { label: 'Security Deposit',            unit: '%',        defaultPrice: 5,      group: 'Statutory'         },
+  // Labour
+  { label: 'Driller Day Rate',             unit: '₹/day',    defaultPrice: 1500,   group: 'Labour'            },
+  { label: 'Helper Day Rate',              unit: '₹/day',    defaultPrice: 800,    group: 'Labour'            },
+  { label: 'Supervisor Day Rate',          unit: '₹/day',    defaultPrice: 2000,   group: 'Labour'            },
+  // Consumables
+  { label: 'Core Bit (NQ)',                unit: '₹/bit',    defaultPrice: 11500,  group: 'Consumables'       },
+  { label: 'Core Bit (HQ)',                unit: '₹/bit',    defaultPrice: 22000,  group: 'Consumables'       },
+  { label: 'Drilling Fluid',               unit: '₹/bucket', defaultPrice: 12151,  group: 'Consumables'       },
+  // Fuel
+  { label: 'Diesel / Fuel',               unit: '₹/litre',  defaultPrice: 97,     group: 'Fuel'              },
+  { label: 'Fuel Lump Sum (monthly)',      unit: '₹/month',  defaultPrice: 38000,  group: 'Fuel'              },
 ]
 
-const RIGS = [
-  { id: 'KEM-04', project: 'RS-01'     },
-  { id: 'KEM-05', project: 'RS-01'     },
-  { id: 'KEM-14', project: 'CMPDI-DAM' },
-  { id: 'KEM-13', project: 'CMPDI-DAM' },
-  { id: 'KEM-12', project: 'CMP-MAD'   },
-  { id: 'KEM-11', project: 'DGMIL-BHK' },
-  { id: 'KEM-10', project: 'MECL-HIN'  },
-]
+const GROUPS = [...new Set(STANDARD_CATEGORIES.map(c => c.group))]
 
-// ── SEED STATE ────────────────────────────────────────────────────────────
-const seedContractRates: Record<string, any> = {
-  'RS-01': {
-    contractType: 'meterage',
-    band1To: 200, band1Rate: 850,
-    band2From: 200, band2To: 400, band2Rate: 950,
-    band3From: 400, band3Rate: 1050,
-    standbyRate: 8000,
-    mobilisation: 250000, demobilisation: 150000,
-    gst: 18, tds: 2, retention: 5,
-  },
-  'CMPDI-DAM': {
-    contractType: 'meterage',
-    band1To: 200, band1Rate: 820,
-    band2From: 200, band2To: 400, band2Rate: 920,
-    band3From: 400, band3Rate: 1020,
-    standbyRate: 7500,
-    mobilisation: 220000, demobilisation: 130000,
-    gst: 18, tds: 2, retention: 5,
-  },
-  'CMP-MAD': {
-    contractType: 'meterage',
-    band1To: 200, band1Rate: 800,
-    band2From: 200, band2To: 400, band2Rate: 900,
-    band3From: 400, band3Rate: 1000,
-    standbyRate: 7000,
-    mobilisation: 200000, demobilisation: 120000,
-    gst: 18, tds: 2, retention: 5,
-  },
-  'DGMIL-BHK': {
-    contractType: 'meterage',
-    band1To: 200, band1Rate: 800,
-    band2From: 200, band2To: 400, band2Rate: 900,
-    band3From: 400, band3Rate: 1000,
-    standbyRate: 7000,
-    mobilisation: 200000, demobilisation: 120000,
-    gst: 18, tds: 2, retention: 5,
-  },
-  'PAT-CMPDI': {
-    contractType: 'meterage',
-    band1To: 200, band1Rate: 830,
-    band2From: 200, band2To: 400, band2Rate: 930,
-    band3From: 400, band3Rate: 1030,
-    standbyRate: 7800,
-    mobilisation: 210000, demobilisation: 125000,
-    gst: 18, tds: 2, retention: 5,
-  },
-  'MECL-HIN': {
-    contractType: 'dayrate',
-    drillingDayRate: 28000, standbyDayRate: 12000, repairDayRate: 8000,
-    mobilisation: 180000, demobilisation: 100000,
-    gst: 18, tds: 2, retention: 5,
-    band1To: 200, band1Rate: 0,
-    band2From: 200, band2To: 400, band2Rate: 0,
-    band3From: 400, band3Rate: 0, standbyRate: 0,
-  },
+const UNITS = ['₹/meter', '₹/day', '₹/month', '₹ lump sum', '%', '₹/bit', '₹/litre', '₹/bucket', '₹/shift', '₹/hole', 'Other']
+
+// ── TYPES ─────────────────────────────────────────────────────────────────
+interface LineItem {
+  id: string
+  category: string
+  unit: string
+  price: number
+  notes: string
+  isCustom: boolean
 }
 
-const seedRigRates: Record<string, any> = {
-  'KEM-04': { drillingRate: 9000,  standbyRate: 4500, repairRate: 3000 },
-  'KEM-05': { drillingRate: 9500,  standbyRate: 4800, repairRate: 3200 },
-  'KEM-14': { drillingRate: 9000,  standbyRate: 4500, repairRate: 3000 },
-  'KEM-13': { drillingRate: 9000,  standbyRate: 4500, repairRate: 3000 },
-  'KEM-12': { drillingRate: 9000,  standbyRate: 4500, repairRate: 3000 },
-  'KEM-11': { drillingRate: 9000,  standbyRate: 4500, repairRate: 3000 },
-  'KEM-10': { drillingRate: 9500,  standbyRate: 4800, repairRate: 3200 },
-}
-
-const seedLabour: Record<string, any> = {
-  'RS-01':     { may2026: 84000,  apr2026: 82000, mar2026: 80000 },
-  'CMPDI-DAM': { may2026: 72000,  apr2026: 70000, mar2026: 68000 },
-  'CMP-MAD':   { may2026: 54000,  apr2026: 52000, mar2026: 50000 },
-  'DGMIL-BHK': { may2026: 54000,  apr2026: 52000, mar2026: 50000 },
-  'PAT-CMPDI': { may2026: 48000,  apr2026: 46000, mar2026: 44000 },
-  'MECL-HIN':  { may2026: 60000,  apr2026: 58000, mar2026: 56000 },
-}
-
-const seedMaintenance: Record<string, any> = {
-  'KEM-04': { mechanicRate: 1200, helperRate: 600 },
-  'KEM-05': { mechanicRate: 1200, helperRate: 600 },
-  'KEM-14': { mechanicRate: 1100, helperRate: 550 },
-  'KEM-13': { mechanicRate: 1100, helperRate: 550 },
-  'KEM-12': { mechanicRate: 1100, helperRate: 550 },
-  'KEM-11': { mechanicRate: 1100, helperRate: 550 },
-  'KEM-10': { mechanicRate: 1200, helperRate: 600 },
+interface ContractData {
+  projectId: string
+  contractNo: string
+  dateFrom: string
+  dateTo: string
+  lineItems: LineItem[]
+  fromCompany: string
+  fromAddress: string
+  fromGstin: string
+  fromContact: string
+  fromLogo: string
+  toCompany: string
+  toAddress: string
+  toGstin: string
+  toContact: string
+  terms: string
 }
 
 // ── SHARED STYLES ─────────────────────────────────────────────────────────
 const iStyle: React.CSSProperties = {
-  padding: '9px 12px',
-  background: C.bg,
-  border: `1px solid ${C.border}`,
-  borderRadius: 8,
-  color: C.text,
-  fontSize: 13,
-  outline: 'none',
-  fontFamily: 'inherit',
-  width: '100%',
+  padding: '9px 12px', background: C.bg, border: `1px solid ${C.border}`,
+  borderRadius: 8, color: C.text, fontSize: 13, outline: 'none',
+  fontFamily: 'inherit', width: '100%',
 }
 
-const labelStyle: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  color: C.faint,
-  letterSpacing: '0.1em',
-  textTransform: 'uppercase',
-  marginBottom: 6,
-}
-
-// ── NAV ───────────────────────────────────────────────────────────────────
+// ── FINANCE NAV ───────────────────────────────────────────────────────────
 function FinanceNav({ active }: { active: string }) {
-  const tabs = [
-    { href: '/admin/finance', label: 'Dashboard' },
-    { href: '/admin/finance/costing', label: 'Costing' },
-    { href: '/admin/finance/invoicing', label: 'Invoicing' },
-    { href: '/admin/finance/reports', label: 'Reports' },
-  ]
   return (
     <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 4 }}>
-      {tabs.map(t => (
+      {[
+        { href: '/admin/finance',           label: 'Dashboard' },
+        { href: '/admin/finance/costing',   label: 'Costing'   },
+        { href: '/admin/finance/invoicing', label: 'Invoicing' },
+        { href: '/admin/finance/reports',   label: 'Reports'   },
+      ].map(t => (
         <Link key={t.href} href={t.href} style={{
           padding: '7px 18px', borderRadius: 9, fontSize: 13, fontWeight: 600,
           textDecoration: 'none', transition: 'all 0.2s',
@@ -177,876 +109,691 @@ function FinanceNav({ active }: { active: string }) {
   )
 }
 
-// ── COSTING SUB-NAV ───────────────────────────────────────────────────────
-const COSTING_TABS = [
-  { id: 'contract',     label: 'Contract Rates',   icon: '📋' },
-  { id: 'rig',          label: 'Rig Rates',         icon: '🚛' },
-  { id: 'labour',       label: 'Labour Costs',      icon: '👷' },
-  { id: 'fuel',         label: 'Fuel Rate',         icon: '⛽' },
-  { id: 'maintenance',  label: 'Maintenance Rates', icon: '🔧' },
-]
+// ── ADD ITEM MODAL ────────────────────────────────────────────────────────
+function AddItemModal({ onAdd, onClose }: { onAdd: (item: LineItem) => void; onClose: () => void }) {
+  const [mode, setMode] = useState<'standard' | 'custom'>('standard')
+  const [selectedGroup, setSelectedGroup] = useState('Meterage Rates')
+  const [selectedCat, setSelectedCat] = useState(STANDARD_CATEGORIES[0])
+  const [customCategory, setCustomCategory] = useState('')
+  const [customUnit, setCustomUnit] = useState('₹/day')
+  const [price, setPrice] = useState(850)
+  const [notes, setNotes] = useState('')
 
-function CostingNav({ active, setActive }: { active: string; setActive: (t: string) => void }) {
-  return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-      {COSTING_TABS.map(t => (
-        <button key={t.id} onClick={() => setActive(t.id)} style={{
-          display: 'flex', alignItems: 'center', gap: 7,
-          padding: '9px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-          cursor: 'pointer', transition: 'all 0.2s', border: 'none',
-          background: active === t.id
-            ? `linear-gradient(135deg,${C.orange},${C.orangeD})`
-            : `rgba(255,255,255,0.04)`,
-          color: active === t.id ? '#fff' : C.muted,
-          boxShadow: active === t.id ? `0 4px 16px rgba(249,115,22,0.3)` : 'none',
-        }}>
-          <span style={{ fontSize: 15 }}>{t.icon}</span>
-          {t.label}
-        </button>
-      ))}
-    </div>
-  )
-}
+  const filteredCats = STANDARD_CATEGORIES.filter(c => c.group === selectedGroup)
 
-// ── SAVE TOAST ─────────────────────────────────────────────────────────────
-function useSaveToast() {
-  const [saved, setSaved] = useState(false)
-  const trigger = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
-  return { saved, trigger }
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// TAB 1 — CONTRACT RATES
-// ══════════════════════════════════════════════════════════════════════════
-function ContractRates() {
-  const { rates: ctxRates, updateRate } = useCostingRates()
-  const [rates, setRates] = useState(seedContractRates)
-  const [selected, setSelected] = useState('RS-01')
-  const [editing, setEditing] = useState(false)
-  const { saved, trigger } = useSaveToast()
-  const r = rates[selected]
-
-  const update = (field: string, val: any) =>
-    setRates(prev => ({ ...prev, [selected]: { ...prev[selected], [field]: val } }))
-
-  const handleSave = () => {
-    // Save to shared context so Invoicing picks up the changes
-    updateRate(selected, rates[selected])
-    setEditing(false)
-    trigger()
+  const handleAdd = () => {
+    const item: LineItem = {
+      id: Date.now().toString(),
+      category: mode === 'standard' ? selectedCat.label : customCategory,
+      unit: mode === 'standard' ? selectedCat.unit : customUnit,
+      price,
+      notes,
+      isCustom: mode === 'custom',
+    }
+    onAdd(item)
+    onClose()
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, padding: 32, width: 540 }}>
 
-      {/* Info banner */}
-      <div style={{ display: 'flex', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(249,115,22,0.05)', border: `1px solid rgba(249,115,22,0.15)` }}>
-        <Info size={14} style={{ color: C.orange, flexShrink: 0, marginTop: 1 }} />
-        <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
-          Set the contract rates for each project once. The billing engine uses these rates to
-          auto-calculate invoices — meterage × depth band rate, standby charges, GST, TDS and retention.
-        </p>
-      </div>
-
-      {/* Project selector */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {PROJECTS.map(p => (
-          <button key={p.id} onClick={() => { setSelected(p.id); setEditing(false) }} style={{
-            padding: '8px 16px', borderRadius: 9, fontSize: 12, fontWeight: 700,
-            cursor: 'pointer', transition: 'all 0.2s',
-            background: selected === p.id ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${selected === p.id ? 'rgba(249,115,22,0.4)' : C.border}`,
-            color: selected === p.id ? C.orange : C.faint,
-          }}>
-            {p.name}
-            <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.7 }}>{p.client}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Contract card */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-
-        {/* Card header */}
-        <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(249,115,22,0.03)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>
-              {PROJECTS.find(p => p.id === selected)?.fullName}
-            </div>
-            <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>
-              Client: {PROJECTS.find(p => p.id === selected)?.client} ·{' '}
-              <span style={{ color: C.orange, fontWeight: 700 }}>
-                {r.contractType === 'meterage' ? '📏 Meterage Contract' : '📅 Day Rate Contract'}
-              </span>
-            </div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>Add Line Item</div>
+            <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>Choose from standard categories or add a custom item</div>
           </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {saved && (
-              <span style={{ fontSize: 12, color: C.green, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <Check size={13} /> Saved!
-              </span>
-            )}
-            {editing ? (
-              <>
-                <button onClick={handleSave} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 9, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none', boxShadow: '0 4px 16px rgba(249,115,22,0.3)' }}>
-                  <Check size={14} /> Save
-                </button>
-                <button onClick={() => setEditing(false)} style={{ padding: '8px 14px', borderRadius: 9, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button onClick={() => setEditing(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 9, background: 'rgba(249,115,22,0.1)', border: `1px solid rgba(249,115,22,0.25)`, color: C.orange, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                <Edit2 size={13} /> Edit Rates
-              </button>
-            )}
-          </div>
+          <button onClick={onClose} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer' }}><X size={16} /></button>
         </div>
 
-        <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24 }}>
+        {/* Mode toggle */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+          {[
+            { id: 'standard', label: '📋 Standard Category', desc: 'Pick from common drilling items' },
+            { id: 'custom',   label: '✏️ Custom Item',       desc: 'Write your own category'         },
+          ].map(m => (
+            <button key={m.id} onClick={() => setMode(m.id as any)} style={{
+              flex: 1, padding: '12px 16px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s',
+              background: mode === m.id ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${mode === m.id ? 'rgba(249,115,22,0.4)' : C.border}`,
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: mode === m.id ? C.orange : C.text }}>{m.label}</div>
+              <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>{m.desc}</div>
+            </button>
+          ))}
+        </div>
 
-          {/* Contract type toggle */}
-          <div style={{ gridColumn: '1/-1' }}>
-            <div style={labelStyle}>Contract Type</div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              {['meterage', 'dayrate'].map(type => (
-                <button key={type} onClick={() => {
-                  if (!editing) return
-                  update('contractType', type)
-                  if (type === 'dayrate') {
-                    if (!r.drillingDayRate) update('drillingDayRate', 28000)
-                    if (!r.standbyDayRate)  update('standbyDayRate',  12000)
-                    if (!r.repairDayRate)   update('repairDayRate',    8000)
-                  }
-                }} style={{
-                  padding: '10px 24px', borderRadius: 10, fontSize: 13, fontWeight: 700,
-                  cursor: editing ? 'pointer' : 'default', transition: 'all 0.2s',
-                  background: r.contractType === type
-                    ? type === 'meterage' ? 'rgba(249,115,22,0.15)' : 'rgba(59,130,246,0.15)'
-                    : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${r.contractType === type
-                    ? type === 'meterage' ? 'rgba(249,115,22,0.4)' : 'rgba(59,130,246,0.4)'
-                    : C.border}`,
-                  color: r.contractType === type
-                    ? type === 'meterage' ? C.orange : C.blue
-                    : C.faint,
-                }}>
-                  {type === 'meterage' ? '📏 Meterage (₹/meter)' : '📅 Day Rate (₹/day)'}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Standard mode */}
+        {mode === 'standard' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* Meterage bands */}
-          {r.contractType === 'meterage' && (
-            <div style={{ gridColumn: '1/-1' }}>
-              <div style={labelStyle}>Depth Band Rates (₹ per meter drilled)</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-                {[
-                  { label: `Band 1 — 0 to ${r.band1To}m`, field: 'band1Rate', depthField: 'band1To', color: C.green },
-                  { label: `Band 2 — ${r.band2From}m to ${r.band2To}m`, field: 'band2Rate', depthField: 'band2To', color: C.amber },
-                  { label: `Band 3 — ${r.band3From}m and beyond`, field: 'band3Rate', depthField: null, color: C.orange },
-                ].map((band, i) => (
-                  <div key={i} style={{ padding: '16px', borderRadius: 12, background: `${band.color}08`, border: `1px solid ${band.color}25` }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: band.color, marginBottom: 10 }}>{band.label}</div>
-                    <div style={labelStyle}>Rate (₹/m)</div>
-                    {editing ? (
-                      <input type="number" value={(r as any)[band.field]} onChange={e => update(band.field, parseFloat(e.target.value) || 0)}
-                        style={{ ...iStyle, fontSize: 18, fontWeight: 800, color: band.color, textAlign: 'center' }} />
-                    ) : (
-                      <div style={{ fontSize: 22, fontWeight: 800, color: band.color, fontFamily: 'monospace' }}>
-                        ₹{Number((r as any)[band.field]).toLocaleString()}<span style={{ fontSize: 12, fontWeight: 400, color: C.faint }}>/m</span>
-                      </div>
-                    )}
-                  </div>
+            {/* Group selector */}
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Category Group</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {GROUPS.map(g => (
+                  <button key={g} onClick={() => {
+                    setSelectedGroup(g)
+                    const first = STANDARD_CATEGORIES.find(c => c.group === g)!
+                    setSelectedCat(first)
+                    setPrice(first.defaultPrice)
+                  }} style={{
+                    padding: '6px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                    background: selectedGroup === g ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${selectedGroup === g ? 'rgba(249,115,22,0.4)' : C.border}`,
+                    color: selectedGroup === g ? C.orange : C.faint,
+                  }}>{g}</button>
                 ))}
               </div>
             </div>
-          )}
 
-          {/* Day rate fields */}
-          {r.contractType === 'dayrate' && (
-            <>
-              {[
-                { label: 'Drilling Day Rate', field: 'drillingDayRate', color: C.green },
-                { label: 'Standby Day Rate',  field: 'standbyDayRate',  color: C.amber },
-                { label: 'Repair Day Rate',   field: 'repairDayRate',   color: C.red   },
-              ].map((dr, i) => (
-                <div key={i} style={{ padding: '16px', borderRadius: 12, background: `${dr.color}08`, border: `1px solid ${dr.color}25` }}>
-                  <div style={labelStyle}>{dr.label}</div>
-                  {editing ? (
-                    <input type="number" value={(r as any)[dr.field]} onChange={e => update(dr.field, parseFloat(e.target.value) || 0)}
-                      style={{ ...iStyle, fontSize: 16, fontWeight: 800, color: dr.color }} />
-                  ) : (
-                    <div style={{ fontSize: 20, fontWeight: 800, color: dr.color, fontFamily: 'monospace' }}>
-                      ₹{Number((r as any)[dr.field]).toLocaleString()}<span style={{ fontSize: 11, color: C.faint }}>/day</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </>
-          )}
-
-          {/* Standby rate (meterage only) */}
-          {r.contractType === 'meterage' && (
-            <div style={{ padding: '16px', borderRadius: 12, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)' }}>
-              <div style={labelStyle}>Standby Rate (₹/day)</div>
-              {editing ? (
-                <input type="number" value={r.standbyRate} onChange={e => update('standbyRate', parseFloat(e.target.value) || 0)}
-                  style={{ ...iStyle, fontSize: 16, fontWeight: 800, color: C.purple }} />
-              ) : (
-                <div style={{ fontSize: 20, fontWeight: 800, color: C.purple, fontFamily: 'monospace' }}>
-                  ₹{Number(r.standbyRate).toLocaleString()}<span style={{ fontSize: 11, color: C.faint }}>/day</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Mobilisation */}
-          <div style={{ padding: '16px', borderRadius: 12, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <div style={labelStyle}>Mobilisation (₹ one-time)</div>
-            {editing ? (
-              <input type="number" value={r.mobilisation} onChange={e => update('mobilisation', parseFloat(e.target.value) || 0)}
-                style={{ ...iStyle, fontSize: 14, fontWeight: 700, color: C.green }} />
-            ) : (
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.green, fontFamily: 'monospace' }}>
-                ₹{Number(r.mobilisation).toLocaleString()}
+            {/* Category dropdown */}
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Line Item</div>
+              <div style={{ position: 'relative' }}>
+                <select value={selectedCat.label} onChange={e => {
+                  const cat = STANDARD_CATEGORIES.find(c => c.label === e.target.value)!
+                  setSelectedCat(cat)
+                  setPrice(cat.defaultPrice)
+                }} style={{ ...iStyle, appearance: 'none', cursor: 'pointer', paddingRight: 32 }}>
+                  {filteredCats.map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
+                </select>
+                <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.faint, pointerEvents: 'none' }} />
               </div>
-            )}
-          </div>
-
-          {/* Demobilisation */}
-          <div style={{ padding: '16px', borderRadius: 12, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <div style={labelStyle}>Demobilisation (₹ one-time)</div>
-            {editing ? (
-              <input type="number" value={r.demobilisation} onChange={e => update('demobilisation', parseFloat(e.target.value) || 0)}
-                style={{ ...iStyle, fontSize: 14, fontWeight: 700, color: C.green }} />
-            ) : (
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.green, fontFamily: 'monospace' }}>
-                ₹{Number(r.demobilisation).toLocaleString()}
-              </div>
-            )}
-          </div>
-
-          {/* GST / TDS / Retention */}
-          <div style={{ gridColumn: '1/-1', borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
-            <div style={labelStyle}>Statutory Deductions & Charges</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-              {[
-                { label: 'GST %', field: 'gst', color: C.blue, note: 'Added to invoice total' },
-                { label: 'TDS % (Sec 194C)', field: 'tds', color: C.red, note: 'Deducted by client' },
-                { label: 'Retention %', field: 'retention', color: C.amber, note: 'Held till project end' },
-              ].map((stat, i) => (
-                <div key={i} style={{ padding: '14px 16px', borderRadius: 10, background: `${stat.color}08`, border: `1px solid ${stat.color}20` }}>
-                  <div style={labelStyle}>{stat.label}</div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                    {editing ? (
-                      <input type="number" step="0.5" value={(r as any)[stat.field]} onChange={e => update(stat.field, parseFloat(e.target.value) || 0)}
-                        style={{ ...iStyle, width: 80, fontSize: 20, fontWeight: 800, color: stat.color, textAlign: 'center' }} />
-                    ) : (
-                      <span style={{ fontSize: 24, fontWeight: 800, color: stat.color, fontFamily: 'monospace' }}>{(r as any)[stat.field]}%</span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 10, color: C.faint, marginTop: 4 }}>{stat.note}</div>
-                </div>
-              ))}
+              <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>Unit: <span style={{ color: C.orange }}>{selectedCat.unit}</span></div>
             </div>
           </div>
+        )}
 
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// TAB 2 — RIG RATES
-// ══════════════════════════════════════════════════════════════════════════
-function RigRates() {
-  const [rates, setRates] = useState(seedRigRates)
-  const [editingRig, setEditingRig] = useState<string | null>(null)
-  const { saved, trigger } = useSaveToast()
-
-  const update = (rig: string, field: string, val: number) =>
-    setRates(prev => ({ ...prev, [rig]: { ...prev[rig], [field]: val } }))
-
-  const handleSave = (rig: string) => { setEditingRig(null); trigger() }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-      <div style={{ display: 'flex', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(249,115,22,0.05)', border: `1px solid rgba(249,115,22,0.15)` }}>
-        <Info size={14} style={{ color: C.orange, flexShrink: 0, marginTop: 1 }} />
-        <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
-          Set daily operating rates for each rig. The CPM engine uses drilling rate × drilling days,
-          standby rate × standby days, and repair rate × repair days to calculate rig operating cost automatically.
-        </p>
-      </div>
-
-      {saved && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', alignSelf: 'flex-start' }}>
-          <Check size={14} style={{ color: C.green }} />
-          <span style={{ fontSize: 13, color: C.green, fontWeight: 600 }}>Rig rates saved successfully</span>
-        </div>
-      )}
-
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-              {['Rig', 'Project', 'Drilling Rate / Day', 'Standby Rate / Day', 'Repair Rate / Day', 'Daily Cost Range', ''].map(h => (
-                <th key={h} style={{ padding: '12px 18px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.faint, letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {RIGS.map((rig, i) => {
-              const r = rates[rig.id]
-              const isEditing = editingRig === rig.id
-              const project = PROJECTS.find(p => p.id === rig.project)
-
-              return (
-                <tr key={rig.id} style={{ borderBottom: `1px solid rgba(30,41,59,0.5)`, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
-                  <td style={{ padding: '14px 18px' }}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: C.text, fontFamily: 'monospace' }}>{rig.id}</div>
-                  </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(249,115,22,0.1)', color: C.orange, border: '1px solid rgba(249,115,22,0.2)' }}>
-                      {project?.name}
-                    </span>
-                  </td>
-                  {[
-                    { field: 'drillingRate', color: C.green, label: '/day drilling' },
-                    { field: 'standbyRate',  color: C.amber, label: '/day standby'  },
-                    { field: 'repairRate',   color: C.red,   label: '/day repair'   },
-                  ].map(col => (
-                    <td key={col.field} style={{ padding: '14px 18px' }}>
-                      {isEditing ? (
-                        <input type="number" value={(r as any)[col.field]}
-                          onChange={e => update(rig.id, col.field, parseFloat(e.target.value) || 0)}
-                          style={{ ...iStyle, width: 110, fontSize: 14, fontWeight: 700, color: col.color }} />
-                      ) : (
-                        <div>
-                          <span style={{ fontSize: 15, fontWeight: 800, color: col.color, fontFamily: 'monospace' }}>
-                            ₹{Number((r as any)[col.field]).toLocaleString()}
-                          </span>
-                          <span style={{ fontSize: 10, color: C.faint, marginLeft: 4 }}>{col.label}</span>
-                        </div>
-                      )}
-                    </td>
-                  ))}
-                  <td style={{ padding: '14px 18px' }}>
-                    <div style={{ fontSize: 12, color: C.muted }}>
-                      ₹{r.repairRate.toLocaleString()} – ₹{r.drillingRate.toLocaleString()}
-                    </div>
-                    <div style={{ fontSize: 10, color: C.faint, marginTop: 2 }}>repair to drilling</div>
-                  </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    {isEditing ? (
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={() => handleSave(rig.id)} style={{ padding: '6px 14px', borderRadius: 8, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none' }}>
-                          <Check size={13} />
-                        </button>
-                        <button onClick={() => setEditingRig(null)} style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer' }}>
-                          <X size={13} />
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setEditingRig(rig.id)} style={{ padding: '6px 14px', borderRadius: 8, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', color: C.orange, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                        <Edit2 size={13} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
-        {[
-          { label: 'Total Rigs', value: RIGS.length, color: C.orange },
-          { label: 'Avg Drilling Rate', value: `₹${Math.round(Object.values(seedRigRates).reduce((s: number, r: any) => s + r.drillingRate, 0) / RIGS.length).toLocaleString()}/day`, color: C.green },
-          { label: 'Avg Standby Rate', value: `₹${Math.round(Object.values(seedRigRates).reduce((s: number, r: any) => s + r.standbyRate, 0) / RIGS.length).toLocaleString()}/day`, color: C.amber },
-        ].map((s, i) => (
-          <div key={i} style={{ padding: '16px 20px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>{s.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: s.color, fontFamily: 'monospace' }}>{s.value}</div>
+        {/* Custom mode */}
+        {mode === 'custom' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Category Name</div>
+              <input value={customCategory} onChange={e => setCustomCategory(e.target.value)}
+                placeholder="e.g. Casing Shoe Charges, Survey Charges..."
+                style={iStyle} />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Unit</div>
+              <div style={{ position: 'relative' }}>
+                <select value={customUnit} onChange={e => setCustomUnit(e.target.value)}
+                  style={{ ...iStyle, appearance: 'none', cursor: 'pointer', paddingRight: 32 }}>
+                  {UNITS.map(u => <option key={u}>{u}</option>)}
+                </select>
+                <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.faint, pointerEvents: 'none' }} />
+              </div>
+            </div>
           </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+        )}
 
-// ══════════════════════════════════════════════════════════════════════════
-// TAB 3 — LABOUR COSTS
-// ══════════════════════════════════════════════════════════════════════════
-function LabourCosts() {
-  const [labour, setLabour] = useState(seedLabour)
-  const [editingProject, setEditingProject] = useState<string | null>(null)
-  const [newMonth, setNewMonth] = useState({ project: 'RS-01', month: 'jun2026', amount: '' })
-  const { saved, trigger } = useSaveToast()
-
-  const months = ['may2026', 'apr2026', 'mar2026']
-  const monthLabels: Record<string, string> = { may2026: 'May 2026', apr2026: 'Apr 2026', mar2026: 'Mar 2026' }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-      <div style={{ display: 'flex', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(249,115,22,0.05)', border: `1px solid rgba(249,115,22,0.15)` }}>
-        <Info size={14} style={{ color: C.orange, flexShrink: 0, marginTop: 1 }} />
-        <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
-          Enter total crew cost per project per month — drillers, helpers and supervisors combined.
-          This is the only cost that cannot be pulled automatically. Enter once a month.
-        </p>
-      </div>
-
-      {saved && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', alignSelf: 'flex-start' }}>
-          <Check size={14} style={{ color: C.green }} />
-          <span style={{ fontSize: 13, color: C.green, fontWeight: 600 }}>Labour costs saved</span>
-        </div>
-      )}
-
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Monthly Labour Cost by Project</div>
-          <div style={{ fontSize: 11, color: C.faint }}>Enter total crew wages including all staff</div>
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-              <th style={{ padding: '12px 18px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.faint, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Project</th>
-              <th style={{ padding: '12px 18px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.faint, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Client</th>
-              {months.map(m => (
-                <th key={m} style={{ padding: '12px 18px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.faint, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{monthLabels[m]}</th>
-              ))}
-              <th style={{ padding: '12px 18px' }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {PROJECTS.map((proj, i) => {
-              const l = labour[proj.id] || {}
-              const isEditing = editingProject === proj.id
-              return (
-                <tr key={proj.id} style={{ borderBottom: `1px solid rgba(30,41,59,0.5)`, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
-                  <td style={{ padding: '14px 18px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{proj.name}</div>
-                    <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>{proj.fullName.split('—')[1]?.trim()}</div>
-                  </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(16,185,129,0.08)', color: C.green, border: '1px solid rgba(16,185,129,0.2)' }}>
-                      {proj.client}
-                    </span>
-                  </td>
-                  {months.map(m => (
-                    <td key={m} style={{ padding: '14px 18px' }}>
-                      {isEditing ? (
-                        <input type="number" value={(l as any)[m] || ''}
-                          onChange={e => setLabour(prev => ({ ...prev, [proj.id]: { ...prev[proj.id], [m]: parseFloat(e.target.value) || 0 } }))}
-                          placeholder="0"
-                          style={{ ...iStyle, width: 130, fontSize: 13, fontWeight: 700, color: C.green }} />
-                      ) : (
-                        <div style={{ fontSize: 14, fontWeight: 700, color: C.green, fontFamily: 'monospace' }}>
-                          {(l as any)[m] ? `₹${Number((l as any)[m]).toLocaleString()}` : <span style={{ color: C.faint }}>—</span>}
-                        </div>
-                      )}
-                    </td>
-                  ))}
-                  <td style={{ padding: '14px 18px' }}>
-                    {isEditing ? (
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={() => { setEditingProject(null); trigger() }} style={{ padding: '6px 14px', borderRadius: 8, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none' }}>
-                          <Check size={13} />
-                        </button>
-                        <button onClick={() => setEditingProject(null)} style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer' }}>
-                          <X size={13} />
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setEditingProject(proj.id)} style={{ padding: '6px 14px', borderRadius: 8, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', color: C.orange, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                        <Edit2 size={13} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-          <tfoot>
-            <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-              <td colSpan={2} style={{ padding: '12px 18px', fontSize: 12, fontWeight: 700, color: C.faint }}>Total (All Projects)</td>
-              {months.map(m => {
-                const total = Object.values(labour).reduce((s: number, l: any) => s + (l[m] || 0), 0)
-                return (
-                  <td key={m} style={{ padding: '12px 18px', fontSize: 14, fontWeight: 800, color: C.orange, fontFamily: 'monospace' }}>
-                    ₹{total.toLocaleString()}
-                  </td>
-                )
-              })}
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// TAB 4 — FUEL RATE
-// ══════════════════════════════════════════════════════════════════════════
-function FuelRate() {
-  const [dieselPrice, setDieselPrice] = useState(97)
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(97)
-  const { saved, trigger } = useSaveToast()
-
-  // From inventory — simulated fuel issues per project
-  const fuelData = [
-    { project: 'RS-01',     litres: 392, rigs: ['KEM-04', 'KEM-05'] },
-    { project: 'CMPDI-DAM', litres: 338, rigs: ['KEM-13', 'KEM-14'] },
-    { project: 'CMP-MAD',   litres: 195, rigs: ['KEM-12']           },
-    { project: 'DGMIL-BHK', litres: 180, rigs: ['KEM-11']           },
-    { project: 'PAT-CMPDI', litres: 165, rigs: ['KEM-10']           },
-    { project: 'MECL-HIN',  litres: 155, rigs: ['KEM-10']           },
-  ]
-
-  const handleSave = () => { setDieselPrice(draft); setEditing(false); trigger() }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-      <div style={{ display: 'flex', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(249,115,22,0.05)', border: `1px solid rgba(249,115,22,0.15)` }}>
-        <Info size={14} style={{ color: C.orange, flexShrink: 0, marginTop: 1 }} />
-        <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
-          One global diesel price per litre. Update it whenever fuel prices change.
-          Fuel consumption data is pulled from Inventory fuel issues. Cost = litres issued × price per litre.
-        </p>
-      </div>
-
-      {/* Global price card */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        {/* Price + notes — always shown */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 16 }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Diesel Price</div>
-            <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>Current market rate · Update when price changes</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Price / Rate</div>
+            <input type="number" value={price} onChange={e => setPrice(parseFloat(e.target.value) || 0)}
+              style={{ ...iStyle, fontSize: 18, fontWeight: 800, color: C.orange, textAlign: 'center' }} />
           </div>
-          {saved && (
-            <span style={{ fontSize: 12, color: C.green, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Check size={13} /> Price updated
-            </span>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <div style={{ padding: '24px 36px', borderRadius: 16, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.25)', textAlign: 'center', minWidth: 200 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Current Price</div>
-            {editing ? (
-              <input type="number" value={draft} onChange={e => setDraft(parseFloat(e.target.value) || 0)}
-                style={{ ...iStyle, width: 120, fontSize: 32, fontWeight: 900, color: C.orange, textAlign: 'center', background: 'transparent', border: `2px solid ${C.orange}`, borderRadius: 10 }} />
-            ) : (
-              <div style={{ fontSize: 40, fontWeight: 900, color: C.orange, fontFamily: 'monospace' }}>₹{dieselPrice}</div>
-            )}
-            <div style={{ fontSize: 13, color: C.faint, marginTop: 4 }}>per litre</div>
-          </div>
-
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 12, color: C.muted }}>
-              At ₹{dieselPrice}/litre a typical rig consumes approximately:
-            </div>
-            {[
-              { label: '80 litres/day (soft formation)', cost: 80 * dieselPrice },
-              { label: '120 litres/day (medium rock)', cost: 120 * dieselPrice },
-              { label: '150 litres/day (hard rock)', cost: 150 * dieselPrice },
-            ].map((row, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}` }}>
-                <span style={{ fontSize: 12, color: C.muted }}>{row.label}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: C.amber, fontFamily: 'monospace' }}>₹{row.cost.toLocaleString()}/day</span>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {editing ? (
-              <>
-                <button onClick={handleSave} style={{ padding: '10px 24px', borderRadius: 10, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none', boxShadow: '0 4px 16px rgba(249,115,22,0.3)' }}>
-                  Update Price
-                </button>
-                <button onClick={() => { setEditing(false); setDraft(dieselPrice) }} style={{ padding: '10px 24px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button onClick={() => setEditing(true)} style={{ padding: '10px 24px', borderRadius: 10, background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.25)', color: C.orange, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                <Edit2 size={13} style={{ display: 'inline', marginRight: 6 }} />
-                Edit Price
-              </button>
-            )}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Notes (optional)</div>
+            <input value={notes} onChange={e => setNotes(e.target.value)}
+              placeholder="Any additional note..."
+              style={iStyle} />
           </div>
         </div>
-      </div>
 
-      {/* Fuel consumption from inventory */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 16 }}>⛽</span>
-          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Fuel Consumption — May 2026</div>
-          <span style={{ fontSize: 11, color: C.faint, marginLeft: 4 }}>Pulled from Inventory fuel issues</span>
+        {/* Summary preview */}
+        <div style={{ marginTop: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)' }}>
+          <div style={{ fontSize: 12, color: C.muted }}>
+            Adding: <span style={{ color: C.text, fontWeight: 700 }}>{mode === 'standard' ? selectedCat.label : customCategory || 'Custom item'}</span>
+            {' '}at <span style={{ color: C.orange, fontWeight: 700 }}>₹{price.toLocaleString()}</span>
+            {' '}<span style={{ color: C.faint }}>{mode === 'standard' ? selectedCat.unit : customUnit}</span>
+          </div>
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-              {['Project', 'Rigs', 'Litres Issued', 'Price/Litre', 'Total Fuel Cost', 'vs Last Month'].map(h => (
-                <th key={h} style={{ padding: '11px 18px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.faint, letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {fuelData.map((row, i) => (
-              <tr key={i} style={{ borderBottom: `1px solid rgba(30,41,59,0.5)` }}>
-                <td style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: C.text }}>{row.project}</td>
-                <td style={{ padding: '12px 18px' }}>
-                  <div style={{ display: 'flex', gap: 5 }}>
-                    {row.rigs.map(r => (
-                      <span key={r} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, background: 'rgba(249,115,22,0.1)', color: C.orange, border: '1px solid rgba(249,115,22,0.2)', fontWeight: 700 }}>{r}</span>
-                    ))}
-                  </div>
-                </td>
-                <td style={{ padding: '12px 18px', fontSize: 14, fontWeight: 700, color: C.text }}>{row.litres}L</td>
-                <td style={{ padding: '12px 18px', fontSize: 13, color: C.muted }}>₹{dieselPrice}/L</td>
-                <td style={{ padding: '12px 18px', fontSize: 15, fontWeight: 800, color: C.amber, fontFamily: 'monospace' }}>
-                  ₹{(row.litres * dieselPrice).toLocaleString()}
-                </td>
-                <td style={{ padding: '12px 18px', fontSize: 12, color: C.green }}>↓ 3.2%</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-              <td colSpan={2} style={{ padding: '12px 18px', fontSize: 12, fontWeight: 700, color: C.faint }}>Total All Projects</td>
-              <td style={{ padding: '12px 18px', fontSize: 14, fontWeight: 800, color: C.text }}>
-                {fuelData.reduce((s, r) => s + r.litres, 0)}L
-              </td>
-              <td style={{ padding: '12px 18px' }} />
-              <td style={{ padding: '12px 18px', fontSize: 16, fontWeight: 900, color: C.orange, fontFamily: 'monospace' }}>
-                ₹{fuelData.reduce((s, r) => s + r.litres * dieselPrice, 0).toLocaleString()}
-              </td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={handleAdd} disabled={mode === 'custom' && !customCategory.trim()}
+            style={{ flex: 2, padding: '12px', borderRadius: 10, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none', boxShadow: '0 4px 16px rgba(249,115,22,0.3)', opacity: mode === 'custom' && !customCategory.trim() ? 0.5 : 1 }}>
+            Add to Contract
+          </button>
+        </div>
       </div>
     </div>
   )
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// TAB 5 — MAINTENANCE RATES
-// ══════════════════════════════════════════════════════════════════════════
-function MaintenanceRates() {
-  const [rates, setRates] = useState(seedMaintenance)
-  const [editingRig, setEditingRig] = useState<string | null>(null)
-  const { saved, trigger } = useSaveToast()
+// ── CONTRACT PREVIEW / DOWNLOAD ───────────────────────────────────────────
+function generateContractHTML(contract: ContractData, projectName: string): string {
+  const rows = contract.lineItems.map((item, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${item.category}</td>
+      <td>${item.unit}</td>
+      <td style="text-align:right;font-weight:700">₹${item.price.toLocaleString()}</td>
+      <td>${item.notes || '—'}</td>
+    </tr>
+  `).join('')
 
-  // Recent maintenance jobs from Maintenance module (simulated)
-  const recentJobs = [
-    { rig: 'KEM-05', project: 'RS-01',     job: 'Water swivel seal replacement', days: 1.5, partsFromInventory: 8830,  status: 'Completed' },
-    { rig: 'KEM-09', project: 'RS-01',     job: 'Top cover oil seal replacement', days: 1.0, partsFromInventory: 31785, status: 'Completed' },
-    { rig: 'KEM-13', project: 'CMPDI-DAM', job: 'Bearing 61830 replacement',      days: 2.0, partsFromInventory: 41074, status: 'In Progress' },
-    { rig: 'KEM-12', project: 'CMP-MAD',   job: 'Hydraulic hose replacement',     days: 0.5, partsFromInventory: 14385, status: 'Completed' },
-  ]
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <title>Contract — ${projectName}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', Arial, sans-serif; color: #111; background: #fff; padding: 0; }
+    .page { max-width: 860px; margin: 0 auto; padding: 48px 48px; }
+    
+    /* Header */
+    .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 28px; border-bottom: 3px solid #F97316; margin-bottom: 32px; }
+    .logo-area { display: flex; flex-direction: column; gap: 6px; }
+    .logo-placeholder { width: 80px; height: 80px; background: #FFF7ED; border: 2px dashed #F97316; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #F97316; font-weight: 700; text-align: center; }
+    .company-name { font-size: 16px; font-weight: 800; color: #111; margin-top: 8px; }
+    .company-detail { font-size: 12px; color: #555; line-height: 1.7; }
+    .contract-badge { text-align: right; }
+    .contract-title { font-size: 28px; font-weight: 900; color: #F97316; letter-spacing: -1px; }
+    .contract-no { font-size: 13px; color: #555; margin-top: 6px; }
+    .contract-date { font-size: 12px; color: #888; margin-top: 4px; }
+    
+    /* Parties */
+    .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+    .party-box { padding: 16px 20px; border-radius: 10px; background: #F9FAFB; border: 1px solid #E5E7EB; }
+    .party-label { font-size: 10px; font-weight: 800; color: #F97316; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+    .party-name { font-size: 14px; font-weight: 700; color: #111; margin-bottom: 4px; }
+    .party-detail { font-size: 12px; color: #555; line-height: 1.6; }
+    
+    /* Project info */
+    .project-info { padding: 14px 20px; border-radius: 10px; background: #FFF7ED; border: 1px solid #FED7AA; margin-bottom: 28px; display: flex; justify-content: space-between; align-items: center; }
+    .project-label { font-size: 11px; color: #92400E; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+    .project-value { font-size: 16px; font-weight: 800; color: #C2410C; }
+    .date-range { font-size: 12px; color: #92400E; }
+    
+    /* Line items */
+    .section-title { font-size: 12px; font-weight: 800; color: #374151; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
+    thead tr { background: #111; }
+    thead th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; color: #fff; letter-spacing: 0.06em; text-transform: uppercase; }
+    thead th:last-child { text-align: right; }
+    tbody tr { border-bottom: 1px solid #F3F4F6; }
+    tbody tr:nth-child(even) { background: #FAFAFA; }
+    tbody td { padding: 10px 14px; font-size: 13px; color: #374151; vertical-align: top; }
+    tbody td:first-child { font-weight: 700; color: #F97316; width: 32px; }
+    
+    /* Terms */
+    .terms { padding: 16px 20px; border-radius: 10px; background: #F9FAFB; border: 1px solid #E5E7EB; margin-bottom: 32px; }
+    .terms-text { font-size: 12px; color: #555; line-height: 1.8; white-space: pre-wrap; }
+    
+    /* Signature */
+    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; padding-top: 24px; border-top: 1px solid #E5E7EB; }
+    .sig-box { }
+    .sig-line { border-bottom: 1.5px solid #374151; height: 40px; margin-bottom: 8px; }
+    .sig-label { font-size: 11px; color: #888; }
+    .sig-name { font-size: 13px; font-weight: 700; color: #374151; margin-top: 4px; }
+    
+    /* Footer */
+    .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #E5E7EB; text-align: center; font-size: 11px; color: #9CA3AF; }
+    .footer span { color: #F97316; font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="page">
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-      <div style={{ display: 'flex', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(249,115,22,0.05)', border: `1px solid rgba(249,115,22,0.15)` }}>
-        <Info size={14} style={{ color: C.orange, flexShrink: 0, marginTop: 1 }} />
-        <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
-          Set mechanic and helper daily rates per rig. Parts costs flow automatically from Inventory.
-          Total maintenance cost = (mechanic days × rate) + (helper days × rate) + parts from inventory.
-        </p>
-      </div>
-
-      {saved && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 10, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', alignSelf: 'flex-start' }}>
-          <Check size={14} style={{ color: C.green }} />
-          <span style={{ fontSize: 13, color: C.green, fontWeight: 600 }}>Maintenance rates saved</span>
-        </div>
-      )}
-
-      {/* Rates table */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Mechanic & Helper Labour Rates</div>
-          <div style={{ fontSize: 11, color: C.faint }}>Parts costs are pulled from Inventory automatically</div>
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-              {['Rig', 'Project', 'Mechanic Rate / Day', 'Helper Rate / Day', 'Combined / Day', 'Parts Cost Source', ''].map(h => (
-                <th key={h} style={{ padding: '11px 18px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.faint, letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {RIGS.map((rig, i) => {
-              const r = rates[rig.id]
-              const isEditing = editingRig === rig.id
-              const project = PROJECTS.find(p => p.id === rig.project)
-              return (
-                <tr key={rig.id} style={{ borderBottom: `1px solid rgba(30,41,59,0.5)`, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
-                  <td style={{ padding: '14px 18px', fontSize: 15, fontWeight: 800, color: C.text, fontFamily: 'monospace' }}>{rig.id}</td>
-                  <td style={{ padding: '14px 18px' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(249,115,22,0.1)', color: C.orange, border: '1px solid rgba(249,115,22,0.2)' }}>
-                      {project?.name}
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    {isEditing ? (
-                      <input type="number" value={r.mechanicRate} onChange={e => setRates(prev => ({ ...prev, [rig.id]: { ...prev[rig.id], mechanicRate: parseFloat(e.target.value) || 0 } }))}
-                        style={{ ...iStyle, width: 120, fontSize: 14, fontWeight: 700, color: C.blue }} />
-                    ) : (
-                      <div style={{ fontSize: 15, fontWeight: 800, color: C.blue, fontFamily: 'monospace' }}>
-                        ₹{r.mechanicRate.toLocaleString()}<span style={{ fontSize: 10, color: C.faint }}>/day</span>
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    {isEditing ? (
-                      <input type="number" value={r.helperRate} onChange={e => setRates(prev => ({ ...prev, [rig.id]: { ...prev[rig.id], helperRate: parseFloat(e.target.value) || 0 } }))}
-                        style={{ ...iStyle, width: 120, fontSize: 14, fontWeight: 700, color: C.purple }} />
-                    ) : (
-                      <div style={{ fontSize: 15, fontWeight: 800, color: C.purple, fontFamily: 'monospace' }}>
-                        ₹{r.helperRate.toLocaleString()}<span style={{ fontSize: 10, color: C.faint }}>/day</span>
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ padding: '14px 18px', fontSize: 14, fontWeight: 700, color: C.muted, fontFamily: 'monospace' }}>
-                    ₹{(r.mechanicRate + r.helperRate).toLocaleString()}/day
-                  </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(16,185,129,0.08)', color: C.green, border: '1px solid rgba(16,185,129,0.15)', fontWeight: 700 }}>
-                      📦 Auto from Inventory
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    {isEditing ? (
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={() => { setEditingRig(null); trigger() }} style={{ padding: '6px 14px', borderRadius: 8, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none' }}>
-                          <Check size={13} />
-                        </button>
-                        <button onClick={() => setEditingRig(null)} style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer' }}>
-                          <X size={13} />
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setEditingRig(rig.id)} style={{ padding: '6px 14px', borderRadius: 8, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', color: C.orange, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                        <Edit2 size={13} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Recent maintenance jobs */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Wrench size={15} style={{ color: C.faint }} />
-          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Recent Maintenance Jobs — Cost Breakdown</div>
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-              {['Rig', 'Project', 'Job', 'Days', 'Labour Cost', 'Parts (Inventory)', 'Total Cost', 'Status'].map(h => (
-                <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.faint, letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {recentJobs.map((job, i) => {
-              const rigRate = rates[job.rig] || { mechanicRate: 1100, helperRate: 550 }
-              const labourCost = job.days * (rigRate.mechanicRate + rigRate.helperRate)
-              const totalCost = labourCost + job.partsFromInventory
-              return (
-                <tr key={i} style={{ borderBottom: `1px solid rgba(30,41,59,0.4)` }}>
-                  <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 700, color: C.text, fontFamily: 'monospace' }}>{job.rig}</td>
-                  <td style={{ padding: '11px 16px' }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 5, background: 'rgba(249,115,22,0.1)', color: C.orange }}>{job.project}</span>
-                  </td>
-                  <td style={{ padding: '11px 16px', fontSize: 12, color: C.muted }}>{job.job}</td>
-                  <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 700, color: C.text }}>{job.days}d</td>
-                  <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 700, color: C.blue, fontFamily: 'monospace' }}>₹{labourCost.toLocaleString()}</td>
-                  <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 700, color: C.purple, fontFamily: 'monospace' }}>₹{job.partsFromInventory.toLocaleString()}</td>
-                  <td style={{ padding: '11px 16px', fontSize: 14, fontWeight: 800, color: C.red, fontFamily: 'monospace' }}>₹{totalCost.toLocaleString()}</td>
-                  <td style={{ padding: '11px 16px' }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                      background: job.status === 'Completed' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
-                      color: job.status === 'Completed' ? C.green : C.amber,
-                      border: `1px solid ${job.status === 'Completed' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`,
-                    }}>{job.status}</span>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-area">
+      ${contract.fromLogo
+        ? `<img src="${contract.fromLogo}" style="width:80px;height:80px;object-fit:contain;border-radius:8px;" />`
+        : `<div class="logo-placeholder">YOUR<br>LOGO</div>`}
+      <div class="company-name">${contract.fromCompany || 'Your Company Name'}</div>
+      <div class="company-detail">${contract.fromAddress || ''}<br>GSTIN: ${contract.fromGstin || '—'}<br>${contract.fromContact || ''}</div>
     </div>
-  )
+    <div class="contract-badge">
+      <div class="contract-title">CONTRACT</div>
+      <div class="contract-no">No. ${contract.contractNo || 'CTR-2026-001'}</div>
+      <div class="contract-date">Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+    </div>
+  </div>
+
+  <!-- Parties -->
+  <div class="parties">
+    <div class="party-box">
+      <div class="party-label">From (Contractor)</div>
+      <div class="party-name">${contract.fromCompany || 'Your Company Name'}</div>
+      <div class="party-detail">${contract.fromAddress || '—'}<br>GSTIN: ${contract.fromGstin || '—'}<br>${contract.fromContact || '—'}</div>
+    </div>
+    <div class="party-box">
+      <div class="party-label">To (Client)</div>
+      <div class="party-name">${contract.toCompany || 'Client Name'}</div>
+      <div class="party-detail">${contract.toAddress || '—'}<br>GSTIN: ${contract.toGstin || '—'}<br>${contract.toContact || '—'}</div>
+    </div>
+  </div>
+
+  <!-- Project info -->
+  <div class="project-info">
+    <div>
+      <div class="project-label">Project</div>
+      <div class="project-value">${projectName}</div>
+    </div>
+    ${contract.dateFrom || contract.dateTo ? `
+    <div style="text-align:right">
+      <div class="project-label">Contract Period</div>
+      <div class="date-range">${contract.dateFrom || '—'} to ${contract.dateTo || '—'}</div>
+    </div>` : ''}
+  </div>
+
+  <!-- Line items -->
+  <div class="section-title">Rates & Charges</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Description</th>
+        <th>Unit</th>
+        <th style="text-align:right">Rate / Price</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+  </table>
+
+  <!-- Terms -->
+  ${contract.terms ? `
+  <div class="section-title">Terms & Conditions</div>
+  <div class="terms">
+    <div class="terms-text">${contract.terms}</div>
+  </div>` : ''}
+
+  <!-- Signatures -->
+  <div class="signatures">
+    <div class="sig-box">
+      <div class="sig-line"></div>
+      <div class="sig-label">Authorised Signatory</div>
+      <div class="sig-name">${contract.fromCompany || 'Contractor'}</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-line"></div>
+      <div class="sig-label">Authorised Signatory</div>
+      <div class="sig-name">${contract.toCompany || 'Client'}</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Generated by <span>XPLORIX</span> · Finance & Costing Module · ${new Date().toLocaleDateString('en-IN')}
+  </div>
+
+</div>
+</body>
+</html>`
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// MAIN PAGE
-// ══════════════════════════════════════════════════════════════════════════
+// ── DEFAULT TERMS ─────────────────────────────────────────────────────────
+const DEFAULT_TERMS = `1. Payment shall be made within 30 days of invoice submission after MB certification.
+2. TDS shall be deducted at source as per Section 194C of the Income Tax Act.
+3. Retention money shall be released within 30 days of project completion and final inspection.
+4. Standby charges are applicable when the contractor's equipment is kept idle due to client-side reasons.
+5. Mobilisation charges are payable within 15 days of rig deployment at site.
+6. Any additional work beyond the scope of this contract shall be billed separately with prior approval.
+7. This contract is subject to the jurisdiction of courts at the contractor's registered address.`
+
+// ── MAIN PAGE ─────────────────────────────────────────────────────────────
 export default function CostingPage() {
-  const [activeTab, setActiveTab] = useState('contract')
+  const { updateRate } = useCostingRates()
+
+  const [selectedProject, setSelectedProject] = useState<string | null>(null)
+  const [showAddItem, setShowAddItem] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [editingItem, setEditingItem] = useState<string | null>(null)
+  const logoRef = useRef<HTMLInputElement>(null)
+
+  // All contracts stored per project
+  const [contracts, setContracts] = useState<Record<string, ContractData>>({})
+
+  const proj = PROJECTS.find(p => p.id === selectedProject)
+
+  // Get or initialise contract for selected project
+  const getContract = (projId: string): ContractData => {
+    return contracts[projId] || {
+      projectId: projId,
+      contractNo: `CTR-2026-${String(Object.keys(contracts).length + 1).padStart(3, '0')}`,
+      dateFrom: '', dateTo: '',
+      lineItems: [],
+      fromCompany: 'ANMAK CONSULTANCY SERVICES PRIVATE LIMITED',
+      fromAddress: '', fromGstin: '', fromContact: '', fromLogo: '',
+      toCompany: PROJECTS.find(p => p.id === projId)?.client || '',
+      toAddress: '', toGstin: '', toContact: '',
+      terms: DEFAULT_TERMS,
+    }
+  }
+
+  const contract = selectedProject ? getContract(selectedProject) : null
+
+  const updateContract = (field: keyof ContractData, value: any) => {
+    if (!selectedProject) return
+    setContracts(prev => ({
+      ...prev,
+      [selectedProject]: { ...getContract(selectedProject), [field]: value }
+    }))
+  }
+
+  const addItem = (item: LineItem) => {
+    if (!selectedProject) return
+    const current = getContract(selectedProject)
+    updateContract('lineItems', [...current.lineItems, item])
+  }
+
+  const deleteItem = (id: string) => {
+    if (!selectedProject || !contract) return
+    updateContract('lineItems', contract.lineItems.filter(i => i.id !== id))
+  }
+
+  const updateItem = (id: string, field: keyof LineItem, value: any) => {
+    if (!selectedProject || !contract) return
+    updateContract('lineItems', contract.lineItems.map(i => i.id === id ? { ...i, [field]: value } : i))
+  }
+
+  const handleSave = () => {
+    if (!selectedProject || !contract) return
+    // Also sync to costing context for invoicing
+    const rates: any = { contractType: 'meterage', band1To: 200, band1Rate: 0, band2From: 200, band2To: 400, band2Rate: 0, band3From: 400, band3Rate: 0, standbyRate: 0, drillingDayRate: 0, standbyDayRate: 0, repairDayRate: 0, mobilisation: 0, demobilisation: 0, gst: 18, tds: 2, retention: 5 }
+    contract.lineItems.forEach(item => {
+      if (item.category.includes('Band 1'))       rates.band1Rate       = item.price
+      if (item.category.includes('Band 2'))       rates.band2Rate       = item.price
+      if (item.category.includes('Band 3'))       rates.band3Rate       = item.price
+      if (item.category.includes('Standby Day'))  rates.standbyRate     = item.price
+      if (item.category.includes('Drilling Day')) { rates.drillingDayRate = item.price; rates.contractType = 'dayrate' }
+      if (item.category.includes('Standby Day Rate')) rates.standbyDayRate = item.price
+      if (item.category.includes('Repair'))       rates.repairDayRate   = item.price
+      if (item.category.includes('Mobilisation')) rates.mobilisation    = item.price
+      if (item.category.includes('Demobilisation')) rates.demobilisation = item.price
+      if (item.category === 'GST')               rates.gst             = item.price
+      if (item.category.includes('TDS'))         rates.tds             = item.price
+      if (item.category.includes('Retention'))   rates.retention       = item.price
+    })
+    updateRate(selectedProject, rates)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
+  }
+
+  const handleDownload = () => {
+    if (!selectedProject || !contract || !proj) return
+    const html = generateContractHTML(contract, proj.fullName)
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Contract_${selectedProject}_${new Date().toISOString().split('T')[0]}.html`
+    a.click()
+  }
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => updateContract('fromLogo', ev.target?.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  // Group items by category group for display
+  const getItemGroup = (item: LineItem) => {
+    if (item.isCustom) return 'Custom'
+    return STANDARD_CATEGORIES.find(c => c.label === item.category)?.group || 'Other'
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 48, minHeight: '100vh', background: C.bg }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 48, background: C.bg, minHeight: '100vh' }}>
 
       {/* Page header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 900, color: C.text, margin: 0, letterSpacing: '-0.5px' }}>
-            Finance & Costing
-          </h1>
-          <p style={{ fontSize: 13, color: C.faint, marginTop: 4 }}>
-            Set your rates once — billing, CPM and P&L calculate automatically
-          </p>
+          <h1 style={{ fontSize: 26, fontWeight: 900, color: C.text, margin: 0, letterSpacing: '-0.5px' }}>Finance & Costing</h1>
+          <p style={{ fontSize: 13, color: C.faint, marginTop: 4 }}>Build contracts per project — rates auto-feed into billing and CPM engine</p>
         </div>
         <FinanceNav active="Costing" />
       </div>
 
-      {/* Costing sub-nav */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 24px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Costing Setup</div>
-            <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>
-              Configure all cost inputs — each section feeds directly into the CPM engine and billing
+      {/* Step 1 — Select Project */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '20px 24px' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.orange, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 14 }}>
+          Step 1 — Select Project
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {PROJECTS.map(p => {
+            const hasContract = contracts[p.id]?.lineItems?.length > 0
+            return (
+              <button key={p.id} onClick={() => setSelectedProject(p.id)} style={{
+                padding: '10px 18px', borderRadius: 10, cursor: 'pointer', transition: 'all 0.2s',
+                background: selectedProject === p.id ? `linear-gradient(135deg,${C.orange},${C.orangeD})` : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${selectedProject === p.id ? 'transparent' : C.border}`,
+                color: selectedProject === p.id ? '#fff' : C.muted,
+                boxShadow: selectedProject === p.id ? '0 4px 16px rgba(249,115,22,0.3)' : 'none',
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{p.name}</div>
+                <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>
+                  {p.client} {hasContract ? '· ✅ Contract set' : '· No contract yet'}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Contract builder — shown after project selected */}
+      {selectedProject && contract && proj && (
+        <>
+          {/* Step 2 — Party Details */}
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+            <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(249,115,22,0.03)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: C.orange, textTransform: 'uppercase', letterSpacing: '0.1em', marginRight: 10 }}>Step 2</span>
+                Contract Details — {proj.fullName}
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <input value={contract.contractNo} onChange={e => updateContract('contractNo', e.target.value)}
+                  placeholder="Contract No."
+                  style={{ ...iStyle, width: 160, fontSize: 12 }} />
+                <input type="date" value={contract.dateFrom} onChange={e => updateContract('dateFrom', e.target.value)}
+                  style={{ ...iStyle, width: 150, fontSize: 12 }} />
+                <span style={{ color: C.faint, alignSelf: 'center', fontSize: 12 }}>to</span>
+                <input type="date" value={contract.dateTo} onChange={e => updateContract('dateTo', e.target.value)}
+                  style={{ ...iStyle, width: 150, fontSize: 12 }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+
+              {/* From — Contractor */}
+              <div style={{ padding: '20px 24px', borderRight: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.orange, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>From — Contractor</div>
+                <div style={{ display: 'flex', gap: 14, marginBottom: 14 }}>
+                  {/* Logo upload */}
+                  <div onClick={() => logoRef.current?.click()} style={{ width: 72, height: 72, borderRadius: 10, border: `2px dashed ${contract.fromLogo ? C.orange : C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.02)', transition: 'all 0.2s' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = C.orange}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = contract.fromLogo ? C.orange : C.border}>
+                    {contract.fromLogo
+                      ? <img src={contract.fromLogo} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      : <div style={{ textAlign: 'center' }}><Building2 size={20} style={{ color: C.faint, margin: '0 auto 4px' }} /><div style={{ fontSize: 9, color: C.faint }}>Logo</div></div>}
+                  </div>
+                  <input ref={logoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
+                  <input value={contract.fromCompany} onChange={e => updateContract('fromCompany', e.target.value)}
+                    placeholder="Company name"
+                    style={{ ...iStyle, fontSize: 13, fontWeight: 700 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[
+                    { field: 'fromAddress', placeholder: 'Full address with PIN code' },
+                    { field: 'fromGstin',   placeholder: 'GSTIN (e.g. 27AAAAA0000A1Z5)' },
+                    { field: 'fromContact', placeholder: 'Email / Phone' },
+                  ].map((f, i) => (
+                    <input key={i} value={(contract as any)[f.field]} onChange={e => updateContract(f.field as keyof ContractData, e.target.value)}
+                      placeholder={f.placeholder} style={{ ...iStyle, fontSize: 12 }} />
+                  ))}
+                </div>
+              </div>
+
+              {/* To — Client */}
+              <div style={{ padding: '20px 24px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.blue, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>To — Client</div>
+                <div style={{ marginBottom: 14 }}>
+                  <input value={contract.toCompany} onChange={e => updateContract('toCompany', e.target.value)}
+                    placeholder="Client company name"
+                    style={{ ...iStyle, fontSize: 13, fontWeight: 700 }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[
+                    { field: 'toAddress', placeholder: 'Client address' },
+                    { field: 'toGstin',   placeholder: 'Client GSTIN' },
+                    { field: 'toContact', placeholder: 'Client email / phone' },
+                  ].map((f, i) => (
+                    <input key={i} value={(contract as any)[f.field]} onChange={e => updateContract(f.field as keyof ContractData, e.target.value)}
+                      placeholder={f.placeholder} style={{ ...iStyle, fontSize: 12 }} />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Step 3 — Line Items */}
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+            <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(249,115,22,0.03)' }}>
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: C.orange, textTransform: 'uppercase', letterSpacing: '0.1em', marginRight: 10 }}>Step 3</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Rates & Charges</span>
+                <span style={{ fontSize: 11, color: C.faint, marginLeft: 10 }}>{contract.lineItems.length} items added</span>
+              </div>
+              <button onClick={() => setShowAddItem(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 10, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none', boxShadow: '0 4px 16px rgba(249,115,22,0.25)' }}>
+                <Plus size={14} /> Add Item
+              </button>
+            </div>
+
+            {contract.lineItems.length === 0 ? (
+              <div style={{ padding: '48px', textAlign: 'center' }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>No items added yet</div>
+                <div style={{ fontSize: 13, color: C.faint, marginBottom: 20 }}>Click "Add Item" to add meterage rates, day rates, mobilisation charges and more</div>
+                <button onClick={() => setShowAddItem(true)} style={{ padding: '10px 24px', borderRadius: 10, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none' }}>
+                  + Add First Item
+                </button>
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+                    {['#', 'Description', 'Unit', 'Rate / Price', 'Notes', ''].map(h => (
+                      <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.faint, letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {contract.lineItems.map((item, i) => {
+                    const isEditing = editingItem === item.id
+                    const group = getItemGroup(item)
+                    return (
+                      <tr key={item.id} style={{ borderBottom: `1px solid rgba(30,41,59,0.5)`, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
+                        <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 700, color: C.orange }}>{i + 1}</td>
+                        <td style={{ padding: '12px 16px' }}>
+                          {isEditing
+                            ? <input value={item.category} onChange={e => updateItem(item.id, 'category', e.target.value)} style={{ ...iStyle, fontSize: 13 }} />
+                            : <div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{item.category}</div>
+                                <div style={{ fontSize: 10, color: C.faint, marginTop: 2 }}>{group}{item.isCustom ? ' · Custom' : ''}</div>
+                              </div>}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          {isEditing
+                            ? <div style={{ position: 'relative' }}>
+                                <select value={item.unit} onChange={e => updateItem(item.id, 'unit', e.target.value)}
+                                  style={{ ...iStyle, width: 120, appearance: 'none', paddingRight: 28, cursor: 'pointer', fontSize: 12 }}>
+                                  {UNITS.map(u => <option key={u}>{u}</option>)}
+                                </select>
+                                <ChevronDown size={11} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: C.faint, pointerEvents: 'none' }} />
+                              </div>
+                            : <span style={{ fontSize: 12, color: C.muted, padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}>{item.unit}</span>}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          {isEditing
+                            ? <input type="number" value={item.price} onChange={e => updateItem(item.id, 'price', parseFloat(e.target.value) || 0)}
+                                style={{ ...iStyle, width: 130, fontSize: 16, fontWeight: 800, color: C.green }} />
+                            : <div style={{ fontSize: 18, fontWeight: 900, color: C.green, fontFamily: 'monospace' }}>
+                                ₹{item.price.toLocaleString()}
+                                <span style={{ fontSize: 11, color: C.faint, fontWeight: 400, marginLeft: 4 }}>{item.unit}</span>
+                              </div>}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          {isEditing
+                            ? <input value={item.notes} onChange={e => updateItem(item.id, 'notes', e.target.value)} placeholder="Notes..." style={{ ...iStyle, fontSize: 12 }} />
+                            : <span style={{ fontSize: 12, color: C.faint }}>{item.notes || '—'}</span>}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            {isEditing ? (
+                              <>
+                                <button onClick={() => setEditingItem(null)} style={{ padding: '6px 12px', borderRadius: 7, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: C.green, cursor: 'pointer' }}><Check size={13} /></button>
+                                <button onClick={() => setEditingItem(null)} style={{ padding: '6px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer' }}><X size={13} /></button>
+                              </>
+                            ) : (
+                              <button onClick={() => setEditingItem(item.id)} style={{ padding: '6px 10px', borderRadius: 7, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', color: C.orange, cursor: 'pointer' }}><Edit2 size={13} /></button>
+                            )}
+                            <button onClick={() => deleteItem(item.id)} style={{ padding: '6px 10px', borderRadius: 7, background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.1)', color: 'rgba(239,68,68,0.6)', cursor: 'pointer' }}><Trash2 size={13} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Step 4 — Terms */}
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '20px 24px' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.orange, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
+              Step 4 — Terms & Conditions
+            </div>
+            <textarea value={contract.terms} onChange={e => updateContract('terms', e.target.value)}
+              rows={8}
+              style={{ ...iStyle, resize: 'vertical', lineHeight: '1.7', fontSize: 12 }} />
+          </div>
+
+          {/* Action bar */}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '16px 20px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, position: 'sticky', bottom: 16 }}>
+            <div style={{ flex: 1, fontSize: 12, color: C.faint }}>
+              {contract.lineItems.length > 0
+                ? `${contract.lineItems.length} items · ${proj.fullName} · ${proj.client}`
+                : 'Add items to build the contract'}
+            </div>
+            {saved && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                <Check size={13} style={{ color: C.green }} />
+                <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>Saved — rates synced to Invoicing</span>
+              </div>
+            )}
+            <button onClick={handleSave} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 22px', borderRadius: 10, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: C.green, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              <Save size={14} /> Save Contract
+            </button>
+            <button onClick={handleDownload} disabled={contract.lineItems.length === 0}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: contract.lineItems.length === 0 ? 'not-allowed' : 'pointer', border: 'none', boxShadow: '0 4px 16px rgba(249,115,22,0.3)', opacity: contract.lineItems.length === 0 ? 0.5 : 1 }}>
+              <Download size={14} /> Download Contract
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Empty state */}
+      {!selectedProject && (
+        <div style={{ padding: '60px', textAlign: 'center', background: C.card, border: `1px solid ${C.border}`, borderRadius: 16 }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 8 }}>Select a project to build its contract</div>
+          <div style={{ fontSize: 13, color: C.faint }}>Each project gets its own contract with custom rates, party details and downloadable PDF</div>
         </div>
-        <CostingNav active={activeTab} setActive={setActiveTab} />
-      </div>
+      )}
 
-      {/* Tab content */}
-      <div>
-        {activeTab === 'contract'    && <ContractRates />}
-        {activeTab === 'rig'         && <RigRates />}
-        {activeTab === 'labour'      && <LabourCosts />}
-        {activeTab === 'fuel'        && <FuelRate />}
-        {activeTab === 'maintenance' && <MaintenanceRates />}
-      </div>
-
+      {/* Add item modal */}
+      {showAddItem && <AddItemModal onAdd={addItem} onClose={() => setShowAddItem(false)} />}
     </div>
   )
 }
