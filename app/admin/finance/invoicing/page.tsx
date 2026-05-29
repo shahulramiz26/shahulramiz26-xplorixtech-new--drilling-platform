@@ -638,7 +638,7 @@ function InvoiceTracker({ invoices, setInvoices, profile }: { invoices: Invoice[
           <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
             style={{ ...iStyle, width: 'auto', appearance: 'none', cursor: 'pointer', paddingRight: 28 }}>
             <option value="All">All Projects</option>
-            {PROJECTS.map(p => <option key={p.id} value={p.id}>{p.id}</option>)}
+            {CTX_PROJECTS.map(p => <option key={p.id} value={p.id}>{p.id}</option>)}
           </select>
           <ChevronDown size={12} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: C.faint, pointerEvents: 'none' }} />
         </div>
