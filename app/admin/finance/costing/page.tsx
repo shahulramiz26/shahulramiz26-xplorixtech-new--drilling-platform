@@ -49,7 +49,7 @@ const STANDARD_CATEGORIES = [
   { label: 'Fuel Lump Sum (monthly)',      unit: '₹/month',  defaultPrice: 38000,  group: 'Fuel'              },
 ]
 
-const GROUPS = [...new Set(STANDARD_CATEGORIES.map(c => c.group))]
+const GROUPS = STANDARD_CATEGORIES.map(c => c.group).filter((g, i, arr) => arr.indexOf(g) === i)
 
 const UNITS = ['₹/meter', '₹/day', '₹/month', '₹ lump sum', '%', '₹/bit', '₹/litre', '₹/bucket', '₹/shift', '₹/hole', 'Other']
 
