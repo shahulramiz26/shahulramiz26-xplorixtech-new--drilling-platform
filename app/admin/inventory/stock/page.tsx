@@ -730,7 +730,7 @@ export default function StockManagementPage() {
                 background: r.urgency==='Critical'?'rgba(239,68,68,0.1)':r.urgency==='Urgent'?'rgba(245,158,11,0.1)':'rgba(16,185,129,0.1)',
                 color: r.urgency==='Critical'?'#EF4444':r.urgency==='Urgent'?'#F59E0B':'#10B981',
                 border: `1px solid ${r.urgency==='Critical'?'rgba(239,68,68,0.2)':r.urgency==='Urgent'?'rgba(245,158,11,0.2)':'rgba(16,185,129,0.2)'}`,
-              }}>{r.urgency}: {r.partName} × {r.qty}</span>
+              }}>{r.urgency}: {r.items[0]?.partName}{r.items.length>1?` +${r.items.length-1} more`:''}</span>
             ))}
             <Link href="/admin/inventory/purchase-orders" style={{ fontSize:11, fontWeight:700, padding:'4px 12px', borderRadius:20, background:'rgba(249,115,22,0.15)', border:'1px solid rgba(249,115,22,0.3)', color:'#F97316', textDecoration:'none' }}>
               View in Purchase Orders →
