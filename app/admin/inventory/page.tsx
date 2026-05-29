@@ -111,18 +111,23 @@ export default function InventoryDashboard() {
   const [selectedRig, setSelectedRig] = useState('All Rigs')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  // Applied filters — only update when Apply is clicked
+  const [appliedProject, setAppliedProject] = useState('All Projects')
+  const [appliedRig, setAppliedRig] = useState('All Rigs')
+  const [appliedDateFrom, setAppliedDateFrom] = useState('')
+  const [appliedDateTo, setAppliedDateTo] = useState('')
 
   const closingChange = ((storeSummary.closing - storeSummary.prevClosing) / storeSummary.prevClosing * 100).toFixed(1)
   const isClosingUp = storeSummary.closing > storeSummary.prevClosing
 
   const filteredStockOuts = useMemo(() =>
-    stockOuts.filter(s => selectedProject === 'All Projects' || s.project === selectedProject.split(' - ')[0]),
-    [selectedProject]
+    stockOuts.filter(s => appliedProject === 'All Projects' || s.project === appliedProject.split(' - ')[0]),
+    [appliedProject]
   )
 
   const filteredActivity = useMemo(() =>
-    activityFeed.filter(a => selectedProject === 'All Projects' || a.sub.includes(selectedProject.split(' - ')[0])),
-    [selectedProject]
+    activityFeed.filter(a => appliedProject === 'All Projects' || a.sub.includes(appliedProject.split(' - ')[0])),
+    [appliedProject]
   )
 
   return (
@@ -188,6 +193,18 @@ export default function InventoryDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Applied filter indicator */}
+      {(appliedProject !== 'All Projects' || appliedRig !== 'All Rigs' || appliedDateFrom) && (
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', borderRadius:10, background:'rgba(249,115,22,0.06)', border:'1px solid rgba(249,115,22,0.15)' }}>
+          <span style={{ fontSize:11, color:'#F97316', fontWeight:700 }}>Filtered:</span>
+          {appliedProject !== 'All Projects' && <span style={{ fontSize:11, color:'#F8FAFC', padding:'2px 8px', borderRadius:20, background:'rgba(249,115,22,0.12)', border:'1px solid rgba(249,115,22,0.2)' }}>{appliedProject.split(' - ')[0]}</span>}
+          {appliedRig !== 'All Rigs' && <span style={{ fontSize:11, color:'#F8FAFC', padding:'2px 8px', borderRadius:20, background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.2)' }}>{appliedRig}</span>}
+          {appliedDateFrom && <span style={{ fontSize:11, color:'#F8FAFC', padding:'2px 8px', borderRadius:20, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.2)' }}>{appliedDateFrom} → {appliedDateTo}</span>}
+          <button onClick={()=>{setAppliedProject('All Projects');setAppliedRig('All Rigs');setAppliedDateFrom('');setAppliedDateTo('');setSelectedProject('All Projects');setSelectedRig('All Rigs');setDateFrom('');setDateTo('')}}
+            style={{ marginLeft:'auto', fontSize:11, color:'#64748B', cursor:'pointer', background:'none', border:'none', padding:0 }}>✕ Clear all</button>
+        </div>
+      )}
 
       {/* ── WIDGET 2: STORE SUMMARY — connected flow tiles ── */}
       <div style={{ ...S.card, padding:20, background:'linear-gradient(135deg,rgba(249,115,22,0.04),rgba(13,17,23,0.98))', borderColor:'rgba(249,115,22,0.12)' }}>
@@ -446,6 +463,111 @@ export default function InventoryDashboard() {
           </div>
         </div>
       </div>
+
+      {/* ── STORE STATEMENT (shown when Apply with dates is clicked) ── */}
+      {appliedDateFrom && appliedDateTo && (
+        <div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, overflow:'hidden' }}>
+          {/* Header */}
+          <div style={{ padding:'16px 24px', borderBottom:'1px solid #1E293B', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div>
+              <div style={{ fontSize:15, fontWeight:700, color:'#F8FAFC' }}>📋 Store Statement</div>
+              <div style={{ fontSize:12, color:'#64748B', marginTop:2 }}>
+                {appliedProject !== 'All Projects' ? appliedProject : 'All Projects'}
+                {appliedRig !== 'All Rigs' ? ` · ${appliedRig}` : ''}
+                {` · ${appliedDateFrom} to ${appliedDateTo}`}
+              </div>
+            </div>
+            <button onClick={()=>{setAppliedDateFrom('');setAppliedDateTo('');setDateFrom('');setDateTo('')}}
+              style={{ padding:6, borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#64748B', cursor:'pointer', fontSize:12 }}>
+              ✕ Close
+            </button>
+          </div>
+
+          <div style={{ padding:24, display:'flex', flexDirection:'column', gap:20 }}>
+
+            {/* Summary tiles */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:4 }}>
+              {[
+                { label:'Opening Balance', value:'₹11.6L', color:'#94A3B8' },
+                { label:'+ Received',      value:'₹2.1L',  color:'#10B981' },
+                { label:'− Issued',        value:'₹67,413', color:'#EF4444' },
+                { label:'− Transferred',   value:'₹75,490', color:'#F59E0B' },
+                { label:'Closing Balance', value:'₹73.2L', color:'#F97316' },
+              ].map((s,i)=>(
+                <div key={i} style={{ textAlign:'center', padding:'14px 8px', borderRadius:10,
+                  background: i===4?'rgba(249,115,22,0.08)':'rgba(255,255,255,0.02)',
+                  border: i===4?'1px solid rgba(249,115,22,0.2)':'1px solid rgba(255,255,255,0.04)',
+                }}>
+                  <div style={{ fontSize:9, color:'#64748B', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>{s.label}</div>
+                  <div style={{ fontSize:16, fontWeight:800, color:s.color, fontFamily:"'Space Grotesk',sans-serif" }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Three columns — Received, Issued, Transferred */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:16 }}>
+
+              {/* Received */}
+              <div>
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:10, padding:'8px 12px', borderRadius:8, background:'rgba(16,185,129,0.08)', border:'1px solid rgba(16,185,129,0.15)' }}>
+                  <span style={{ fontSize:13 }}>📦</span>
+                  <span style={{ fontSize:12, fontWeight:700, color:'#10B981' }}>Received</span>
+                </div>
+                {[
+                  { po:'PO-2026-056', supplier:'IDP', part:'NQ Core Bit SR-06', qty:'8 NOS', value:'₹92,000', date:'28-04-2026' },
+                  { po:'PO-2026-055', supplier:'WESTFIELDS', part:'MATEX DD955', qty:'10 Buckets', value:'₹1,21,510', date:'29-04-2026' },
+                  { po:'PO-2026-054', supplier:'ROCKTEK', part:'Lube Filter B7125', qty:'12 NOS', value:'₹23,880', date:'22-04-2026' },
+                ].map((r,i)=>(
+                  <div key={i} style={{ padding:'10px 12px', borderRadius:10, background:'rgba(16,185,129,0.04)', border:'1px solid rgba(16,185,129,0.1)', marginBottom:6 }}>
+                    <div style={{ fontSize:11, fontWeight:600, color:'#F8FAFC' }}>{r.part}</div>
+                    <div style={{ fontSize:10, color:'#64748B', marginTop:2 }}>{r.qty} · {r.supplier} · {r.date}</div>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#10B981', marginTop:4 }}>+{r.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Issued */}
+              <div>
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:10, padding:'8px 12px', borderRadius:8, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.15)' }}>
+                  <span style={{ fontSize:13 }}>✋</span>
+                  <span style={{ fontSize:12, fontWeight:700, color:'#F97316' }}>Issued to Rigs</span>
+                </div>
+                {[
+                  { part:'NQ Core Bit SR-06', qty:'2 NOS', rig:'KEM-9', by:'Rajesh Kumar', value:'₹23,000', date:'24-05-2026' },
+                  { part:'NQ Core Lifter', qty:'2 NOS', rig:'KEM-8', by:'Suresh Singh', value:'₹800', date:'30-04-2026' },
+                  { part:'Lube Filter B7125', qty:'4 NOS', rig:'KEM-1', by:'Ravi Kumar', value:'₹7,960', date:'28-04-2026' },
+                  { part:'Top Cover Oil Seal', qty:'4 NOS', rig:'KEM-9', by:'Mohan Verma', value:'₹31,785', date:'09-04-2026' },
+                ].map((r,i)=>(
+                  <div key={i} style={{ padding:'10px 12px', borderRadius:10, background:'rgba(249,115,22,0.04)', border:'1px solid rgba(249,115,22,0.1)', marginBottom:6 }}>
+                    <div style={{ fontSize:11, fontWeight:600, color:'#F8FAFC' }}>{r.part}</div>
+                    <div style={{ fontSize:10, color:'#64748B', marginTop:2 }}>{r.qty} · {r.rig} · By: {r.by}</div>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#F97316', marginTop:4 }}>−{r.value} · {r.date}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Transferred */}
+              <div>
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:10, padding:'8px 12px', borderRadius:8, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.15)' }}>
+                  <span style={{ fontSize:13 }}>⇄</span>
+                  <span style={{ fontSize:12, fontWeight:700, color:'#8B5CF6' }}>Transferred</span>
+                </div>
+                {[
+                  { part:'MATEX DD955 × 6 Buckets', from:'RS-01', to:'DGMIL-BHK', by:'Suresh Singh', value:'₹72,906', date:'18-04-2026' },
+                  { part:'NQ Recover Tape × 1', from:'RS-01', to:'CMPDI-DAM', by:'Rajesh Kumar', value:'₹2,100', date:'06-04-2026' },
+                ].map((r,i)=>(
+                  <div key={i} style={{ padding:'10px 12px', borderRadius:10, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.1)', marginBottom:6 }}>
+                    <div style={{ fontSize:11, fontWeight:600, color:'#F8FAFC' }}>{r.part}</div>
+                    <div style={{ fontSize:10, color:'#64748B', marginTop:2 }}>{r.from} → {r.to} · By: {r.by}</div>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#8B5CF6', marginTop:4 }}>{r.value} · {r.date}</div>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Project consumption bar chart */}
       <div style={{ ...S.card, padding:24 }}>
