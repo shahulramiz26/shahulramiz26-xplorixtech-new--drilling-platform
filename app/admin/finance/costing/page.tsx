@@ -505,21 +505,32 @@ export default function CostingPage() {
 
   const handleSave = () => {
     if (!selectedProject || !contract) return
-    // Also sync to costing context for invoicing
-    const rates: any = { contractType: 'meterage', band1To: 200, band1Rate: 0, band2From: 200, band2To: 400, band2Rate: 0, band3From: 400, band3Rate: 0, standbyRate: 0, drillingDayRate: 0, standbyDayRate: 0, repairDayRate: 0, mobilisation: 0, demobilisation: 0, gst: 18, tds: 2, retention: 5 }
+    // Build rates ONLY from what user actually added as line items
+    // Start with zeroes — no hidden defaults
+    const rates: any = {
+      contractType: 'meterage',
+      band1To: 200, band1Rate: 0,
+      band2From: 200, band2To: 400, band2Rate: 0,
+      band3From: 400, band3Rate: 0,
+      standbyRate: 0,
+      drillingDayRate: 0, standbyDayRate: 0, repairDayRate: 0,
+      mobilisation: 0, demobilisation: 0,
+      gst: 0, tds: 0, retention: 0,
+    }
     contract.lineItems.forEach(item => {
-      if (item.category.includes('Band 1'))       rates.band1Rate       = item.price
-      if (item.category.includes('Band 2'))       rates.band2Rate       = item.price
-      if (item.category.includes('Band 3'))       rates.band3Rate       = item.price
-      if (item.category.includes('Standby Day'))  rates.standbyRate     = item.price
-      if (item.category.includes('Drilling Day')) { rates.drillingDayRate = item.price; rates.contractType = 'dayrate' }
-      if (item.category.includes('Standby Day Rate')) rates.standbyDayRate = item.price
-      if (item.category.includes('Repair'))       rates.repairDayRate   = item.price
-      if (item.category.includes('Mobilisation')) rates.mobilisation    = item.price
-      if (item.category.includes('Demobilisation')) rates.demobilisation = item.price
-      if (item.category === 'GST')               rates.gst             = item.price
-      if (item.category.includes('TDS'))         rates.tds             = item.price
-      if (item.category.includes('Retention'))   rates.retention       = item.price
+      const lbl = item.category.toLowerCase()
+      if (lbl.includes('band 1') || lbl.includes('meterage band 1'))       rates.band1Rate        = item.price
+      if (lbl.includes('band 2') || lbl.includes('meterage band 2'))       rates.band2Rate        = item.price
+      if (lbl.includes('band 3') || lbl.includes('meterage band 3'))       rates.band3Rate        = item.price
+      if (lbl.includes('standby day rate') && !lbl.includes('drilling'))  { rates.standbyDayRate   = item.price; if (rates.drillingDayRate > 0) rates.contractType = 'dayrate' }
+      if (lbl.includes('standby') && !lbl.includes('day rate'))            rates.standbyRate      = item.price
+      if (lbl.includes('drilling day'))                                   { rates.drillingDayRate  = item.price; rates.contractType = 'dayrate' }
+      if (lbl.includes('repair') || lbl.includes('breakdown'))             rates.repairDayRate    = item.price
+      if (lbl.includes('mobilisation') && !lbl.includes('demo'))           rates.mobilisation     = item.price
+      if (lbl.includes('demobilisation'))                                   rates.demobilisation   = item.price
+      if (lbl === 'gst')                                                    rates.gst              = item.price
+      if (lbl.includes('tds'))                                              rates.tds              = item.price
+      if (lbl.includes('retention'))                                        rates.retention        = item.price
     })
     updateRate(selectedProject, rates)
     setSaved(true)
@@ -800,41 +811,75 @@ export default function CostingPage() {
           </div>
 
           {/* Saved contracts overview */}
-          {Object.keys(contracts).length > 0 && (
+          {Object.keys(contracts).filter(k => contracts[k]?.lineItems?.length > 0).length > 0 && (
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-              <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 700, color: C.text }}>
-                Saved Contracts
+              <div style={{ padding: '14px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Saved Contracts</div>
+                <span style={{ fontSize: 11, color: C.faint }}>{Object.keys(contracts).filter(k => contracts[k]?.lineItems?.length > 0).length} contracts saved</span>
               </div>
               {Object.entries(contracts).map(([projId, c], i) => {
                 const p = PROJECTS.find(x => x.id === projId)
                 if (!c.lineItems?.length) return null
+                // Find key rates from line items
+                const hasGST = c.lineItems.some(l => l.category.toLowerCase() === 'gst')
+                const hasTDS = c.lineItems.some(l => l.category.toLowerCase().includes('tds'))
+                const hasMob = c.lineItems.some(l => l.category.toLowerCase().includes('mobilisation') && !l.category.toLowerCase().includes('demo'))
+                const isDayRate = c.lineItems.some(l => l.category.toLowerCase().includes('drilling day'))
                 return (
-                  <div key={projId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: `1px solid rgba(30,41,59,0.5)`, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 9, background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📋</div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{p?.fullName || projId}</div>
-                        <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>
-                          {p?.client} · {c.lineItems.length} line items
-                          {c.dateFrom && c.dateTo ? ` · ${c.dateFrom} to ${c.dateTo}` : ''}
-                          · <span style={{ color: C.green }}>✅ Synced to Invoicing</span>
+                  <div key={projId} style={{ padding: '18px 24px', borderBottom: `1px solid rgba(30,41,59,0.5)`, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📋</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>{p?.fullName || projId}</div>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'rgba(16,185,129,0.1)', color: C.green, border: '1px solid rgba(16,185,129,0.2)' }}>✅ Saved</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: isDayRate ? 'rgba(59,130,246,0.1)' : 'rgba(249,115,22,0.1)', color: isDayRate ? C.blue : C.orange, border: `1px solid ${isDayRate ? 'rgba(59,130,246,0.2)' : 'rgba(249,115,22,0.2)'}` }}>
+                              {isDayRate ? '📅 Day Rate' : '📏 Meterage'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 11, color: C.faint, marginTop: 5, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                            <span>{p?.client}</span>
+                            <span>{c.lineItems.length} line items</span>
+                            {c.contractNo && <span>No. {c.contractNo}</span>}
+                            {c.dateFrom && c.dateTo && <span>{c.dateFrom} → {c.dateTo}</span>}
+                            {hasGST && <span style={{ color: C.blue }}>GST included</span>}
+                            {hasTDS && <span style={{ color: C.red }}>TDS included</span>}
+                            {hasMob && <span style={{ color: C.green }}>Mobilisation included</span>}
+                          </div>
+                          {/* Line items preview */}
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                            {c.lineItems.slice(0, 5).map((item, j) => (
+                              <span key={j} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted }}>
+                                {item.category}: ₹{item.price.toLocaleString()} {item.unit}
+                              </span>
+                            ))}
+                            {c.lineItems.length > 5 && <span style={{ fontSize: 10, color: C.faint }}>+{c.lineItems.length - 5} more</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => setSelectedProject(projId)}
-                        style={{ padding: '7px 16px', borderRadius: 8, background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)', color: C.orange, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                        Edit
-                      </button>
-                      <button onClick={() => {
-                        const html = generateContractHTML(c, p?.fullName || projId)
-                        const blob = new Blob([html], { type: 'text/html' })
-                        const url = URL.createObjectURL(blob)
-                        const a = document.createElement('a'); a.href = url; a.download = `Contract_${projId}.html`; a.click()
-                      }}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none' }}>
-                        <Download size={13} /> Download
-                      </button>
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => setSelectedProject(projId)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', color: C.orange, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                            <Edit2 size={13} /> Edit
+                          </button>
+                          <button onClick={() => {
+                            const html = generateContractHTML(c, p?.fullName || projId)
+                            const blob = new Blob([html], { type: 'text/html' })
+                            const url = URL.createObjectURL(blob)
+                            const a = document.createElement('a'); a.href = url; a.download = `Contract_${projId}.html`; a.click()
+                          }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                            <Download size={13} /> Download
+                          </button>
+                        </div>
+                        {/* Go to Invoice button */}
+                        <Link href={`/admin/finance/invoicing?project=${projId}`}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '9px 14px', borderRadius: 8, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 12, fontWeight: 700, textDecoration: 'none', boxShadow: '0 4px 12px rgba(249,115,22,0.25)' }}>
+                          <FileText size={13} /> Go to Invoice →
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 )
