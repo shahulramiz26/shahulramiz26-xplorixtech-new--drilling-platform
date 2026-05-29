@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Download, Check, Clock, AlertTriangle, ChevronDown,
@@ -321,7 +322,14 @@ ${inv.notes ? `<div class="section"><div class="section-title">Notes</div><p sty
 // ══════════════════════════════════════════════════════════════════════════
 function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice[]; setInvoices: any; profile: typeof defaultProfile }) {
   const { getRate } = useCostingRates()
-  const [selectedProject, setSelectedProject] = useState('RS-01')
+  const searchParams = useSearchParams()
+  const urlProject = searchParams.get('project')
+  const [selectedProject, setSelectedProject] = useState(urlProject || 'RS-01')
+
+  // Update if URL changes
+  useEffect(() => {
+    if (urlProject) setSelectedProject(urlProject)
+  }, [urlProject])
   const [month, setMonth] = useState('May 2026')
   const [meters, setMeters] = useState(624)
   const [standbyDays, setStandbyDays] = useState(3)
@@ -385,10 +393,11 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
   }
 
   const grossAmount = calcRevenue()
-  const gstAmt = Math.round(grossAmount * proj.gst / 100)
-  const tdsAmt = Math.round(grossAmount * proj.tds / 100)
-  const retAmt = Math.round(grossAmount * proj.retention / 100)
-  const netAmt = grossAmount + gstAmt - tdsAmt - retAmt
+  // Only apply GST/TDS/retention if user actually set them in the contract
+  const gstAmt      = proj.gst > 0      ? Math.round(grossAmount * proj.gst / 100)       : 0
+  const tdsAmt      = proj.tds > 0      ? Math.round(grossAmount * proj.tds / 100)       : 0
+  const retAmt      = proj.retention > 0 ? Math.round(grossAmount * proj.retention / 100) : 0
+  const netAmt      = grossAmount + gstAmt - tdsAmt - retAmt
 
   const handleGenerate = () => {
     const inv: Invoice = {
@@ -489,7 +498,8 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
             </>
           )}
 
-          {/* Include mobilisation */}
+          {/* Include mobilisation — only show if set in contract */}
+          {proj.mobilisation > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}` }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Include Mobilisation</div>
@@ -502,6 +512,7 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
               <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: includeMob ? 23 : 3, transition: 'all 0.2s' }} />
             </button>
           </div>
+          )}
 
           <button onClick={handleGenerate} style={{ padding: '14px', borderRadius: 12, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', border: 'none', boxShadow: '0 4px 20px rgba(249,115,22,0.35)' }}>
             Generate Invoice →
