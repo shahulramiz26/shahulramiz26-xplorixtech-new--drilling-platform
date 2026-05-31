@@ -279,6 +279,7 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
   const [standbyDaysDay, setStandbyDaysDay] = useState(4)
   const [repairDays, setRepairDays] = useState(2)
   const [includeMob, setIncludeMob] = useState(false)
+  const [includeDemob, setIncludeDemob] = useState(false)
   const [preview, setPreview] = useState<Invoice | null>(null)
   const [generated, setGenerated] = useState(false)
 
@@ -293,7 +294,8 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
     band1To: ctxRate.band1To, band2To: ctxRate.band2To,
     standbyRate: ctxRate.standbyRate,
     drillingDayRate: ctxRate.drillingDayRate, standbyDayRate: ctxRate.standbyDayRate, repairDayRate: ctxRate.repairDayRate,
-    mobilisation: ctxRate.mobilisation, gst: ctxRate.gst, tds: ctxRate.tds, retention: ctxRate.retention,
+    mobilisation: ctxRate.mobilisation, demobilisation: ctxRate.demobilisation,
+    gst: ctxRate.gst, tds: ctxRate.tds, retention: ctxRate.retention,
   }
   const isMeterage = proj.contractType === 'meterage'
   const isDayRate  = proj.contractType === 'dayrate'
@@ -307,10 +309,12 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
       if (meters > proj.band2To && proj.band3Rate > 0) rev += (meters - proj.band2To) * proj.band3Rate
       if (proj.standbyRate > 0) rev += standbyDays * proj.standbyRate
       if (includeMob && proj.mobilisation > 0) rev += proj.mobilisation
+      if (includeDemob && proj.demobilisation > 0) rev += proj.demobilisation
       return rev
     } else {
       let rev = (drillingDays * proj.drillingDayRate) + (standbyDaysDay * proj.standbyDayRate) + (repairDays * proj.repairDayRate)
       if (includeMob && proj.mobilisation > 0) rev += proj.mobilisation
+      if (includeDemob && proj.demobilisation > 0) rev += proj.demobilisation
       return rev
     }
   }
@@ -333,7 +337,11 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
       meters, standbyDays, includeMob,
       grossAmount, gstAmt, tdsAmt, retentionAmt: retAmt, netReceivable: netAmt,
       status: 'Draft', raisedDate: new Date().toLocaleDateString('en-IN'),
-      dueDate: '', paidAmount: 0, notes: '',
+      dueDate: '', paidAmount: 0,
+      notes: [
+        includeMob && proj.mobilisation > 0 ? `Mob: ₹${proj.mobilisation.toLocaleString()}` : '',
+        includeDemob && proj.demobilisation > 0 ? `Demob: ₹${proj.demobilisation.toLocaleString()}` : '',
+      ].filter(Boolean).join(' · ') || '',
     }
     setInvoices((prev: Invoice[]) => [inv, ...prev])
     setPreview(inv)
@@ -440,6 +448,19 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
           </div>
         )}
 
+        {/* Demobilisation toggle */}
+        {proj.demobilisation > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}` }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Include Demobilisation</div>
+              <div style={{ fontSize: 11, color: C.faint }}>₹{proj.demobilisation.toLocaleString()} one-time</div>
+            </div>
+            <button onClick={() => setIncludeDemob(!includeDemob)} style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer', border: 'none', background: includeDemob ? C.orange : C.border, position: 'relative', transition: 'all 0.2s' }}>
+              <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: includeDemob ? 23 : 3, transition: 'all 0.2s' }} />
+            </button>
+          </div>
+        )}
+
         <button onClick={handleGenerate} style={{ padding: '14px', borderRadius: 12, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', border: 'none', boxShadow: '0 4px 20px rgba(249,115,22,0.35)' }}>
           Generate Invoice →
         </button>
@@ -490,6 +511,12 @@ function GenerateInvoice({ invoices, setInvoices, profile }: { invoices: Invoice
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginTop: 6 }}>
                 <span style={{ color: C.muted }}>Mobilisation (one-time)</span>
                 <span style={{ color: C.green, fontWeight: 700, fontFamily: 'monospace' }}>₹{proj.mobilisation.toLocaleString()}</span>
+              </div>
+            )}
+            {includeDemob && proj.demobilisation > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginTop: 6 }}>
+                <span style={{ color: C.muted }}>Demobilisation (one-time)</span>
+                <span style={{ color: C.green, fontWeight: 700, fontFamily: 'monospace' }}>₹{proj.demobilisation.toLocaleString()}</span>
               </div>
             )}
           </div>
@@ -671,13 +698,74 @@ function InvoiceTracker({ invoices, setInvoices, profile }: { invoices: Invoice[
         })}
       </div>
 
+      {/* Receivables Summary — merged from Cash Flow */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text }}>
+          Receivables & Locked Cash
+        </div>
+
+        {/* Summary cards */}
+        <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, borderBottom: `1px solid ${C.border}` }}>
+          {[
+            { label: 'Total Billed',   value: invoices.reduce((s,i) => s+i.grossAmount,0),                                                       color: C.text,   icon: '📋' },
+            { label: 'Cash Received',  value: invoices.filter(i=>i.status==='Paid').reduce((s,i)=>s+i.netReceivable,0) + invoices.filter(i=>i.status==='Partially Paid').reduce((s,i)=>s+i.paidAmount,0), color: C.green,  icon: '✅' },
+            { label: 'Outstanding',    value: invoices.filter(i=>!['Paid','Draft'].includes(i.status)).reduce((s,i)=>s+(i.netReceivable-i.paidAmount),0), color: C.orange, icon: '⏳' },
+            { label: 'Overdue',        value: invoices.filter(i=>i.status==='Overdue').reduce((s,i)=>s+i.netReceivable,0),                        color: C.red,    icon: '🚨' },
+          ].map((k,i) => (
+            <div key={i} style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: 18, marginBottom: 6 }}>{k.icon}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{k.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: k.color, fontFamily: 'monospace' }}>₹{(k.value/100000).toFixed(1)}L</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Locked cash */}
+        <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ padding: '16px 18px', borderRadius: 12, background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>🔒 Retention Locked</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: C.red, fontFamily: 'monospace', marginBottom: 4 }}>₹{(invoices.reduce((s,i)=>s+i.retentionAmt,0)/100000).toFixed(1)}L</div>
+            <div style={{ fontSize: 11, color: C.faint }}>Held by clients until project completion</div>
+          </div>
+          <div style={{ padding: '16px 18px', borderRadius: 12, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.purple, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>🔒 TDS Deducted</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: C.purple, fontFamily: 'monospace', marginBottom: 4 }}>₹{(invoices.reduce((s,i)=>s+i.tdsAmt,0)/100000).toFixed(1)}L</div>
+            <div style={{ fontSize: 11, color: C.faint }}>Recoverable via annual income tax filing</div>
+          </div>
+        </div>
+
+        {/* Client-wise */}
+        <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
+          {['CMPDI','DGML','MECL'].map((client,i) => {
+            const ci = invoices.filter(inv => inv.client === client)
+            if (!ci.length) return null
+            return (
+              <div key={i} style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: C.orange, marginBottom: 10 }}>{client}</div>
+                {[
+                  { label: 'Billed',    value: ci.reduce((s,i)=>s+i.grossAmount,0),                                                         color: C.text   },
+                  { label: 'Received',  value: ci.filter(i=>i.status==='Paid').reduce((s,i)=>s+i.netReceivable,0),                           color: C.green  },
+                  { label: 'Overdue',   value: ci.filter(i=>i.status==='Overdue').reduce((s,i)=>s+i.netReceivable,0),                        color: C.red    },
+                  { label: 'Retention', value: ci.reduce((s,i)=>s+i.retentionAmt,0),                                                        color: C.amber  },
+                ].map((stat,j) => (
+                  <div key={j} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                    <span style={{ color: C.faint }}>{stat.label}</span>
+                    <span style={{ color: stat.color, fontWeight: 700, fontFamily: 'monospace' }}>₹{(stat.value/100000).toFixed(1)}L</span>
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
       {preview && <InvoicePreviewModal inv={preview} profile={profile} onClose={() => setPreview(null)} />}
     </div>
   )
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// TAB 3 — CASH FLOW
+// TAB 3 — CASH FLOW (kept as function but no longer used as tab)
 // ══════════════════════════════════════════════════════════════════════════
 function CashFlow({ invoices }: { invoices: Invoice[] }) {
 
@@ -858,7 +946,6 @@ function CashFlow({ invoices }: { invoices: Invoice[] }) {
 const TABS = [
   { id: 'generate', label: 'Generate Invoice', icon: '📄' },
   { id: 'tracker',  label: 'Invoice Tracker',  icon: '📊' },
-  { id: 'cashflow', label: 'Cash Flow',         icon: '💰' },
 ]
 
 function InvoicingPageInner() {
@@ -914,7 +1001,6 @@ function InvoicingPageInner() {
       {/* Tab content */}
       {activeTab === 'generate' && <GenerateInvoice invoices={invoices} setInvoices={setInvoices} profile={profile} />}
       {activeTab === 'tracker'  && <InvoiceTracker  invoices={invoices} setInvoices={setInvoices} profile={profile} />}
-      {activeTab === 'cashflow' && <CashFlow invoices={invoices} />}
 
       {showProfile && <CompanyProfileModal profile={profile} onClose={() => setShowProfile(false)} onSave={setProfile} />}
     </div>
