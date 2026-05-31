@@ -76,7 +76,6 @@ function FinanceNav({ active }: { active: string }) {
         { href: '/admin/finance',           label: 'Dashboard' },
         { href: '/admin/finance/costing',   label: 'Costing'   },
         { href: '/admin/finance/invoicing', label: 'Invoicing' },
-        { href: '/admin/finance/reports',   label: 'Reports'   },
       ].map(t => (
         <Link key={t.href} href={t.href} style={{
           padding: '7px 18px', borderRadius: 9, fontSize: 13, fontWeight: 600,
