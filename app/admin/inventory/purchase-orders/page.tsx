@@ -719,12 +719,21 @@ export default function PurchaseOrdersPage() {
   const [filterRig, setFilterRig] = useState('All Rigs')
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(defaultCompanyProfile)
   // Part requests from Stock Management (Change 6)
-  const [pendingRequests, setPendingRequests] = useState([
-    { id:'1', items:[{partName:'NQ Core Bit SR-06',partNumber:'NQ-CB-SR06',qty:4,unit:'NOS'},{partName:'HQ Core Lifter',partNumber:'HQ-CL-001',qty:10,unit:'NOS'}], project:'DGMIL-BHK - Bhalukona', rig:'KEM-5', urgency:'Urgent', requestedBy:'Anil Sharma', reason:'Bits worn out, need replacement', date:'24-05-2026', status:'Pending' },
-    { id:'2', items:[{partName:'Fuel Water Separator',partNumber:'FLT-FWS-01',qty:6,unit:'NOS'}], project:'RS-01 - Chhindwara', rig:'KEM-1', urgency:'Normal', requestedBy:'Ravi Kumar', reason:'Monthly replacement due', date:'23-05-2026', status:'Pending' },
-    { id:'3', items:[{partName:'ADDRILL EA-20 KG',partNumber:'ADD-EA-20',qty:60,unit:'Kg'},{partName:'MATEX DD955 Liquid',partNumber:'MTX-DD955',qty:5,unit:'Bucket'}], project:'CMPDI-DAM - Bokaro', rig:'KEM-6', urgency:'Critical', requestedBy:'Suresh Patil', reason:'Running low on drilling fluids', date:'22-05-2026', status:'Pending' },
-  ])
-  const convertedRequests = pendingRequests.filter(r=>r.status==='Converted')
+  const [pendingRequests, setPendingRequests] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('xplorix_part_requests')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.length > 0) return parsed
+      }
+    } catch(e) {}
+    // fallback seed data
+    return [
+      { id:'1', items:[{partName:'NQ Core Bit SR-06',partNumber:'NQ-CB-SR06',qty:4,unit:'NOS'},{partName:'HQ Core Lifter',partNumber:'HQ-CL-001',qty:10,unit:'NOS'}], project:'DGMIL-BHK - Bhalukona', rig:'KEM-5', urgency:'Urgent', requestedBy:'Anil Sharma', reason:'Bits worn out, need replacement', date:'24-05-2026', status:'Pending' },
+      { id:'2', items:[{partName:'Fuel Water Separator',partNumber:'FLT-FWS-01',qty:6,unit:'NOS'}], project:'RS-01 - Chhindwara', rig:'KEM-1', urgency:'Normal', requestedBy:'Ravi Kumar', reason:'Monthly replacement due', date:'23-05-2026', status:'Pending' },
+      { id:'3', items:[{partName:'ADDRILL EA-20 KG',partNumber:'ADD-EA-20',qty:60,unit:'Kg'},{partName:'MATEX DD955 Liquid',partNumber:'MTX-DD955',qty:5,unit:'Bucket'}], project:'CMPDI-DAM - Bokaro', rig:'KEM-6', urgency:'Critical', requestedBy:'Suresh Patil', reason:'Running low on drilling fluids', date:'22-05-2026', status:'Pending' },
+    ]
+  })
 
   const filtered = pos.filter(po => {
     const matchStatus = filterStatus==='All' || po.status===filterStatus
@@ -835,7 +844,9 @@ ${po.notes ? `<div style="margin-top:10px"><strong>Notes:</strong> ${po.notes}</
                     </span>
                   </div>
                   <button onClick={()=>{
-                    setPendingRequests(prev=>prev.map(x=>x.id===r.id?{...x,status:'Converted'}:x))
+                    const updated = pendingRequests.map((x:any)=>x.id===r.id?{...x,status:'Converted'}:x)
+                    setPendingRequests(updated)
+                    try { localStorage.setItem('xplorix_part_requests', JSON.stringify(updated)) } catch(e) {}
                     setShowNewPO(true)
                   }}
                     style={{ padding:'6px 16px', borderRadius:8, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer', border:'none', whiteSpace:'nowrap' }}>
