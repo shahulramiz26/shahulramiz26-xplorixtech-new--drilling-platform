@@ -719,11 +719,12 @@ export default function PurchaseOrdersPage() {
   const [filterRig, setFilterRig] = useState('All Rigs')
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(defaultCompanyProfile)
   // Part requests from Stock Management (Change 6)
-  const pendingRequests = [
-    { id:'1', partName:'NQ Core Bit SR-06', partNumber:'NQ-CB-SR06', qty:4, unit:'NOS', project:'DGMIL-BHK - Bhalukona', rig:'KEM-5', urgency:'Urgent', requestedBy:'Anil Sharma', reason:'Bits worn out', date:'24-05-2026' },
-    { id:'2', partName:'Fuel Water Separator', partNumber:'FLT-FWS-01', qty:6, unit:'NOS', project:'RS-01 - Chhindwara', rig:'KEM-1', urgency:'Normal', requestedBy:'Ravi Kumar', reason:'Monthly replacement', date:'23-05-2026' },
-    { id:'3', partName:'ADDRILL EA-20 KG', partNumber:'ADD-EA-20', qty:60, unit:'Kg', project:'CMPDI-DAM - Bokaro', rig:'KEM-6', urgency:'Critical', requestedBy:'Suresh Patil', reason:'Running low', date:'22-05-2026' },
-  ]
+  const [pendingRequests, setPendingRequests] = useState([
+    { id:'1', items:[{partName:'NQ Core Bit SR-06',partNumber:'NQ-CB-SR06',qty:4,unit:'NOS'},{partName:'HQ Core Lifter',partNumber:'HQ-CL-001',qty:10,unit:'NOS'}], project:'DGMIL-BHK - Bhalukona', rig:'KEM-5', urgency:'Urgent', requestedBy:'Anil Sharma', reason:'Bits worn out, need replacement', date:'24-05-2026', status:'Pending' },
+    { id:'2', items:[{partName:'Fuel Water Separator',partNumber:'FLT-FWS-01',qty:6,unit:'NOS'}], project:'RS-01 - Chhindwara', rig:'KEM-1', urgency:'Normal', requestedBy:'Ravi Kumar', reason:'Monthly replacement due', date:'23-05-2026', status:'Pending' },
+    { id:'3', items:[{partName:'ADDRILL EA-20 KG',partNumber:'ADD-EA-20',qty:60,unit:'Kg'},{partName:'MATEX DD955 Liquid',partNumber:'MTX-DD955',qty:5,unit:'Bucket'}], project:'CMPDI-DAM - Bokaro', rig:'KEM-6', urgency:'Critical', requestedBy:'Suresh Patil', reason:'Running low on drilling fluids', date:'22-05-2026', status:'Pending' },
+  ])
+  const convertedRequests = pendingRequests.filter(r=>r.status==='Converted')
 
   const filtered = pos.filter(po => {
     const matchStatus = filterStatus==='All' || po.status===filterStatus
@@ -804,36 +805,57 @@ ${po.notes ? `<div style="margin-top:10px"><strong>Notes:</strong> ${po.notes}</
         })}
       </div>
 
-      {/* Part Requests Banner — from Stock Management (Change 6) */}
-      <div style={{ padding:'14px 20px', borderRadius:14, background:'rgba(249,115,22,0.05)', border:'1px solid rgba(249,115,22,0.2)' }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, marginBottom:12 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <Bell size={16} style={{ color:'#F97316' }} />
-            <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC' }}>3 Part Requests pending — convert to Purchase Order</span>
-          </div>
-          <span style={{ fontSize:11, color:'#64748B' }}>Raised from Stock Management</span>
-        </div>
-        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          {pendingRequests.map((r,i)=>(
-            <div key={r.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid #1E293B' }}>
-              <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:20, whiteSpace:'nowrap',
-                background: r.urgency==='Critical'?'rgba(239,68,68,0.1)':r.urgency==='Urgent'?'rgba(245,158,11,0.1)':'rgba(16,185,129,0.1)',
-                color: r.urgency==='Critical'?'#EF4444':r.urgency==='Urgent'?'#F59E0B':'#10B981',
-                border: `1px solid ${r.urgency==='Critical'?'rgba(239,68,68,0.2)':r.urgency==='Urgent'?'rgba(245,158,11,0.2)':'rgba(16,185,129,0.2)'}`,
-              }}>{r.urgency}</span>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:600, color:'#F8FAFC' }}>{r.partName} × {r.qty} {r.unit}</div>
-                <div style={{ fontSize:10, color:'#64748B', marginTop:1 }}>Requested by {r.requestedBy} · {r.project.split(' - ')[0]} · {r.rig} · {r.reason}</div>
-              </div>
-              <div style={{ fontSize:10, color:'#64748B', whiteSpace:'nowrap' }}>{r.date}</div>
-              <button onClick={()=>setShowNewPO(true)}
-                style={{ padding:'6px 14px', borderRadius:7, background:'rgba(249,115,22,0.15)', border:'1px solid rgba(249,115,22,0.3)', color:'#F97316', fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>
-                Create PO →
-              </button>
+      {/* Part Requests Banner */}
+      {pendingRequests.filter(r=>r.status==='Pending').length > 0 && (
+        <div style={{ padding:'14px 20px', borderRadius:14, background:'rgba(249,115,22,0.05)', border:'1px solid rgba(249,115,22,0.2)' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, marginBottom:12 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <Bell size={16} style={{ color:'#F97316' }} />
+              <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC' }}>
+                {pendingRequests.filter(r=>r.status==='Pending').length} Part Request{pendingRequests.filter(r=>r.status==='Pending').length>1?'s':''} pending — convert to Purchase Order
+              </span>
             </div>
-          ))}
+            <span style={{ fontSize:11, color:'#64748B' }}>Raised from Stock Management</span>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {pendingRequests.filter(r=>r.status==='Pending').map((r)=>(
+              <div key={r.id} style={{ padding:'12px 14px', borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid #1E293B' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:8 }}>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:20, whiteSpace:'nowrap',
+                    background: r.urgency==='Critical'?'rgba(239,68,68,0.1)':r.urgency==='Urgent'?'rgba(245,158,11,0.1)':'rgba(16,185,129,0.1)',
+                    color: r.urgency==='Critical'?'#EF4444':r.urgency==='Urgent'?'#F59E0B':'#10B981',
+                    border: `1px solid ${r.urgency==='Critical'?'rgba(239,68,68,0.2)':r.urgency==='Urgent'?'rgba(245,158,11,0.2)':'rgba(16,185,129,0.2)'}`,
+                  }}>{r.urgency}</span>
+                  <div style={{ flex:1 }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:'#F8FAFC' }}>
+                      {r.items.length} part{r.items.length>1?'s':''} requested
+                    </span>
+                    <span style={{ fontSize:11, color:'#64748B', marginLeft:8 }}>
+                      By {r.requestedBy} · {r.project.split(' - ')[0]} · {r.rig} · {r.date}
+                    </span>
+                  </div>
+                  <button onClick={()=>{
+                    setPendingRequests(prev=>prev.map(x=>x.id===r.id?{...x,status:'Converted'}:x))
+                    setShowNewPO(true)
+                  }}
+                    style={{ padding:'6px 16px', borderRadius:8, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer', border:'none', whiteSpace:'nowrap' }}>
+                    Create PO →
+                  </button>
+                </div>
+                {/* Show parts list */}
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6, paddingLeft:8 }}>
+                  {r.items.map((item,j)=>(
+                    <span key={j} style={{ fontSize:10, padding:'3px 10px', borderRadius:20, background:'rgba(255,255,255,0.05)', border:'1px solid #1E293B', color:'#94A3B8' }}>
+                      {item.partName} × {item.qty} {item.unit}
+                    </span>
+                  ))}
+                </div>
+                <div style={{ fontSize:10, color:'#64748B', marginTop:6, paddingLeft:8 }}>Reason: {r.reason}</div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Filters + Actions — with date + rig filters */}
       <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap', background:'#0D1117', border:'1px solid #1E293B', borderRadius:14, padding:'12px 16px' }}>
