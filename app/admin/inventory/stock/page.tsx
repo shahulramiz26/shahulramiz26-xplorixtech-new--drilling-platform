@@ -550,7 +550,13 @@ function PartRequestModal({ onClose, onSave }: { onClose:()=>void; onSave:(r:Par
     if (!requestedBy.trim()) { setError('Please enter your name'); return }
     if (items.length === 0) { setError('Please add at least one part'); return }
     if (!reason.trim()) { setError('Please enter a reason'); return }
-    onSave({ id:Date.now().toString(), requestedBy, items:items.map(({id,...rest})=>rest), project, rig, urgency, reason, date:new Date().toLocaleDateString('en-IN'), status:'Pending' })
+    const newRequest = { id:Date.now().toString(), requestedBy, items:items.map(({id,...rest})=>rest), project, rig, urgency, reason, date:new Date().toLocaleDateString('en-IN'), status:'Pending' }
+    // Save to localStorage so Purchase Orders page can read it
+    try {
+      const existing = JSON.parse(localStorage.getItem('xplorix_part_requests') || '[]')
+      localStorage.setItem('xplorix_part_requests', JSON.stringify([newRequest, ...existing]))
+    } catch(e) { console.error('localStorage error:', e) }
+    onSave(newRequest)
     onClose()
   }
 
@@ -693,7 +699,16 @@ export default function StockManagementPage() {
   const [showTransferHistory, setShowTransferHistory] = useState(false)
   const [showOpeningBalance, setShowOpeningBalance] = useState(false)
   const [showPartRequest, setShowPartRequest] = useState(false)
-  const [partRequests, setPartRequests] = useState<PartRequest[]>(seedRequests)
+  const [partRequests, setPartRequests] = useState<PartRequest[]>(() => {
+    try {
+      const saved = localStorage.getItem('xplorix_part_requests')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.length > 0) return parsed
+      }
+    } catch(e) {}
+    return seedRequests
+  })
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   // Applied filters (only update when Apply is clicked)
@@ -1024,7 +1039,11 @@ export default function StockManagementPage() {
       {showTransfer && <TransferModal onClose={()=>setShowTransfer(false)} onConfirm={handleTransfer} stockData={stockData} />}
       {showTransferHistory && <TransferHistoryModal project={selectedProject} movements={movements} onClose={()=>setShowTransferHistory(false)} />}
       {showOpeningBalance && <OpeningBalanceModal project={selectedProject} onClose={()=>setShowOpeningBalance(false)} />}
-      {showPartRequest && <PartRequestModal onClose={()=>setShowPartRequest(false)} onSave={r=>setPartRequests(prev=>[r,...prev])} />}
+      {showPartRequest && <PartRequestModal onClose={()=>setShowPartRequest(false)} onSave={r=>{
+        const updated = [r, ...partRequests]
+        setPartRequests(updated)
+        try { localStorage.setItem('xplorix_part_requests', JSON.stringify(updated)) } catch(e) {}
+      }} />}
 
     </div>
   )
