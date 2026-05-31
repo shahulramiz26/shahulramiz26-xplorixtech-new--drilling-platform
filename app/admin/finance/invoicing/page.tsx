@@ -615,6 +615,20 @@ function InvoiceTracker({ invoices, setInvoices, profile }: { invoices: Invoice[
         ))}
       </div>
 
+      {/* Locked Cash — top of tracker */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <div style={{ padding: '18px 22px', borderRadius: 14, background: C.card, border: '1px solid rgba(239,68,68,0.2)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>🔒 Retention Locked</div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: C.red, fontFamily: 'monospace', marginBottom: 4 }}>₹{(invoices.reduce((s,i)=>s+i.retentionAmt,0)/100000).toFixed(1)}L</div>
+          <div style={{ fontSize: 12, color: C.faint }}>Held by clients until project completion</div>
+        </div>
+        <div style={{ padding: '18px 22px', borderRadius: 14, background: C.card, border: '1px solid rgba(139,92,246,0.2)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.purple, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>🔒 TDS Deducted</div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: C.purple, fontFamily: 'monospace', marginBottom: 4 }}>₹{(invoices.reduce((s,i)=>s+i.tdsAmt,0)/100000).toFixed(1)}L</div>
+          <div style={{ fontSize: 12, color: C.faint }}>Recoverable via annual income tax filing</div>
+        </div>
+      </div>
+
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 16px' }}>
         <div style={{ position: 'relative' }}>
@@ -696,67 +710,6 @@ function InvoiceTracker({ invoices, setInvoices, profile }: { invoices: Invoice[
             </div>
           )
         })}
-      </div>
-
-      {/* Receivables Summary — merged from Cash Flow */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, fontSize: 14, fontWeight: 700, color: C.text }}>
-          Receivables & Locked Cash
-        </div>
-
-        {/* Summary cards */}
-        <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, borderBottom: `1px solid ${C.border}` }}>
-          {[
-            { label: 'Total Billed',   value: invoices.reduce((s,i) => s+i.grossAmount,0),                                                       color: C.text,   icon: '📋' },
-            { label: 'Cash Received',  value: invoices.filter(i=>i.status==='Paid').reduce((s,i)=>s+i.netReceivable,0) + invoices.filter(i=>i.status==='Partially Paid').reduce((s,i)=>s+i.paidAmount,0), color: C.green,  icon: '✅' },
-            { label: 'Outstanding',    value: invoices.filter(i=>!['Paid','Draft'].includes(i.status)).reduce((s,i)=>s+(i.netReceivable-i.paidAmount),0), color: C.orange, icon: '⏳' },
-            { label: 'Overdue',        value: invoices.filter(i=>i.status==='Overdue').reduce((s,i)=>s+i.netReceivable,0),                        color: C.red,    icon: '🚨' },
-          ].map((k,i) => (
-            <div key={i} style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: 18, marginBottom: 6 }}>{k.icon}</div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{k.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: k.color, fontFamily: 'monospace' }}>₹{(k.value/100000).toFixed(1)}L</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Locked cash */}
-        <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ padding: '16px 18px', borderRadius: 12, background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.red, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>🔒 Retention Locked</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: C.red, fontFamily: 'monospace', marginBottom: 4 }}>₹{(invoices.reduce((s,i)=>s+i.retentionAmt,0)/100000).toFixed(1)}L</div>
-            <div style={{ fontSize: 11, color: C.faint }}>Held by clients until project completion</div>
-          </div>
-          <div style={{ padding: '16px 18px', borderRadius: 12, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.purple, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>🔒 TDS Deducted</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: C.purple, fontFamily: 'monospace', marginBottom: 4 }}>₹{(invoices.reduce((s,i)=>s+i.tdsAmt,0)/100000).toFixed(1)}L</div>
-            <div style={{ fontSize: 11, color: C.faint }}>Recoverable via annual income tax filing</div>
-          </div>
-        </div>
-
-        {/* Client-wise */}
-        <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
-          {['CMPDI','DGML','MECL'].map((client,i) => {
-            const ci = invoices.filter(inv => inv.client === client)
-            if (!ci.length) return null
-            return (
-              <div key={i} style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: C.orange, marginBottom: 10 }}>{client}</div>
-                {[
-                  { label: 'Billed',    value: ci.reduce((s,i)=>s+i.grossAmount,0),                                                         color: C.text   },
-                  { label: 'Received',  value: ci.filter(i=>i.status==='Paid').reduce((s,i)=>s+i.netReceivable,0),                           color: C.green  },
-                  { label: 'Overdue',   value: ci.filter(i=>i.status==='Overdue').reduce((s,i)=>s+i.netReceivable,0),                        color: C.red    },
-                  { label: 'Retention', value: ci.reduce((s,i)=>s+i.retentionAmt,0),                                                        color: C.amber  },
-                ].map((stat,j) => (
-                  <div key={j} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
-                    <span style={{ color: C.faint }}>{stat.label}</span>
-                    <span style={{ color: stat.color, fontWeight: 700, fontFamily: 'monospace' }}>₹{(stat.value/100000).toFixed(1)}L</span>
-                  </div>
-                ))}
-              </div>
-            )
-          })}
-        </div>
       </div>
 
       {preview && <InvoicePreviewModal inv={preview} profile={profile} onClose={() => setPreview(null)} />}
