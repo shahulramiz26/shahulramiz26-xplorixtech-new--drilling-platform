@@ -495,11 +495,11 @@ export default function CostingPage() {
       if (lbl.includes('retention'))     rates.retention       = item.price
     })
     updateRate(projId, rates)
-    setSavedProjects(prev => new Set([...prev, projId]))
+    setSavedProjects(prev => new Set(Array.from(prev).concat(projId)))
   }
 
   const handleSaveRig = (rigId: string) => {
-    setSavedRigs(prev => new Set([...prev, rigId]))
+    setSavedRigs(prev => new Set(Array.from(prev).concat(rigId)))
   }
 
   const TABS = [
