@@ -855,7 +855,7 @@ ${po.notes ? `<div style="margin-top:10px"><strong>Notes:</strong> ${po.notes}</
                 </div>
                 {/* Show parts list */}
                 <div style={{ display:'flex', flexWrap:'wrap', gap:6, paddingLeft:8 }}>
-                  {r.items.map((item,j)=>(
+                  {r.items.map((item:any,j:number)=>(
                     <span key={j} style={{ fontSize:10, padding:'3px 10px', borderRadius:20, background:'rgba(255,255,255,0.05)', border:'1px solid #1E293B', color:'#94A3B8' }}>
                       {item.partName} × {item.qty} {item.unit}
                     </span>
