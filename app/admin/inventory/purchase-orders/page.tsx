@@ -344,17 +344,37 @@ function CompanyProfileModal({ profile, onClose, onSave }: { profile: CompanyPro
 }
 
 // ── NEW PO MODAL ───────────────────────────────────────────────────────────
-function NewPOModal({ onClose, onSave, companyProfile }: { onClose:()=>void; onSave:(po:PurchaseOrder)=>void; companyProfile: CompanyProfile }) {
+function NewPOModal({ onClose, onSave, companyProfile, prefilledProject, prefilledItems }: {
+  onClose:()=>void; onSave:(po:PurchaseOrder)=>void; companyProfile: CompanyProfile
+  prefilledProject?: string
+  prefilledItems?: {partName:string; partNumber:string; qty:number; unit:string}[]
+}) {
   const { format } = useCurrency()
   const [supplier, setSupplier] = useState(suppliers[0].name)
   const [supplierId, setSupplierId] = useState(suppliers[0].id)
   const [customSupplier, setCustomSupplier] = useState('')
-  const [project, setProject] = useState(projectOptions[0])
+  const [project, setProject] = useState(prefilledProject || projectOptions[0])
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0])
   const [expectedDate, setExpectedDate] = useState('')
   const [billNo, setBillNo] = useState('')
   const [notes, setNotes] = useState('')
-  const [items, setItems] = useState<POLineItem[]>([{ id:'new1', partNumber:'', partName:'', qtyOrdered:1, qtyReceived:0, unitCost:0, unit:'Each' }])
+  const [items, setItems] = useState<POLineItem[]>(() => {
+    if (prefilledItems && prefilledItems.length > 0) {
+      return prefilledItems.map((item, i) => {
+        const cat = partsCatalogue[item.partNumber.toUpperCase()]
+        return {
+          id: `new${i}`,
+          partNumber: item.partNumber,
+          partName: item.partName,
+          qtyOrdered: item.qty,
+          qtyReceived: 0,
+          unitCost: cat ? cat.unitCost : 0,
+          unit: item.unit,
+        }
+      })
+    }
+    return [{ id:'new1', partNumber:'', partName:'', qtyOrdered:1, qtyReceived:0, unitCost:0, unit:'Each' }]
+  })
   const [priceUpdatePrompt, setPriceUpdatePrompt] = useState<{id:string; partNumber:string; oldPrice:number; newPrice:number}|null>(null)
   const [taxData, setTaxData] = useState({ cgst:0, sgst:0, igst:0, tds:0, freight:0, other:0 })
 
@@ -711,6 +731,8 @@ export default function PurchaseOrdersPage() {
   const [filterStatus, setFilterStatus] = useState<POStatus|'All'>('All')
   const [filterProject, setFilterProject] = useState('All')
   const [showNewPO, setShowNewPO] = useState(false)
+  const [prefilledProject, setPrefilledProject] = useState<string|undefined>(undefined)
+  const [prefilledItems, setPrefilledItems] = useState<any[]|undefined>(undefined)
   const [expandedPO, setExpandedPO] = useState<string|null>(null)
   const [receiveTarget, setReceiveTarget] = useState<PurchaseOrder|null>(null)
   const [showCompanyProfile, setShowCompanyProfile] = useState(false)
@@ -847,6 +869,8 @@ ${po.notes ? `<div style="margin-top:10px"><strong>Notes:</strong> ${po.notes}</
                     const updated = pendingRequests.map((x:any)=>x.id===r.id?{...x,status:'Converted'}:x)
                     setPendingRequests(updated)
                     try { localStorage.setItem('xplorix_part_requests', JSON.stringify(updated)) } catch(e) {}
+                    setPrefilledProject(r.project)
+                    setPrefilledItems(r.items)
                     setShowNewPO(true)
                   }}
                     style={{ padding:'6px 16px', borderRadius:8, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer', border:'none', whiteSpace:'nowrap' }}>
@@ -909,7 +933,7 @@ ${po.notes ? `<div style="margin-top:10px"><strong>Notes:</strong> ${po.notes}</
           style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 12px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:12, fontWeight:600, cursor:'pointer' }}>
           <Building2 size={14} /> Company Profile
         </button>
-        <button onClick={()=>setShowNewPO(true)}
+        <button onClick={()=>{ setPrefilledProject(undefined); setPrefilledItems(undefined); setShowNewPO(true) }}
           style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6, padding:'9px 18px', borderRadius:10, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none', boxShadow:'0 4px 20px rgba(249,115,22,0.25)' }}>
           <Plus size={14} /> New Purchase Order
         </button>
@@ -1026,7 +1050,13 @@ ${po.notes ? `<div style="margin-top:10px"><strong>Notes:</strong> ${po.notes}</
       </div>
 
       {/* Modals */}
-      {showNewPO && <NewPOModal onClose={()=>setShowNewPO(false)} onSave={po=>setPos(prev=>[po,...prev])} companyProfile={companyProfile} />}
+      {showNewPO && <NewPOModal
+        onClose={()=>{ setShowNewPO(false); setPrefilledProject(undefined); setPrefilledItems(undefined) }}
+        onSave={po=>setPos(prev=>[po,...prev])}
+        companyProfile={companyProfile}
+        prefilledProject={prefilledProject}
+        prefilledItems={prefilledItems}
+      />}
       {receiveTarget && <ReceiveModal po={receiveTarget} onClose={()=>setReceiveTarget(null)} onConfirm={(receivedBy, onTime, daysLate, qualityIssue)=>handleReceiveConfirm(receiveTarget.id, receivedBy, onTime, daysLate, qualityIssue)} />}
       {showCompanyProfile && <CompanyProfileModal profile={companyProfile} onClose={()=>setShowCompanyProfile(false)} onSave={setCompanyProfile} />}
 
