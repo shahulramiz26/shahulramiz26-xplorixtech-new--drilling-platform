@@ -550,7 +550,7 @@ function PartRequestModal({ onClose, onSave }: { onClose:()=>void; onSave:(r:Par
     if (!requestedBy.trim()) { setError('Please enter your name'); return }
     if (items.length === 0) { setError('Please add at least one part'); return }
     if (!reason.trim()) { setError('Please enter a reason'); return }
-    const newRequest = { id:Date.now().toString(), requestedBy, items:items.map(({id,...rest})=>rest), project, rig, urgency, reason, date:new Date().toLocaleDateString('en-IN'), status:'Pending' }
+    const newRequest: PartRequest = { id:Date.now().toString(), requestedBy, items:items.map(({id,...rest})=>rest), project, rig, urgency, reason, date:new Date().toLocaleDateString('en-IN'), status:'Pending' as const }
     // Save to localStorage so Purchase Orders page can read it
     try {
       const existing = JSON.parse(localStorage.getItem('xplorix_part_requests') || '[]')
