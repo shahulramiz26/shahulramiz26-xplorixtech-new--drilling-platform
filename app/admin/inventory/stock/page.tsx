@@ -495,19 +495,29 @@ function PartRequestModal({ onClose, onSave }: { onClose:()=>void; onSave:(r:Par
             </div>
             <div style={{ border:'1px solid #1E293B', borderRadius:12, overflow:'hidden' }}>
               {/* Table Header */}
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 100px 70px 70px 32px', gap:8, padding:'8px 12px', background:'rgba(255,255,255,0.02)', borderBottom:'1px solid #1E293B' }}>
-                {['Part Name','Part No','Qty','Unit',''].map(h=>(
+              <div style={{ display:'grid', gridTemplateColumns:'100px 1fr 70px 70px 32px', gap:8, padding:'8px 12px', background:'rgba(255,255,255,0.02)', borderBottom:'1px solid #1E293B' }}>
+                {['Part No','Part Name','Qty','Unit',''].map(h=>(
                   <div key={h} style={{ fontSize:10, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</div>
                 ))}
               </div>
               {/* Rows */}
               {items.map((item)=>(
-                <div key={item.id} style={{ display:'grid', gridTemplateColumns:'1fr 100px 70px 70px 32px', gap:8, padding:'8px 12px', borderBottom:'1px solid rgba(30,41,59,0.5)', position:'relative', alignItems:'center' }}>
-                  {/* Part Name search */}
+                <div key={item.id} style={{ display:'grid', gridTemplateColumns:'100px 1fr 70px 70px 32px', gap:8, padding:'8px 12px', borderBottom:'1px solid rgba(30,41,59,0.5)', position:'relative', alignItems:'center' }}>
+                  {/* Part Number — first column, editable */}
+                  <input value={item.partNumber}
+                    onChange={e=>{
+                      updateItem(item.id,'partNumber',e.target.value)
+                      // auto-fill name from catalogue if match found
+                      const match = partsCatalogueList.find(p=>p.partNumber.toLowerCase()===e.target.value.toLowerCase())
+                      if(match){ updateItem(item.id,'partName',match.name); updateItem(item.id,'unit',match.unit) }
+                    }}
+                    placeholder="Part No..."
+                    style={{...iStyle, fontSize:11, padding:'6px 8px', fontFamily:'monospace'}} />
+                  {/* Part Name search — second column */}
                   <div style={{ position:'relative' }}>
                     <input value={item.search || item.partName}
                       onChange={e=>{ updateItem(item.id,'search',e.target.value); updateItem(item.id,'showSug',true); updateItem(item.id,'partName',e.target.value) }}
-                      placeholder="Search part..."
+                      placeholder="Search part name..."
                       style={{...iStyle, fontSize:11, padding:'6px 8px'}} />
                     {item.showSug && item.search && (
                       <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:200, background:'#0D1117', border:'1px solid #1E293B', borderRadius:8, maxHeight:160, overflowY:'auto' }}>
@@ -523,8 +533,6 @@ function PartRequestModal({ onClose, onSave }: { onClose:()=>void; onSave:(r:Par
                       </div>
                     )}
                   </div>
-                  {/* Part Number */}
-                  <div style={{ fontSize:10, color:'#10B981', fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.partNumber || '—'}</div>
                   {/* Qty */}
                   <input type="number" min={1} value={item.qty}
                     onChange={e=>updateItem(item.id,'qty',parseInt(e.target.value)||1)}
