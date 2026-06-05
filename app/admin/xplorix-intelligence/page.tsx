@@ -633,6 +633,17 @@ function AIReportTab() {
 
   function handlePrint() { window.print(); }
 
+  function handleExport() {
+    const el = reportRef.current;
+    if (!el) return;
+    const text = el.innerText;
+    const blob = new Blob([text], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "XPLORIX_Report_" + project.replace(/ /g, "_") + ".txt";
+    a.click();
+  }
+
   const pd = getProjectData(project);
   const rigs = PROJECT_RIGS[project] || [];
   const totalMeters = pd.metersPerDay * 28;
@@ -676,7 +687,7 @@ function AIReportTab() {
             <button onClick={handlePrint} className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
               <Printer size={15} /> Print
             </button>
-            <button onClick={() => { const el = reportRef.current; if (!el) return; const text = el.innerText; const blob = new Blob([text], { type: "text/plain" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `XPLORIX_Report_${project.replace(" ","_")}.txt`; a.click(); }} className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            <button onClick={handleExport} className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
               <Download size={15} /> Export
             </button>
           </>
