@@ -632,8 +632,7 @@ function AIPredictionTab() {
                   <XAxis dataKey="month" tick={{ fill: "#6b7280", fontSize: 11 }} />
                   <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} />
                   <Tooltip content={<CUSTOM_TOOLTIP />} />
-                  <Line type="monotone" dataKey="rop" stroke="#f97316" strokeWidth={2} dot={{ r: 3, fill: "#f97316" }} name="ROP (m/hr)"
-                    strokeDasharray={(d: any) => d.predicted ? "5 5" : "0"} />
+                  <Line type="monotone" dataKey="rop" stroke="#f97316" strokeWidth={2} dot={{ r: 3, fill: "#f97316" }} name="ROP (m/hr)" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
