@@ -166,7 +166,7 @@ function generatePrediction(projectKey: string) {
 }
 
 // ─────────────────────────────────────────────
-// CHAT ENGINE — UPGRADED
+// CHAT ENGINE  -  UPGRADED
 // ─────────────────────────────────────────────
 function formatDateRange(date: string) {
   const [from, to] = date.split("|");
@@ -193,7 +193,7 @@ function processChat(input: string, filters: { rig1: string; rig2: string; proje
     const top = allDrillers[0];
     return {
       type: "text",
-      text: `👷 **Driller Performance — This Month**\n\n🏆 Best Driller: **${top.name}** (${top.rig})\nEfficiency: **${top.efficiency}%** | Meters: **${top.meters.toLocaleString()} m** | Incidents: **${top.incidents}**\n\n📊 Full Rankings:\n1. ${allDrillers[0].name} (${allDrillers[0].rig}) — ${allDrillers[0].efficiency}%\n2. ${allDrillers[1].name} (${allDrillers[1].rig}) — ${allDrillers[1].efficiency}%\n3. ${allDrillers[2].name} (${allDrillers[2].rig}) — ${allDrillers[2].efficiency}%\n4. ${allDrillers[3].name} (${allDrillers[3].rig}) — ${allDrillers[3].efficiency}%\n5. ${allDrillers[4].name} (${allDrillers[4].rig}) — ${allDrillers[4].efficiency}%`,
+      text: `👷 **Driller Performance  -  This Month**\n\n🏆 Best Driller: **${top.name}** (${top.rig})\nEfficiency: **${top.efficiency}%** | Meters: **${top.meters.toLocaleString()} m** | Incidents: **${top.incidents}**\n\n📊 Full Rankings:\n1. ${allDrillers[0].name} (${allDrillers[0].rig})  -  ${allDrillers[0].efficiency}%\n2. ${allDrillers[1].name} (${allDrillers[1].rig})  -  ${allDrillers[1].efficiency}%\n3. ${allDrillers[2].name} (${allDrillers[2].rig})  -  ${allDrillers[2].efficiency}%\n4. ${allDrillers[3].name} (${allDrillers[3].rig})  -  ${allDrillers[3].efficiency}%\n5. ${allDrillers[4].name} (${allDrillers[4].rig})  -  ${allDrillers[4].efficiency}%`,
     };
   }
   // SAFETY / INCIDENTS
@@ -201,7 +201,7 @@ function processChat(input: string, filters: { rig1: string; rig2: string; proje
     const d = RIG_DATA[r1];
     return {
       type: "text",
-      text: `🦺 **Safety Report — ${r1}** (${dateLabel})\n\nIncidents logged: **${d.incidents}**\nSeverity: ${d.incidents === 0 ? "**None — Clean record ✅**" : d.incidents <= 1 ? "**Minor 🟡**" : "**High — Review required 🔴**"}\n\nFleet-wide incidents this period:\n• RIG-01: ${RIG_DATA["RIG-01"].incidents} incidents ✅\n• RIG-02: ${RIG_DATA["RIG-02"].incidents} incidents 🔴\n• RIG-03: ${RIG_DATA["RIG-03"].incidents} incidents ✅\n• RIG-04: ${RIG_DATA["RIG-04"].incidents} incidents 🟡\n• RIG-05: ${RIG_DATA["RIG-05"].incidents} incidents ✅\n\n${d.incidents > 0 ? "⚠️ Recommend immediate HSE debrief and corrective action report." : "✅ Safety performance is excellent. Continue current safety protocols."}`,
+      text: `🦺 **Safety Report  -  ${r1}** (${dateLabel})\n\nIncidents logged: **${d.incidents}**\nSeverity: ${d.incidents === 0 ? "**None  -  Clean record ✅**" : d.incidents <= 1 ? "**Minor 🟡**" : "**High  -  Review required 🔴**"}\n\nFleet-wide incidents this period:\n• RIG-01: ${RIG_DATA["RIG-01"].incidents} incidents ✅\n• RIG-02: ${RIG_DATA["RIG-02"].incidents} incidents 🔴\n• RIG-03: ${RIG_DATA["RIG-03"].incidents} incidents ✅\n• RIG-04: ${RIG_DATA["RIG-04"].incidents} incidents 🟡\n• RIG-05: ${RIG_DATA["RIG-05"].incidents} incidents ✅\n\n${d.incidents > 0 ? "⚠️ Recommend immediate HSE debrief and corrective action report." : "✅ Safety performance is excellent. Continue current safety protocols."}`,
     };
   }
   // BIT LIFE
@@ -210,7 +210,7 @@ function processChat(input: string, filters: { rig1: string; rig2: string; proje
     const pct = Math.round((bit.hoursUsed / bit.lifespan) * 100);
     return {
       type: "text",
-      text: `🔩 **Bit Life Status — ${r1}**\n\nBit type: **${bit.type}**\nHours used: **${bit.hoursUsed} / ${bit.lifespan} hrs** (${pct}% worn)\nEstimated days to replace: **${bit.daysToReplace} days**\n\n${bit.daysToReplace <= 5 ? "🔴 CRITICAL — Replace bit immediately!" : bit.daysToReplace <= 14 ? "🟡 WARNING — Plan bit replacement soon." : "✅ Bit life is healthy. No action needed."}\n\nFleet bit status:\n• RIG-01: ${BIT_DATA["RIG-01"].daysToReplace}d remaining\n• RIG-02: ${BIT_DATA["RIG-02"].daysToReplace}d remaining ⚠️\n• RIG-03: ${BIT_DATA["RIG-03"].daysToReplace}d remaining\n• RIG-04: ${BIT_DATA["RIG-04"].daysToReplace}d remaining\n• RIG-05: ${BIT_DATA["RIG-05"].daysToReplace}d remaining`,
+      text: `🔩 **Bit Life Status  -  ${r1}**\n\nBit type: **${bit.type}**\nHours used: **${bit.hoursUsed} / ${bit.lifespan} hrs** (${pct}% worn)\nEstimated days to replace: **${bit.daysToReplace} days**\n\n${bit.daysToReplace <= 5 ? "🔴 CRITICAL  -  Replace bit immediately!" : bit.daysToReplace <= 14 ? "🟡 WARNING  -  Plan bit replacement soon." : "✅ Bit life is healthy. No action needed."}\n\nFleet bit status:\n• RIG-01: ${BIT_DATA["RIG-01"].daysToReplace}d remaining\n• RIG-02: ${BIT_DATA["RIG-02"].daysToReplace}d remaining ⚠️\n• RIG-03: ${BIT_DATA["RIG-03"].daysToReplace}d remaining\n• RIG-04: ${BIT_DATA["RIG-04"].daysToReplace}d remaining\n• RIG-05: ${BIT_DATA["RIG-05"].daysToReplace}d remaining`,
     };
   }
   // MAINTENANCE
@@ -218,39 +218,39 @@ function processChat(input: string, filters: { rig1: string; rig2: string; proje
     const m = MAINTENANCE_DATA[r1];
     return {
       type: "text",
-      text: `🔧 **Maintenance Status — ${r1}**\n\nLast service: **${m.lastService}**\nNext service in: **${m.nextDueIn < 0 ? `OVERDUE by ${Math.abs(m.nextDueIn)} days 🔴` : `${m.nextDueIn} days`}**\nStatus: **${m.status === "OK" ? "✅ On Schedule" : m.status === "OVERDUE" ? "🔴 OVERDUE" : "🟡 Due Soon"}**\n\nFleet maintenance overview:\n• RIG-01: ✅ Due in ${MAINTENANCE_DATA["RIG-01"].nextDueIn}d\n• RIG-02: 🔴 OVERDUE by ${Math.abs(MAINTENANCE_DATA["RIG-02"].nextDueIn)}d\n• RIG-03: ✅ Due in ${MAINTENANCE_DATA["RIG-03"].nextDueIn}d\n• RIG-04: 🟡 Due in ${MAINTENANCE_DATA["RIG-04"].nextDueIn}d\n• RIG-05: ✅ Due in ${MAINTENANCE_DATA["RIG-05"].nextDueIn}d`,
+      text: `🔧 **Maintenance Status  -  ${r1}**\n\nLast service: **${m.lastService}**\nNext service in: **${m.nextDueIn < 0 ? `OVERDUE by ${Math.abs(m.nextDueIn)} days 🔴` : `${m.nextDueIn} days`}**\nStatus: **${m.status === "OK" ? "✅ On Schedule" : m.status === "OVERDUE" ? "🔴 OVERDUE" : "🟡 Due Soon"}**\n\nFleet maintenance overview:\n• RIG-01: ✅ Due in ${MAINTENANCE_DATA["RIG-01"].nextDueIn}d\n• RIG-02: 🔴 OVERDUE by ${Math.abs(MAINTENANCE_DATA["RIG-02"].nextDueIn)}d\n• RIG-03: ✅ Due in ${MAINTENANCE_DATA["RIG-03"].nextDueIn}d\n• RIG-04: 🟡 Due in ${MAINTENANCE_DATA["RIG-04"].nextDueIn}d\n• RIG-05: ✅ Due in ${MAINTENANCE_DATA["RIG-05"].nextDueIn}d`,
     };
   }
   // LAST WEEK / RECENT
   if (lower.includes("last week") || lower.includes("recent") || lower.includes("what happened")) {
     return {
       type: "text",
-      text: `📅 **Last Week Summary — ${filters.project}**\n\nRigs active: **${PROJECT_RIGS[filters.project]?.join(", ")}**\nTotal meters drilled: **${(getProjectData(filters.project).metersPerDay * 7).toLocaleString()} m**\nAvg ROP: **${getProjectData(filters.project).rop} m/hr**\nDowntime events: **${getProjectData(filters.project).incidents + 2}**\nBit changes: **${getProjectData(filters.project).bits}**\n\n${getProjectData(filters.project).efficiency > 85 ? "✅ Strong week — all targets met." : "🟡 Moderate week — some delays recorded."}`,
+      text: `📅 **Last Week Summary  -  ${filters.project}**\n\nRigs active: **${PROJECT_RIGS[filters.project]?.join(", ")}**\nTotal meters drilled: **${(getProjectData(filters.project).metersPerDay * 7).toLocaleString()} m**\nAvg ROP: **${getProjectData(filters.project).rop} m/hr**\nDowntime events: **${getProjectData(filters.project).incidents + 2}**\nBit changes: **${getProjectData(filters.project).bits}**\n\n${getProjectData(filters.project).efficiency > 85 ? "✅ Strong week  -  all targets met." : "🟡 Moderate week  -  some delays recorded."}`,
     };
   }
   // METERS
   if (lower.includes("meter") || lower.includes("drilled") || lower.includes("footage")) {
-    return { type: "text", text: `📏 **Drilling Meters — ${r1}** (${dateLabel})\n\nDaily average: **${d1.metersPerDay} m/day**\nPeriod total: **~${(d1.metersPerDay * 28).toLocaleString()} m**\nROP: **${d1.rop} m/hr**\n\n${d1.metersPerDay > 140 ? "✅ Above fleet average — excellent." : d1.metersPerDay > 110 ? "🟡 Near fleet average." : "🔴 Below fleet average."}` };
+    return { type: "text", text: `📏 **Drilling Meters  -  ${r1}** (${dateLabel})\n\nDaily average: **${d1.metersPerDay} m/day**\nPeriod total: **~${(d1.metersPerDay * 28).toLocaleString()} m**\nROP: **${d1.rop} m/hr**\n\n${d1.metersPerDay > 140 ? "✅ Above fleet average  -  excellent." : d1.metersPerDay > 110 ? "🟡 Near fleet average." : "🔴 Below fleet average."}` };
   }
   // DOWNTIME
   if (lower.includes("downtime") || lower.includes("idle") || lower.includes("delay") || lower.includes("stopped")) {
-    return { type: "text", text: `⏱️ **Downtime Report — ${r1}** (${dateLabel})\n\nAvg daily downtime: **${d1.downtime} hrs**\nEfficiency: **${d1.efficiency}%**\nIncidents: **${d1.incidents}**\n\n${d1.downtime < 3 ? "✅ Minimal downtime — excellent." : d1.downtime < 6 ? "🟡 Moderate downtime. Monitor closely." : "🔴 High downtime! Maintenance review needed."}` };
+    return { type: "text", text: `⏱️ **Downtime Report  -  ${r1}** (${dateLabel})\n\nAvg daily downtime: **${d1.downtime} hrs**\nEfficiency: **${d1.efficiency}%**\nIncidents: **${d1.incidents}**\n\n${d1.downtime < 3 ? "✅ Minimal downtime  -  excellent." : d1.downtime < 6 ? "🟡 Moderate downtime. Monitor closely." : "🔴 High downtime! Maintenance review needed."}` };
   }
   // INVENTORY
   if (lower.includes("inventor") || lower.includes("material") || lower.includes("consumable") || lower.includes("supply")) {
-    return { type: "text", text: `📦 **Inventory — ${r1}** (${dateLabel})\n\nItems consumed: **${d1.inventory} units**\nBits used: **${d1.bits}**\nCost: **$${(d1.inventory * 42).toLocaleString()}**\n\n${d1.bits > 3 ? "⚠️ High bit consumption — check WOB settings." : "✅ Consumption within normal range."}` };
+    return { type: "text", text: `📦 **Inventory  -  ${r1}** (${dateLabel})\n\nItems consumed: **${d1.inventory} units**\nBits used: **${d1.bits}**\nCost: **$${(d1.inventory * 42).toLocaleString()}**\n\n${d1.bits > 3 ? "⚠️ High bit consumption  -  check WOB settings." : "✅ Consumption within normal range."}` };
   }
   // COST
   if (lower.includes("cost") || lower.includes("money") || lower.includes("bill") || lower.includes("expense") || lower.includes("financ")) {
-    return { type: "text", text: `💰 **Cost Report — ${r1}** (${dateLabel})\n\nDaily cost: **$${d1.cost.toLocaleString()}**\nMonthly: **$${(d1.cost * 28).toLocaleString()}**\nCost/meter: **$${(d1.cost / d1.metersPerDay).toFixed(2)}/m**\nRevenue/month: **$${Math.round(d1.revenue * 28).toLocaleString()}**\nProfit margin: **${Math.round(((d1.revenue * 28 - d1.cost * 28) / (d1.revenue * 28)) * 100)}%**` };
+    return { type: "text", text: `💰 **Cost Report  -  ${r1}** (${dateLabel})\n\nDaily cost: **$${d1.cost.toLocaleString()}**\nMonthly: **$${(d1.cost * 28).toLocaleString()}**\nCost/meter: **$${(d1.cost / d1.metersPerDay).toFixed(2)}/m**\nRevenue/month: **$${Math.round(d1.revenue * 28).toLocaleString()}**\nProfit margin: **${Math.round(((d1.revenue * 28 - d1.cost * 28) / (d1.revenue * 28)) * 100)}%**` };
   }
   // ROP
   if (lower.includes("rop") || lower.includes("penetration") || lower.includes("speed") || lower.includes("rate")) {
-    return { type: "text", text: `⚡ **ROP — ${r1}** (${dateLabel})\n\nCurrent ROP: **${d1.rop} m/hr**\nEfficiency: **${d1.efficiency}%**\n\n${d1.rop > 19 ? "🏆 Top performer." : d1.rop > 16 ? "✅ Good ROP." : "🔴 Low ROP. Review bit type, WOB, RPM."}` };
+    return { type: "text", text: `⚡ **ROP  -  ${r1}** (${dateLabel})\n\nCurrent ROP: **${d1.rop} m/hr**\nEfficiency: **${d1.efficiency}%**\n\n${d1.rop > 19 ? "🏆 Top performer." : d1.rop > 16 ? "✅ Good ROP." : "🔴 Low ROP. Review bit type, WOB, RPM."}` };
   }
   // SUMMARY
   if (lower.includes("summary") || lower.includes("overview") || lower.includes("all") || lower.includes("everything")) {
-    return { type: "text", text: `📋 **Full Summary — ${r1}** (${filters.project}, ${dateLabel})\n\n📏 Meters/day: **${d1.metersPerDay} m**\n⚡ ROP: **${d1.rop} m/hr**\n⏱️ Downtime: **${d1.downtime} hrs/day**\n📦 Inventory: **${d1.inventory} units**\n💰 Daily cost: **$${d1.cost.toLocaleString()}**\n💵 Revenue: **$${Math.round(d1.revenue).toLocaleString()}/day**\n🔩 Bits: **${d1.bits}** | 🦺 Incidents: **${d1.incidents}**\n✅ Efficiency: **${d1.efficiency}%**\n\n${d1.efficiency > 90 ? "🟢 EXCELLENT operation." : d1.efficiency > 78 ? "🟡 GOOD — minor improvements possible." : "🔴 NEEDS ATTENTION."}` };
+    return { type: "text", text: `📋 **Full Summary  -  ${r1}** (${filters.project}, ${dateLabel})\n\n📏 Meters/day: **${d1.metersPerDay} m**\n⚡ ROP: **${d1.rop} m/hr**\n⏱️ Downtime: **${d1.downtime} hrs/day**\n📦 Inventory: **${d1.inventory} units**\n💰 Daily cost: **$${d1.cost.toLocaleString()}**\n💵 Revenue: **$${Math.round(d1.revenue).toLocaleString()}/day**\n🔩 Bits: **${d1.bits}** | 🦺 Incidents: **${d1.incidents}**\n✅ Efficiency: **${d1.efficiency}%**\n\n${d1.efficiency > 90 ? "🟢 EXCELLENT operation." : d1.efficiency > 78 ? "🟡 GOOD  -  minor improvements possible." : "🔴 NEEDS ATTENTION."}` };
   }
   return { type: "text", text: `🤖 Try asking:\n\n• "Who is the best driller?"\n• "Any incidents on RIG-02?"\n• "Which bit needs replacement?"\n• "Maintenance status RIG-03"\n• "What happened last week on Alpha?"\n• "Compare RIG-01 vs RIG-02"\n• "Full summary RIG-01"\n• "Cost breakdown RIG-03"` };
 }
@@ -298,7 +298,7 @@ function CompareTable({ r1, r2, d1, d2 }: any) {
                 <td className="px-4 py-2 text-gray-300">{row.label}</td>
                 <td className={`px-4 py-2 text-center font-semibold ${winner === r1 ? "text-green-400" : "text-gray-300"}`}>{row.unit === "$" ? "$" : ""}{typeof v1 === "number" ? v1.toLocaleString() : v1}{row.unit !== "$" ? " " + row.unit : ""}</td>
                 <td className={`px-4 py-2 text-center font-semibold ${winner === r2 ? "text-green-400" : "text-gray-300"}`}>{row.unit === "$" ? "$" : ""}{typeof v2 === "number" ? v2.toLocaleString() : v2}{row.unit !== "$" ? " " + row.unit : ""}</td>
-                <td className="px-4 py-2 text-center">{winner === "Tie" ? <span className="text-gray-500 text-xs">—</span> : <span className="text-green-400 text-xs font-bold bg-green-400/10 px-2 py-0.5 rounded-full">{winner}</span>}</td>
+                <td className="px-4 py-2 text-center">{winner === "Tie" ? <span className="text-gray-500 text-xs"> - </span> : <span className="text-green-400 text-xs font-bold bg-green-400/10 px-2 py-0.5 rounded-full">{winner}</span>}</td>
               </tr>
             );
           })}
@@ -324,7 +324,7 @@ function RenderMessage({ text }: { text: string }) {
 }
 
 // ─────────────────────────────────────────────
-// TAB 1 — AI CHAT
+// TAB 1  -  AI CHAT
 // ─────────────────────────────────────────────
 type Msg = { role: "user" | "assistant"; content: string; extra?: any; timestamp: Date };
 
@@ -422,7 +422,7 @@ function AIChatTab() {
 }
 
 // ─────────────────────────────────────────────
-// TAB 2 — AI PREDICTION (UPGRADED)
+// TAB 2  -  AI PREDICTION (UPGRADED)
 // ─────────────────────────────────────────────
 function AIPredictionTab() {
   const [selectedProject, setSelectedProject] = useState("Project Alpha");
@@ -507,7 +507,7 @@ function AIPredictionTab() {
 
           {/* Risk Alerts */}
           <div>
-            <p className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2"><ShieldAlert size={15} className="text-red-400" /> Risk Alerts — Next Month</p>
+            <p className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2"><ShieldAlert size={15} className="text-red-400" /> Risk Alerts  -  Next Month</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {PROJECT_RIGS[selectedProject]?.map(rig => {
                 const risk = riskLevel(rig);
@@ -553,7 +553,7 @@ function AIPredictionTab() {
                 return (
                   <div key={rig} className="py-2 border-b border-gray-800 last:border-0">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm text-gray-300">{rig} — {b.type}</span>
+                      <span className="text-sm text-gray-300">{rig}  -  {b.type}</span>
                       <span className={`text-xs font-semibold ${b.daysToReplace <= 5 ? "text-red-400" : b.daysToReplace <= 14 ? "text-yellow-400" : "text-green-400"}`}>{b.daysToReplace}d left</span>
                     </div>
                     <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
@@ -597,10 +597,10 @@ function AIPredictionTab() {
           <div className="bg-gray-900 border border-orange-500/20 rounded-xl p-4 flex gap-3">
             <div className="w-8 h-8 rounded-lg bg-orange-500/20 border border-orange-500/30 flex items-center justify-center shrink-0 mt-0.5"><Brain size={16} className="text-orange-400" /></div>
             <div>
-              <p className="text-orange-400 text-sm font-semibold mb-1">AI Summary — {selectedProject} Next Month</p>
+              <p className="text-orange-400 text-sm font-semibold mb-1">AI Summary  -  {selectedProject} Next Month</p>
               <p className="text-gray-300 text-sm leading-relaxed">
                 Based on {selectedProject} data across <strong className="text-orange-300">{PROJECT_RIGS[selectedProject]?.join(", ")}</strong>, ROP is predicted at <strong className="text-orange-300">{pred.nextMonth.rop} m/hr</strong> with total output of <strong className="text-orange-300">{pred.nextMonth.meters.toLocaleString()} meters</strong>. Revenue forecast: <strong className="text-orange-300">${pred.nextMonth.revenue.toLocaleString()}</strong>.
-                {PROJECT_RIGS[selectedProject]?.some(r => MAINTENANCE_DATA[r].status === "OVERDUE") ? " ⚠️ Critical: maintenance overdue on one or more rigs — action required before next month." : " ✅ Maintenance schedule looks good."}
+                {PROJECT_RIGS[selectedProject]?.some(r => MAINTENANCE_DATA[r].status === "OVERDUE") ? " ⚠️ Critical: maintenance overdue on one or more rigs  -  action required before next month." : " ✅ Maintenance schedule looks good."}
                 {PROJECT_RIGS[selectedProject]?.some(r => BIT_DATA[r].daysToReplace <= 5) ? " 🔴 Bit replacement needed within 5 days." : ""}
               </p>
             </div>
@@ -612,7 +612,7 @@ function AIPredictionTab() {
 }
 
 // ─────────────────────────────────────────────
-// TAB 3 — AI REPORT GENERATOR
+// TAB 3  -  AI REPORT GENERATOR
 // ─────────────────────────────────────────────
 function AIReportTab() {
   const [project, setProject] = useState("Project Alpha");
@@ -643,7 +643,7 @@ function AIReportTab() {
     ...rigs.filter(r => MAINTENANCE_DATA[r].status === "OVERDUE").map(r => ({ severity: "HIGH", text: `${r}: Maintenance overdue by ${Math.abs(MAINTENANCE_DATA[r].nextDueIn)} days` })),
     ...rigs.filter(r => BIT_DATA[r].daysToReplace <= 14).map(r => ({ severity: BIT_DATA[r].daysToReplace <= 5 ? "HIGH" : "MEDIUM", text: `${r}: Bit replacement due in ${BIT_DATA[r].daysToReplace} days (${BIT_DATA[r].type})` })),
     ...rigs.filter(r => RIG_DATA[r].incidents > 0).map(r => ({ severity: "MEDIUM", text: `${r}: ${RIG_DATA[r].incidents} safety incident(s) recorded` })),
-    ...rigs.filter(r => RIG_DATA[r].downtime > 6).map(r => ({ severity: "MEDIUM", text: `${r}: High downtime — ${RIG_DATA[r].downtime} hrs/day average` })),
+    ...rigs.filter(r => RIG_DATA[r].downtime > 6).map(r => ({ severity: "MEDIUM", text: `${r}: High downtime  -  ${RIG_DATA[r].downtime} hrs/day average` })),
   ];
 
   const PIE_DATA = rigs.map(r => ({ name: r, value: RIG_DATA[r].metersPerDay, color: ["#f97316","#22c55e","#3b82f6","#a855f7","#eab308"][RIGS.indexOf(r)] }));
@@ -716,7 +716,7 @@ function AIReportTab() {
             <div className="flex items-start justify-between flex-wrap gap-4">
               <div>
                 <div className="flex items-center gap-2 mb-1"><Brain size={18} className="text-orange-400" /><span className="text-orange-400 text-xs font-bold tracking-widest uppercase">XPLORIX Intelligence Report</span></div>
-                <h2 className="text-2xl font-bold text-white mb-1">{project} — Operations Report</h2>
+                <h2 className="text-2xl font-bold text-white mb-1">{project}  -  Operations Report</h2>
                 <p className="text-gray-400 text-sm">{dateFrom} → {dateTo} · Generated {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
               </div>
               <div className={`px-4 py-2 rounded-xl font-bold text-sm border ${issues.filter(i => i.severity === "HIGH").length > 0 ? "bg-red-500/10 border-red-500/30 text-red-400" : issues.length > 0 ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-400" : "bg-green-500/10 border-green-500/30 text-green-400"}`}>
@@ -786,7 +786,7 @@ function AIReportTab() {
             {/* Charts */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-gray-500 mb-2 font-medium">Meters Drilled per Rig — Last 5 Months</p>
+                <p className="text-xs text-gray-500 mb-2 font-medium">Meters Drilled per Rig  -  Last 5 Months</p>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={pd.history}><CartesianGrid strokeDasharray="3 3" stroke="#1f2937" /><XAxis dataKey="month" tick={{ fill: "#6b7280", fontSize: 11 }} /><YAxis tick={{ fill: "#6b7280", fontSize: 11 }} /><Tooltip content={<TOOLTIP_STYLE />} /><Bar dataKey="meters" fill="#f97316" radius={[4,4,0,0]} name="Meters" /></BarChart>
                 </ResponsiveContainer>
@@ -800,7 +800,7 @@ function AIReportTab() {
                 </ResponsiveContainer>
               </div>
               <div>
-                <p className="text-xs text-gray-500 mb-2 font-medium">ROP Trend — All Months</p>
+                <p className="text-xs text-gray-500 mb-2 font-medium">ROP Trend  -  All Months</p>
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={pd.history}><CartesianGrid strokeDasharray="3 3" stroke="#1f2937" /><XAxis dataKey="month" tick={{ fill: "#6b7280", fontSize: 11 }} /><YAxis tick={{ fill: "#6b7280", fontSize: 11 }} /><Tooltip content={<TOOLTIP_STYLE />} /><Line type="monotone" dataKey="rop" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Avg ROP" /></LineChart>
                 </ResponsiveContainer>
@@ -853,7 +853,7 @@ function AIReportTab() {
                 pd.downtime > 4 && { priority: "MEDIUM", icon: "⏱️", text: `Fleet average downtime of ${pd.downtime} hrs/day is above the 3-hr target. Review shift handover procedures and pre-shift inspection checklists.` },
                 { priority: "IMPROVE", icon: "📈", text: `Best performing rig is ${rigs.sort((a,b) => RIG_DATA[b].efficiency - RIG_DATA[a].efficiency)[0]} at ${RIG_DATA[rigs.sort((a,b) => RIG_DATA[b].efficiency - RIG_DATA[a].efficiency)[0]].efficiency}% efficiency. Apply its operational parameters to lower-performing rigs.` },
                 pd.incidents > 0 && { priority: "SAFETY", icon: "🦺", text: `${pd.incidents} incident(s) recorded this period. Conduct toolbox talks and re-certify personnel on relevant HSE procedures.` },
-                { priority: "OPTIMIZE", icon: "💰", text: `Current cost per meter is $${(pd.cost / pd.metersPerDay).toFixed(2)}. A 5% ROP improvement would reduce this by approximately $${((pd.cost / pd.metersPerDay) * 0.05).toFixed(2)}/m — saving $${Math.round((pd.cost / pd.metersPerDay) * 0.05 * totalMeters).toLocaleString()} over this period.` },
+                { priority: "OPTIMIZE", icon: "💰", text: `Current cost per meter is $${(pd.cost / pd.metersPerDay).toFixed(2)}. A 5% ROP improvement would reduce this by approximately $${((pd.cost / pd.metersPerDay) * 0.05).toFixed(2)}/m  -  saving $${Math.round((pd.cost / pd.metersPerDay) * 0.05 * totalMeters).toLocaleString()} over this period.` },
               ].filter(Boolean).map((rec: any, i) => (
                 <div key={i} className={`flex items-start gap-3 p-4 rounded-xl border ${rec.priority === "URGENT" ? "bg-red-500/10 border-red-500/20" : rec.priority === "HIGH" ? "bg-orange-500/10 border-orange-500/20" : rec.priority === "SAFETY" ? "bg-yellow-500/10 border-yellow-500/20" : "bg-blue-500/10 border-blue-500/20"}`}>
                   <span className="text-lg shrink-0">{rec.icon}</span>
@@ -868,7 +868,7 @@ function AIReportTab() {
 
           {/* Report footer */}
           <div className="flex items-center justify-between text-xs text-gray-600 border-t border-gray-800 pt-4">
-            <span>XPLORIX Intelligence Platform — Auto-generated report</span>
+            <span>XPLORIX Intelligence Platform  -  Auto-generated report</span>
             <span>Generated: {new Date().toLocaleString()}</span>
           </div>
         </div>
@@ -878,7 +878,7 @@ function AIReportTab() {
 }
 
 // ─────────────────────────────────────────────
-// MAIN PAGE — 3 TABS
+// MAIN PAGE  -  3 TABS
 // ─────────────────────────────────────────────
 export default function XplorixIntelligencePage() {
   const [tab, setTab] = useState<"chat" | "predict" | "report">("chat");
@@ -905,7 +905,7 @@ export default function XplorixIntelligencePage() {
             className={`flex items-center gap-2.5 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${tab === key ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}>
             <Icon size={16} />
             <span>{label}</span>
-            <span className={`text-xs hidden md:inline ${tab === key ? "text-orange-200" : "text-gray-600"}`}>— {desc}</span>
+            <span className={`text-xs hidden md:inline ${tab === key ? "text-orange-200" : "text-gray-600"}`}> -  {desc}</span>
           </button>
         ))}
       </div>
