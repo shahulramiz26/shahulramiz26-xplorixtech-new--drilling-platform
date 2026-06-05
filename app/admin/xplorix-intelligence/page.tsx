@@ -658,7 +658,6 @@ function AIReportTab() {
   ];
 
   const PIE_DATA = rigs.map(r => ({ name: r, value: RIG_DATA[r].metersPerDay, color: ["#f97316","#22c55e","#3b82f6","#a855f7","#eab308"][RIGS.indexOf(r)] }));
-  const EFFICIENCY_DATA = rigs.map(r => ({ rig: r, efficiency: RIG_DATA[r].efficiency, rop: RIG_DATA[r].rop, downtime: RIG_DATA[r].downtime }));
 
   return (
     <div className="space-y-6">
@@ -805,7 +804,7 @@ function AIReportTab() {
               <div>
                 <p className="text-xs text-gray-500 mb-2 font-medium">Rig Contribution (Meters/Day)</p>
                 <ResponsiveContainer width="100%" height={200}>
-                  <PieChart><Pie data={PIE_DATA} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value" nameKey="name" label={({ name, value }: any) => `${name}: ${value}m`} labelLine={false}>
+                  <PieChart><Pie data={PIE_DATA} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value" nameKey="name" label={false} labelLine={false}>
                     {PIE_DATA.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   </Pie><Tooltip content={<TOOLTIP_STYLE />} /></PieChart>
                 </ResponsiveContainer>
