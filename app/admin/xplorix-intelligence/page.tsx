@@ -13,9 +13,9 @@ import {
   ResponsiveContainer, Legend, PieChart, Pie, Cell
 } from "recharts";
 
-// ─────────────────────────────────────────────
+// -------------------------------------
 // MOCK DATA
-// ─────────────────────────────────────────────
+// -------------------------------------
 const RIGS = ["RIG-01", "RIG-02", "RIG-03", "RIG-04", "RIG-05"];
 const PROJECTS = ["Project Alpha", "Project Beta", "Project Gamma", "Project Delta"];
 
@@ -165,9 +165,9 @@ function generatePrediction(projectKey: string) {
   };
 }
 
-// ─────────────────────────────────────────────
+// -------------------------------------
 // CHAT ENGINE  -  UPGRADED
-// ─────────────────────────────────────────────
+// -------------------------------------
 function formatDateRange(date: string) {
   const [from, to] = date.split("|");
   if (from && to) return `${from} → ${to}`;
@@ -255,9 +255,9 @@ function processChat(input: string, filters: { rig1: string; rig2: string; proje
   return { type: "text", text: `🤖 Try asking:\n\n• "Who is the best driller?"\n• "Any incidents on RIG-02?"\n• "Which bit needs replacement?"\n• "Maintenance status RIG-03"\n• "What happened last week on Alpha?"\n• "Compare RIG-01 vs RIG-02"\n• "Full summary RIG-01"\n• "Cost breakdown RIG-03"` };
 }
 
-// ─────────────────────────────────────────────
+// -------------------------------------
 // SHARED UI COMPONENTS
-// ─────────────────────────────────────────────
+// -------------------------------------
 const TOOLTIP_STYLE = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
@@ -323,9 +323,9 @@ function RenderMessage({ text }: { text: string }) {
   );
 }
 
-// ─────────────────────────────────────────────
+// -------------------------------------
 // TAB 1  -  AI CHAT
-// ─────────────────────────────────────────────
+// -------------------------------------
 type Msg = { role: "user" | "assistant"; content: string; extra?: any; timestamp: Date };
 
 function AIChatTab() {
@@ -421,9 +421,9 @@ function AIChatTab() {
   );
 }
 
-// ─────────────────────────────────────────────
+// -------------------------------------
 // TAB 2  -  AI PREDICTION (UPGRADED)
-// ─────────────────────────────────────────────
+// -------------------------------------
 function AIPredictionTab() {
   const [selectedProject, setSelectedProject] = useState("Project Alpha");
   const [loading, setLoading] = useState(false);
@@ -611,9 +611,9 @@ function AIPredictionTab() {
   );
 }
 
-// ─────────────────────────────────────────────
+// -------------------------------------
 // TAB 3  -  AI REPORT GENERATOR
-// ─────────────────────────────────────────────
+// -------------------------------------
 function AIReportTab() {
   const [project, setProject] = useState("Project Alpha");
   const [dateFrom, setDateFrom] = useState("2026-01-01");
@@ -888,9 +888,9 @@ function AIReportTab() {
   );
 }
 
-// ─────────────────────────────────────────────
+// -------------------------------------
 // MAIN PAGE  -  3 TABS
-// ─────────────────────────────────────────────
+// -------------------------------------
 export default function XplorixIntelligencePage() {
   const [tab, setTab] = useState<"chat" | "predict" | "report">("chat");
   return (
