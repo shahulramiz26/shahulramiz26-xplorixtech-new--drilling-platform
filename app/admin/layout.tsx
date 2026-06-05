@@ -7,23 +7,24 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Users, FolderOpen, Settings,
   Truck, CreditCard, BarChart3, LogOut, Menu,
-  ChevronRight, Search, DollarSign, Bell, X, Boxes, FileText
+  ChevronRight, Search, DollarSign, Bell, X, Boxes, FileText, Brain
 } from 'lucide-react'
 import NotificationCenter from '../components/NotificationCenter'
 import { CurrencyProvider } from '../components/currency-context'
 import CurrencySwitcher from '../components/CurrencySwitcher'
 
 const navItems = [
-  { href: '/admin/dashboard',  label: 'Dashboard',            icon: LayoutDashboard },
-  { href: '/admin/finance',    label: 'Finance & Costing',     icon: DollarSign      },
-  { href: '/admin/inventory',  label: 'Inventory',             icon: Boxes           },
-  { href: '/admin/users',      label: 'User Management',       icon: Users           },
-  { href: '/admin/projects',   label: 'Projects',              icon: FolderOpen      },
-  { href: '/admin/rigs',       label: 'Rigs & Equipment',      icon: Truck           },
-  { href: '/admin/billing',    label: 'Billing',               icon: CreditCard      },
-  { href: '/admin/analytics',  label: 'Analytics',             icon: BarChart3       },
-  { href: '/admin/reports',    label: 'Performance Reports',   icon: FileText        },
-  { href: '/admin/settings',   label: 'Settings',              icon: Settings        },
+  { href: '/admin/dashboard',              label: 'Dashboard',              icon: LayoutDashboard },
+  { href: '/admin/finance',                label: 'Finance & Costing',      icon: DollarSign      },
+  { href: '/admin/inventory',              label: 'Inventory',              icon: Boxes           },
+  { href: '/admin/users',                  label: 'User Management',        icon: Users           },
+  { href: '/admin/projects',               label: 'Projects',               icon: FolderOpen      },
+  { href: '/admin/rigs',                   label: 'Rigs & Equipment',       icon: Truck           },
+  { href: '/admin/billing',                label: 'Billing',                icon: CreditCard      },
+  { href: '/admin/analytics',              label: 'Analytics',              icon: BarChart3       },
+  { href: '/admin/xplorix-intelligence',   label: 'XPLORIX Intelligence',   icon: Brain           },
+  { href: '/admin/reports',                label: 'Performance Reports',    icon: FileText        },
+  { href: '/admin/settings',               label: 'Settings',               icon: Settings        },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
