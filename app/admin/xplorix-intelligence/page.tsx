@@ -858,4 +858,61 @@ function AIReportTab() {
                 <div key={i} className={`flex items-start gap-3 p-4 rounded-xl border ${rec.priority === "URGENT" ? "bg-red-500/10 border-red-500/20" : rec.priority === "HIGH" ? "bg-orange-500/10 border-orange-500/20" : rec.priority === "SAFETY" ? "bg-yellow-500/10 border-yellow-500/20" : "bg-blue-500/10 border-blue-500/20"}`}>
                   <span className="text-lg shrink-0">{rec.icon}</span>
                   <div>
-                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded mr-2 ${rec.priority === "URGENT" ? "bg-red-500/20 text-red-400" : rec.priority === "HIGH" ? "bg-orange-500/20 text-orange-400" : rec.priority === "SAFETY" ? 
+"bg-yellow-500/20 text-yellow-400" : "bg-blue-500/20 text-blue-400"}`}>{rec.priority}</span>
+                    <span className="text-sm text-gray-300">{rec.text}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Report footer */}
+          <div className="flex items-center justify-between text-xs text-gray-600 border-t border-gray-800 pt-4">
+            <span>XPLORIX Intelligence Platform — Auto-generated report</span>
+            <span>Generated: {new Date().toLocaleString()}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// MAIN PAGE — 3 TABS
+// ─────────────────────────────────────────────
+export default function XplorixIntelligencePage() {
+  const [tab, setTab] = useState<"chat" | "predict" | "report">("chat");
+  return (
+    <div className="min-h-screen bg-gray-950 p-6">
+      <style>{`@media print { body { background: white !important; color: black !important; } }`}</style>
+      <div className="mb-6 flex items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center"><Brain size={24} className="text-orange-400" /></div>
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">XPLORIX Intelligence</h1>
+          <p className="text-gray-500 text-sm">AI-powered drilling insights, predictions & reports</p>
+        </div>
+        <div className="ml-auto flex items-center gap-2 text-xs text-green-400 bg-green-400/10 border border-green-400/20 px-3 py-1.5 rounded-full">
+          <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" /> Intelligence Active
+        </div>
+      </div>
+      <div className="flex gap-1 bg-gray-900 border border-gray-800 p-1 rounded-xl mb-6 w-fit">
+        {[
+          { key: "chat",    label: "AI Chat",       icon: Bot,      desc: "Query your data"    },
+          { key: "predict", label: "AI Prediction", icon: Brain,    desc: "Forecast next month" },
+          { key: "report",  label: "AI Report",     icon: FileText, desc: "Generate full report"},
+        ].map(({ key, label, icon: Icon, desc }) => (
+          <button key={key} onClick={() => setTab(key as any)}
+            className={`flex items-center gap-2.5 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${tab === key ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-gray-400 hover:text-white hover:bg-gray-800"}`}>
+            <Icon size={16} />
+            <span>{label}</span>
+            <span className={`text-xs hidden md:inline ${tab === key ? "text-orange-200" : "text-gray-600"}`}>— {desc}</span>
+          </button>
+        ))}
+      </div>
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+        {tab === "chat" ? <AIChatTab /> : tab === "predict" ? <AIPredictionTab /> : <AIReportTab />}
+      </div>
+    </div>
+  );
+}
+
