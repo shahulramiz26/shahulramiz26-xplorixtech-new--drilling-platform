@@ -502,6 +502,8 @@ export default function LandingPage() {
         @keyframes xplPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(1.5)}}
         @keyframes xplFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
         @keyframes tickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+        @keyframes tScroll1{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+        @keyframes tScroll2{0%{transform:translateX(-50%)}100%{transform:translateX(0)}}
         .btn-primary{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:10px;border:none;cursor:pointer;background:linear-gradient(135deg,#F97316,#EA580C);color:#fff;font-weight:700;font-size:14px;font-family:'Space Grotesk',sans-serif;box-shadow:0 4px 20px rgba(249,115,22,0.3);transition:all 0.25s;text-decoration:none;}
         .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(249,115,22,0.45);}
         .btn-ghost{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:10px;cursor:pointer;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:#F8FAFC;font-weight:600;font-size:14px;font-family:'Space Grotesk',sans-serif;transition:all 0.25s;text-decoration:none;}
@@ -754,6 +756,199 @@ export default function LandingPage() {
                   </div>
                 </TiltCard>
               ))}
+            </div>
+          </div>
+        </SR>
+      </section>
+
+      {/* TESTIMONIALS */}
+      <section id="testimonials" style={{background:'#080B10',padding:`80px 0`,borderTop:'1px solid rgba(249,115,22,0.06)',overflow:'hidden'}}>
+        <SR anim="riseUp">
+          <div style={{textAlign:'center',marginBottom:48,padding:`0 ${P}`}}>
+            <Tag>What the Field Says</Tag>
+            <h2 style={{fontSize:'clamp(22px,2.8vw,36px)',fontWeight:800,letterSpacing:'-0.01em',fontFamily:"'Space Grotesk',sans-serif"}}>
+              Trusted by operations across <span style={{background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>3 countries.</span>
+            </h2>
+            <p style={{fontSize:13,color:'#64748B',marginTop:8}}>Real feedback from drilling contractors, exploration bodies and mining companies.</p>
+          </div>
+        </SR>
+
+        {/* ROW 1 — scrolls left */}
+        <div style={{position:'relative',marginBottom:14}} onMouseEnter={e=>{const t=e.currentTarget.querySelector('.t-row-1') as HTMLElement;if(t)t.style.animationPlayState='paused'}} onMouseLeave={e=>{const t=e.currentTarget.querySelector('.t-row-1') as HTMLElement;if(t)t.style.animationPlayState='running'}}>
+          <div className="t-row-1" style={{display:'flex',gap:14,animation:'tScroll1 55s linear infinite',width:'max-content'}}>
+            {[
+              {quote:'The downtime chart alone changed our Monday review meetings. We could see exactly which rigs had the most idle time and why — something we had never been able to do before. It changed the questions we were asking.',name:'Vikram Sharma',role:'HOD Operations',company:'Kartikay Exploration & Mining Services',country:'India',flag:'🇮🇳',featured:true,color:'#F97316'},
+              {quote:'We submit hundreds of bore logs every month across multiple projects. Seeing all of it consolidated — formation data, core recovery, ROP trends — on one screen in real time was something we have genuinely never had before.',name:'Head of Operations',role:'Head of Operations',company:'MECL — Mineral Exploration & Consultancy Ltd.',country:'India',flag:'🇮🇳',featured:false,color:'#3B82F6'},
+              {quote:'My team was logging live on the platform within two days. No training, no IT setup. I have never seen field supervisors adopt a new system that quickly. The interface genuinely thinks the way they think.',name:'Piyush Mrig',role:'Director',company:'Kartikay Exploration & Mining Services Pvt. Ltd.',country:'India',flag:'🇮🇳',featured:false,color:'#10B981'},
+              {quote:'Gold exploration demands precision at every stage. What struck me about XPLORIX is that it treats drilling data the way a geologist would — not as a log to be filed, but as intelligence to be acted on. That distinction matters enormously in our industry.',name:'Chairman',role:'Chairman',company:'Saudi Gold Refinery',country:'Saudi Arabia',flag:'🇸🇦',featured:false,color:'#F59E0B'},
+              {quote:'First week in and already this is showing us things our spreadsheets never could. The dashboard is clean, the data makes sense and the team picked it up fast. This is what we have been looking for.',name:'Mohammed Ali Reyaz',role:'General Manager',company:'KANZ AL-MAADEN Contracting Company',country:'Saudi Arabia',flag:'🇸🇦',featured:true,color:'#F97316'},
+            ].concat([
+              {quote:'The downtime chart alone changed our Monday review meetings. We could see exactly which rigs had the most idle time and why — something we had never been able to do before. It changed the questions we were asking.',name:'Vikram Sharma',role:'HOD Operations',company:'Kartikay Exploration & Mining Services',country:'India',flag:'🇮🇳',featured:true,color:'#F97316'},
+              {quote:'We submit hundreds of bore logs every month across multiple projects. Seeing all of it consolidated — formation data, core recovery, ROP trends — on one screen in real time was something we have genuinely never had before.',name:'Head of Operations',role:'Head of Operations',company:'MECL — Mineral Exploration & Consultancy Ltd.',country:'India',flag:'🇮🇳',featured:false,color:'#3B82F6'},
+              {quote:'My team was logging live on the platform within two days. No training, no IT setup. I have never seen field supervisors adopt a new system that quickly. The interface genuinely thinks the way they think.',name:'Piyush Mrig',role:'Director',company:'Kartikay Exploration & Mining Services Pvt. Ltd.',country:'India',flag:'🇮🇳',featured:false,color:'#10B981'},
+              {quote:'Gold exploration demands precision at every stage. What struck me about XPLORIX is that it treats drilling data the way a geologist would — not as a log to be filed, but as intelligence to be acted on. That distinction matters enormously in our industry.',name:'Chairman',role:'Chairman',company:'Saudi Gold Refinery',country:'Saudi Arabia',flag:'🇸🇦',featured:false,color:'#F59E0B'},
+              {quote:'First week in and already this is showing us things our spreadsheets never could. The dashboard is clean, the data makes sense and the team picked it up fast. This is what we have been looking for.',name:'Mohammed Ali Reyaz',role:'General Manager',company:'KANZ AL-MAADEN Contracting Company',country:'Saudi Arabia',flag:'🇸🇦',featured:true,color:'#F97316'},
+            ]).map((t,i)=>(
+              <div key={i} style={{flexShrink:0,width:t.featured?380:320,background:t.featured?'rgba(249,115,22,0.04)':'rgba(13,17,23,0.8)',border:`1px solid ${t.featured?'rgba(249,115,22,0.25)':'rgba(255,255,255,0.06)'}`,borderRadius:14,padding:'22px 22px 18px',position:'relative',overflow:'hidden'}}>
+                {t.featured&&<div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${t.color},transparent)`}}/>}
+                <div style={{display:'flex',gap:1,marginBottom:10}}>{[1,2,3,4,5].map(s=><span key={s} style={{color:'#F59E0B',fontSize:11}}>★</span>)}</div>
+                <p style={{fontSize:12,color:'#94A3B8',lineHeight:1.75,marginBottom:16,fontStyle:'italic'}}>"{t.quote}"</p>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderTop:'1px solid rgba(255,255,255,0.05)',paddingTop:12}}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:'#F8FAFC'}}>{t.name}</div>
+                    <div style={{fontSize:10,color:t.color,marginTop:1}}>{t.role}</div>
+                    <div style={{fontSize:10,color:'#64748B',marginTop:1}}>{t.company}</div>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3}}>
+                    <span style={{fontSize:18}}>{t.flag}</span>
+                    <span style={{fontSize:9,color:'#334155'}}>{t.country}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{position:'absolute',top:0,left:0,bottom:0,width:80,background:'linear-gradient(90deg,#080B10,transparent)',pointerEvents:'none',zIndex:2}}/>
+          <div style={{position:'absolute',top:0,right:0,bottom:0,width:80,background:'linear-gradient(270deg,#080B10,transparent)',pointerEvents:'none',zIndex:2}}/>
+        </div>
+
+        {/* ROW 2 — scrolls right */}
+        <div style={{position:'relative'}} onMouseEnter={e=>{const t=e.currentTarget.querySelector('.t-row-2') as HTMLElement;if(t)t.style.animationPlayState='paused'}} onMouseLeave={e=>{const t=e.currentTarget.querySelector('.t-row-2') as HTMLElement;if(t)t.style.animationPlayState='running'}}>
+          <div className="t-row-2" style={{display:'flex',gap:14,animation:'tScroll2 65s linear infinite',width:'max-content'}}>
+            {[
+              {quote:'I did not expect a software trial to impress me this quickly. Everything from rig performance to inventory in one place, and it actually works the way field teams think.',name:'Dileep Kumar',role:'Geologist Manager',company:'Kartikay Exploration & Mining Services',country:'India',flag:'🇮🇳',featured:true,color:'#10B981'},
+              {quote:'For a government exploration body, compliance documentation is non-negotiable. The fact that safety records, shift logs and core recovery reports generate automatically from the same entry our supervisors already make — that removes a significant administrative burden.',name:'Head of Operations',role:'Head of Operations',company:'CMPDI — Central Mine Planning & Design Institute',country:'India',flag:'🇮🇳',featured:false,color:'#8B5CF6'},
+              {quote:'I asked a simple question: can I see which rig is underperforming right now, and why? XPLORIX answered it in under thirty seconds. That is the kind of tool a CEO needs — not a report from last week, but an answer today.',name:'CEO',role:'Chief Executive Officer',company:'Saudi Gold Refinery',country:'Saudi Arabia',flag:'🇸🇦',featured:false,color:'#F59E0B'},
+              {quote:'Operating in Oman means remote sites, limited connectivity and crews spread across large distances. XPLORIX handles all of that — the mobile logging works offline, the data syncs when connection returns. It is built for the field, not the office.',name:'Head of Operations',role:'Head of Operations',company:'Geo Solutions Engineering',country:'Oman',flag:'🇴🇲',featured:false,color:'#3B82F6'},
+            ].concat([
+              {quote:'I did not expect a software trial to impress me this quickly. Everything from rig performance to inventory in one place, and it actually works the way field teams think.',name:'Dileep Kumar',role:'Geologist Manager',company:'Kartikay Exploration & Mining Services',country:'India',flag:'🇮🇳',featured:true,color:'#10B981'},
+              {quote:'For a government exploration body, compliance documentation is non-negotiable. The fact that safety records, shift logs and core recovery reports generate automatically from the same entry our supervisors already make — that removes a significant administrative burden.',name:'Head of Operations',role:'Head of Operations',company:'CMPDI — Central Mine Planning & Design Institute',country:'India',flag:'🇮🇳',featured:false,color:'#8B5CF6'},
+              {quote:'I asked a simple question: can I see which rig is underperforming right now, and why? XPLORIX answered it in under thirty seconds. That is the kind of tool a CEO needs — not a report from last week, but an answer today.',name:'CEO',role:'Chief Executive Officer',company:'Saudi Gold Refinery',country:'Saudi Arabia',flag:'🇸🇦',featured:false,color:'#F59E0B'},
+              {quote:'Operating in Oman means remote sites, limited connectivity and crews spread across large distances. XPLORIX handles all of that — the mobile logging works offline, the data syncs when connection returns. It is built for the field, not the office.',name:'Head of Operations',role:'Head of Operations',company:'Geo Solutions Engineering',country:'Oman',flag:'🇴🇲',featured:false,color:'#3B82F6'},
+            ]).map((t,i)=>(
+              <div key={i} style={{flexShrink:0,width:t.featured?380:320,background:t.featured?'rgba(16,185,129,0.04)':'rgba(13,17,23,0.8)',border:`1px solid ${t.featured?'rgba(16,185,129,0.25)':'rgba(255,255,255,0.06)'}`,borderRadius:14,padding:'22px 22px 18px',position:'relative',overflow:'hidden'}}>
+                {t.featured&&<div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${t.color},transparent)`}}/>}
+                <div style={{display:'flex',gap:1,marginBottom:10}}>{[1,2,3,4,5].map(s=><span key={s} style={{color:'#F59E0B',fontSize:11}}>★</span>)}</div>
+                <p style={{fontSize:12,color:'#94A3B8',lineHeight:1.75,marginBottom:16,fontStyle:'italic'}}>"{t.quote}"</p>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',borderTop:'1px solid rgba(255,255,255,0.05)',paddingTop:12}}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:'#F8FAFC'}}>{t.name}</div>
+                    <div style={{fontSize:10,color:t.color,marginTop:1}}>{t.role}</div>
+                    <div style={{fontSize:10,color:'#64748B',marginTop:1}}>{t.company}</div>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3}}>
+                    <span style={{fontSize:18}}>{t.flag}</span>
+                    <span style={{fontSize:9,color:'#334155'}}>{t.country}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{position:'absolute',top:0,left:0,bottom:0,width:80,background:'linear-gradient(90deg,#080B10,transparent)',pointerEvents:'none',zIndex:2}}/>
+          <div style={{position:'absolute',top:0,right:0,bottom:0,width:80,background:'linear-gradient(270deg,#080B10,transparent)',pointerEvents:'none',zIndex:2}}/>
+        </div>
+      </section>
+
+      {/* 30-DAY TRIAL */}
+      <section id="trial" style={{background:'#0D1117',padding:`80px ${P}`,borderTop:'1px solid rgba(249,115,22,0.06)'}}>
+        <SR anim="zoomDeep">
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:64,alignItems:'center'}} className="about-grid">
+
+            {/* LEFT — story */}
+            <div>
+              <Tag>Live Field Trial</Tag>
+              <h2 style={{fontSize:'clamp(24px,3vw,40px)',fontWeight:800,lineHeight:1.1,marginBottom:16,letterSpacing:'-0.02em',fontFamily:"'Space Grotesk',sans-serif"}}>
+                30 Days. Two Countries.<br/>
+                <span style={{background:'linear-gradient(135deg,#F97316,#F59E0B)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>One Platform.</span>
+              </h2>
+              <p style={{fontSize:14,color:'#94A3B8',lineHeight:1.8,marginBottom:20}}>
+                Before XPLORIX launched publicly, we ran a 30-day live trial with two active drilling contractors — one in India, one in Saudi Arabia — across real projects, real rigs, and real field conditions.
+              </p>
+              <p style={{fontSize:14,color:'#94A3B8',lineHeight:1.8,marginBottom:28}}>
+                No demos. No sandbox data. Supervisors logging live shifts from day one, managers reviewing dashboards the same evening, and the platform refined in real time based on what the field actually needed.
+              </p>
+
+              {/* Stats row */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:28}}>
+                {[
+                  {val:'2',label:'Countries',sub:'India & Saudi Arabia',color:'#F97316'},
+                  {val:'28',label:'Days Live',sub:'May – June 2026',color:'#3B82F6'},
+                  {val:'0',label:'Safety Incidents',sub:'Across all sites',color:'#10B981'},
+                  {val:'48h',label:'Go-Live Time',sub:'From account creation',color:'#8B5CF6'},
+                ].map((s,i)=>(
+                  <div key={i} style={{background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.06)',borderRadius:10,padding:'14px 16px'}}>
+                    <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:800,fontSize:28,color:s.color,lineHeight:1}}>{s.val}</div>
+                    <div style={{fontSize:12,fontWeight:600,color:'#F8FAFC',marginTop:4}}>{s.label}</div>
+                    <div style={{fontSize:10,color:'#64748B',marginTop:2}}>{s.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* CTA */}
+              <a href="/blog/30-days-trial.html" target="_blank" rel="noopener noreferrer"
+                className="btn-primary"
+                style={{display:'inline-flex',alignItems:'center',gap:10,fontSize:14,padding:'13px 26px'}}>
+                <span>Read the Full Field Report</span>
+                <span style={{fontSize:16}}>→</span>
+              </a>
+              <p style={{fontSize:11,color:'#334155',marginTop:10}}>Opens in a new tab · No sign-in required</p>
+            </div>
+
+            {/* RIGHT — partner cards */}
+            <div style={{display:'flex',flexDirection:'column',gap:14}}>
+
+              {/* Partner 1 */}
+              <TiltCard>
+                <div style={{background:'rgba(8,11,16,0.8)',border:'1px solid rgba(249,115,22,0.2)',borderRadius:14,padding:'20px 22px',position:'relative',overflow:'hidden'}}>
+                  <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'linear-gradient(90deg,#F97316,transparent)'}}/>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                      <span style={{fontSize:24}}>🇮🇳</span>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:'#F8FAFC'}}>Kartikay Exploration & Mining Services</div>
+                        <div style={{fontSize:10,color:'#64748B'}}>Nagpur, India · Exploration Drilling Contractor</div>
+                      </div>
+                    </div>
+                    <div style={{background:'rgba(249,115,22,0.1)',border:'1px solid rgba(249,115,22,0.25)',borderRadius:6,padding:'3px 9px',fontSize:9,fontWeight:700,color:'#F97316',whiteSpace:'nowrap' as const}}>Partner 1</div>
+                  </div>
+                  <p style={{fontSize:12,color:'#64748B',lineHeight:1.6,marginBottom:10}}>Active CMPDI & MECL coal block exploration projects. Multiple rigs, multiple sites — all logged live from day one.</p>
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap' as const}}>
+                    {['Diamond Core','CMPDI Projects','MECL Projects','Coal Exploration'].map(t=>(
+                      <span key={t} style={{fontSize:9,padding:'2px 8px',borderRadius:4,background:'rgba(249,115,22,0.08)',border:'1px solid rgba(249,115,22,0.15)',color:'#F97316'}}>{t}</span>
+                    ))}
+                  </div>
+                </div>
+              </TiltCard>
+
+              {/* Partner 2 */}
+              <TiltCard>
+                <div style={{background:'rgba(8,11,16,0.8)',border:'1px solid rgba(59,130,246,0.2)',borderRadius:14,padding:'20px 22px',position:'relative',overflow:'hidden'}}>
+                  <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:'linear-gradient(90deg,#3B82F6,transparent)'}}/>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                      <span style={{fontSize:24}}>🇸🇦</span>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:'#F8FAFC'}}>KANZ AL-MAADEN Contracting Company</div>
+                        <div style={{fontSize:10,color:'#64748B'}}>Saudi Arabia · International Drilling Contractor</div>
+                      </div>
+                    </div>
+                    <div style={{background:'rgba(59,130,246,0.1)',border:'1px solid rgba(59,130,246,0.25)',borderRadius:6,padding:'3px 9px',fontSize:9,fontWeight:700,color:'#60A5FA',whiteSpace:'nowrap' as const}}>Partner 2</div>
+                  </div>
+                  <p style={{fontSize:12,color:'#64748B',lineHeight:1.6,marginBottom:10}}>International exploration contractor operating across the Middle East. Team adopted the platform within 48 hours, no training sessions required.</p>
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap' as const}}>
+                    {['RC Drilling','Diamond Core','Middle East','Mineral Exploration'].map(t=>(
+                      <span key={t} style={{fontSize:9,padding:'2px 8px',borderRadius:4,background:'rgba(59,130,246,0.08)',border:'1px solid rgba(59,130,246,0.15)',color:'#60A5FA'}}>{t}</span>
+                    ))}
+                  </div>
+                </div>
+              </TiltCard>
+
+              {/* Quote highlight */}
+              <div style={{background:'rgba(249,115,22,0.04)',border:'1px solid rgba(249,115,22,0.15)',borderRadius:12,padding:'16px 18px'}}>
+                <p style={{fontSize:12,color:'#94A3B8',lineHeight:1.75,fontStyle:'italic',marginBottom:10}}>"First week in and already this is showing us things our spreadsheets never could. The dashboard is clean, the data makes sense and the team picked it up fast."</p>
+                <div style={{fontSize:11,fontWeight:600,color:'#F97316'}}>Mohammed Ali Reyaz</div>
+                <div style={{fontSize:10,color:'#64748B'}}>General Manager · KANZ AL-MAADEN</div>
+              </div>
+
             </div>
           </div>
         </SR>
