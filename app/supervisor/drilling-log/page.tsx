@@ -22,10 +22,6 @@ const downtimeReasonsList = [
   'Site Access Issue', 'Safety Hold', 'Weather Condition',
   'Waiting for Instruction', 'Others'
 ]
-const standbyReasons = [
-  'Geologist Standby', 'Client Request', 'Survey in Progress',
-  'Waiting for Casing', 'Waiting for Equipment', 'Weather Condition', 'Others'
-]
 const accessoriesList = [
   'Adaptor Sub', 'Air Hose', 'Casing', 'Core Barrel', 'Core Lifter',
   'Core Lifter Case', 'Coupling', 'DTH Hammer', 'Drill Pipe', 'Inner Tube',
@@ -53,8 +49,6 @@ export default function DrillingLogPage() {
 
   // Standby Mode
   const [isStandby, setIsStandby] = useState(false)
-  const [standbyReason, setStandbyReason] = useState('')
-  const [standbyHours, setStandbyHours] = useState('')
 
   // Basic Shift Details
   const [project, setProject] = useState('')
@@ -200,28 +194,8 @@ export default function DrillingLogPage() {
 
         {/* Standby reason + hours — only shown when standby is ON */}
         {isStandby && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-amber-500/20">
-            <div>
-              <label className="block text-sm text-amber-300/70 mb-2">Standby Reason *</label>
-              <select
-                className="w-full px-4 py-3 bg-[#0D1117] border border-amber-500/30 rounded-xl text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-amber-500/60 transition-colors"
-                value={standbyReason}
-                onChange={e => setStandbyReason(e.target.value)}
-              >
-                <option value="">Select reason...</option>
-                {standbyReasons.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-amber-300/70 mb-2">Standby Hours *</label>
-              <input
-                type="number" step="0.5"
-                className="w-full px-4 py-3 bg-[#0D1117] border border-amber-500/30 rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-amber-500/60 transition-colors"
-                placeholder="0"
-                value={standbyHours}
-                onChange={e => setStandbyHours(e.target.value)}
-              />
-            </div>
+          <div className="mt-3 pt-3 border-t border-amber-500/20">
+            <p className="text-xs text-amber-300/70">Downtime section below is pre-set to <span className="font-semibold text-amber-300">Client</span> — add your standby reason and hours there.</p>
           </div>
         )}
       </div>
@@ -506,10 +480,7 @@ export default function DrillingLogPage() {
                 onChange={e => updateDowntime(row.id, 'reason', e.target.value)}
               >
                 <option value="">Select reason</option>
-                {isStandby
-                  ? standbyReasons.map(r => <option key={r} value={r}>{r}</option>)
-                  : downtimeReasonsList.map(r => <option key={r} value={r}>{r}</option>)
-                }
+                {downtimeReasonsList.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
               {/* Internal / Client toggle */}
               <div className="flex items-center bg-[#1A2234] rounded-lg p-1 shrink-0">
