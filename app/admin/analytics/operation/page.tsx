@@ -99,15 +99,12 @@ function RankedList({ items, showPercent = true, showValue = true, showRank = fa
               {/* ── OTHERS EXPANDED SUB-TABLE ── */}
               {isOthers && hasSubItems && othersExpanded && (
                 <div style={{ marginTop:10, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.15)', borderRadius:10, overflow:'hidden' }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto auto', gap:8, padding:'8px 14px', borderBottom:'1px solid rgba(59,130,246,0.1)', fontSize:10, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.06em' }}>
-                    <span>Reason</span><span>Date</span><span>Rig</span><span>Shift</span><span style={{ textAlign:'right' }}>Hours</span>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, padding:'8px 14px', borderBottom:'1px solid rgba(59,130,246,0.1)', fontSize:10, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                    <span>Reason</span><span style={{ textAlign:'right' }}>Hours</span>
                   </div>
                   {item.subItems!.map((sub, si) => (
-                    <div key={si} style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto auto', gap:8, padding:'9px 14px', borderBottom: si < item.subItems!.length - 1 ? '1px solid rgba(30,41,59,0.5)' : 'none', alignItems:'center' }}>
+                    <div key={si} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, padding:'9px 14px', borderBottom: si < item.subItems!.length - 1 ? '1px solid rgba(30,41,59,0.5)' : 'none', alignItems:'center' }}>
                       <span style={{ fontSize:12, color:'#F8FAFC', fontWeight:500 }}>{sub.label}</span>
-                      <span style={{ fontSize:11, color:'#64748B' }}>{sub.date || '—'}</span>
-                      <span style={{ fontSize:11, color:'#64748B' }}>{sub.rig || '—'}</span>
-                      <span style={{ fontSize:11, color:'#64748B' }}>{sub.shift || '—'}</span>
                       <span style={{ fontSize:12, fontWeight:700, color:'#F8FAFC', textAlign:'right', fontFamily:"'Space Grotesk',sans-serif" }}>{sub.value}{sub.unit ? ` ${sub.unit}` : ''}</span>
                     </div>
                   ))}
