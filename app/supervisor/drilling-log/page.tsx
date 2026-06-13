@@ -289,8 +289,20 @@ export default function DrillingLogPage() {
           </div>
           <div>
             <label className={labelClass}>Hole Number *</label>
-            <input type="text" className={inputClass} placeholder="Enter hole number"
-              value={holeNumber} onChange={e => setHoleNumber(e.target.value)} />
+            <select className={selectClass} value={holeNumber} onChange={e => setHoleNumber(e.target.value)}>
+              <option value="">Select hole number...</option>
+              <optgroup label="Open Holes">
+                {['H1', 'H2', 'H3', 'BH-001', 'BH-002'].map(h => (
+                  <option key={h} value={h}>{h} — OPEN</option>
+                ))}
+              </optgroup>
+              <optgroup label="Closed Holes">
+                {['H0'].map(h => (
+                  <option key={h} value={h}>{h} — CLOSED</option>
+                ))}
+              </optgroup>
+            </select>
+            <p className="text-xs text-[#4B5563] mt-1">Holes are managed in Admin → Projects → Manage Resources</p>
           </div>
           <div>
             <label className={labelClass}>Crew Count *</label>
