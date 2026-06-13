@@ -68,6 +68,7 @@ export default function DrillingLogPage() {
 
   // Hole closed / new hole
   const [holeClosed, setHoleClosed] = useState(false)
+  const [newHoleDrilled, setNewHoleDrilled] = useState(false)
   const [newHoleNumber, setNewHoleNumber] = useState('')
   const [newHoleMeterStart, setNewHoleMeterStart] = useState('')
   const [newHoleMeterEnd, setNewHoleMeterEnd] = useState('')
@@ -425,38 +426,57 @@ export default function DrillingLogPage() {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+
+                {/* Started drilling toggle */}
+                <div className="flex items-center justify-between py-3 px-4 bg-[#111827] rounded-xl border border-[#1E293B] mb-4">
                   <div>
-                    <label className={labelClass}>Meter Start (m)</label>
-                    <input type="number" step="0.1" className={inputClass} placeholder="0"
-                      value={newHoleMeterStart} onChange={e => setNewHoleMeterStart(e.target.value)} />
+                    <p className="text-sm font-medium text-[#F8FAFC]">Started drilling in new hole?</p>
+                    <p className="text-xs text-[#64748B] mt-0.5">Turn off if new hole was opened but no meters drilled yet</p>
                   </div>
-                  <div>
-                    <label className={labelClass}>Meter End (m)</label>
-                    <input type="number" step="0.1" className={inputClass} placeholder="0"
-                      value={newHoleMeterEnd} onChange={e => setNewHoleMeterEnd(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Meters Drilled (m)</label>
-                    <input type="number" className={`${inputClass} opacity-70 cursor-not-allowed`} placeholder="0"
-                      value={newHoleMetersDrilled} readOnly />
-                    <p className="text-xs text-[#4B5563] mt-1">Calculated from start/end</p>
-                  </div>
-                  <div>
-                    <label className={labelClass}>Formation Type</label>
-                    <select className={selectClass} value={newHoleFormation} onChange={e => setNewHoleFormation(e.target.value)}>
-                      <option value="">Select formation...</option>
-                      {formationTypes.map(f => <option key={f} value={f}>{f}</option>)}
-                    </select>
-                  </div>
+                  <button
+                    onClick={() => setNewHoleDrilled(!newHoleDrilled)}
+                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${newHoleDrilled ? 'bg-[#3B82F6]' : 'bg-[#1E293B]'}`}
+                  >
+                    <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${newHoleDrilled ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
                 </div>
-                <div>
-                  <label className={labelClass}>Lithology</label>
-                  <select className={selectClass} value={newHoleLithology} onChange={e => setNewHoleLithology(e.target.value)}>
-                    <option value="">Select lithology...</option>
-                    {lithologyTypes.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
+
+                {newHoleDrilled && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                      <div>
+                        <label className={labelClass}>Meter Start (m)</label>
+                        <input type="number" step="0.1" className={inputClass} placeholder="0"
+                          value={newHoleMeterStart} onChange={e => setNewHoleMeterStart(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Meter End (m)</label>
+                        <input type="number" step="0.1" className={inputClass} placeholder="0"
+                          value={newHoleMeterEnd} onChange={e => setNewHoleMeterEnd(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Meters Drilled (m)</label>
+                        <input type="number" className={`${inputClass} opacity-70 cursor-not-allowed`} placeholder="0"
+                          value={newHoleMetersDrilled} readOnly />
+                        <p className="text-xs text-[#4B5563] mt-1">Calculated from start/end</p>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Formation Type</label>
+                        <select className={selectClass} value={newHoleFormation} onChange={e => setNewHoleFormation(e.target.value)}>
+                          <option value="">Select formation...</option>
+                          {formationTypes.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Lithology</label>
+                      <select className={selectClass} value={newHoleLithology} onChange={e => setNewHoleLithology(e.target.value)}>
+                        <option value="">Select lithology...</option>
+                        {lithologyTypes.map(l => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
