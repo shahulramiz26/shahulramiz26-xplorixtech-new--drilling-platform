@@ -191,9 +191,9 @@ export default function DrillingLogPage() {
           {/* Toggle switch */}
           <button
             onClick={() => handleStandbyToggle(!isStandby)}
-            className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${isStandby ? 'bg-amber-500' : 'bg-[#1E293B]'}`}
+            className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${isStandby ? 'bg-amber-500' : 'bg-[#1E293B]'}`}
           >
-            <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${isStandby ? 'translate-x-7' : 'translate-x-1'}`} />
+            <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${isStandby ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
         </div>
 
@@ -388,9 +388,9 @@ export default function DrillingLogPage() {
               </div>
               <button
                 onClick={() => setHoleClosed(!holeClosed)}
-                className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${holeClosed ? 'bg-[#3B82F6]' : 'bg-[#1E293B]'}`}
+                className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${holeClosed ? 'bg-[#3B82F6]' : 'bg-[#1E293B]'}`}
               >
-                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${holeClosed ? 'translate-x-7' : 'translate-x-1'}`} />
+                <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${holeClosed ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
             </div>
 
