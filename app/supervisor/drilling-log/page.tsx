@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Save, Plus, Trash2, Paperclip } from 'lucide-react'
+import { Save, Plus, Trash2, Paperclip, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 
 // Mock data
 const mockData = {
@@ -22,6 +22,10 @@ const downtimeReasonsList = [
   'Site Access Issue', 'Safety Hold', 'Weather Condition',
   'Waiting for Instruction', 'Others'
 ]
+const standbyReasons = [
+  'Geologist Standby', 'Client Request', 'Survey in Progress',
+  'Waiting for Casing', 'Waiting for Equipment', 'Weather Condition', 'Others'
+]
 const accessoriesList = [
   'Adaptor Sub', 'Air Hose', 'Casing', 'Core Barrel', 'Core Lifter',
   'Core Lifter Case', 'Coupling', 'DTH Hammer', 'Drill Pipe', 'Inner Tube',
@@ -32,7 +36,7 @@ const severityTypes = ['Minor', 'Major', 'Critical']
 const shifts = ['Day', 'Night']
 
 interface DowntimeRow { id: string; reason: string; type: 'Internal' | 'Client'; hours: string }
-interface BitRow { id: string; bitId: string; meterStart: string; meterEnd: string; notes: string }
+interface BitRow { id: string; serialNo: string; bitId: string; meterStart: string; meterEnd: string; status: 'In Use' | 'Changed' }
 interface AccessoryRow { id: string; name: string; quantity: string }
 interface IncidentRow { id: string; type: string; severity: string; description: string }
 
@@ -41,9 +45,16 @@ const selectClass = "w-full px-4 py-3 bg-[#0D1117] border border-[#1E293B] round
 const labelClass = "block text-sm text-[#94A3B8] mb-2"
 const sectionClass = "p-6 rounded-2xl bg-[#111827] border border-[#1E293B]"
 const sectionTitleClass = "text-lg font-bold text-[#F8FAFC]"
+const disabledInputClass = "w-full px-4 py-3 bg-[#0D1117]/50 border border-[#1E293B]/50 rounded-xl text-[#4B5563] placeholder-[#2D3748] cursor-not-allowed"
+const disabledSelectClass = "w-full px-4 py-3 bg-[#0D1117]/50 border border-[#1E293B]/50 rounded-xl text-[#4B5563] appearance-none cursor-not-allowed"
 
 export default function DrillingLogPage() {
   const [shiftMode, setShiftMode] = useState<10 | 12>(12)
+
+  // Standby Mode
+  const [isStandby, setIsStandby] = useState(false)
+  const [standbyReason, setStandbyReason] = useState('')
+  const [standbyHours, setStandbyHours] = useState('')
 
   // Basic Shift Details
   const [project, setProject] = useState('')
@@ -54,6 +65,15 @@ export default function DrillingLogPage() {
   const [driller, setDriller] = useState('')
   const [holeNumber, setHoleNumber] = useState('')
   const [crewCount, setCrewCount] = useState('0')
+
+  // Hole closed / new hole
+  const [holeClosed, setHoleClosed] = useState(false)
+  const [newHoleNumber, setNewHoleNumber] = useState('')
+  const [newHoleMeterStart, setNewHoleMeterStart] = useState('')
+  const [newHoleMeterEnd, setNewHoleMeterEnd] = useState('')
+  const [newHoleSize, setNewHoleSize] = useState('')
+  const [newHoleFormation, setNewHoleFormation] = useState('')
+  const [newHoleLithology, setNewHoleLithology] = useState('')
 
   // Operation Details
   const [drillingHours, setDrillingHours] = useState('')
@@ -71,13 +91,16 @@ export default function DrillingLogPage() {
   const metersDrilled = meterStart && meterEnd
     ? Math.max(0, parseFloat(meterEnd) - parseFloat(meterStart)).toFixed(2)
     : ''
+  const newHoleMetersDrilled = newHoleMeterStart && newHoleMeterEnd
+    ? Math.max(0, parseFloat(newHoleMeterEnd) - parseFloat(newHoleMeterStart)).toFixed(2)
+    : ''
 
   // Dynamic sections
   const [downtimeRows, setDowntimeRows] = useState<DowntimeRow[]>([
     { id: '1', reason: '', type: 'Internal', hours: '' }
   ])
   const [bitRows, setBitRows] = useState<BitRow[]>([
-    { id: '1', bitId: '', meterStart: '', meterEnd: '', notes: '' }
+    { id: '1', serialNo: '', bitId: '', meterStart: '', meterEnd: '', status: 'In Use' }
   ])
 
   // Consumables
@@ -98,14 +121,25 @@ export default function DrillingLogPage() {
   // Attachments
   const [attachments, setAttachments] = useState<File[]>([])
 
+  // Standby toggle handler
+  const handleStandbyToggle = (val: boolean) => {
+    setIsStandby(val)
+    if (val) {
+      // Pre-set downtime to Client when standby is on
+      setDowntimeRows([{ id: '1', reason: '', type: 'Client', hours: '' }])
+    } else {
+      setDowntimeRows([{ id: '1', reason: '', type: 'Internal', hours: '' }])
+    }
+  }
+
   // Downtime rows handlers
-  const addDowntime = () => setDowntimeRows(r => [...r, { id: Date.now().toString(), reason: '', type: 'Internal', hours: '' }])
+  const addDowntime = () => setDowntimeRows(r => [...r, { id: Date.now().toString(), reason: '', type: isStandby ? 'Client' : 'Internal', hours: '' }])
   const removeDowntime = (id: string) => setDowntimeRows(r => r.filter(x => x.id !== id))
   const updateDowntime = (id: string, field: keyof DowntimeRow, value: string) =>
     setDowntimeRows(r => r.map(x => x.id === id ? { ...x, [field]: value } : x))
 
   // Bit rows handlers
-  const addBit = () => setBitRows(r => [...r, { id: Date.now().toString(), bitId: '', meterStart: '', meterEnd: '', notes: '' }])
+  const addBit = () => setBitRows(r => [...r, { id: Date.now().toString(), serialNo: '', bitId: '', meterStart: '', meterEnd: '', status: 'In Use' }])
   const removeBit = (id: string) => setBitRows(r => r.filter(x => x.id !== id))
   const updateBit = (id: string, field: keyof BitRow, value: string) =>
     setBitRows(r => r.map(x => x.id === id ? { ...x, [field]: value } : x))
@@ -144,6 +178,53 @@ export default function DrillingLogPage() {
         </button>
       </div>
 
+      {/* ── STANDBY MODE BANNER ── */}
+      <div className={`rounded-2xl border p-4 transition-all ${isStandby ? 'bg-amber-500/10 border-amber-500/40' : 'bg-[#111827] border-[#1E293B]'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className={`w-5 h-5 ${isStandby ? 'text-amber-400' : 'text-[#64748B]'}`} />
+            <div>
+              <p className={`font-semibold text-sm ${isStandby ? 'text-amber-300' : 'text-[#F8FAFC]'}`}>Standby Mode</p>
+              <p className="text-xs text-[#64748B] mt-0.5">Enable if operations are on hold — drilling fields will be hidden and downtime set to Client</p>
+            </div>
+          </div>
+          {/* Toggle switch */}
+          <button
+            onClick={() => handleStandbyToggle(!isStandby)}
+            className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${isStandby ? 'bg-amber-500' : 'bg-[#1E293B]'}`}
+          >
+            <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${isStandby ? 'translate-x-7' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        {/* Standby reason + hours — only shown when standby is ON */}
+        {isStandby && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-amber-500/20">
+            <div>
+              <label className="block text-sm text-amber-300/70 mb-2">Standby Reason *</label>
+              <select
+                className="w-full px-4 py-3 bg-[#0D1117] border border-amber-500/30 rounded-xl text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-amber-500/60 transition-colors"
+                value={standbyReason}
+                onChange={e => setStandbyReason(e.target.value)}
+              >
+                <option value="">Select reason...</option>
+                {standbyReasons.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-amber-300/70 mb-2">Standby Hours *</label>
+              <input
+                type="number" step="0.5"
+                className="w-full px-4 py-3 bg-[#0D1117] border border-amber-500/30 rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-amber-500/60 transition-colors"
+                placeholder="0"
+                value={standbyHours}
+                onChange={e => setStandbyHours(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ── 1. BASIC SHIFT DETAILS ── */}
       <div className={sectionClass}>
         <div className="flex items-center justify-between mb-6">
@@ -172,21 +253,14 @@ export default function DrillingLogPage() {
           </div>
           <div>
             <label className={labelClass}>Rig *</label>
-            <select className={selectClass} value={rig} onChange={e => setRig(e.target.value)}
-              disabled={!project}
-            >
+            <select className={selectClass} value={rig} onChange={e => setRig(e.target.value)} disabled={!project}>
               <option value="">{project ? 'Select rig...' : 'Select a project first'}</option>
               {mockData.rigs.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
           <div>
             <label className={labelClass}>Shift Date *</label>
-            <input
-              type="text"
-              className={inputClass}
-              value={shiftDate}
-              onChange={e => setShiftDate(e.target.value)}
-            />
+            <input type="text" className={inputClass} value={shiftDate} onChange={e => setShiftDate(e.target.value)} />
           </div>
           <div>
             <label className={labelClass}>Shift *</label>
@@ -215,114 +289,175 @@ export default function DrillingLogPage() {
           </div>
           <div>
             <label className={labelClass}>Hole Number *</label>
-            <input
-              type="text"
-              className={inputClass}
-              placeholder="Enter hole number"
-              value={holeNumber}
-              onChange={e => setHoleNumber(e.target.value)}
-            />
+            <input type="text" className={inputClass} placeholder="Enter hole number"
+              value={holeNumber} onChange={e => setHoleNumber(e.target.value)} />
           </div>
           <div>
             <label className={labelClass}>Crew Count *</label>
-            <input
-              type="number"
-              className={inputClass}
-              placeholder="0"
-              value={crewCount}
-              onChange={e => setCrewCount(e.target.value)}
-            />
+            <input type="number" className={inputClass} placeholder="0"
+              value={crewCount} onChange={e => setCrewCount(e.target.value)} />
           </div>
         </div>
       </div>
 
-      {/* ── 2. OPERATION DETAILS ── */}
-      <div className={sectionClass}>
-        <h2 className={`${sectionTitleClass} mb-6`}>Operation Details</h2>
+      {/* ── 2. OPERATION DETAILS ── (hidden in standby) */}
+      {!isStandby && (
+        <div className={sectionClass}>
+          <h2 className={`${sectionTitleClass} mb-6`}>Operation Details</h2>
 
-        {/* Row 1: Drilling Hours, Downtime Hours */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className={labelClass}>Drilling Hours *</label>
-            <input type="number" step="0.5" className={inputClass} placeholder="0"
-              value={drillingHours} onChange={e => setDrillingHours(e.target.value)} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className={labelClass}>Drilling Hours *</label>
+              <input type="number" step="0.5" className={inputClass} placeholder="0"
+                value={drillingHours} onChange={e => setDrillingHours(e.target.value)} />
+            </div>
+            <div>
+              <label className={labelClass}>Downtime Hours *</label>
+              <input type="number" step="0.5" className={inputClass} placeholder="0"
+                value={downtimeHours} onChange={e => setDowntimeHours(e.target.value)} />
+            </div>
           </div>
-          <div>
-            <label className={labelClass}>Downtime Hours *</label>
-            <input type="number" step="0.5" className={inputClass} placeholder="0"
-              value={downtimeHours} onChange={e => setDowntimeHours(e.target.value)} />
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div>
+              <label className={labelClass}>Meter Start (m) *</label>
+              <input type="number" step="0.1" className={inputClass} placeholder="0"
+                value={meterStart} onChange={e => setMeterStart(e.target.value)} />
+            </div>
+            <div>
+              <label className={labelClass}>Meter End (m) *</label>
+              <input type="number" step="0.1" className={inputClass} placeholder="0"
+                value={meterEnd} onChange={e => setMeterEnd(e.target.value)} />
+            </div>
+            <div>
+              <label className={labelClass}>Meters Drilled (m) *</label>
+              <input type="number" className={`${inputClass} opacity-70 cursor-not-allowed`} placeholder="0"
+                value={metersDrilled} readOnly />
+              <p className="text-xs text-[#4B5563] mt-1">Calculated from start/end</p>
+            </div>
+            <div>
+              <label className={labelClass}>Core Recovery (m) *</label>
+              <input type="number" step="0.1" className={inputClass} placeholder="0"
+                value={coreRecovery} onChange={e => setCoreRecovery(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className={labelClass}>Hole / Bit Size *</label>
+              <select className={selectClass} value={holeSize} onChange={e => setHoleSize(e.target.value)}>
+                <option value="">Select size...</option>
+                {holeSizes.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Formation Type *</label>
+              <select className={selectClass} value={formationType} onChange={e => setFormationType(e.target.value)}>
+                <option value="">Select formation...</option>
+                {formationTypes.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Lithology Types</label>
+              <select className={selectClass} value={lithology} onChange={e => setLithology(e.target.value)}>
+                <option value="">Select lithology...</option>
+                {lithologyTypes.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Engine HMR</label>
+              <input type="number" step="0.1" className={inputClass} placeholder="0"
+                value={engineHmr} onChange={e => setEngineHmr(e.target.value)} />
+            </div>
+            <div>
+              <label className={labelClass}>Engine Hours</label>
+              <input type="number" step="0.5" className={inputClass} placeholder="0"
+                value={engineHours} onChange={e => setEngineHours(e.target.value)} />
+            </div>
+          </div>
+
+          {/* ── HOLE CLOSED TOGGLE ── */}
+          <div className={`mt-6 pt-6 border-t border-[#1E293B]`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[#F8FAFC]">Hole Closed This Shift?</p>
+                <p className="text-xs text-[#64748B] mt-0.5">Enable if this hole was completed and a new hole was started in the same shift</p>
+              </div>
+              <button
+                onClick={() => setHoleClosed(!holeClosed)}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${holeClosed ? 'bg-[#3B82F6]' : 'bg-[#1E293B]'}`}
+              >
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${holeClosed ? 'translate-x-7' : 'translate-x-1'}`} />
+              </button>
+            </div>
+
+            {holeClosed && (
+              <div className="mt-4 p-4 rounded-xl bg-[#0D1117] border border-[#3B82F6]/30">
+                <p className="text-sm font-semibold text-[#3B82F6] mb-4 flex items-center gap-2">
+                  <ChevronDown className="w-4 h-4" /> New Hole Started This Shift
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className={labelClass}>New Hole Number *</label>
+                    <input type="text" className={inputClass} placeholder="e.g. H3"
+                      value={newHoleNumber} onChange={e => setNewHoleNumber(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Hole / Bit Size</label>
+                    <select className={selectClass} value={newHoleSize} onChange={e => setNewHoleSize(e.target.value)}>
+                      <option value="">Select size...</option>
+                      {holeSizes.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <label className={labelClass}>Meter Start (m)</label>
+                    <input type="number" step="0.1" className={inputClass} placeholder="0"
+                      value={newHoleMeterStart} onChange={e => setNewHoleMeterStart(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Meter End (m)</label>
+                    <input type="number" step="0.1" className={inputClass} placeholder="0"
+                      value={newHoleMeterEnd} onChange={e => setNewHoleMeterEnd(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Meters Drilled (m)</label>
+                    <input type="number" className={`${inputClass} opacity-70 cursor-not-allowed`} placeholder="0"
+                      value={newHoleMetersDrilled} readOnly />
+                    <p className="text-xs text-[#4B5563] mt-1">Calculated from start/end</p>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Formation Type</label>
+                    <select className={selectClass} value={newHoleFormation} onChange={e => setNewHoleFormation(e.target.value)}>
+                      <option value="">Select formation...</option>
+                      {formationTypes.map(f => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className={labelClass}>Lithology</label>
+                  <select className={selectClass} value={newHoleLithology} onChange={e => setNewHoleLithology(e.target.value)}>
+                    <option value="">Select lithology...</option>
+                    {lithologyTypes.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Row 2: Meter Start, Meter End, Meters Drilled (auto), Core Recovery */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-          <div>
-            <label className={labelClass}>Meter Start (m) *</label>
-            <input type="number" step="0.1" className={inputClass} placeholder="0"
-              value={meterStart} onChange={e => setMeterStart(e.target.value)} />
-          </div>
-          <div>
-            <label className={labelClass}>Meter End (m) *</label>
-            <input type="number" step="0.1" className={inputClass} placeholder="0"
-              value={meterEnd} onChange={e => setMeterEnd(e.target.value)} />
-          </div>
-          <div>
-            <label className={labelClass}>Meters Drilled (m) *</label>
-            <input type="number" className={`${inputClass} opacity-70 cursor-not-allowed`} placeholder="0"
-              value={metersDrilled} readOnly />
-            <p className="text-xs text-[#4B5563] mt-1">Calculated from start/end</p>
-          </div>
-          <div>
-            <label className={labelClass}>Core Recovery (m) *</label>
-            <input type="number" step="0.1" className={inputClass} placeholder="0"
-              value={coreRecovery} onChange={e => setCoreRecovery(e.target.value)} />
-          </div>
-        </div>
-
-        {/* Row 3: Hole/Bit Size, Formation Type, Lithology */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <div>
-            <label className={labelClass}>Hole / Bit Size *</label>
-            <select className={selectClass} value={holeSize} onChange={e => setHoleSize(e.target.value)}>
-              <option value="">Select size...</option>
-              {holeSizes.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelClass}>Formation Type *</label>
-            <select className={selectClass} value={formationType} onChange={e => setFormationType(e.target.value)}>
-              <option value="">Select formation...</option>
-              {formationTypes.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelClass}>Lithology Types</label>
-            <select className={selectClass} value={lithology} onChange={e => setLithology(e.target.value)}>
-              <option value="">Select lithology...</option>
-              {lithologyTypes.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {/* Row 4: Engine HMR, Engine Hours */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>Engine HMR</label>
-            <input type="number" step="0.1" className={inputClass} placeholder="0"
-              value={engineHmr} onChange={e => setEngineHmr(e.target.value)} />
-          </div>
-          <div>
-            <label className={labelClass}>Engine Hours</label>
-            <input type="number" step="0.5" className={inputClass} placeholder="0"
-              value={engineHours} onChange={e => setEngineHours(e.target.value)} />
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* ── 3. DOWNTIME REASONS ── */}
       <div className={sectionClass}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className={sectionTitleClass}>Downtime Reasons</h2>
+          <div>
+            <h2 className={sectionTitleClass}>Downtime Reasons</h2>
+            {isStandby && <p className="text-xs text-amber-400/80 mt-0.5">Standby mode — all downtime defaulted to Client</p>}
+          </div>
           <button onClick={addDowntime}
             className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium flex items-center gap-1 transition-colors">
             <Plus className="w-4 h-4" /> Add
@@ -333,30 +468,30 @@ export default function DrillingLogPage() {
           {downtimeRows.map((row, index) => (
             <div key={row.id} className="flex items-center gap-3">
               <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
-              {/* Reason dropdown */}
               <select
                 className="flex-1 px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
                 value={row.reason}
                 onChange={e => updateDowntime(row.id, 'reason', e.target.value)}
               >
                 <option value="">Select reason</option>
-                {downtimeReasonsList.map(r => <option key={r} value={r}>{r}</option>)}
+                {isStandby
+                  ? standbyReasons.map(r => <option key={r} value={r}>{r}</option>)
+                  : downtimeReasonsList.map(r => <option key={r} value={r}>{r}</option>)
+                }
               </select>
               {/* Internal / Client toggle */}
               <div className="flex items-center bg-[#1A2234] rounded-lg p-1 shrink-0">
                 <button
-                  onClick={() => updateDowntime(row.id, 'type', 'Internal')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${row.type === 'Internal' ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}
+                  onClick={() => !isStandby && updateDowntime(row.id, 'type', 'Internal')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${row.type === 'Internal' ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'} ${isStandby ? 'opacity-40 cursor-not-allowed' : ''}`}
                 >Internal</button>
                 <button
-                  onClick={() => updateDowntime(row.id, 'type', 'Client')}
+                  onClick={() => !isStandby && updateDowntime(row.id, 'type', 'Client')}
                   className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${row.type === 'Client' ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}
                 >Client</button>
               </div>
-              {/* Hours */}
               <input
-                type="number"
-                step="0.5"
+                type="number" step="0.5"
                 className="w-28 px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors shrink-0"
                 placeholder="Hours"
                 value={row.hours}
@@ -371,55 +506,77 @@ export default function DrillingLogPage() {
         </div>
       </div>
 
-      {/* ── 4. BIT USAGE ── */}
-      <div className={sectionClass}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className={sectionTitleClass}>Bit Usage</h2>
-          <button onClick={addBit}
-            className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium flex items-center gap-1 transition-colors">
-            <Plus className="w-4 h-4" /> Add
-          </button>
-        </div>
+      {/* ── 4. BIT USAGE ── (hidden in standby) */}
+      {!isStandby && (
+        <div className={sectionClass}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className={sectionTitleClass}>Bit Usage</h2>
+            <button onClick={addBit}
+              className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium flex items-center gap-1 transition-colors">
+              <Plus className="w-4 h-4" /> Add
+            </button>
+          </div>
 
-        <div className="space-y-3">
-          {bitRows.map((row, index) => (
-            <div key={row.id} className="flex items-center gap-3">
-              <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
-              <select
-                className="flex-1 px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
-                value={row.bitId}
-                onChange={e => updateBit(row.id, 'bitId', e.target.value)}
-              >
-                <option value="">Select bit</option>
-                {mockData.bits.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-              <input type="number" step="0.1"
-                className="w-28 px-3 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors shrink-0"
-                placeholder="Meter S"
-                value={row.meterStart}
-                onChange={e => updateBit(row.id, 'meterStart', e.target.value)}
-              />
-              <span className="text-[#64748B] text-sm shrink-0">to</span>
-              <input type="number" step="0.1"
-                className="w-28 px-3 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors shrink-0"
-                placeholder="Meter E"
-                value={row.meterEnd}
-                onChange={e => updateBit(row.id, 'meterEnd', e.target.value)}
-              />
-              <input type="text"
-                className="flex-1 px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors"
-                placeholder="Notes (optional)"
-                value={row.notes}
-                onChange={e => updateBit(row.id, 'notes', e.target.value)}
-              />
-              <button onClick={() => removeBit(row.id)}
-                className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
+          <div className="space-y-3">
+            {bitRows.map((row, index) => (
+              <div key={row.id} className="flex items-center gap-3">
+                <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
+
+                {/* Serial Number — manual input */}
+                <input type="text"
+                  className="w-32 px-3 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors shrink-0"
+                  placeholder="Serial No."
+                  value={row.serialNo}
+                  onChange={e => updateBit(row.id, 'serialNo', e.target.value)}
+                />
+
+                {/* Bit type dropdown */}
+                <select
+                  className="flex-1 px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
+                  value={row.bitId}
+                  onChange={e => updateBit(row.id, 'bitId', e.target.value)}
+                >
+                  <option value="">Select bit</option>
+                  {mockData.bits.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+
+                {/* Meter Start */}
+                <input type="number" step="0.1"
+                  className="w-28 px-3 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors shrink-0"
+                  placeholder="Meter S"
+                  value={row.meterStart}
+                  onChange={e => updateBit(row.id, 'meterStart', e.target.value)}
+                />
+                <span className="text-[#64748B] text-sm shrink-0">to</span>
+                {/* Meter End */}
+                <input type="number" step="0.1"
+                  className="w-28 px-3 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors shrink-0"
+                  placeholder="Meter E"
+                  value={row.meterEnd}
+                  onChange={e => updateBit(row.id, 'meterEnd', e.target.value)}
+                />
+
+                {/* Status toggle: In Use / Changed */}
+                <div className="flex items-center bg-[#1A2234] border border-[#1E293B] rounded-lg p-1 shrink-0">
+                  <button
+                    onClick={() => updateBit(row.id, 'status', 'In Use')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${row.status === 'In Use' ? 'bg-emerald-600 text-white' : 'text-[#94A3B8] hover:text-white'}`}
+                  >In Use</button>
+                  <button
+                    onClick={() => updateBit(row.id, 'status', 'Changed')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${row.status === 'Changed' ? 'bg-amber-500 text-white' : 'text-[#94A3B8] hover:text-white'}`}
+                  >Changed</button>
+                </div>
+
+                <button onClick={() => removeBit(row.id)}
+                  className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── 5. CONSUMABLES ── */}
       <div className={sectionClass}>
@@ -427,18 +584,18 @@ export default function DrillingLogPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className={labelClass}>Fuel (L) *</label>
-            <input type="number" step="0.1" className={inputClass} placeholder="0"
-              value={fuel} onChange={e => setFuel(e.target.value)} />
+            <input type="number" step="0.1" className={isStandby ? disabledInputClass : inputClass} placeholder="0"
+              value={fuel} onChange={e => !isStandby && setFuel(e.target.value)} readOnly={isStandby} />
           </div>
           <div>
             <label className={labelClass}>Water (L) *</label>
-            <input type="number" step="0.1" className={inputClass} placeholder="0"
-              value={water} onChange={e => setWater(e.target.value)} />
+            <input type="number" step="0.1" className={isStandby ? disabledInputClass : inputClass} placeholder="0"
+              value={water} onChange={e => !isStandby && setWater(e.target.value)} readOnly={isStandby} />
           </div>
           <div>
             <label className={labelClass}>Additives (kg) *</label>
-            <input type="number" step="0.1" className={inputClass} placeholder="0"
-              value={additives} onChange={e => setAdditives(e.target.value)} />
+            <input type="number" step="0.1" className={isStandby ? disabledInputClass : inputClass} placeholder="0"
+              value={additives} onChange={e => !isStandby && setAdditives(e.target.value)} readOnly={isStandby} />
           </div>
         </div>
       </div>
@@ -447,10 +604,12 @@ export default function DrillingLogPage() {
       <div className={sectionClass}>
         <div className="flex items-center justify-between mb-4">
           <h2 className={sectionTitleClass}>Accessories</h2>
-          <button onClick={addAccessory}
-            className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium flex items-center gap-1 transition-colors">
-            <Plus className="w-4 h-4" /> Add
-          </button>
+          {!isStandby && (
+            <button onClick={addAccessory}
+              className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium flex items-center gap-1 transition-colors">
+              <Plus className="w-4 h-4" /> Add
+            </button>
+          )}
         </div>
 
         <div className="space-y-3">
@@ -458,23 +617,27 @@ export default function DrillingLogPage() {
             <div key={row.id} className="flex items-center gap-3 p-3 bg-[#0D1117] rounded-xl border border-[#1E293B]">
               <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
               <select
-                className="flex-1 px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
+                className={`flex-1 px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] appearance-none ${isStandby ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} focus:outline-none focus:border-[#3B82F6] transition-colors`}
                 value={row.name}
-                onChange={e => updateAccessory(row.id, 'name', e.target.value)}
+                onChange={e => !isStandby && updateAccessory(row.id, 'name', e.target.value)}
+                disabled={isStandby}
               >
                 <option value="">Select accessory</option>
                 {accessoriesList.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
               <input type="number" min="1"
-                className="w-24 px-3 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors text-center shrink-0"
+                className={`w-24 px-3 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg ${isStandby ? 'text-[#4B5563] cursor-not-allowed opacity-50' : 'text-[#F8FAFC]'} placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors text-center shrink-0`}
                 placeholder="Qty"
                 value={row.quantity}
-                onChange={e => updateAccessory(row.id, 'quantity', e.target.value)}
+                onChange={e => !isStandby && updateAccessory(row.id, 'quantity', e.target.value)}
+                readOnly={isStandby}
               />
-              <button onClick={() => removeAccessory(row.id)}
-                className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {!isStandby && (
+                <button onClick={() => removeAccessory(row.id)}
+                  className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -524,7 +687,7 @@ export default function DrillingLogPage() {
           ))}
         </div>
 
-        {/* Attachments inside incidents section */}
+        {/* Attachments */}
         <div className="mt-6 pt-6 border-t border-[#1E293B]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-[#94A3B8]">
