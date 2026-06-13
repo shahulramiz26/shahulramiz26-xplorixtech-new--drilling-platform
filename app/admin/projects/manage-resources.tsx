@@ -28,7 +28,7 @@ const tabClass = (active: boolean) =>
   }`
 
 export default function ManageResources({ project, availableSupervisors, availableDrillers, availableRigs, availableBits, onUpdate, onBack }: Props) {
-  const [tab, setTab] = useState<'personnel' | 'rigs' | 'bits'>('personnel')
+  const [tab, setTab] = useState<'personnel' | 'rigs' | 'bits' | 'holes'>('personnel')
   const [personnelTab, setPersonnelTab] = useState<'supervisors' | 'drillers'>('supervisors')
   const [search, setSearch] = useState('')
 
@@ -151,6 +151,9 @@ export default function ManageResources({ project, availableSupervisors, availab
         </button>
         <button onClick={() => setTab('bits')} className={tabClass(tab === 'bits')}>
           <Circle className="w-4 h-4" /> Bits
+        </button>
+        <button onClick={() => setTab('holes')} className={tabClass(tab === 'holes')}>
+          <Target className="w-4 h-4" /> Holes
         </button>
       </div>
 
@@ -383,14 +386,17 @@ export default function ManageResources({ project, availableSupervisors, availab
               </tbody>
             </table>
           </div>
+        </div>
+      )}
 
-          {/* ── HOLE NUMBERS ── */}
+      {/* ── HOLES TAB ── */}
+      {tab === 'holes' && (
+        <div className="space-y-4">
           <div className="p-5 rounded-2xl bg-[#111827] border border-[#1E293B]">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-[#3B82F6]" />
+              <div>
                 <p className="text-sm font-semibold text-[#F8FAFC]">Hole Numbers</p>
-                <span className="text-xs text-[#64748B]">— assigned holes appear in the Drilling Log dropdown</span>
+                <p className="text-xs text-[#64748B] mt-0.5">Assigned holes appear in the Drilling Log dropdown (both open and closed)</p>
               </div>
               <button onClick={() => setShowNewHoleModal(true)}
                 className="text-[#3B82F6] text-sm font-medium flex items-center gap-1 hover:text-[#60A5FA] transition">
@@ -398,7 +404,7 @@ export default function ManageResources({ project, availableSupervisors, availab
               </button>
             </div>
             {(project.holes || []).length === 0
-              ? <p className="text-[#4B5563] text-sm text-center py-4">No holes added yet</p>
+              ? <p className="text-[#4B5563] text-sm text-center py-6">No holes added yet</p>
               : (
                 <div className="divide-y divide-[#1E293B]">
                   {project.holes.map(h => (
