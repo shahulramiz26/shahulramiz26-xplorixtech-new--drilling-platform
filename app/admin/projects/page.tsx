@@ -5,7 +5,16 @@ import { motion } from 'framer-motion'
 import { Plus, FolderOpen, MapPin, User, X, Settings } from 'lucide-react'
 import ManageResources from './manage-resources'
 
-const initialProjects = [
+type Hole = { id: string; holeNumber: string; status: 'OPEN' | 'CLOSED' }
+type Personnel = { id: string; name: string; email: string; type: string; status: string }
+type Rig = { id: string; name: string; type: string; status: string }
+type Bit = { id: string; code: string; name: string; type: string; holeSize: string; status: string }
+type Project = {
+  id: number; name: string; code: string; location: string; client: string; status: string
+  rigs: Rig[]; supervisors: Personnel[]; drillers: Personnel[]; bits: Bit[]; holes: Hole[]
+}
+
+const initialProjects: Project[] = [
   {
     id: 1,
     name: 'Gold Mine Project A',
@@ -87,14 +96,14 @@ const availableBits = [
 ]
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState(initialProjects)
+  const [projects, setProjects] = useState<Project[]>(initialProjects)
   const [showModal, setShowModal] = useState(false)
-  const [selectedProject, setSelectedProject] = useState<typeof initialProjects[0] | null>(null)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [formData, setFormData] = useState({ name: '', code: '', location: '', client: '', status: 'ACTIVE' })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const newProject = {
+    const newProject: Project = {
       id: projects.length + 1,
       ...formData,
       rigs: [], supervisors: [], drillers: [], bits: [], holes: []
@@ -104,7 +113,7 @@ export default function ProjectsPage() {
     setFormData({ name: '', code: '', location: '', client: '', status: 'ACTIVE' })
   }
 
-  const handleUpdateProject = (updated: typeof initialProjects[0]) => {
+  const handleUpdateProject = (updated: Project) => {
     setProjects(projects.map(p => p.id === updated.id ? updated : p))
     setSelectedProject(updated)
   }
