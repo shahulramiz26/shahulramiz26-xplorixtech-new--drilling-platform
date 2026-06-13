@@ -126,7 +126,7 @@ export default function PerformanceDashboard() {
   const maxMeters = holeData ? Math.max(...holeData.shifts.map(s => s.meters)) : 1
   const totalMeters = holeData ? holeData.shifts.reduce((s, r) => s + r.meters, 0) : 0
   const totalDt     = holeData ? holeData.shifts.reduce((s, r) => s + r.downtime, 0) : 0
-  const bitsUsed    = holeData ? [...new Set(holeData.shifts.map(s => s.bit))].length : 0
+  const bitsUsed    = holeData ? Array.from(new Set(holeData.shifts.map(s => s.bit))).length : 0
   const finalDepth  = holeData ? holeData.shifts[holeData.shifts.length - 1].depthTo : 0
 
   return (
