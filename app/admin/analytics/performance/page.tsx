@@ -122,7 +122,7 @@ const DATA: Record<string, ProjectData> = {
   }
 }
 
-const rigsByProjectconst rigsByProject: Record<string, string[]> = { GMA: ['KEM-14', 'KEM-13'], CES: ['KEM-02'] }
+const rigsByProject: Record<string, string[]> = { GMA: ['KEM-14', 'KEM-13'], CES: ['KEM-02'] }
 
 // ── STYLES ────────────────────────────────────────────────────────────────────
 const selectCls = "w-full px-4 py-2.5 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] text-sm appearance-none outline-none focus:border-[#3B82F6] transition-colors cursor-pointer"
