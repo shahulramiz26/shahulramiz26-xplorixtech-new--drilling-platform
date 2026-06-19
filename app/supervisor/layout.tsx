@@ -7,14 +7,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, FileText, BarChart3,
   ClipboardList, LogOut, Menu, ChevronRight,
-  Search, Bell, X, HardHat
+  Bell, X, HardHat, Wrench
 } from 'lucide-react'
 
 const navItems = [
-  { href: '/supervisor/dashboard',    label: 'Dashboard',       icon: LayoutDashboard },
-  { href: '/supervisor/drilling-log', label: 'Drilling Log',    icon: FileText        },
-  { href: '/supervisor/reports',      label: 'Reports',         icon: BarChart3       },
-  { href: '/supervisor/logs',         label: 'Log History',     icon: ClipboardList   },
+  { href: '/supervisor/dashboard',       label: 'Dashboard',        icon: LayoutDashboard },
+  { href: '/supervisor/drilling-log',    label: 'Drilling Log',     icon: FileText        },
+  { href: '/supervisor/maintenance-log', label: 'Maintenance Log',  icon: Wrench          },
+  { href: '/supervisor/reports',         label: 'Reports',          icon: BarChart3       },
+  { href: '/supervisor/logs',            label: 'Log History',      icon: ClipboardList   },
 ]
 
 export default function SupervisorLayout({ children }: { children: React.ReactNode }) {
