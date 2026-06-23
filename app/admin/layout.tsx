@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
+import Image from 'next/image'
 import {
   LayoutDashboard, Users, FolderOpen, Settings,
   Truck, CreditCard, BarChart3, LogOut, Menu,
@@ -63,14 +64,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {/* Logo */}
           <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid #1E293B' }}>
             <Link href="/admin/dashboard" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
+              {/* NEW LOGO IMAGE */}
               <div style={{
-                width: 40, height: 40, borderRadius: 10,
-                background: 'linear-gradient(135deg, #F97316, #F59E0B)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 800, fontSize: 18, color: '#000',
-                boxShadow: '0 0 20px rgba(249,115,22,0.35)',
-                fontFamily: "'Space Grotesk', sans-serif",
-              }}>X</div>
+                width: 40, height: 40, borderRadius: 10, overflow: 'hidden',
+                flexShrink: 0, background: '#0D1117',
+                boxShadow: '0 0 20px rgba(249,115,22,0.25)',
+              }}>
+                <Image
+                  src="/xplorix-logo.png"
+                  alt="Xplorix"
+                  width={40}
+                  height={40}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
               <div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#F8FAFC', letterSpacing: '0.05em', fontFamily: "'Space Grotesk', sans-serif" }}>XPLORIX</div>
                 <div style={{ fontSize: 9, color: '#64748B', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 1 }}>Admin Console</div>
@@ -190,7 +197,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <>
                       <ChevronRight size={14} style={{ color: '#334155' }} />
                       <span style={{ color: '#F97316', fontWeight: 600, fontSize: 12 }}>
-                        {pathname.split('/')[3]?.replace(/-/g,' ').replace(/\b\w/g, c => c.toUpperCase())}
+                        {pathname.split('/')[3]?.replace(/-/g,' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
                       </span>
                     </>
                   )}
@@ -227,13 +234,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         </main>
 
-        <style>{`
+        <style>{\`
           @keyframes pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(1.4); }
           }
           @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
-        `}</style>
+        \`}</style>
       </div>
     </CurrencyProvider>
   )
