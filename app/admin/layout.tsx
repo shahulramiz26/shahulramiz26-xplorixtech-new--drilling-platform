@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import Image from 'next/image'
+
 import {
   LayoutDashboard, Users, FolderOpen, Settings,
   Truck, CreditCard, BarChart3, LogOut, Menu,
@@ -58,9 +58,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {/* Logo */}
           <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid #1E293B' }}>
             <Link href="/admin/dashboard" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, overflow: 'hidden', flexShrink: 0, boxShadow: '0 0 20px rgba(249,115,22,0.25)' }}>
-                <Image src="/xplorix-logo.png" alt="Xplorix" width={40} height={40} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              </div>
+              <svg width="40" height="40" viewBox="0 0 100 100" fill="none" style={{ flexShrink: 0, filter: 'drop-shadow(0 0 8px rgba(249,115,22,0.3))' }}>
+                <polygon points="50,50 5,5 5,95" fill="#1a1a1a"/>
+                <polygon points="50,50 5,5 30,5" fill="#2a2a2a"/>
+                <polygon points="50,50 5,95 30,95" fill="#2a2a2a"/>
+                <polygon points="50,50 95,5 95,95" fill="#F97316"/>
+                <polygon points="50,50 95,5 70,5" fill="#EA580C"/>
+                <polygon points="50,50 95,95 70,95" fill="#EA580C"/>
+              </svg>
               <div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#F8FAFC', letterSpacing: '0.05em', fontFamily: "'Space Grotesk', sans-serif" }}>XPLORIX</div>
                 <div style={{ fontSize: 9, color: '#64748B', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 1 }}>Admin Console</div>
