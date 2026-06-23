@@ -22,185 +22,161 @@ interface Props {
   onBack: () => void
 }
 
-const tabClass = (active: boolean) =>
-  `flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-    active ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-[#F8FAFC]'
-  }`
-
 export default function ManageResources({ project, availableSupervisors, availableDrillers, availableRigs, availableBits, onUpdate, onBack }: Props) {
-  const [tab, setTab] = useState<'personnel' | 'rigs' | 'bits' | 'holes'>('personnel')
-  const [personnelTab, setPersonnelTab] = useState<'supervisors' | 'drillers'>('supervisors')
+  const [tab, setTab] = useState<'personnel'|'rigs'|'bits'|'holes'>('personnel')
+  const [personnelTab, setPersonnelTab] = useState<'supervisors'|'drillers'>('supervisors')
   const [search, setSearch] = useState('')
-
-  // Modals
   const [showNewSupervisorModal, setShowNewSupervisorModal] = useState(false)
   const [showNewDrillerModal, setShowNewDrillerModal] = useState(false)
   const [showNewRigModal, setShowNewRigModal] = useState(false)
   const [showNewBitModal, setShowNewBitModal] = useState(false)
   const [showNewHoleModal, setShowNewHoleModal] = useState(false)
-
-  // New forms
-  const [newSupForm, setNewSupForm] = useState({ name: '', email: '' })
-  const [newDrillerForm, setNewDrillerForm] = useState({ name: '' })
-  const [newRigForm, setNewRigForm] = useState({ code: '', type: 'CORE' })
-  const [newBitForm, setNewBitForm] = useState({ code: '', name: '', type: 'SURFACE_SET', holeSize: 'NQ' })
-  const [newHoleForm, setNewHoleForm] = useState({ holeNumber: '' })
+  const [newSupForm, setNewSupForm] = useState({ name:'', email:'' })
+  const [newDrillerForm, setNewDrillerForm] = useState({ name:'' })
+  const [newRigForm, setNewRigForm] = useState({ code:'', type:'CORE' })
+  const [newBitForm, setNewBitForm] = useState({ code:'', name:'', type:'SURFACE_SET', holeSize:'NQ' })
+  const [newHoleForm, setNewHoleForm] = useState({ holeNumber:'' })
 
   const update = (changes: Partial<Project>) => onUpdate({ ...project, ...changes })
 
-  // ── PERSONNEL ──
-  const assignedIds = [...project.supervisors, ...project.drillers].map(p => p.id)
-  const poolSups = availableSupervisors.filter(s =>
-    !project.supervisors.find(x => x.id === s.id) &&
-    s.name.toLowerCase().includes(search.toLowerCase())
-  )
-  const poolDrillers = availableDrillers.filter(d =>
-    !project.drillers.find(x => x.id === d.id) &&
-    d.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const poolSups = availableSupervisors.filter(s => !project.supervisors.find(x=>x.id===s.id) && s.name.toLowerCase().includes(search.toLowerCase()))
+  const poolDrillers = availableDrillers.filter(d => !project.drillers.find(x=>x.id===d.id) && d.name.toLowerCase().includes(search.toLowerCase()))
+  const poolRigs = availableRigs.filter(r => !project.rigs.find(x=>x.id===r.id))
+  const poolBits = availableBits.filter(b => !project.bits.find(x=>x.id===b.id))
 
-  const assignSupervisor = (s: { id: string; name: string }) => {
-    update({ supervisors: [...project.supervisors, { id: s.id, name: s.name, email: '—', type: 'SUPERVISOR', status: 'ACTIVE' }] })
-  }
-  const assignDriller = (d: { id: string; name: string }) => {
-    update({ drillers: [...project.drillers, { id: d.id, name: d.name, email: '—', type: 'DRILLER', status: 'ACTIVE' }] })
-  }
-  const removeSupervisor = (id: string) => update({ supervisors: project.supervisors.filter(s => s.id !== id) })
-  const removeDriller = (id: string) => update({ drillers: project.drillers.filter(d => d.id !== id) })
+  const assignSupervisor = (s:{id:string;name:string}) => update({ supervisors:[...project.supervisors,{id:s.id,name:s.name,email:'—',type:'SUPERVISOR',status:'ACTIVE'}] })
+  const assignDriller    = (d:{id:string;name:string}) => update({ drillers:[...project.drillers,{id:d.id,name:d.name,email:'—',type:'DRILLER',status:'ACTIVE'}] })
+  const removeSupervisor = (id:string) => update({ supervisors:project.supervisors.filter(s=>s.id!==id) })
+  const removeDriller    = (id:string) => update({ drillers:project.drillers.filter(d=>d.id!==id) })
+  const assignRig = (r:{id:string;code:string;type:string}) => update({ rigs:[...project.rigs,{id:r.id,name:r.code,type:r.type,status:'ACTIVE'}] })
+  const removeRig = (id:string) => update({ rigs:project.rigs.filter(r=>r.id!==id) })
+  const assignBit = (b:typeof availableBits[0]) => update({ bits:[...project.bits,{...b,status:'ACTIVE'}] })
+  const removeBit = (id:string) => update({ bits:project.bits.filter(b=>b.id!==id) })
+  const toggleHoleStatus = (id:string) => update({ holes:project.holes.map(h=>h.id===id?{...h,status:h.status==='OPEN'?'CLOSED':'OPEN' as const}:h) })
+  const removeHole = (id:string) => update({ holes:project.holes.filter(h=>h.id!==id) })
 
   const addNewSupervisor = () => {
-    if (!newSupForm.name.trim()) return
-    const newS: Personnel = { id: Date.now().toString(), name: newSupForm.name.toUpperCase(), email: newSupForm.email || '—', type: 'SUPERVISOR', status: 'ACTIVE' }
-    update({ supervisors: [...project.supervisors, newS] })
-    setNewSupForm({ name: '', email: '' })
-    setShowNewSupervisorModal(false)
+    if(!newSupForm.name.trim()) return
+    update({ supervisors:[...project.supervisors,{id:Date.now().toString(),name:newSupForm.name.toUpperCase(),email:newSupForm.email||'—',type:'SUPERVISOR',status:'ACTIVE'}] })
+    setNewSupForm({name:'',email:''}); setShowNewSupervisorModal(false)
   }
   const addNewDriller = () => {
-    if (!newDrillerForm.name.trim()) return
-    const newD: Personnel = { id: Date.now().toString(), name: newDrillerForm.name.toUpperCase(), email: '—', type: 'DRILLER', status: 'ACTIVE' }
-    update({ drillers: [...project.drillers, newD] })
-    setNewDrillerForm({ name: '' })
-    setShowNewDrillerModal(false)
+    if(!newDrillerForm.name.trim()) return
+    update({ drillers:[...project.drillers,{id:Date.now().toString(),name:newDrillerForm.name.toUpperCase(),email:'—',type:'DRILLER',status:'ACTIVE'}] })
+    setNewDrillerForm({name:''}); setShowNewDrillerModal(false)
   }
-
-  // ── RIGS ──
-  const poolRigs = availableRigs.filter(r =>
-    !project.rigs.find(x => x.id === r.id)
-  )
-  const assignRig = (r: { id: string; code: string; type: string }) => {
-    update({ rigs: [...project.rigs, { id: r.id, name: '—', type: r.type, status: 'ACTIVE' }] })
-  }
-  const removeRig = (id: string) => update({ rigs: project.rigs.filter(r => r.id !== id) })
   const addNewRig = () => {
-    if (!newRigForm.code.trim()) return
-    const newR: Rig = { id: Date.now().toString(), name: newRigForm.code, type: newRigForm.type, status: 'ACTIVE' }
-    update({ rigs: [...project.rigs, newR] })
-    setNewRigForm({ code: '', type: 'CORE' })
-    setShowNewRigModal(false)
+    if(!newRigForm.code.trim()) return
+    update({ rigs:[...project.rigs,{id:Date.now().toString(),name:newRigForm.code,type:newRigForm.type,status:'ACTIVE'}] })
+    setNewRigForm({code:'',type:'CORE'}); setShowNewRigModal(false)
   }
-
-  // ── BITS ──
-  const poolBits = availableBits.filter(b => !project.bits.find(x => x.id === b.id))
-  const assignBit = (b: typeof availableBits[0]) => {
-    update({ bits: [...project.bits, { ...b, status: 'ACTIVE' }] })
-  }
-  const removeBit = (id: string) => update({ bits: project.bits.filter(b => b.id !== id) })
   const addNewBit = () => {
-    if (!newBitForm.code.trim()) return
-    const newB: Bit = { id: Date.now().toString(), ...newBitForm, status: 'ACTIVE' }
-    update({ bits: [...project.bits, newB] })
-    setNewBitForm({ code: '', name: '', type: 'SURFACE_SET', holeSize: 'NQ' })
-    setShowNewBitModal(false)
+    if(!newBitForm.code.trim()) return
+    update({ bits:[...project.bits,{id:Date.now().toString(),...newBitForm,status:'ACTIVE'}] })
+    setNewBitForm({code:'',name:'',type:'SURFACE_SET',holeSize:'NQ'}); setShowNewBitModal(false)
   }
-
-  // ── HOLES ──
   const addNewHole = () => {
-    if (!newHoleForm.holeNumber.trim()) return
-    if (project.holes.find(h => h.holeNumber === newHoleForm.holeNumber)) return
-    const newH: Hole = { id: Date.now().toString(), holeNumber: newHoleForm.holeNumber.toUpperCase(), status: 'OPEN' }
-    update({ holes: [...(project.holes || []), newH] })
-    setNewHoleForm({ holeNumber: '' })
-    setShowNewHoleModal(false)
+    if(!newHoleForm.holeNumber.trim()) return
+    if(project.holes.find(h=>h.holeNumber===newHoleForm.holeNumber)) return
+    update({ holes:[...(project.holes||[]),{id:Date.now().toString(),holeNumber:newHoleForm.holeNumber.toUpperCase(),status:'OPEN'}] })
+    setNewHoleForm({holeNumber:''}); setShowNewHoleModal(false)
   }
-  const toggleHoleStatus = (id: string) => {
-    update({ holes: project.holes.map(h => h.id === id ? { ...h, status: h.status === 'OPEN' ? 'CLOSED' : 'OPEN' } : h) })
-  }
-  const removeHole = (id: string) => update({ holes: project.holes.filter(h => h.id !== id) })
 
-  const inputCls = "w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder:text-[#64748B] focus:border-[#3B82F6] outline-none transition-all"
-  const selectCls = "w-full px-4 py-3 bg-[#1A2234] border border-[#1E293B] rounded-xl text-[#F8FAFC] focus:border-[#3B82F6] outline-none transition-all appearance-none"
+  // ── STYLES ──
+  const card: React.CSSProperties = { background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:20 }
+  const iStyle: React.CSSProperties = { width:'100%', padding:'10px 14px', background:'#080B10', border:'1px solid #1E293B', borderRadius:9, color:'#F8FAFC', fontSize:13, outline:'none', fontFamily:'inherit' }
+  const selStyle: React.CSSProperties = { ...iStyle, cursor:'pointer', appearance:'none' as any }
+  const label11: React.CSSProperties = { fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }
+  const thStyle: React.CSSProperties = { padding:'10px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:'#64748B', letterSpacing:'0.08em', textTransform:'uppercase' }
+  const tdStyle: React.CSSProperties = { padding:'10px 14px', fontSize:13 }
+
+  const tabBtn = (active:boolean, color='#F97316'): React.CSSProperties => ({
+    display:'flex', alignItems:'center', gap:6, padding:'8px 18px', borderRadius:10,
+    fontSize:13, fontWeight:600, cursor:'pointer', transition:'all 0.2s', border:'none',
+    background: active ? color : 'transparent',
+    color: active ? '#fff' : '#94A3B8',
+  })
+
+  const Modal = ({ show, title, onClose, onSave, children }: any) => !show ? null : (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(10px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20, zIndex:1000 }}>
+      <div style={{ width:'100%', maxWidth:460, padding:26, borderRadius:18, background:'#0D1117', border:'1px solid #1E293B', boxShadow:'0 24px 80px rgba(0,0,0,0.8)' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <div style={{ fontSize:16, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>{title}</div>
+          <button onClick={onClose} style={{ padding:6, borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#64748B', cursor:'pointer' }}><X size={15}/></button>
+        </div>
+        {children}
+        <div style={{ display:'flex', gap:10, marginTop:20 }}>
+          <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:13, fontWeight:600, cursor:'pointer' }}>Cancel</button>
+          <button onClick={onSave} style={{ flex:2, padding:'10px', borderRadius:9, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none' }}>Save →</button>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="space-y-6 pb-8">
+    <div style={{ display:'flex', flexDirection:'column', gap:24, paddingBottom:40 }}>
+
       {/* Back + Title */}
       <div>
-        <button onClick={onBack} className="flex items-center gap-2 text-[#94A3B8] hover:text-[#F8FAFC] transition mb-4 text-sm">
-          <ArrowLeft className="w-4 h-4" /> Back to Projects
+        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, color:'#94A3B8', background:'none', border:'none', cursor:'pointer', fontSize:13, marginBottom:12, padding:0 }}>
+          <ArrowLeft size={15}/> Back to Projects
         </button>
-        <h1 className="text-3xl font-bold text-[#F8FAFC]">{project.name}</h1>
-        <p className="text-[#64748B] text-sm mt-1">{project.code}</p>
+        <div style={{ fontSize:24, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>{project.name}</div>
+        <div style={{ fontSize:12, color:'#64748B', marginTop:4 }}>{project.code} · {project.location} · {project.client}</div>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 p-1.5 bg-[#111827] border border-[#1E293B] rounded-2xl w-fit">
-        <button onClick={() => setTab('personnel')} className={tabClass(tab === 'personnel')}>
-          <Users className="w-4 h-4" /> Personnel
-        </button>
-        <button onClick={() => setTab('rigs')} className={tabClass(tab === 'rigs')}>
-          <Truck className="w-4 h-4" /> Rigs
-        </button>
-        <button onClick={() => setTab('bits')} className={tabClass(tab === 'bits')}>
-          <Circle className="w-4 h-4" /> Bits
-        </button>
-        <button onClick={() => setTab('holes')} className={tabClass(tab === 'holes')}>
-          <Target className="w-4 h-4" /> Holes
-        </button>
+      <div style={{ display:'flex', gap:4, background:'#080B10', border:'1px solid #1E293B', borderRadius:12, padding:4, width:'fit-content' }}>
+        {([
+          { key:'personnel', icon:<Users size={14}/>,  label:'Personnel' },
+          { key:'rigs',      icon:<Truck size={14}/>,  label:'Rigs'      },
+          { key:'bits',      icon:<Circle size={14}/>, label:'Bits'      },
+          { key:'holes',     icon:<Target size={14}/>, label:'Holes'     },
+        ] as const).map(t=>(
+          <button key={t.key} onClick={()=>setTab(t.key)} style={tabBtn(tab===t.key)}>
+            {t.icon} {t.label}
+          </button>
+        ))}
       </div>
 
       {/* ── PERSONNEL TAB ── */}
-      {tab === 'personnel' && (
-        <div className="space-y-4">
+      {tab==='personnel' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           {/* Assign panel */}
-          <div className="p-5 rounded-2xl bg-[#111827] border border-[#1E293B]">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-semibold text-[#94A3B8]">Assign Personnel</p>
-              <button
-                onClick={() => personnelTab === 'supervisors' ? setShowNewSupervisorModal(true) : setShowNewDrillerModal(true)}
-                className="text-[#3B82F6] text-sm font-medium flex items-center gap-1 hover:text-[#60A5FA] transition"
-              >
-                <Plus className="w-4 h-4" />
-                New {personnelTab === 'supervisors' ? 'Supervisor' : 'Driller'}
+          <div style={card}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#94A3B8' }}>Assign Personnel</div>
+              <button onClick={()=>personnelTab==='supervisors'?setShowNewSupervisorModal(true):setShowNewDrillerModal(true)}
+                style={{ display:'flex', alignItems:'center', gap:5, color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+                <Plus size={13}/> New {personnelTab==='supervisors'?'Supervisor':'Driller'}
               </button>
             </div>
             {/* Sub-tabs */}
-            <div className="flex gap-2 mb-4">
-              <button onClick={() => { setPersonnelTab('supervisors'); setSearch('') }}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${personnelTab === 'supervisors' ? 'bg-[#3B82F6] text-white' : 'bg-[#1A2234] text-[#94A3B8] hover:text-white'}`}>
-                Supervisors
-              </button>
-              <button onClick={() => { setPersonnelTab('drillers'); setSearch('') }}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${personnelTab === 'drillers' ? 'bg-[#F59E0B] text-white' : 'bg-[#1A2234] text-[#94A3B8] hover:text-white'}`}>
-                Drillers
-              </button>
+            <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+              {(['supervisors','drillers'] as const).map(pt=>(
+                <button key={pt} onClick={()=>{setPersonnelTab(pt);setSearch('')}}
+                  style={{ padding:'6px 16px', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', border:'none', transition:'all 0.2s',
+                    background: personnelTab===pt?(pt==='supervisors'?'#F97316':'#F59E0B'):'rgba(255,255,255,0.04)',
+                    color: personnelTab===pt?'#fff':'#94A3B8' }}>
+                  {pt==='supervisors'?'Supervisors':'Drillers'}
+                </button>
+              ))}
             </div>
             {/* Search */}
-            <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4B5563]" />
-              <input type="text" placeholder="Search by name..."
-                className="w-full pl-9 pr-4 py-2.5 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder:text-[#4B5563] focus:border-[#3B82F6] outline-none text-sm"
-                value={search} onChange={e => setSearch(e.target.value)} />
+            <div style={{ position:'relative', marginBottom:12 }}>
+              <Search size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#64748B' }}/>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name..."
+                style={{...iStyle, paddingLeft:30}} />
             </div>
-            {/* Pool list */}
-            <div className="max-h-48 overflow-y-auto divide-y divide-[#1E293B]">
-              {(personnelTab === 'supervisors' ? poolSups : poolDrillers).length === 0
-                ? <p className="text-[#4B5563] text-sm py-4 text-center">No available {personnelTab}</p>
-                : (personnelTab === 'supervisors' ? poolSups : poolDrillers).map(p => (
-                  <div key={p.id} className="flex items-center justify-between py-3 px-1">
-                    <span className="text-sm font-semibold text-[#F8FAFC]">{p.name}</span>
-                    <button
-                      onClick={() => personnelTab === 'supervisors' ? assignSupervisor(p) : assignDriller(p)}
-                      className="text-[#3B82F6] text-sm font-medium hover:text-[#60A5FA] transition"
-                    >Assign</button>
+            {/* Pool */}
+            <div style={{ maxHeight:180, overflowY:'auto' }}>
+              {(personnelTab==='supervisors'?poolSups:poolDrillers).length===0
+                ? <div style={{ textAlign:'center', padding:'16px', color:'#64748B', fontSize:12 }}>No available {personnelTab}</div>
+                : (personnelTab==='supervisors'?poolSups:poolDrillers).map(p=>(
+                  <div key={p.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 4px', borderBottom:'1px solid rgba(30,41,59,0.5)' }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:'#F8FAFC' }}>{p.name}</span>
+                    <button onClick={()=>personnelTab==='supervisors'?assignSupervisor(p):assignDriller(p)}
+                      style={{ color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:700 }}>Assign</button>
                   </div>
                 ))
               }
@@ -208,41 +184,38 @@ export default function ManageResources({ project, availableSupervisors, availab
           </div>
 
           {/* Assigned table */}
-          <div className="rounded-2xl bg-[#111827] border border-[#1E293B] overflow-hidden">
-            <table className="w-full">
+          <div style={{ ...card, padding:0, overflow:'hidden' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
-                <tr className="text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider border-b border-[#1E293B]">
-                  <th className="px-5 py-3">Name</th>
-                  <th className="px-5 py-3">Type</th>
-                  <th className="px-5 py-3">Email</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3"></th>
+                <tr style={{ borderBottom:'1px solid #1E293B', background:'rgba(255,255,255,0.02)' }}>
+                  {['Name','Type','Email','Status',''].map(h=><th key={h} style={thStyle}>{h}</th>)}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1E293B]">
-                {[...project.supervisors, ...project.drillers].length === 0
-                  ? <tr><td colSpan={5} className="px-5 py-8 text-center text-[#4B5563] text-sm">No personnel assigned yet</td></tr>
-                  : [...project.supervisors, ...project.drillers].map(p => (
-                    <tr key={p.id} className="hover:bg-[#1A2234]/50 transition">
-                      <td className="px-5 py-4 font-semibold text-[#F8FAFC] text-sm">{p.name}</td>
-                      <td className="px-5 py-4">
-                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
-                          p.type === 'SUPERVISOR' ? 'bg-[#3B82F6]/20 text-[#3B82F6]' : 'bg-[#F59E0B]/20 text-[#F59E0B]'
-                        }`}>
-                          {p.type === 'SUPERVISOR' ? '👤' : '⛏️'} {p.type}
+              <tbody>
+                {[...project.supervisors,...project.drillers].length===0
+                  ? <tr><td colSpan={5} style={{ ...tdStyle, textAlign:'center', color:'#64748B', padding:'32px' }}>No personnel assigned yet</td></tr>
+                  : [...project.supervisors,...project.drillers].map(p=>(
+                    <tr key={p.id} style={{ borderBottom:'1px solid rgba(30,41,59,0.5)' }}
+                      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.02)'}
+                      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                      <td style={{ ...tdStyle, fontWeight:700, color:'#F8FAFC' }}>{p.name}</td>
+                      <td style={tdStyle}>
+                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20,
+                          background: p.type==='SUPERVISOR'?'rgba(249,115,22,0.1)':'rgba(245,158,11,0.1)',
+                          color: p.type==='SUPERVISOR'?'#F97316':'#F59E0B',
+                          border: `1px solid ${p.type==='SUPERVISOR'?'rgba(249,115,22,0.2)':'rgba(245,158,11,0.2)'}` }}>
+                          {p.type==='SUPERVISOR'?'👤':'⛏️'} {p.type}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-[#94A3B8] text-sm">{p.email}</td>
-                      <td className="px-5 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" /> ACTIVE
+                      <td style={{ ...tdStyle, color:'#94A3B8' }}>{p.email}</td>
+                      <td style={tdStyle}>
+                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, background:'rgba(16,185,129,0.1)', color:'#10B981', border:'1px solid rgba(16,185,129,0.2)' }}>
+                          ● ACTIVE
                         </span>
                       </td>
-                      <td className="px-5 py-4">
-                        <button onClick={() => p.type === 'SUPERVISOR' ? removeSupervisor(p.id) : removeDriller(p.id)}
-                          className="p-1.5 text-[#64748B] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      <td style={tdStyle}>
+                        <button onClick={()=>p.type==='SUPERVISOR'?removeSupervisor(p.id):removeDriller(p.id)}
+                          style={{ padding:6, borderRadius:7, background:'rgba(239,68,68,0.05)', border:'none', color:'rgba(239,68,68,0.4)', cursor:'pointer' }}><Trash2 size={13}/></button>
                       </td>
                     </tr>
                   ))
@@ -254,61 +227,52 @@ export default function ManageResources({ project, availableSupervisors, availab
       )}
 
       {/* ── RIGS TAB ── */}
-      {tab === 'rigs' && (
-        <div className="space-y-4">
-          <div className="p-5 rounded-2xl bg-[#111827] border border-[#1E293B]">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-semibold text-[#94A3B8]">Assign Rig</p>
-              <button onClick={() => setShowNewRigModal(true)}
-                className="text-[#3B82F6] text-sm font-medium flex items-center gap-1 hover:text-[#60A5FA] transition">
-                <Plus className="w-4 h-4" /> New Rig
+      {tab==='rigs' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div style={card}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#94A3B8' }}>Assign Rig</div>
+              <button onClick={()=>setShowNewRigModal(true)}
+                style={{ display:'flex', alignItems:'center', gap:5, color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+                <Plus size={13}/> New Rig
               </button>
             </div>
-            <div className="max-h-48 overflow-y-auto divide-y divide-[#1E293B]">
-              {poolRigs.length === 0
-                ? <p className="text-[#4B5563] text-sm py-4 text-center">No available rigs</p>
-                : poolRigs.map(r => (
-                  <div key={r.id} className="flex items-center justify-between py-3 px-1">
+            <div style={{ maxHeight:180, overflowY:'auto' }}>
+              {poolRigs.length===0
+                ? <div style={{ textAlign:'center', padding:'16px', color:'#64748B', fontSize:12 }}>No available rigs</div>
+                : poolRigs.map(r=>(
+                  <div key={r.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 4px', borderBottom:'1px solid rgba(30,41,59,0.5)' }}>
                     <div>
-                      <span className="text-sm font-semibold text-[#F8FAFC]">{r.code}</span>
-                      <span className="text-xs text-[#64748B] ml-2">{r.type}</span>
+                      <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC', fontFamily:'monospace' }}>{r.code}</span>
+                      <span style={{ fontSize:11, color:'#64748B', marginLeft:8 }}>{r.type}</span>
                     </div>
-                    <button onClick={() => assignRig(r)} className="text-[#3B82F6] text-sm font-medium hover:text-[#60A5FA] transition">Assign</button>
+                    <button onClick={()=>assignRig(r)} style={{ color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:700 }}>Assign</button>
                   </div>
                 ))
               }
             </div>
           </div>
-
-          <div className="rounded-2xl bg-[#111827] border border-[#1E293B] overflow-hidden">
-            <table className="w-full">
+          <div style={{ ...card, padding:0, overflow:'hidden' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
-                <tr className="text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider border-b border-[#1E293B]">
-                  <th className="px-5 py-3">Code</th>
-                  <th className="px-5 py-3">Name</th>
-                  <th className="px-5 py-3">Type</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3"></th>
+                <tr style={{ borderBottom:'1px solid #1E293B', background:'rgba(255,255,255,0.02)' }}>
+                  {['Rig Name','Type','Status',''].map(h=><th key={h} style={thStyle}>{h}</th>)}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1E293B]">
-                {project.rigs.length === 0
-                  ? <tr><td colSpan={5} className="px-5 py-8 text-center text-[#4B5563] text-sm">No rigs assigned yet</td></tr>
-                  : project.rigs.map(r => (
-                    <tr key={r.id} className="hover:bg-[#1A2234]/50 transition">
-                      <td className="px-5 py-4 font-bold text-[#F8FAFC] text-sm">{r.id.startsWith('ar') ? availableRigs.find(x => x.id === r.id)?.code || r.name : r.name}</td>
-                      <td className="px-5 py-4 text-[#94A3B8] text-sm">—</td>
-                      <td className="px-5 py-4 text-[#94A3B8] text-sm">{r.type}</td>
-                      <td className="px-5 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" /> ACTIVE
-                        </span>
+              <tbody>
+                {project.rigs.length===0
+                  ? <tr><td colSpan={4} style={{ ...tdStyle, textAlign:'center', color:'#64748B', padding:'32px' }}>No rigs assigned yet</td></tr>
+                  : project.rigs.map(r=>(
+                    <tr key={r.id} style={{ borderBottom:'1px solid rgba(30,41,59,0.5)' }}
+                      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.02)'}
+                      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                      <td style={{ ...tdStyle, fontWeight:700, color:'#F8FAFC', fontFamily:'monospace' }}>{r.name}</td>
+                      <td style={{ ...tdStyle, color:'#94A3B8' }}>{r.type}</td>
+                      <td style={tdStyle}>
+                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, background:'rgba(16,185,129,0.1)', color:'#10B981', border:'1px solid rgba(16,185,129,0.2)' }}>● ACTIVE</span>
                       </td>
-                      <td className="px-5 py-4">
-                        <button onClick={() => removeRig(r.id)}
-                          className="p-1.5 text-[#64748B] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      <td style={tdStyle}>
+                        <button onClick={()=>removeRig(r.id)} style={{ padding:6, borderRadius:7, background:'rgba(239,68,68,0.05)', border:'none', color:'rgba(239,68,68,0.4)', cursor:'pointer' }}><Trash2 size={13}/></button>
                       </td>
                     </tr>
                   ))
@@ -320,65 +284,54 @@ export default function ManageResources({ project, availableSupervisors, availab
       )}
 
       {/* ── BITS TAB ── */}
-      {tab === 'bits' && (
-        <div className="space-y-4">
-          {/* Assign Bit panel */}
-          <div className="p-5 rounded-2xl bg-[#111827] border border-[#1E293B]">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-semibold text-[#94A3B8]">Assign Bit</p>
-              <button onClick={() => setShowNewBitModal(true)}
-                className="text-[#3B82F6] text-sm font-medium flex items-center gap-1 hover:text-[#60A5FA] transition">
-                <Plus className="w-4 h-4" /> New Bit
+      {tab==='bits' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div style={card}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#94A3B8' }}>Assign Bit</div>
+              <button onClick={()=>setShowNewBitModal(true)}
+                style={{ display:'flex', alignItems:'center', gap:5, color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+                <Plus size={13}/> New Bit
               </button>
             </div>
-            <div className="max-h-40 overflow-y-auto divide-y divide-[#1E293B]">
-              {poolBits.length === 0
-                ? <p className="text-[#4B5563] text-sm py-4 text-center">No available bits</p>
-                : poolBits.map(b => (
-                  <div key={b.id} className="flex items-center justify-between py-3 px-1">
+            <div style={{ maxHeight:160, overflowY:'auto' }}>
+              {poolBits.length===0
+                ? <div style={{ textAlign:'center', padding:'16px', color:'#64748B', fontSize:12 }}>No available bits</div>
+                : poolBits.map(b=>(
+                  <div key={b.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 4px', borderBottom:'1px solid rgba(30,41,59,0.5)' }}>
                     <div>
-                      <span className="text-sm font-semibold text-[#F8FAFC]">{b.code}</span>
-                      <span className="text-xs text-[#64748B] ml-2">{b.name} · {b.holeSize}</span>
+                      <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC' }}>{b.code}</span>
+                      <span style={{ fontSize:11, color:'#64748B', marginLeft:8 }}>{b.name} · {b.holeSize}</span>
                     </div>
-                    <button onClick={() => assignBit(b)} className="text-[#3B82F6] text-sm font-medium hover:text-[#60A5FA] transition">Assign</button>
+                    <button onClick={()=>assignBit(b)} style={{ color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:700 }}>Assign</button>
                   </div>
                 ))
               }
             </div>
           </div>
-
-          {/* Assigned Bits table */}
-          <div className="rounded-2xl bg-[#111827] border border-[#1E293B] overflow-hidden">
-            <table className="w-full">
+          <div style={{ ...card, padding:0, overflow:'hidden' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
-                <tr className="text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider border-b border-[#1E293B]">
-                  <th className="px-5 py-3">Code</th>
-                  <th className="px-5 py-3">Name</th>
-                  <th className="px-5 py-3">Type</th>
-                  <th className="px-5 py-3">Hole Size</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3"></th>
+                <tr style={{ borderBottom:'1px solid #1E293B', background:'rgba(255,255,255,0.02)' }}>
+                  {['Code','Name','Type','Hole Size','Status',''].map(h=><th key={h} style={thStyle}>{h}</th>)}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1E293B]">
-                {project.bits.length === 0
-                  ? <tr><td colSpan={6} className="px-5 py-8 text-center text-[#4B5563] text-sm">No bits assigned yet</td></tr>
-                  : project.bits.map(b => (
-                    <tr key={b.id} className="hover:bg-[#1A2234]/50 transition">
-                      <td className="px-5 py-4 font-bold text-[#F8FAFC] text-sm">{b.code}</td>
-                      <td className="px-5 py-4 text-[#94A3B8] text-sm">{b.name}</td>
-                      <td className="px-5 py-4 text-[#94A3B8] text-sm">{b.type}</td>
-                      <td className="px-5 py-4 text-[#94A3B8] text-sm">{b.holeSize}</td>
-                      <td className="px-5 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" /> ACTIVE
-                        </span>
+              <tbody>
+                {project.bits.length===0
+                  ? <tr><td colSpan={6} style={{ ...tdStyle, textAlign:'center', color:'#64748B', padding:'32px' }}>No bits assigned yet</td></tr>
+                  : project.bits.map(b=>(
+                    <tr key={b.id} style={{ borderBottom:'1px solid rgba(30,41,59,0.5)' }}
+                      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.02)'}
+                      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                      <td style={{ ...tdStyle, fontWeight:700, color:'#F8FAFC' }}>{b.code}</td>
+                      <td style={{ ...tdStyle, color:'#94A3B8' }}>{b.name}</td>
+                      <td style={{ ...tdStyle, color:'#94A3B8' }}>{b.type}</td>
+                      <td style={{ ...tdStyle, color:'#94A3B8' }}>{b.holeSize}</td>
+                      <td style={tdStyle}>
+                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, background:'rgba(16,185,129,0.1)', color:'#10B981', border:'1px solid rgba(16,185,129,0.2)' }}>● ACTIVE</span>
                       </td>
-                      <td className="px-5 py-4">
-                        <button onClick={() => removeBit(b.id)}
-                          className="p-1.5 text-[#64748B] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      <td style={tdStyle}>
+                        <button onClick={()=>removeBit(b.id)} style={{ padding:6, borderRadius:7, background:'rgba(239,68,68,0.05)', border:'none', color:'rgba(239,68,68,0.4)', cursor:'pointer' }}><Trash2 size={13}/></button>
                       </td>
                     </tr>
                   ))
@@ -390,152 +343,94 @@ export default function ManageResources({ project, availableSupervisors, availab
       )}
 
       {/* ── HOLES TAB ── */}
-      {tab === 'holes' && (
-        <div className="space-y-4">
-          <div className="p-5 rounded-2xl bg-[#111827] border border-[#1E293B]">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-sm font-semibold text-[#F8FAFC]">Hole Numbers</p>
-                <p className="text-xs text-[#64748B] mt-0.5">Assigned holes appear in the Drilling Log dropdown (both open and closed)</p>
-              </div>
-              <button onClick={() => setShowNewHoleModal(true)}
-                className="text-[#3B82F6] text-sm font-medium flex items-center gap-1 hover:text-[#60A5FA] transition">
-                <Plus className="w-4 h-4" /> Add Hole
-              </button>
+      {tab==='holes' && (
+        <div style={card}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>Hole Numbers</div>
+              <div style={{ fontSize:11, color:'#64748B', marginTop:3 }}>Assigned holes appear in the Drilling Log dropdown</div>
             </div>
-            {(project.holes || []).length === 0
-              ? <p className="text-[#4B5563] text-sm text-center py-6">No holes added yet</p>
-              : (
-                <div className="divide-y divide-[#1E293B]">
-                  {project.holes.map(h => (
-                    <div key={h.id} className="flex items-center justify-between py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="font-bold text-[#F8FAFC]">{h.holeNumber}</span>
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                          h.status === 'OPEN'
-                            ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30'
-                            : 'bg-[#64748B]/20 text-[#64748B] border border-[#64748B]/30'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${h.status === 'OPEN' ? 'bg-[#10B981]' : 'bg-[#64748B]'}`} />
-                          {h.status}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => toggleHoleStatus(h.id)}
-                          className="text-xs px-3 py-1 rounded-lg border border-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] hover:border-[#3B82F6] transition"
-                        >
-                          {h.status === 'OPEN' ? 'Mark Closed' : 'Reopen'}
-                        </button>
-                        <button onClick={() => removeHole(h.id)}
-                          className="p-1.5 text-[#64748B] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )
-            }
+            <button onClick={()=>setShowNewHoleModal(true)}
+              style={{ display:'flex', alignItems:'center', gap:5, color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+              <Plus size={13}/> Add Hole
+            </button>
           </div>
+          {(project.holes||[]).length===0
+            ? <div style={{ textAlign:'center', padding:'24px', color:'#64748B', fontSize:13 }}>No holes added yet</div>
+            : (project.holes||[]).map(h=>(
+              <div key={h.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid rgba(30,41,59,0.5)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <span style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>{h.holeNumber}</span>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20,
+                    background: h.status==='OPEN'?'rgba(16,185,129,0.1)':'rgba(100,116,139,0.1)',
+                    color: h.status==='OPEN'?'#10B981':'#64748B',
+                    border: `1px solid ${h.status==='OPEN'?'rgba(16,185,129,0.2)':'rgba(100,116,139,0.2)'}` }}>
+                    ● {h.status}
+                  </span>
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={()=>toggleHoleStatus(h.id)}
+                    style={{ padding:'5px 12px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:11, cursor:'pointer' }}>
+                    {h.status==='OPEN'?'Mark Closed':'Reopen'}
+                  </button>
+                  <button onClick={()=>removeHole(h.id)} style={{ padding:6, borderRadius:7, background:'rgba(239,68,68,0.05)', border:'none', color:'rgba(239,68,68,0.4)', cursor:'pointer' }}><Trash2 size={13}/></button>
+                </div>
+              </div>
+            ))
+          }
         </div>
       )}
 
       {/* ── MODALS ── */}
-      {[
-        { show: showNewSupervisorModal, title: 'Add New Supervisor', onClose: () => setShowNewSupervisorModal(false), onSave: addNewSupervisor, body: (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-[#94A3B8] mb-2">Full Name *</label>
-              <input type="text" className={inputCls} placeholder="Enter name"
-                value={newSupForm.name} onChange={e => setNewSupForm({...newSupForm, name: e.target.value})} />
-            </div>
-            <div>
-              <label className="block text-sm text-[#94A3B8] mb-2">Email (Optional)</label>
-              <input type="email" className={inputCls} placeholder="Enter email"
-                value={newSupForm.email} onChange={e => setNewSupForm({...newSupForm, email: e.target.value})} />
-            </div>
+      <Modal show={showNewSupervisorModal} title="Add New Supervisor" onClose={()=>setShowNewSupervisorModal(false)} onSave={addNewSupervisor}>
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <div><div style={label11}>Full Name *</div><input style={iStyle} placeholder="Enter name" value={newSupForm.name} onChange={e=>setNewSupForm({...newSupForm,name:e.target.value})} /></div>
+          <div><div style={label11}>Email (Optional)</div><input style={iStyle} placeholder="Enter email" value={newSupForm.email} onChange={e=>setNewSupForm({...newSupForm,email:e.target.value})} /></div>
+        </div>
+      </Modal>
+
+      <Modal show={showNewDrillerModal} title="Add New Driller" onClose={()=>setShowNewDrillerModal(false)} onSave={addNewDriller}>
+        <div><div style={label11}>Full Name *</div><input style={iStyle} placeholder="Enter name" value={newDrillerForm.name} onChange={e=>setNewDrillerForm({name:e.target.value})} /></div>
+      </Modal>
+
+      <Modal show={showNewRigModal} title="Add New Rig" onClose={()=>setShowNewRigModal(false)} onSave={addNewRig}>
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <div><div style={label11}>Rig Code *</div><input style={iStyle} placeholder="e.g. KEM-15" value={newRigForm.code} onChange={e=>setNewRigForm({...newRigForm,code:e.target.value})} /></div>
+          <div><div style={label11}>Type</div>
+            <select style={selStyle} value={newRigForm.type} onChange={e=>setNewRigForm({...newRigForm,type:e.target.value})}>
+              {['CORE','DTH','RC','BLAST_HOLE'].map(t=><option key={t}>{t}</option>)}
+            </select>
           </div>
-        )},
-        { show: showNewDrillerModal, title: 'Add New Driller', onClose: () => setShowNewDrillerModal(false), onSave: addNewDriller, body: (
-          <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Full Name *</label>
-            <input type="text" className={inputCls} placeholder="Enter name"
-              value={newDrillerForm.name} onChange={e => setNewDrillerForm({...newDrillerForm, name: e.target.value})} />
-          </div>
-        )},
-        { show: showNewRigModal, title: 'Add New Rig', onClose: () => setShowNewRigModal(false), onSave: addNewRig, body: (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-[#94A3B8] mb-2">Rig Code *</label>
-              <input type="text" className={inputCls} placeholder="e.g. KEM-15"
-                value={newRigForm.code} onChange={e => setNewRigForm({...newRigForm, code: e.target.value})} />
+        </div>
+      </Modal>
+
+      <Modal show={showNewBitModal} title="Add New Bit" onClose={()=>setShowNewBitModal(false)} onSave={addNewBit}>
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <div><div style={label11}>Bit Code *</div><input style={iStyle} placeholder="e.g. SS-NQ-15/32" value={newBitForm.code} onChange={e=>setNewBitForm({...newBitForm,code:e.target.value})} /></div>
+          <div><div style={label11}>Bit Name</div><input style={iStyle} placeholder="e.g. NQ S/S CORE BIT SR-15/32" value={newBitForm.name} onChange={e=>setNewBitForm({...newBitForm,name:e.target.value})} /></div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div><div style={label11}>Type</div>
+              <select style={selStyle} value={newBitForm.type} onChange={e=>setNewBitForm({...newBitForm,type:e.target.value})}>
+                {['SURFACE_SET','IMPREGNATED','PDC_CORE','DTH','TRICONE'].map(t=><option key={t}>{t}</option>)}
+              </select>
             </div>
-            <div>
-              <label className="block text-sm text-[#94A3B8] mb-2">Type</label>
-              <select className={selectCls} value={newRigForm.type} onChange={e => setNewRigForm({...newRigForm, type: e.target.value})}>
-                {['CORE', 'DTH', 'RC', 'BLAST_HOLE'].map(t => <option key={t} value={t}>{t}</option>)}
+            <div><div style={label11}>Hole Size</div>
+              <select style={selStyle} value={newBitForm.holeSize} onChange={e=>setNewBitForm({...newBitForm,holeSize:e.target.value})}>
+                {['NQ','HQ','PQ','BQ','AQ'].map(s=><option key={s}>{s}</option>)}
               </select>
             </div>
           </div>
-        )},
-        { show: showNewBitModal, title: 'Add New Bit', onClose: () => setShowNewBitModal(false), onSave: addNewBit, body: (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-[#94A3B8] mb-2">Bit Code *</label>
-              <input type="text" className={inputCls} placeholder="e.g. SS-NQ-15/32"
-                value={newBitForm.code} onChange={e => setNewBitForm({...newBitForm, code: e.target.value})} />
-            </div>
-            <div>
-              <label className="block text-sm text-[#94A3B8] mb-2">Bit Name</label>
-              <input type="text" className={inputCls} placeholder="e.g. NQ S/S CORE BIT SR-15/32"
-                value={newBitForm.name} onChange={e => setNewBitForm({...newBitForm, name: e.target.value})} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-[#94A3B8] mb-2">Type</label>
-                <select className={selectCls} value={newBitForm.type} onChange={e => setNewBitForm({...newBitForm, type: e.target.value})}>
-                  {['SURFACE_SET', 'IMPREGNATED', 'PDC_CORE', 'DTH', 'TRICONE'].map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-[#94A3B8] mb-2">Hole Size</label>
-                <select className={selectCls} value={newBitForm.holeSize} onChange={e => setNewBitForm({...newBitForm, holeSize: e.target.value})}>
-                  {['NQ', 'HQ', 'PQ', 'BQ', 'AQ'].map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-        )},
-        { show: showNewHoleModal, title: 'Add Hole Number', onClose: () => setShowNewHoleModal(false), onSave: addNewHole, body: (
-          <div>
-            <label className="block text-sm text-[#94A3B8] mb-2">Hole Number *</label>
-            <input type="text" className={inputCls} placeholder="e.g. H1, BH-001"
-              value={newHoleForm.holeNumber} onChange={e => setNewHoleForm({holeNumber: e.target.value})} />
-            <p className="text-xs text-[#64748B] mt-2">This hole will appear in the Drilling Log dropdown for this project</p>
-          </div>
-        )},
-      ].map((m, i) => m.show && (
-        <div key={i} className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-md p-6 rounded-2xl bg-[#111827] border border-[#1E293B] shadow-[0_24px_80px_rgba(0,0,0,0.8)]">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-[#F8FAFC]">{m.title}</h2>
-              <button onClick={m.onClose} className="p-1.5 text-[#64748B] hover:text-[#F8FAFC] transition"><X className="w-5 h-5" /></button>
-            </div>
-            {m.body}
-            <div className="flex gap-3 mt-5">
-              <button onClick={m.onClose}
-                className="flex-1 py-2.5 border border-[#1E293B] text-[#94A3B8] rounded-xl text-sm font-medium hover:bg-[#1A2234] transition">
-                Cancel
-              </button>
-              <button onClick={m.onSave}
-                className="flex-1 py-2.5 bg-[#3B82F6] text-white rounded-xl text-sm font-medium hover:bg-[#2563EB] transition">
-                Save
-              </button>
-            </div>
-          </div>
         </div>
-      ))}
+      </Modal>
+
+      <Modal show={showNewHoleModal} title="Add Hole Number" onClose={()=>setShowNewHoleModal(false)} onSave={addNewHole}>
+        <div>
+          <div style={label11}>Hole Number *</div>
+          <input style={iStyle} placeholder="e.g. H1, BH-001" value={newHoleForm.holeNumber} onChange={e=>setNewHoleForm({holeNumber:e.target.value})} />
+          <div style={{ fontSize:11, color:'#64748B', marginTop:6 }}>This hole will appear in the Drilling Log dropdown for this project</div>
+        </div>
+      </Modal>
+
     </div>
   )
 }
