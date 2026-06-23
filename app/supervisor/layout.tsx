@@ -28,7 +28,6 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
   return (
     <div className="min-h-screen flex" style={{ background: '#080B10', color: '#F8FAFC' }}>
 
-      {/* Mobile overlay */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
@@ -42,25 +41,20 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 flex flex-col w-72
-          transition-transform duration-300 ease-out
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
-        style={{
-          background: 'linear-gradient(180deg, #0D1117 0%, #080B10 100%)',
-          borderRight: '1px solid #1E293B',
-        }}
+        className={`fixed lg:static inset-y-0 left-0 z-50 flex flex-col w-72 transition-transform duration-300 ease-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        style={{ background: 'linear-gradient(180deg, #0D1117 0%, #080B10 100%)', borderRight: '1px solid #1E293B' }}
       >
         {/* Logo */}
         <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid #1E293B' }}>
           <Link href="/supervisor/dashboard" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 10,
-              background: 'linear-gradient(135deg, #F97316, #F59E0B)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 800, fontSize: 18, color: '#000',
-              boxShadow: '0 0 20px rgba(249,115,22,0.35)',
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}>X</div>
+            <svg width="40" height="40" viewBox="0 0 100 100" fill="none" style={{ flexShrink: 0, filter: 'drop-shadow(0 0 8px rgba(249,115,22,0.3))' }}>
+              <polygon points="50,50 5,5 5,95" fill="#1a1a1a"/>
+              <polygon points="50,50 5,5 30,5" fill="#2a2a2a"/>
+              <polygon points="50,50 5,95 30,95" fill="#2a2a2a"/>
+              <polygon points="50,50 95,5 95,95" fill="#F97316"/>
+              <polygon points="50,50 95,5 70,5" fill="#EA580C"/>
+              <polygon points="50,50 95,95 70,95" fill="#EA580C"/>
+            </svg>
             <div>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#F8FAFC', letterSpacing: '0.05em', fontFamily: "'Space Grotesk', sans-serif" }}>XPLORIX</div>
               <div style={{ fontSize: 9, color: '#64748B', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 1 }}>Supervisor Portal</div>
@@ -112,11 +106,7 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
 
         {/* Shift status */}
         <div className="px-4 pb-2">
-          <div style={{
-            padding: '10px 14px', borderRadius: 10,
-            background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)',
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
+          <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', display: 'flex', alignItems: 'center', gap: 10 }}>
             <HardHat size={14} style={{ color: '#60A5FA', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#F8FAFC' }}>Day Shift Active</div>
@@ -127,18 +117,8 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
 
         {/* User */}
         <div className="p-4" style={{ borderTop: '1px solid #1E293B' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '10px 12px', borderRadius: 12,
-            background: 'rgba(255,255,255,0.03)', border: '1px solid #1E293B',
-          }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-              background: 'linear-gradient(135deg, #3B82F6, #60A5FA)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 700, fontSize: 14, color: '#fff',
-              boxShadow: '0 0 12px rgba(59,130,246,0.3)',
-            }}>S</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid #1E293B' }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #3B82F6, #60A5FA)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: '#fff', boxShadow: '0 0 12px rgba(59,130,246,0.3)' }}>S</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#F8FAFC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Supervisor</div>
               <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>Field Operations</div>
@@ -156,13 +136,7 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
       <main className="flex-1 flex flex-col min-w-0">
 
         {/* Header */}
-        <header style={{
-          position: 'sticky', top: 0, zIndex: 30,
-          background: 'rgba(8,11,16,0.85)',
-          backdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(30,41,59,0.6)',
-          padding: '0 28px',
-        }}>
+        <header style={{ position: 'sticky', top: 0, zIndex: 30, background: 'rgba(8,11,16,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(30,41,59,0.6)', padding: '0 28px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <button onClick={() => setSidebarOpen(true)} className="lg:hidden"
@@ -177,42 +151,15 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {/* Today's date badge */}
-              <div style={{
-                padding: '6px 14px', borderRadius: 8,
-                background: 'rgba(255,255,255,0.04)', border: '1px solid #1E293B',
-                fontSize: 12, color: '#94A3B8', fontWeight: 500,
-              }}>
+              <div style={{ padding: '6px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid #1E293B', fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>
                 {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
               </div>
-
-              {/* Notifications */}
-              <button style={{
-                padding: 8, borderRadius: 10, position: 'relative',
-                background: 'rgba(255,255,255,0.04)', border: '1px solid #1E293B',
-                color: '#94A3B8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'all 0.2s',
-              }}>
+              <button style={{ padding: 8, borderRadius: 10, position: 'relative', background: 'rgba(255,255,255,0.04)', border: '1px solid #1E293B', color: '#94A3B8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Bell size={18} />
-                <span style={{
-                  position: 'absolute', top: 6, right: 6,
-                  width: 7, height: 7, borderRadius: '50%',
-                  background: '#F97316', border: '1.5px solid #080B10',
-                }} />
+                <span style={{ position: 'absolute', top: 6, right: 6, width: 7, height: 7, borderRadius: '50%', background: '#F97316', border: '1.5px solid #080B10' }} />
               </button>
-
-              {/* Submit Log CTA */}
               <Link href="/supervisor/drilling-log"
-                style={{
-                  padding: '8px 18px', borderRadius: 10,
-                  background: 'linear-gradient(135deg, #F97316, #EA580C)',
-                  color: '#fff', fontWeight: 700, fontSize: 13,
-                  textDecoration: 'none',
-                  boxShadow: '0 4px 20px rgba(249,115,22,0.3)',
-                  transition: 'all 0.25s',
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  whiteSpace: 'nowrap',
-                }}>
+                style={{ padding: '8px 18px', borderRadius: 10, background: 'linear-gradient(135deg, #F97316, #EA580C)', color: '#fff', fontWeight: 700, fontSize: 13, textDecoration: 'none', boxShadow: '0 4px 20px rgba(249,115,22,0.3)', display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
                 <FileText size={14} />
                 New Drill Log
               </Link>
@@ -225,13 +172,6 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
           {children}
         </div>
       </main>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.4); }
-        }
-      `}</style>
     </div>
   )
 }
