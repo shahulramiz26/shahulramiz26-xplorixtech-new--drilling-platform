@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   LineChart,
   Line,
@@ -39,12 +39,17 @@ const metersData = [
   { date: 'Feb 26', meters: 250, recovery: 235 },
 ]
 
-const downtimeData = [
-  { reason: 'Mechanical', hours: 12 },
-  { reason: 'Bit Change', hours: 8 },
-  { reason: 'Water Shortage', hours: 6 },
-  { reason: 'Weather', hours: 4 },
-  { reason: 'Operator Delay', hours: 3 },
+// Downtime data now carries a category so it can be filtered by Client / Internal.
+// This should come from the same Client/Internal field captured on each downtime
+// reason entry in the Drill Log (see Standby Mode logic).
+type DowntimeCategory = 'Client' | 'Internal'
+
+const downtimeData: { reason: string; hours: number; category: DowntimeCategory }[] = [
+  { reason: 'Mechanical', hours: 12, category: 'Internal' },
+  { reason: 'Bit Change', hours: 8, category: 'Internal' },
+  { reason: 'Water Shortage', hours: 6, category: 'Client' },
+  { reason: 'Weather', hours: 4, category: 'Client' },
+  { reason: 'Operator Delay', hours: 3, category: 'Internal' },
 ]
 
 const productiveData = [
@@ -137,8 +142,22 @@ const operationInsights = [
   }
 ]
 
+type DowntimeFilter = 'All' | DowntimeCategory
+
 export default function OperationDashboard() {
   const [dateRange, setDateRange] = useState('7d')
+  const [downtimeFilter, setDowntimeFilter] = useState<DowntimeFilter>('All')
+
+  // Filtered + sorted downtime data driven by the Client/Internal toggle
+  const filteredDowntimeData = useMemo(() => {
+    const rows =
+      downtimeFilter === 'All'
+        ? downtimeData
+        : downtimeData.filter(d => d.category === downtimeFilter)
+    return [...rows].sort((a, b) => b.hours - a.hours)
+  }, [downtimeFilter])
+
+  const downtimeTotal = filteredDowntimeData.reduce((sum, d) => sum + d.hours, 0)
 
   return (
     <div className="space-y-8">
@@ -218,19 +237,64 @@ export default function OperationDashboard() {
           </div>
         </div>
 
-        {/* Downtime by Reason */}
+        {/* Downtime by Reason — now with Client / Internal filter */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Downtime by Reason</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900">Downtime by Reason</h3>
+            <span className="text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-600 font-medium">
+              {downtimeTotal} hrs total
+            </span>
+          </div>
+
+          {/* Client / Internal filter tabs */}
+          <div className="flex gap-2 mb-4">
+            {(['All', 'Client', 'Internal'] as DowntimeFilter[]).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setDowntimeFilter(tab)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  downtimeFilter === tab
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={downtimeData} layout="vertical">
+              <BarChart data={filteredDowntimeData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" />
                 <YAxis dataKey="reason" type="category" width={100} />
-                <Tooltip />
-                <Bar dataKey="hours" fill="#ef4444" />
+                <Tooltip
+                  formatter={(value: number, _name, item) => [
+                    `${value} hrs`,
+                    item?.payload?.category ?? ''
+                  ]}
+                />
+                <Bar dataKey="hours" radius={[0, 4, 4, 0]}>
+                  {filteredDowntimeData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.category === 'Client' ? '#3b82f6' : '#ef4444'}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* Legend for category colors */}
+          <div className="flex items-center gap-4 mt-3 text-xs text-slate-500">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" /> Client
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" /> Internal
+            </span>
           </div>
         </div>
 
@@ -333,3 +397,4 @@ export default function OperationDashboard() {
     </div>
   )
 }
+
