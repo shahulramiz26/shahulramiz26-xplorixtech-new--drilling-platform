@@ -59,9 +59,11 @@ export default function SuppliersPage() {
 function AddSupplierModal({ onClose, onSave }: { onClose: () => void; onSave: (s: any) => void }) {
   const { state } = useInventory()
   const [name, setName] = useState('')
-  const [category, setCategory] = useState(state.parts[0].category)
-  const [phone, setPhone] = useState('')
   const categories = Array.from(new Set(state.parts.map(p => p.category)))
+  const [category, setCategory] = useState(categories[0])
+  const [customCategory, setCustomCategory] = useState('')
+  const [phone, setPhone] = useState('')
+  const isOther = category === '__other__'
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
@@ -72,12 +74,19 @@ function AddSupplierModal({ onClose, onSave }: { onClose: () => void; onSave: (s
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div><div style={{ ...S.label, marginBottom: 6 }}>Name *</div><input value={name} onChange={e => setName(e.target.value)} style={inputStyle} /></div>
-          <div><div style={{ ...S.label, marginBottom: 6 }}>Category</div><select value={category} onChange={e => setCategory(e.target.value)} style={selectStyle}>{categories.map(c => <option key={c}>{c}</option>)}</select></div>
+          <div>
+            <div style={{ ...S.label, marginBottom: 6 }}>Category</div>
+            <select value={category} onChange={e => setCategory(e.target.value)} style={selectStyle}>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              <option value="__other__">Other (type your own)</option>
+            </select>
+            {isOther && <input value={customCategory} onChange={e => setCustomCategory(e.target.value)} placeholder="Enter category name" style={{ ...inputStyle, marginTop: 8 }} />}
+          </div>
           <div><div style={{ ...S.label, marginBottom: 6 }}>Phone</div><input value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle} /></div>
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid #1E293B', color: '#94A3B8', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={() => { if (!name.trim()) return; onSave({ name, category, phone, status: 'Active' }); onClose() }} style={{ flex: 2, padding: 12, borderRadius: 10, background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none' }}>Add Supplier</button>
+          <button onClick={() => { if (!name.trim()) return; const finalCategory = isOther ? customCategory.trim() : category; if (!finalCategory) return; onSave({ name, category: finalCategory, phone, status: 'Active' }); onClose() }} style={{ flex: 2, padding: 12, borderRadius: 10, background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none' }}>Add Supplier</button>
         </div>
       </div>
     </div>
