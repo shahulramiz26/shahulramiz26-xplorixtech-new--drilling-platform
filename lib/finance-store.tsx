@@ -4,13 +4,13 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import Link from 'next/link'
 import { poReceivedValue } from './inventory-store'
 import type { PurchaseOrder } from './inventory-store'
-import { operationalRecordsForRig } from './operations-store'
+import { operationalRecordsForRig, operationalRecordsForProjectMonth } from './operations-store'
 import type { OperationalRecord } from './operations-store'
 
 // ── TYPES ──────────────────────────────────────────────────────────────────
-// The only things anyone actually types in, for a given rig+project+month.
-// Everything operational (days, meters, fuel, maintenance) lives in
-// operations-store.tsx and is never edited here.
+// The only things anyone types in, for a given rig+project+month.
+// Everything operational (days, meters, fuel, downtime, maintenance) lives
+// in operations-store.tsx and is never edited here.
 export interface RigRateInputs {
   id: string
   rig: string
@@ -23,8 +23,8 @@ export interface RigRateInputs {
   demobilisation: number   // cost TO YOU of moving the rig out, one-time
 }
 
-// The actual contract — what you bill the client, per project. Nothing
-// invoice-related lives here anymore, just the agreed rate.
+// What you bill the client, per project. This is the only real "contract" —
+// a rig doesn't have one, only a project/client relationship does.
 export interface ClientRate {
   project: string
   client: string
@@ -52,10 +52,14 @@ export const SEED_CLIENT_RATES: Record<string, ClientRate> = {
 export const SEED_RIG_RATES: RigRateInputs[] = [
   { id: 'rr1', rig: 'Rig A1', project: 'Site A - North Field', month: '2026-07', rigDayRate: 9000, labourPerDay: 2300, fuelPricePerLitre: 97, mobilisation: 50000, demobilisation: 0 },
   { id: 'rr2', rig: 'Rig A1', project: 'Site A - North Field', month: '2026-08', rigDayRate: 9000, labourPerDay: 2300, fuelPricePerLitre: 98, mobilisation: 0, demobilisation: 0 },
-  { id: 'rr3', rig: 'Rig B1', project: 'Site B - South Ridge', month: '2026-07', rigDayRate: 8500, labourPerDay: 2300, fuelPricePerLitre: 97, mobilisation: 0, demobilisation: 0 },
-  { id: 'rr4', rig: 'Rig B1', project: 'Site B - South Ridge', month: '2026-08', rigDayRate: 8500, labourPerDay: 2300, fuelPricePerLitre: 98, mobilisation: 0, demobilisation: 0 },
-  { id: 'rr5', rig: 'Rig C1', project: 'Site C - East Basin', month: '2026-07', rigDayRate: 9500, labourPerDay: 2500, fuelPricePerLitre: 97, mobilisation: 60000, demobilisation: 0 },
-  { id: 'rr6', rig: 'Rig C1', project: 'Site C - East Basin', month: '2026-08', rigDayRate: 9500, labourPerDay: 2500, fuelPricePerLitre: 98, mobilisation: 0, demobilisation: 0 },
+  { id: 'rr3', rig: 'Rig A2', project: 'Site A - North Field', month: '2026-07', rigDayRate: 8800, labourPerDay: 2300, fuelPricePerLitre: 97, mobilisation: 0, demobilisation: 0 },
+  { id: 'rr4', rig: 'Rig A2', project: 'Site A - North Field', month: '2026-08', rigDayRate: 8800, labourPerDay: 2300, fuelPricePerLitre: 98, mobilisation: 0, demobilisation: 0 },
+  { id: 'rr5', rig: 'Rig B1', project: 'Site B - South Ridge', month: '2026-07', rigDayRate: 8500, labourPerDay: 2300, fuelPricePerLitre: 97, mobilisation: 0, demobilisation: 0 },
+  { id: 'rr6', rig: 'Rig B1', project: 'Site B - South Ridge', month: '2026-08', rigDayRate: 8500, labourPerDay: 2300, fuelPricePerLitre: 98, mobilisation: 0, demobilisation: 0 },
+  { id: 'rr7', rig: 'Rig C1', project: 'Site C - East Basin', month: '2026-07', rigDayRate: 9500, labourPerDay: 2500, fuelPricePerLitre: 97, mobilisation: 60000, demobilisation: 0 },
+  { id: 'rr8', rig: 'Rig C1', project: 'Site C - East Basin', month: '2026-08', rigDayRate: 9500, labourPerDay: 2500, fuelPricePerLitre: 98, mobilisation: 0, demobilisation: 0 },
+  { id: 'rr9', rig: 'Rig C2', project: 'Site C - East Basin', month: '2026-07', rigDayRate: 9200, labourPerDay: 2400, fuelPricePerLitre: 97, mobilisation: 0, demobilisation: 0 },
+  { id: 'rr10', rig: 'Rig C2', project: 'Site C - East Basin', month: '2026-08', rigDayRate: 9200, labourPerDay: 2400, fuelPricePerLitre: 98, mobilisation: 0, demobilisation: 0 },
 ]
 
 // ── STORE ──────────────────────────────────────────────────────────────────
@@ -66,11 +70,10 @@ const uid = (p: string) => `${p}_${Date.now()}_${Math.floor(Math.random() * 9999
 interface Ctx {
   state: State
   setRigRate: (r: Omit<RigRateInputs, 'id'> & { id?: string }) => void
-  deleteRigRate: (id: string) => void
   setClientRate: (project: string, rate: ClientRate) => void
 }
 const FinanceContext = createContext<Ctx | null>(null)
-const KEY = 'xplorix_demo_finance_v2'
+const KEY = 'xplorix_demo_finance_v3'
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
@@ -83,14 +86,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     if (existing) return { ...s, rigRates: s.rigRates.map(x => x.id === existing.id ? { ...r, id: existing.id } : x) }
     return { ...s, rigRates: [{ ...r, id: uid('rr') }, ...s.rigRates] }
   })
-  const deleteRigRate: Ctx['deleteRigRate'] = id => setState(s => ({ ...s, rigRates: s.rigRates.filter(r => r.id !== id) }))
   const setClientRate: Ctx['setClientRate'] = (project, rate) => setState(s => ({ ...s, clientRates: { ...s.clientRates, [project]: rate } }))
 
-  return <FinanceContext.Provider value={{ state, setRigRate, deleteRigRate, setClientRate }}>{children}</FinanceContext.Provider>
+  return <FinanceContext.Provider value={{ state, setRigRate, setClientRate }}>{children}</FinanceContext.Provider>
 }
 export function useFinance() { const c = useContext(FinanceContext); if (!c) throw new Error('useFinance must be used inside FinanceProvider'); return c }
 
-// ── CALCULATIONS — the one place CPM and margin get computed ──────────────
+// ── CALCULATIONS ─────────────────────────────────────────────────────────
 export interface CostBreakdown { rigCost: number; labour: number; fuel: number; maintenance: number; mobDemob: number; parts: number; total: number; cpm: number }
 export function costBreakdown(ops: OperationalRecord, rates: RigRateInputs, inventoryPOs: PurchaseOrder[]): CostBreakdown {
   const rigCost = rates.rigDayRate * ops.daysOperated
@@ -118,19 +120,46 @@ export function calcClientRevenue(rate: ClientRate, opts: { meters: number; stan
   return drillingDays * rate.drillingDayRate + standbyDays * rate.standbyDayRate + repairDays * rate.repairDayRate
 }
 
-export interface MarginResult { cost: CostBreakdown; revenue: number; clientRatePerMeter: number; marginPerMeter: number; totalMargin: number }
-// Day-rate contracts have no natural "per meter" client rate — every
-// operated day is treated as a drilling day for this comparison, since
-// operational data doesn't currently split days by drilling/standby/repair.
-export function computeMargin(ops: OperationalRecord, rates: RigRateInputs, clientRate: ClientRate, inventoryPOs: PurchaseOrder[]): MarginResult {
-  const cost = costBreakdown(ops, rates, inventoryPOs)
-  const revenue = clientRate.contractType === 'meterage'
-    ? calcClientRevenue(clientRate, { meters: ops.metersDrilled })
-    : calcClientRevenue(clientRate, { meters: ops.metersDrilled, drillingDays: ops.daysOperated })
-  const clientRatePerMeter = ops.metersDrilled > 0 ? revenue / ops.metersDrilled : 0
-  const marginPerMeter = clientRatePerMeter - cost.cpm
-  const totalMargin = revenue - cost.total
-  return { cost, revenue, clientRatePerMeter, marginPerMeter, totalMargin }
+// Project Cost — combines every rig working a project in a given month
+// BEFORE applying the client rate. This matters for meterage contracts:
+// the bands apply to the project's combined output, not each rig's meters
+// priced separately (pricing each rig separately would double up the
+// cheaper Band 1 allowance once per rig, which is wrong).
+// Day-rate contracts don't have this problem — each rig's days can be
+// priced independently and summed, since there's no shared tier to split.
+export interface RigContribution { rig: string; ops: OperationalRecord; cost: CostBreakdown }
+export interface ProjectCostResult {
+  project: string; month: string
+  contributions: RigContribution[]     // rigs that have rates set
+  missingRates: OperationalRecord[]    // rigs operating this month with no rates set yet
+  combinedMeters: number; combinedCost: number; projectCPM: number
+  hasClientRate: boolean; revenue: number; clientRatePerMeter: number
+  marginPerMeter: number; totalMargin: number
+}
+export function projectCostForMonth(project: string, month: string, rigRates: RigRateInputs[], clientRate: ClientRate | undefined, inventoryPOs: PurchaseOrder[]): ProjectCostResult {
+  const records = operationalRecordsForProjectMonth(project, month)
+  const contributions: RigContribution[] = []
+  const missingRates: OperationalRecord[] = []
+  records.forEach(ops => {
+    const rates = rigRates.find(r => r.rig === ops.rig && r.project === project && r.month === month)
+    if (rates) contributions.push({ rig: ops.rig, ops, cost: costBreakdown(ops, rates, inventoryPOs) })
+    else missingRates.push(ops)
+  })
+  const combinedMeters = contributions.reduce((s, c) => s + c.ops.metersDrilled, 0)
+  const combinedCost = contributions.reduce((s, c) => s + c.cost.total, 0)
+  const projectCPM = combinedMeters > 0 ? combinedCost / combinedMeters : 0
+
+  let revenue = 0
+  if (clientRate) {
+    revenue = clientRate.contractType === 'meterage'
+      ? calcClientRevenue(clientRate, { meters: combinedMeters })
+      : contributions.reduce((s, c) => s + calcClientRevenue(clientRate, { meters: 0, drillingDays: c.ops.daysOperated }), 0)
+  }
+  const clientRatePerMeter = combinedMeters > 0 ? revenue / combinedMeters : 0
+  const marginPerMeter = clientRatePerMeter - projectCPM
+  const totalMargin = revenue - combinedCost
+
+  return { project, month, contributions, missingRates, combinedMeters, combinedCost, projectCPM, hasClientRate: !!clientRate, revenue, clientRatePerMeter, marginPerMeter, totalMargin }
 }
 
 // Current project for a rig = whichever project currently lists it in
@@ -160,8 +189,7 @@ export function moneyL(n: number) { return `₹${(n / 100000).toFixed(1)}L` }
 export function FinanceNav({ active }: { active: string }) {
   const tabs = [
     { href: '/admin/finance', label: 'Rig Cost' },
-    { href: '/admin/finance/client-contracts', label: 'Client Contracts' },
-    { href: '/admin/finance/margin', label: 'Margin' },
+    { href: '/admin/finance/project-cost', label: 'Project Cost' },
   ]
   return (
     <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 4, flexWrap: 'wrap' }}>
