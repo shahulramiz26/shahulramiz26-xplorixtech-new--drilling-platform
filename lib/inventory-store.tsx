@@ -43,6 +43,9 @@ export const SUPPLIERS: Supplier[] = [
   { id: 'sup5', name: 'Filtermax Inc',          category: 'Filtration',         phone: '+1 555 0158', status: 'Active' },
 ]
 
+// Deliberately includes rigs with history on more than one project — a rig
+// stays locked to a project while it's open, then moves on to the next one
+// once it closes, so its spend history can span several projects over time.
 export const SEED_POS: PurchaseOrder[] = [
   { id: 'po1', poNumber: 'PO-1001', supplierId: 'sup1', project: 'Site A - North Field', rig: 'Rig A1', orderDate: '2026-07-15', status: 'Received', receivedBy: 'D. Singh', receivedDate: '2026-07-18', onTime: true, quality: 'ok',
     items: [{ partNumber: 'NX-DB-01', name: 'NX Drill Bit', category: 'Drill Bits', manufacturer: 'Apex Drilling Supplies', unit: 'Each', unitCost: 12000, qty: 5, qtyReceived: 5 }] },
@@ -54,6 +57,20 @@ export const SEED_POS: PurchaseOrder[] = [
     items: [{ partNumber: 'CB-RS-01', name: 'Reaming Shell', category: 'Core Barrel', manufacturer: 'Northline Equipment', unit: 'Each', unitCost: 9800, qty: 4, qtyReceived: 4 }] },
   { id: 'po5', poNumber: 'PO-1005', supplierId: 'sup1', project: 'Site B - South Ridge', rig: 'Rig B1', orderDate: '2026-06-28', status: 'Received', receivedBy: 'M. Alvarez', receivedDate: '2026-06-30', onTime: true, quality: 'minor',
     items: [{ partNumber: 'NX-DB-01', name: 'NX Drill Bit', category: 'Drill Bits', manufacturer: 'Apex Drilling Supplies', unit: 'Each', unitCost: 12000, qty: 3, qtyReceived: 3 }] },
+  // Rig A1's earlier project, before it moved to Site A
+  { id: 'po6', poNumber: 'PO-1006', supplierId: 'sup5', project: 'Site B - South Ridge', rig: 'Rig A1', orderDate: '2026-05-12', status: 'Received', receivedBy: 'M. Alvarez', receivedDate: '2026-05-14', onTime: true, quality: 'ok',
+    items: [{ partNumber: 'FT-AF-01', name: 'Air Filter', category: 'Filtration', manufacturer: 'Filtermax Inc', unit: 'Each', unitCost: 2600, qty: 8, qtyReceived: 8 }] },
+  // Rig B1's earlier project, before it moved to Site B
+  { id: 'po7', poNumber: 'PO-1007', supplierId: 'sup4', project: 'Site C - East Basin', rig: 'Rig B1', orderDate: '2026-04-20', status: 'Received', receivedBy: 'R. Alonzo', receivedDate: '2026-04-22', onTime: true, quality: 'ok',
+    items: [{ partNumber: 'HY-HH-01', name: 'Hydraulic Hose 1"', category: 'Hydraulics', manufacturer: 'Ironclad Parts Ltd', unit: 'Each', unitCost: 4200, qty: 5, qtyReceived: 5 }] },
+  // Rig A2's earlier project
+  { id: 'po8', poNumber: 'PO-1008', supplierId: 'sup4', project: 'Site C - East Basin', rig: 'Rig A2', orderDate: '2026-03-18', status: 'Received', receivedBy: 'R. Alonzo', receivedDate: '2026-03-19', onTime: true, quality: 'ok',
+    items: [{ partNumber: 'CN-GR-01', name: 'Grease Cartridge', category: 'Consumables', manufacturer: 'Ironclad Parts Ltd', unit: 'Each', unitCost: 480, qty: 30, qtyReceived: 30 }] },
+  // Rig C1's earlier project
+  { id: 'po9', poNumber: 'PO-1009', supplierId: 'sup3', project: 'Site A - North Field', rig: 'Rig C1', orderDate: '2026-02-10', status: 'Received', receivedBy: 'D. Singh', receivedDate: '2026-02-11', onTime: true, quality: 'ok',
+    items: [{ partNumber: 'FL-PA-01', name: 'Polymer Additive', category: 'Fluids & Chemicals', manufacturer: 'Summit Fluids Co', unit: 'Kg', unitCost: 3100, qty: 20, qtyReceived: 20 }] },
+  { id: 'po10', poNumber: 'PO-1010', supplierId: 'sup2', project: 'Site C - East Basin', rig: 'Rig C2', orderDate: '2026-07-25', status: 'Received', receivedBy: 'R. Alonzo', receivedDate: '2026-07-27', onTime: true, quality: 'ok',
+    items: [{ partNumber: 'CB-CL-01', name: 'Core Lifter', category: 'Core Barrel', manufacturer: 'Northline Equipment', unit: 'Each', unitCost: 550, qty: 25, qtyReceived: 25 }] },
 ]
 
 // ── STORE ──────────────────────────────────────────────────────────────────
@@ -74,7 +91,7 @@ interface Ctx {
   addSupplier: (s: Omit<Supplier, 'id'>) => void
 }
 const InventoryContext = createContext<Ctx | null>(null)
-const KEY = 'xplorix_demo_inventory_v4'
+const KEY = 'xplorix_demo_inventory_v5'
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
@@ -121,7 +138,7 @@ export function supplierPerf(state: State, supplierId: string) {
   return { onTimeRate, qualityScore, stars, spend, poCount }
 }
 
-// Rigs are the primary entity on the dashboard now. A rig's list comes from
+// Rigs are the primary entity on the dashboard. A rig's list comes from
 // whatever project(s) it's currently assigned to (managed elsewhere) — this
 // just collects every rig name that exists, plus any referenced by a PO.
 export function allRigs(state: State): string[] {
@@ -146,13 +163,14 @@ export function rigSpendByProject(state: State, rig: string) {
   return Object.entries(byProject).map(([project, spend]) => ({ project, spend })).sort((a, b) => b.spend - a.spend)
 }
 
-// Which parts get ordered most, and what they cost in total — across every
-// purchase order, regardless of supplier, project, or rig. Grouped by part
-// number (falls back to name if part number wasn't entered).
+// Which parts get ordered most, and what they cost in total. Grouped by
+// part number (falls back to name if part number wasn't entered). Takes a
+// plain list of purchase orders so callers can pass a filtered subset
+// (by project, by rig, by search) rather than always aggregating everything.
 export interface PartOrderStat { key: string; partNumber: string; name: string; category: string; manufacturer: string; unit: string; totalQty: number; totalSpent: number; timesOrdered: number; avgUnitCost: number }
-export function partOrderStats(state: State): PartOrderStat[] {
+export function partOrderStats(pos: PurchaseOrder[]): PartOrderStat[] {
   const map: Record<string, PartOrderStat> = {}
-  state.purchaseOrders.forEach(po => po.items.forEach(it => {
+  pos.forEach(po => po.items.forEach(it => {
     const key = (it.partNumber || it.name).trim().toLowerCase()
     if (!key) return
     if (!map[key]) map[key] = { key, partNumber: it.partNumber, name: it.name, category: it.category, manufacturer: it.manufacturer, unit: it.unit, totalQty: 0, totalSpent: 0, timesOrdered: 0, avgUnitCost: 0 }
