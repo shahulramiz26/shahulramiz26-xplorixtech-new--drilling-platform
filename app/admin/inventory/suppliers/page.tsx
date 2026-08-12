@@ -1,21 +1,37 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, X, Phone, Repeat } from 'lucide-react'
-import { useInventory, supplierPerf, partOrderStats, money, SubNav, S, inputStyle, selectStyle, StarRating, CATEGORIES } from '../../../../lib/inventory-store'
+import { Plus, X, Phone, Repeat, Search } from 'lucide-react'
+import { useInventory, supplierPerf, partOrderStats, allRigs, money, SubNav, S, inputStyle, selectStyle, StarRating, CATEGORIES } from '../../../../lib/inventory-store'
 
 export default function SuppliersPage() {
   const { state, addSupplier } = useInventory()
   const [showAdd, setShowAdd] = useState(false)
   const [sortBy, setSortBy] = useState<'rank' | 'spend'>('rank')
+
+  // Most Ordered Parts filters
+  const [search, setSearch] = useState('')
+  const [filterProject, setFilterProject] = useState('All')
+  const [filterRig, setFilterRig] = useState('All')
   const [partSortBy, setPartSortBy] = useState<'spend' | 'count'>('spend')
 
   const ranked = [...state.suppliers]
     .map(s => ({ s, perf: supplierPerf(state, s.id) }))
     .sort((a, b) => sortBy === 'rank' ? b.perf.stars - a.perf.stars : b.perf.spend - a.perf.spend)
 
-  const parts = partOrderStats(state).sort((a, b) => partSortBy === 'spend' ? b.totalSpent - a.totalSpent : b.timesOrdered - a.timesOrdered)
+  const rigOptions = filterProject === 'All' ? allRigs(state) : (state.projects.find(p => p.name === filterProject)?.rigs || [])
+
+  const filteredPOs = state.purchaseOrders.filter(po =>
+    (filterProject === 'All' || po.project === filterProject) &&
+    (filterRig === 'All' || po.rig === filterRig)
+  )
+  const parts = partOrderStats(filteredPOs)
+    .filter(p => search === '' || p.name.toLowerCase().includes(search.toLowerCase()) || p.partNumber.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => partSortBy === 'spend' ? b.totalSpent - a.totalSpent : b.timesOrdered - a.timesOrdered)
   const maxSpent = Math.max(1, ...parts.map(p => p.totalSpent))
+
+  const clearFilters = () => { setSearch(''); setFilterProject('All'); setFilterRig('All') }
+  const filtersActive = search !== '' || filterProject !== 'All' || filterRig !== 'All'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -55,6 +71,7 @@ export default function SuppliersPage() {
         ))}
       </div>
 
+      {/* Most Ordered Parts — searchable, filterable by project + rig */}
       <div style={{ ...S.card, padding: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -67,9 +84,26 @@ export default function SuppliersPage() {
             ))}
           </div>
         </div>
-        <div style={{ fontSize: 11, color: '#64748B', marginBottom: 16 }}>Every part across every purchase order, ranked by cost and repeat frequency.</div>
+        <div style={{ fontSize: 11, color: '#64748B', marginBottom: 16 }}>Search or filter by project and rig to see exactly what's been ordered and what it cost.</div>
 
-        {parts.length === 0 && <div style={{ fontSize: 12, color: '#64748B' }}>No purchase orders yet.</div>}
+        {/* Filter row */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 18, padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid #1E293B' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
+            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748B' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search part name or number..." style={{ ...inputStyle, padding: '8px 12px 8px 30px' }} />
+          </div>
+          <select value={filterProject} onChange={e => { setFilterProject(e.target.value); setFilterRig('All') }} style={{ ...selectStyle, minWidth: 170 }}>
+            <option value="All">All Projects</option>
+            {state.projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+          </select>
+          <select value={filterRig} onChange={e => setFilterRig(e.target.value)} style={{ ...selectStyle, minWidth: 140 }}>
+            <option value="All">All Rigs</option>
+            {rigOptions.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          {filtersActive && <button onClick={clearFilters} style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#EF4444', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Clear</button>}
+        </div>
+
+        {parts.length === 0 && <div style={{ fontSize: 12, color: '#64748B' }}>No parts match this filter.</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {parts.map(p => (
             <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid #1E293B' }}>
