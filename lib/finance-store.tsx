@@ -162,6 +162,32 @@ export function projectCostForMonth(project: string, month: string, rigRates: Ri
   return { project, month, contributions, missingRates, combinedMeters, combinedCost, projectCPM, hasClientRate: !!clientRate, revenue, clientRatePerMeter, marginPerMeter, totalMargin }
 }
 
+// Line-item breakdown of a project's revenue for a given month — built from
+// the exact same math as projectCostForMonth's revenue figure, so an
+// invoice generated from this can never disagree with what's on screen.
+export interface RevenueLineItem { label: string; qty: string; rate: string; amount: number }
+export function projectRevenueLineItems(result: ProjectCostResult, clientRate: ClientRate): RevenueLineItem[] {
+  const items: RevenueLineItem[] = []
+  const meters = result.combinedMeters
+  if (clientRate.contractType === 'meterage') {
+    const b1 = Math.min(meters, clientRate.band1To)
+    if (b1 > 0) items.push({ label: `Meterage Band 1 (0–${clientRate.band1To}m)`, qty: `${b1}m`, rate: `₹${clientRate.band1Rate}/m`, amount: b1 * clientRate.band1Rate })
+    if (meters > clientRate.band1To) {
+      const b2 = Math.min(meters - clientRate.band1To, clientRate.band2To - clientRate.band1To)
+      if (b2 > 0) items.push({ label: `Meterage Band 2 (${clientRate.band1To}–${clientRate.band2To}m)`, qty: `${b2}m`, rate: `₹${clientRate.band2Rate}/m`, amount: b2 * clientRate.band2Rate })
+    }
+    if (meters > clientRate.band2To) {
+      const b3 = meters - clientRate.band2To
+      if (b3 > 0) items.push({ label: `Meterage Band 3 (beyond ${clientRate.band2To}m)`, qty: `${b3}m`, rate: `₹${clientRate.band3Rate}/m`, amount: b3 * clientRate.band3Rate })
+    }
+  } else {
+    result.contributions.forEach(c => {
+      if (c.ops.daysOperated > 0) items.push({ label: `${c.rig} — Drilling Days`, qty: `${c.ops.daysOperated} days`, rate: `₹${clientRate.drillingDayRate}/day`, amount: c.ops.daysOperated * clientRate.drillingDayRate })
+    })
+  }
+  return items
+}
+
 // Current project for a rig = whichever project currently lists it in
 // project.rigs (managed by the separate project/rig assignment system).
 // Everything else in that rig's history is Completed.
