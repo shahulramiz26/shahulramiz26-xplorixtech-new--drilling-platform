@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useInventory, poReceivedValue, poOrderedValue, allRigs, rigTotalSpend, rigOutstanding, rigSpendByProject, supplierPerf, money, SubNav, S, StarRating, Badge, poStatusColor } from '../../../lib/inventory-store'
+import { useInventory, poReceivedValue, poOrderedValue, allRigs, rigTotalSpend, rigOutstanding, rigSpendByProject, supplierPerf, money, SubNav, S, StarRating } from '../../../lib/inventory-store'
 import { TrendingUp, Wallet, Package, Star, ChevronRight, Drill } from 'lucide-react'
 
 export default function Dashboard() {
@@ -53,14 +53,14 @@ export default function Dashboard() {
           {rigs.map(({ rig, spend, outstanding }) => {
             const isExpanded = expandedRig === rig
             const byProject = rigSpendByProject(state, rig)
-            const pos = state.purchaseOrders.filter(po => po.rig === rig)
+            const poCount = state.purchaseOrders.filter(po => po.rig === rig).length
 
             return (
               <div key={rig} style={{ border: '1px solid #1E293B', borderRadius: 12, overflow: 'hidden' }}>
                 <div onClick={() => setExpandedRig(isExpanded ? null : rig)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', cursor: 'pointer', background: 'rgba(255,255,255,0.02)' }}>
                   <div style={{ minWidth: 130 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#F8FAFC' }}>{rig}</div>
-                    <div style={{ fontSize: 10, color: '#64748B' }}>{pos.length} purchase order{pos.length !== 1 ? 's' : ''}</div>
+                    <div style={{ fontSize: 10, color: '#64748B' }}>{poCount} purchase order{poCount !== 1 ? 's' : ''} · {byProject.length} project{byProject.length !== 1 ? 's' : ''}</div>
                   </div>
                   <div style={{ flex: 1, background: '#1A2234', borderRadius: 5, height: 8, overflow: 'hidden' }}>
                     <div style={{ width: `${(spend / maxRigSpend) * 100}%`, height: 8, background: '#F97316', borderRadius: 5 }} />
@@ -75,33 +75,14 @@ export default function Dashboard() {
                 {isExpanded && (
                   <div style={{ padding: '16px 20px', borderTop: '1px solid #1E293B' }}>
                     <div style={{ ...S.label, marginBottom: 10 }}>Spend by project</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {byProject.map(p => (
                         <div key={p.project} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid #1E293B' }}>
                           <span style={{ fontSize: 12, color: '#94A3B8' }}>{p.project}</span>
                           <span style={{ fontSize: 12, fontWeight: 700, color: '#10B981' }}>{money(p.spend)}</span>
                         </div>
                       ))}
-                    </div>
-
-                    <div style={{ ...S.label, marginBottom: 10 }}>Purchase items</div>
-                    <div style={{ border: '1px solid #1E293B', borderRadius: 10, overflow: 'hidden' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                        <thead><tr style={{ background: 'rgba(255,255,255,0.02)' }}>{['PO', 'Project', 'Part', 'Qty', 'Unit Cost', 'Amount', 'Status'].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, color: '#64748B', fontWeight: 700, borderBottom: '1px solid #1E293B' }}>{h}</th>)}</tr></thead>
-                        <tbody>
-                          {pos.flatMap(po => po.items.map((it, i) => (
-                            <tr key={po.id + i} style={{ borderBottom: '1px solid rgba(30,41,59,0.4)' }}>
-                              <td style={{ padding: '8px 12px', color: '#F97316', fontFamily: 'monospace' }}>{po.poNumber}</td>
-                              <td style={{ padding: '8px 12px', color: '#60A5FA' }}>{po.project}</td>
-                              <td style={{ padding: '8px 12px', fontWeight: 600, color: '#F8FAFC' }}>{it.name}</td>
-                              <td style={{ padding: '8px 12px', color: '#94A3B8' }}>{it.qtyReceived}/{it.qty} {it.unit}</td>
-                              <td style={{ padding: '8px 12px', color: '#94A3B8' }}>{money(it.unitCost)}</td>
-                              <td style={{ padding: '8px 12px', fontWeight: 700, color: '#10B981' }}>{money(it.qtyReceived * it.unitCost)}</td>
-                              <td style={{ padding: '8px 12px' }}><Badge text={po.status} c={poStatusColor[po.status]} /></td>
-                            </tr>
-                          )))}
-                        </tbody>
-                      </table>
+                      {byProject.length === 0 && <div style={{ fontSize: 12, color: '#64748B' }}>Nothing received for this rig yet.</div>}
                     </div>
                   </div>
                 )}
