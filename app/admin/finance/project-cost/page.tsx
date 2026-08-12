@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, TrendingUp, TrendingDown, AlertTriangle, Download } from 'lucide-react'
+import { Check, TrendingUp, TrendingDown, AlertTriangle, FileDown } from 'lucide-react'
 import { useInventory } from '../../../../lib/inventory-store'
-import { useFinance, projectCostForMonth, C, iStyle, money, moneyL, cpmColor, marginColor, FinanceNav, PROJECT_CLIENTS } from '../../../../lib/finance-store'
+import { useFinance, projectCostForMonth, projectRevenueLineItems, C, iStyle, money, moneyL, cpmColor, marginColor, FinanceNav, PROJECT_CLIENTS } from '../../../../lib/finance-store'
 import type { ClientRate } from '../../../../lib/finance-store'
 import { monthsForProject } from '../../../../lib/operations-store'
 
@@ -13,6 +13,8 @@ export default function ProjectCostPage() {
   const [project, setProject] = useState(inv.projects[0].name)
   const months = monthsForProject(project)
   const [month, setMonth] = useState(months[months.length - 1] || '')
+  const [companyName, setCompanyName] = useState('')
+  const [companyAddress, setCompanyAddress] = useState('')
 
   const clientRate = state.clientRates[project]
   const result = month ? projectCostForMonth(project, month, state.rigRates, clientRate, inv.purchaseOrders) : null
@@ -23,50 +25,51 @@ export default function ProjectCostPage() {
     setMonth(m[m.length - 1] || '')
   }
 
-  const downloadSummary = () => {
-    if (!result) return
-    const rows = result.contributions.map(c => `
-      <tr><td>${c.rig}</td><td>${c.ops.metersDrilled}m</td><td>₹${c.cost.total.toLocaleString()}</td><td>₹${Math.round(c.cost.cpm)}/m</td></tr>`).join('')
-    const html = `<!DOCTYPE html><html><head><title>${project} — ${month} cost summary</title>
+  const downloadInvoice = () => {
+    if (!result || !clientRate || !result.hasClientRate) return
+    const lineItems = projectRevenueLineItems(result, clientRate)
+    const rows = lineItems.map(li => `
+      <tr><td>${li.label}</td><td>${li.qty}</td><td>${li.rate}</td><td style="text-align:right">₹${li.amount.toLocaleString()}</td></tr>`).join('')
+    const html = `<!DOCTYPE html><html><head><title>Invoice — ${project} — ${month}</title>
 <style>
 body{font-family:Arial,sans-serif;padding:40px;color:#111;max-width:820px;margin:0 auto}
-h1{font-size:20px;margin-bottom:2px}
-.sub{color:#666;font-size:13px;margin-bottom:24px}
+.header{display:flex;justify-content:space-between;padding-bottom:20px;border-bottom:3px solid #F97316;margin-bottom:24px}
+.title{font-size:26px;font-weight:900;color:#F97316;text-align:right}
+.from{font-size:14px;font-weight:700}
+.sub{font-size:12px;color:#666;margin-top:4px}
 table{width:100%;border-collapse:collapse;margin:16px 0}
 th{background:#111;color:#fff;padding:9px 12px;text-align:left;font-size:11px}
-td{padding:8px 12px;border-bottom:1px solid #eee;font-size:13px}
-tfoot td{font-weight:800;border-top:2px solid #111}
-.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}
-.kpi{border:1px solid #ddd;border-radius:10px;padding:14px}
-.kpi .label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px}
-.kpi .value{font-size:20px;font-weight:800}
-.cpm{color:#c2410c}.rate{color:#2563eb}.margin-pos{color:#059669}.margin-neg{color:#dc2626}
+td{padding:9px 12px;border-bottom:1px solid #eee;font-size:13px}
+.total-row td{font-weight:900;font-size:16px;border-top:2px solid #111;background:#fafafa}
+.note{margin-top:18px;font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;padding:10px 14px;border-radius:8px}
 .footer{margin-top:32px;padding-top:14px;border-top:1px solid #eee;font-size:11px;color:#9CA3AF}
 </style></head><body>
-<h1>Project Cost Summary</h1>
-<div class="sub">${project} · ${month}</div>
-
-<div class="kpis">
-  <div class="kpi"><div class="label">Project CPM (combined)</div><div class="value cpm">₹${Math.round(result.projectCPM)}/m</div><div style="font-size:11px;color:#888;margin-top:4px">${result.combinedMeters}m across ${result.contributions.length} rig(s)</div></div>
-  <div class="kpi"><div class="label">Client Rate</div><div class="value rate">${result.hasClientRate ? `₹${Math.round(result.clientRatePerMeter)}/m` : '—'}</div><div style="font-size:11px;color:#888;margin-top:4px">${result.hasClientRate ? `₹${result.revenue.toLocaleString()} total` : 'No rate set'}</div></div>
-  <div class="kpi"><div class="label">Margin</div><div class="value ${result.marginPerMeter >= 0 ? 'margin-pos' : 'margin-neg'}">${result.hasClientRate ? `${result.marginPerMeter >= 0 ? '+' : ''}₹${Math.round(result.marginPerMeter)}/m` : '—'}</div><div style="font-size:11px;color:#888;margin-top:4px">${result.hasClientRate ? `${result.totalMargin >= 0 ? '+' : ''}₹${result.totalMargin.toLocaleString()} total` : ''}</div></div>
+<div class="header">
+  <div>
+    ${companyName ? `<div class="from">${companyName}</div>` : ''}
+    ${companyAddress ? `<div class="sub">${companyAddress}</div>` : ''}
+  </div>
+  <div>
+    <div class="title">INVOICE</div>
+    <div class="sub" style="text-align:right">Bill To: <strong>${clientRate.client || project}</strong><br>${project}<br>${month}</div>
+  </div>
 </div>
 
 <table>
-<thead><tr><th>Rig</th><th>Meters</th><th>Cost</th><th>Own CPM</th></tr></thead>
+<thead><tr><th>Description</th><th>Quantity</th><th>Rate</th><th style="text-align:right">Amount</th></tr></thead>
 <tbody>${rows}</tbody>
-<tfoot><tr><td>Combined</td><td>${result.combinedMeters}m</td><td>₹${result.combinedCost.toLocaleString()}</td><td>₹${Math.round(result.projectCPM)}/m</td></tr></tfoot>
+<tfoot><tr class="total-row"><td colspan="3">Total (excludes tax)</td><td style="text-align:right">₹${result.revenue.toLocaleString()}</td></tr></tfoot>
 </table>
 
-${result.missingRates.length > 0 ? `<p style="color:#b45309;font-size:12px">Note: ${result.missingRates.map(m => m.rig).join(', ')} operated this month but ${result.missingRates.length > 1 ? 'have' : 'has'} no rates set, so ${result.missingRates.length > 1 ? 'they are' : 'it is'} not included above.</p>` : ''}
+<div class="note">This total excludes GST and any other applicable tax — add tax before treating this as a final tax invoice.</div>
 
-<div class="footer">Internal cost summary — generated from XPLORIX Finance</div>
+<div class="footer">Generated from XPLORIX Finance</div>
 </body></html>`
     const blob = new Blob([html], { type: 'text/html' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${project.replace(/\s+/g, '-')}_${month}_cost-summary.html`
+    a.download = `${project.replace(/\s+/g, '-')}_${month}_invoice-no-tax.html`
     a.click()
   }
 
@@ -108,11 +111,21 @@ ${result.missingRates.length > 0 ? `<p style="color:#b45309;font-size:12px">Note
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button onClick={downloadSummary} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              <Download size={14} /> Download Summary
-            </button>
-          </div>
+          {result.hasClientRate && (
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+              <div style={{ flex: 1, minWidth: 180 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>Company Name (optional, not saved)</div>
+                <input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Your company name" style={iStyle} />
+              </div>
+              <div style={{ flex: 1, minWidth: 180 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>Company Address (optional, not saved)</div>
+                <input value={companyAddress} onChange={e => setCompanyAddress(e.target.value)} placeholder="Optional" style={iStyle} />
+              </div>
+              <button onClick={downloadInvoice} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 10, background: `linear-gradient(135deg,${C.orange},${C.orangeD})`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none', whiteSpace: 'nowrap' }}>
+                <FileDown size={14} /> Invoice (No Tax)
+              </button>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
             <div style={{ padding: '18px 20px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }}>
