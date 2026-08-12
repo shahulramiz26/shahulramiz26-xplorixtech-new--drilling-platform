@@ -121,15 +121,26 @@ export default function RigCostPage() {
                     )}
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', borderBottom: `1px solid ${C.border}` }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', borderBottom: `1px solid ${C.border}` }}>
                     {[
-                      { label: 'Days Operated', value: ops.daysOperated },
-                      { label: 'Meters Drilled', value: `${ops.metersDrilled}m` },
+                      { label: 'Drilling Days', value: ops.drillingDays, color: C.green },
+                      { label: 'Standby Days', value: ops.standbyDays, color: C.amber },
+                      { label: 'Repair Days', value: ops.repairDays, color: C.red },
+                      { label: 'Meters Drilled', value: `${ops.metersDrilled}m`, color: C.muted },
+                    ].map((f, i) => (
+                      <div key={i} style={{ padding: '10px 12px', borderRight: i < 3 ? `1px solid ${C.border}` : 'none' }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{f.label} <span style={{ color: '#334155' }}>· from ops</span></div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: f.color, fontFamily: 'monospace' }}>{f.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', borderBottom: `1px solid ${C.border}` }}>
+                    {[
                       { label: 'Fuel', value: `${ops.fuelLitresPerDay} L/day → ${totalFuelLitres(ops).toLocaleString()} L` },
                       { label: 'Downtime', value: `${ops.downtimeHoursPerDay}h/day → ${totalDowntimeHours(ops).toFixed(0)}h` },
                       { label: 'Maintenance', value: money(ops.maintenanceCost) },
                     ].map((f, i) => (
-                      <div key={i} style={{ padding: '10px 12px', borderRight: i < 4 ? `1px solid ${C.border}` : 'none' }}>
+                      <div key={i} style={{ padding: '10px 12px', borderRight: i < 2 ? `1px solid ${C.border}` : 'none' }}>
                         <div style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{f.label} <span style={{ color: '#334155' }}>· from ops</span></div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, fontFamily: 'monospace' }}>{f.value}</div>
                       </div>
@@ -207,7 +218,9 @@ function RateModal({ ops, existing, onClose, onSave }: { ops: OperationalRecord;
         <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', marginBottom: 18 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: C.blue, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>From operations (read-only)</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, color: C.muted }}>
-            <div>Days operated: <strong style={{ color: C.text }}>{ops.daysOperated}</strong></div>
+            <div>Drilling days: <strong style={{ color: C.text }}>{ops.drillingDays}</strong></div>
+            <div>Standby days: <strong style={{ color: C.text }}>{ops.standbyDays}</strong></div>
+            <div>Repair days: <strong style={{ color: C.text }}>{ops.repairDays}</strong></div>
             <div>Meters drilled: <strong style={{ color: C.text }}>{ops.metersDrilled}m</strong></div>
             <div>Fuel: <strong style={{ color: C.text }}>{ops.fuelLitresPerDay} L/day</strong></div>
             <div>Downtime: <strong style={{ color: C.text }}>{ops.downtimeHoursPerDay}h/day</strong></div>
