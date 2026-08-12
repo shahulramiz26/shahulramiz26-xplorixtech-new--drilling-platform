@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react'
+import { Check, TrendingUp, TrendingDown, AlertTriangle, Download } from 'lucide-react'
 import { useInventory } from '../../../../lib/inventory-store'
 import { useFinance, projectCostForMonth, C, iStyle, money, moneyL, cpmColor, marginColor, FinanceNav, PROJECT_CLIENTS } from '../../../../lib/finance-store'
 import type { ClientRate } from '../../../../lib/finance-store'
@@ -21,6 +21,53 @@ export default function ProjectCostPage() {
     setProject(p)
     const m = monthsForProject(p)
     setMonth(m[m.length - 1] || '')
+  }
+
+  const downloadSummary = () => {
+    if (!result) return
+    const rows = result.contributions.map(c => `
+      <tr><td>${c.rig}</td><td>${c.ops.metersDrilled}m</td><td>₹${c.cost.total.toLocaleString()}</td><td>₹${Math.round(c.cost.cpm)}/m</td></tr>`).join('')
+    const html = `<!DOCTYPE html><html><head><title>${project} — ${month} cost summary</title>
+<style>
+body{font-family:Arial,sans-serif;padding:40px;color:#111;max-width:820px;margin:0 auto}
+h1{font-size:20px;margin-bottom:2px}
+.sub{color:#666;font-size:13px;margin-bottom:24px}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th{background:#111;color:#fff;padding:9px 12px;text-align:left;font-size:11px}
+td{padding:8px 12px;border-bottom:1px solid #eee;font-size:13px}
+tfoot td{font-weight:800;border-top:2px solid #111}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}
+.kpi{border:1px solid #ddd;border-radius:10px;padding:14px}
+.kpi .label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px}
+.kpi .value{font-size:20px;font-weight:800}
+.cpm{color:#c2410c}.rate{color:#2563eb}.margin-pos{color:#059669}.margin-neg{color:#dc2626}
+.footer{margin-top:32px;padding-top:14px;border-top:1px solid #eee;font-size:11px;color:#9CA3AF}
+</style></head><body>
+<h1>Project Cost Summary</h1>
+<div class="sub">${project} · ${month}</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="label">Project CPM (combined)</div><div class="value cpm">₹${Math.round(result.projectCPM)}/m</div><div style="font-size:11px;color:#888;margin-top:4px">${result.combinedMeters}m across ${result.contributions.length} rig(s)</div></div>
+  <div class="kpi"><div class="label">Client Rate</div><div class="value rate">${result.hasClientRate ? `₹${Math.round(result.clientRatePerMeter)}/m` : '—'}</div><div style="font-size:11px;color:#888;margin-top:4px">${result.hasClientRate ? `₹${result.revenue.toLocaleString()} total` : 'No rate set'}</div></div>
+  <div class="kpi"><div class="label">Margin</div><div class="value ${result.marginPerMeter >= 0 ? 'margin-pos' : 'margin-neg'}">${result.hasClientRate ? `${result.marginPerMeter >= 0 ? '+' : ''}₹${Math.round(result.marginPerMeter)}/m` : '—'}</div><div style="font-size:11px;color:#888;margin-top:4px">${result.hasClientRate ? `${result.totalMargin >= 0 ? '+' : ''}₹${result.totalMargin.toLocaleString()} total` : ''}</div></div>
+</div>
+
+<table>
+<thead><tr><th>Rig</th><th>Meters</th><th>Cost</th><th>Own CPM</th></tr></thead>
+<tbody>${rows}</tbody>
+<tfoot><tr><td>Combined</td><td>${result.combinedMeters}m</td><td>₹${result.combinedCost.toLocaleString()}</td><td>₹${Math.round(result.projectCPM)}/m</td></tr></tfoot>
+</table>
+
+${result.missingRates.length > 0 ? `<p style="color:#b45309;font-size:12px">Note: ${result.missingRates.map(m => m.rig).join(', ')} operated this month but ${result.missingRates.length > 1 ? 'have' : 'has'} no rates set, so ${result.missingRates.length > 1 ? 'they are' : 'it is'} not included above.</p>` : ''}
+
+<div class="footer">Internal cost summary — generated from XPLORIX Finance</div>
+</body></html>`
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${project.replace(/\s+/g, '-')}_${month}_cost-summary.html`
+    a.click()
   }
 
   return (
@@ -61,7 +108,12 @@ export default function ProjectCostPage() {
         </div>
       ) : (
         <>
-          {/* Combined comparison — the headline */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={downloadSummary} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              <Download size={14} /> Download Summary
+            </button>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
             <div style={{ padding: '18px 20px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Project CPM (combined)</div>
@@ -90,7 +142,6 @@ export default function ProjectCostPage() {
             </div>
           )}
 
-          {/* Rig contribution breakdown */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
             <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 700, color: C.text }}>Rig Contributions</div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -118,7 +169,6 @@ export default function ProjectCostPage() {
         </>
       )}
 
-      {/* Client rate editor — the only place a real contract lives */}
       {clientRate ? <RateEditor rate={clientRate} onSave={r => setClientRate(project, r)} /> : (
         <div style={{ padding: 40, textAlign: 'center', background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, color: C.faint }}>
           No billing rate set for {project} yet.
@@ -184,4 +234,3 @@ function RateEditor({ rate, onSave }: { rate: ClientRate; onSave: (r: ClientRate
     </div>
   )
 }
-
