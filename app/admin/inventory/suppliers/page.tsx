@@ -1,17 +1,21 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, X, Phone } from 'lucide-react'
-import { useInventory, supplierPerf, money, SubNav, S, inputStyle, selectStyle, StarRating } from '../../../../lib/inventory-store'
+import { Plus, X, Phone, Repeat } from 'lucide-react'
+import { useInventory, supplierPerf, partOrderStats, money, SubNav, S, inputStyle, selectStyle, StarRating, CATEGORIES } from '../../../../lib/inventory-store'
 
 export default function SuppliersPage() {
   const { state, addSupplier } = useInventory()
   const [showAdd, setShowAdd] = useState(false)
   const [sortBy, setSortBy] = useState<'rank' | 'spend'>('rank')
+  const [partSortBy, setPartSortBy] = useState<'spend' | 'count'>('spend')
 
   const ranked = [...state.suppliers]
     .map(s => ({ s, perf: supplierPerf(state, s.id) }))
     .sort((a, b) => sortBy === 'rank' ? b.perf.stars - a.perf.stars : b.perf.spend - a.perf.spend)
+
+  const parts = partOrderStats(state).sort((a, b) => partSortBy === 'spend' ? b.totalSpent - a.totalSpent : b.timesOrdered - a.timesOrdered)
+  const maxSpent = Math.max(1, ...parts.map(p => p.totalSpent))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -51,16 +55,49 @@ export default function SuppliersPage() {
         ))}
       </div>
 
+      <div style={{ ...S.card, padding: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Repeat size={15} style={{ color: '#F97316' }} />
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#F8FAFC' }}>Most Ordered Parts</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {(['spend', 'count'] as const).map(k => (
+              <button key={k} onClick={() => setPartSortBy(k)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: partSortBy === k ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${partSortBy === k ? 'rgba(249,115,22,0.3)' : '#1E293B'}`, color: partSortBy === k ? '#F97316' : '#64748B' }}>{k === 'spend' ? 'By Total Spend' : 'By Times Ordered'}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: '#64748B', marginBottom: 16 }}>Every part across every purchase order, ranked by cost and repeat frequency.</div>
+
+        {parts.length === 0 && <div style={{ fontSize: 12, color: '#64748B' }}>No purchase orders yet.</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {parts.map(p => (
+            <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid #1E293B' }}>
+              <div style={{ minWidth: 200 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#F8FAFC' }}>{p.name}</div>
+                <div style={{ fontSize: 10, color: '#64748B', fontFamily: 'monospace' }}>{p.partNumber || '—'} · {p.category || 'Uncategorized'}</div>
+              </div>
+              <div style={{ flex: 1, background: '#1A2234', borderRadius: 5, height: 8, overflow: 'hidden' }}>
+                <div style={{ width: `${(p.totalSpent / maxSpent) * 100}%`, height: 8, background: '#F97316', borderRadius: 5 }} />
+              </div>
+              <div style={{ display: 'flex', gap: 18, flexShrink: 0 }}>
+                <div style={{ textAlign: 'right' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#10B981' }}>{money(p.totalSpent)}</div><div style={{ fontSize: 9, color: '#64748B', fontWeight: 700 }}>TOTAL SPENT</div></div>
+                <div style={{ textAlign: 'right' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#60A5FA' }}>{p.totalQty} {p.unit}</div><div style={{ fontSize: 9, color: '#64748B', fontWeight: 700 }}>TOTAL QTY</div></div>
+                <div style={{ textAlign: 'right' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#F59E0B' }}>{p.timesOrdered}×</div><div style={{ fontSize: 9, color: '#64748B', fontWeight: 700 }}>ORDERED</div></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {showAdd && <AddSupplierModal onClose={() => setShowAdd(false)} onSave={addSupplier} />}
     </div>
   )
 }
 
 function AddSupplierModal({ onClose, onSave }: { onClose: () => void; onSave: (s: any) => void }) {
-  const { state } = useInventory()
   const [name, setName] = useState('')
-  const categories = Array.from(new Set(state.parts.map(p => p.category)))
-  const [category, setCategory] = useState(categories[0])
+  const [category, setCategory] = useState(CATEGORIES[0])
   const [customCategory, setCustomCategory] = useState('')
   const [phone, setPhone] = useState('')
   const isOther = category === '__other__'
@@ -77,7 +114,7 @@ function AddSupplierModal({ onClose, onSave }: { onClose: () => void; onSave: (s
           <div>
             <div style={{ ...S.label, marginBottom: 6 }}>Category</div>
             <select value={category} onChange={e => setCategory(e.target.value)} style={selectStyle}>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               <option value="__other__">Other (type your own)</option>
             </select>
             {isOther && <input value={customCategory} onChange={e => setCustomCategory(e.target.value)} placeholder="Enter category name" style={{ ...inputStyle, marginTop: 8 }} />}
