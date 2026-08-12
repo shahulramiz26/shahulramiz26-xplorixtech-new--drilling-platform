@@ -15,6 +15,11 @@ export default function Dashboard() {
   const rigs = allRigs(state).map(rig => ({ rig, spend: rigTotalSpend(state, rig), outstanding: rigOutstanding(state, rig) })).sort((a, b) => b.spend - a.spend)
   const maxRigSpend = Math.max(1, ...rigs.map(r => r.spend))
 
+  // Whichever project currently lists this rig in its rigs[] is the one
+  // it's actively working — everything else in its spend history is a
+  // completed project, not a second job it's somehow doing at the same time.
+  const currentProjectForRig = (rig: string): string | null => state.projects.find(p => p.rigs.includes(rig))?.name || null
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
@@ -54,6 +59,7 @@ export default function Dashboard() {
             const isExpanded = expandedRig === rig
             const byProject = rigSpendByProject(state, rig)
             const poCount = state.purchaseOrders.filter(po => po.rig === rig).length
+            const currentProject = currentProjectForRig(rig)
 
             return (
               <div key={rig} style={{ border: '1px solid #1E293B', borderRadius: 12, overflow: 'hidden' }}>
@@ -76,12 +82,20 @@ export default function Dashboard() {
                   <div style={{ padding: '16px 20px', borderTop: '1px solid #1E293B' }}>
                     <div style={{ ...S.label, marginBottom: 10 }}>Spend by project</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {byProject.map(p => (
-                        <div key={p.project} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid #1E293B' }}>
-                          <span style={{ fontSize: 12, color: '#94A3B8' }}>{p.project}</span>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#10B981' }}>{money(p.spend)}</span>
-                        </div>
-                      ))}
+                      {byProject.map(p => {
+                        const isCurrent = p.project === currentProject
+                        return (
+                          <div key={p.project} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: `1px solid ${isCurrent ? 'rgba(16,185,129,0.25)' : '#1E293B'}` }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span style={{ fontSize: 12, color: isCurrent ? '#F8FAFC' : '#94A3B8' }}>{p.project}</span>
+                              <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 20, color: isCurrent ? '#10B981' : '#64748B', background: isCurrent ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isCurrent ? 'rgba(16,185,129,0.25)' : '#1E293B'}` }}>
+                                {isCurrent ? '● Current' : 'Completed'}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#10B981' }}>{money(p.spend)}</span>
+                          </div>
+                        )
+                      })}
                       {byProject.length === 0 && <div style={{ fontSize: 12, color: '#64748B' }}>Nothing received for this rig yet.</div>}
                     </div>
                   </div>
@@ -110,4 +124,3 @@ export default function Dashboard() {
     </div>
   )
 }
-
