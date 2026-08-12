@@ -158,23 +158,29 @@ td{padding:9px 12px;border-bottom:1px solid #eee;font-size:13px}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
             <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 700, color: C.text }}>Rig Contributions</div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead><tr style={{ background: 'rgba(255,255,255,0.02)' }}>{['Rig', 'Meters', 'Cost', 'Own CPM'].map(h => <th key={h} style={{ padding: '9px 20px', textAlign: 'left', fontSize: 10, color: C.faint, fontWeight: 700, borderBottom: `1px solid ${C.border}` }}>{h}</th>)}</tr></thead>
+              <thead><tr style={{ background: 'rgba(255,255,255,0.02)' }}>{['Rig', 'Drilling Days', 'Standby Days', 'Repair Days', 'Meters', 'Cost', 'Own CPM'].map(h => <th key={h} style={{ padding: '9px 16px', textAlign: 'left', fontSize: 10, color: C.faint, fontWeight: 700, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>)}</tr></thead>
               <tbody>
                 {result.contributions.map(c => (
                   <tr key={c.rig} style={{ borderBottom: `1px solid rgba(30,41,59,0.4)` }}>
-                    <td style={{ padding: '10px 20px', fontWeight: 700, color: C.text }}>{c.rig}</td>
-                    <td style={{ padding: '10px 20px', color: C.muted }}>{c.ops.metersDrilled}m</td>
-                    <td style={{ padding: '10px 20px', color: C.red, fontFamily: 'monospace' }}>{money(c.cost.total)}</td>
-                    <td style={{ padding: '10px 20px', color: cpmColor(c.cost.cpm), fontFamily: 'monospace' }}>₹{Math.round(c.cost.cpm)}/m</td>
+                    <td style={{ padding: '10px 16px', fontWeight: 700, color: C.text }}>{c.rig}</td>
+                    <td style={{ padding: '10px 16px', color: C.green, fontFamily: 'monospace' }}>{c.ops.drillingDays}</td>
+                    <td style={{ padding: '10px 16px', color: C.amber, fontFamily: 'monospace' }}>{c.ops.standbyDays}</td>
+                    <td style={{ padding: '10px 16px', color: C.red, fontFamily: 'monospace' }}>{c.ops.repairDays}</td>
+                    <td style={{ padding: '10px 16px', color: C.muted }}>{c.ops.metersDrilled}m</td>
+                    <td style={{ padding: '10px 16px', color: C.red, fontFamily: 'monospace' }}>{money(c.cost.total)}</td>
+                    <td style={{ padding: '10px 16px', color: cpmColor(c.cost.cpm), fontFamily: 'monospace' }}>₹{Math.round(c.cost.cpm)}/m</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                  <td style={{ padding: '10px 20px', fontWeight: 800, color: C.text }}>Combined</td>
-                  <td style={{ padding: '10px 20px', fontWeight: 800, color: C.text }}>{result.combinedMeters}m</td>
-                  <td style={{ padding: '10px 20px', fontWeight: 800, color: C.red, fontFamily: 'monospace' }}>{money(result.combinedCost)}</td>
-                  <td style={{ padding: '10px 20px', fontWeight: 800, color: cpmColor(result.projectCPM), fontFamily: 'monospace' }}>₹{Math.round(result.projectCPM)}/m</td>
+                  <td style={{ padding: '10px 16px', fontWeight: 800, color: C.text }}>Combined</td>
+                  <td style={{ padding: '10px 16px', fontWeight: 800, color: C.green, fontFamily: 'monospace' }}>{result.contributions.reduce((s, c) => s + c.ops.drillingDays, 0)}</td>
+                  <td style={{ padding: '10px 16px', fontWeight: 800, color: C.amber, fontFamily: 'monospace' }}>{result.contributions.reduce((s, c) => s + c.ops.standbyDays, 0)}</td>
+                  <td style={{ padding: '10px 16px', fontWeight: 800, color: C.red, fontFamily: 'monospace' }}>{result.contributions.reduce((s, c) => s + c.ops.repairDays, 0)}</td>
+                  <td style={{ padding: '10px 16px', fontWeight: 800, color: C.text }}>{result.combinedMeters}m</td>
+                  <td style={{ padding: '10px 16px', fontWeight: 800, color: C.red, fontFamily: 'monospace' }}>{money(result.combinedCost)}</td>
+                  <td style={{ padding: '10px 16px', fontWeight: 800, color: cpmColor(result.projectCPM), fontFamily: 'monospace' }}>₹{Math.round(result.projectCPM)}/m</td>
                 </tr>
               </tfoot>
             </table>
