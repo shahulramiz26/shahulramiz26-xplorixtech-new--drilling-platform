@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import Link from 'next/link'
 import { poReceivedValue } from './inventory-store'
 import type { PurchaseOrder } from './inventory-store'
-import { operationalRecordsForRig, operationalRecordsForProjectMonth } from './operations-store'
+import { operationalRecordsForRig, operationalRecordsForProjectMonth, totalDaysOperated } from './operations-store'
 import type { OperationalRecord } from './operations-store'
 
 // ── TYPES ──────────────────────────────────────────────────────────────────
@@ -95,9 +95,10 @@ export function useFinance() { const c = useContext(FinanceContext); if (!c) thr
 // ── CALCULATIONS ─────────────────────────────────────────────────────────
 export interface CostBreakdown { rigCost: number; labour: number; fuel: number; maintenance: number; mobDemob: number; parts: number; total: number; cpm: number }
 export function costBreakdown(ops: OperationalRecord, rates: RigRateInputs, inventoryPOs: PurchaseOrder[]): CostBreakdown {
-  const rigCost = rates.rigDayRate * ops.daysOperated
-  const labour = rates.labourPerDay * ops.daysOperated
-  const fuel = ops.fuelLitresPerDay * ops.daysOperated * rates.fuelPricePerLitre
+  const days = totalDaysOperated(ops)
+  const rigCost = rates.rigDayRate * days
+  const labour = rates.labourPerDay * days
+  const fuel = ops.fuelLitresPerDay * days * rates.fuelPricePerLitre
   const maintenance = ops.maintenanceCost
   const mobDemob = rates.mobilisation + rates.demobilisation
   const parts = inventoryPOs.filter(po => po.rig === ops.rig && po.project === ops.project).reduce((s, po) => s + poReceivedValue(po), 0)
@@ -153,7 +154,7 @@ export function projectCostForMonth(project: string, month: string, rigRates: Ri
   if (clientRate) {
     revenue = clientRate.contractType === 'meterage'
       ? calcClientRevenue(clientRate, { meters: combinedMeters })
-      : contributions.reduce((s, c) => s + calcClientRevenue(clientRate, { meters: 0, drillingDays: c.ops.daysOperated }), 0)
+      : contributions.reduce((s, c) => s + calcClientRevenue(clientRate, { meters: 0, drillingDays: c.ops.drillingDays, standbyDays: c.ops.standbyDays, repairDays: c.ops.repairDays }), 0)
   }
   const clientRatePerMeter = combinedMeters > 0 ? revenue / combinedMeters : 0
   const marginPerMeter = clientRatePerMeter - projectCPM
@@ -182,7 +183,9 @@ export function projectRevenueLineItems(result: ProjectCostResult, clientRate: C
     }
   } else {
     result.contributions.forEach(c => {
-      if (c.ops.daysOperated > 0) items.push({ label: `${c.rig} — Drilling Days`, qty: `${c.ops.daysOperated} days`, rate: `₹${clientRate.drillingDayRate}/day`, amount: c.ops.daysOperated * clientRate.drillingDayRate })
+      if (c.ops.drillingDays > 0) items.push({ label: `${c.rig} — Drilling Days`, qty: `${c.ops.drillingDays} days`, rate: `₹${clientRate.drillingDayRate}/day`, amount: c.ops.drillingDays * clientRate.drillingDayRate })
+      if (c.ops.standbyDays > 0) items.push({ label: `${c.rig} — Standby Days`, qty: `${c.ops.standbyDays} days`, rate: `₹${clientRate.standbyDayRate}/day`, amount: c.ops.standbyDays * clientRate.standbyDayRate })
+      if (c.ops.repairDays > 0) items.push({ label: `${c.rig} — Repair Days`, qty: `${c.ops.repairDays} days`, rate: `₹${clientRate.repairDayRate}/day`, amount: c.ops.repairDays * clientRate.repairDayRate })
     })
   }
   return items
