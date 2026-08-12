@@ -4,11 +4,11 @@ import { useState } from 'react'
 import { Plus, X, Edit2, Package } from 'lucide-react'
 import { useInventory } from '../../../lib/inventory-store'
 import {
-  useFinance, costBreakdown, computeMargin, currentProjectForRig, operationalRecordsForRig,
+  useFinance, costBreakdown, projectCostForMonth, currentProjectForRig, operationalRecordsForRig,
   C, iStyle, money, moneyL, cpmColor, cpmLabel, marginColor, FinanceNav,
 } from '../../../lib/finance-store'
 import type { RigRateInputs, OperationalRecord } from '../../../lib/finance-store'
-import { allRigsWithOperationalData } from '../../../lib/operations-store'
+import { allRigsWithOperationalData, allProjectMonths, totalFuelLitres, totalDowntimeHours } from '../../../lib/operations-store'
 
 export default function RigCostPage() {
   const { state: inv } = useInventory()
@@ -17,17 +17,16 @@ export default function RigCostPage() {
   const [selectedRig, setSelectedRig] = useState(rigs[0] || '')
   const [rateModalFor, setRateModalFor] = useState<{ ops: OperationalRecord; existing?: RigRateInputs } | null>(null)
 
-  // Overall KPIs — every period where we have ops + rates + a client rate.
-  const allPeriods = rigs.flatMap(rig => operationalRecordsForRig(rig).map(ops => {
-    const rates = state.rigRates.find(r => r.rig === ops.rig && r.project === ops.project && r.month === ops.month)
-    const clientRate = state.clientRates[ops.project]
-    if (!rates || !clientRate) return null
-    return computeMargin(ops, rates, clientRate, inv.purchaseOrders)
-  }).filter(Boolean) as ReturnType<typeof computeMargin>[])
-
-  const totalMargin = allPeriods.reduce((s, p) => s + p.totalMargin, 0)
-  const avgCPM = allPeriods.length > 0 ? Math.round(allPeriods.reduce((s, p) => s + p.cost.cpm, 0) / allPeriods.length) : 0
-  const totalParts = allPeriods.reduce((s, p) => s + p.cost.parts, 0)
+  // Overall KPIs use the corrected project-combined calculation — summing
+  // each rig's own margin separately would repeat the same bug we fixed:
+  // double-counting the cheap first meterage band once per rig.
+  const projectMonths = allProjectMonths()
+  const results = projectMonths.map(({ project, month }) => projectCostForMonth(project, month, state.rigRates, state.clientRates[project], inv.purchaseOrders))
+  const pricedResults = results.filter(r => r.contributions.length > 0)
+  const totalMargin = pricedResults.filter(r => r.hasClientRate).reduce((s, r) => s + r.totalMargin, 0)
+  const totalParts = pricedResults.reduce((s, r) => s + r.contributions.reduce((cs, c) => cs + c.cost.parts, 0), 0)
+  const allRigCPMs = pricedResults.flatMap(r => r.contributions.map(c => c.cost.cpm))
+  const avgCPM = allRigCPMs.length > 0 ? Math.round(allRigCPMs.reduce((s, v) => s + v, 0) / allRigCPMs.length) : 0
 
   const records = operationalRecordsForRig(selectedRig)
   const currentProject = currentProjectForRig(inv.projects, selectedRig)
@@ -51,10 +50,10 @@ export default function RigCostPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
         {[
-          { label: 'Average CPM', value: `₹${avgCPM}/m`, color: cpmColor(avgCPM), note: cpmLabel(avgCPM) },
-          { label: 'Overall Margin', value: `${totalMargin >= 0 ? '+' : ''}${moneyL(Math.abs(totalMargin))}`, color: marginColor(totalMargin), note: totalMargin >= 0 ? 'Profitable' : 'Loss' },
+          { label: 'Average CPM (per rig)', value: `₹${avgCPM}/m`, color: cpmColor(avgCPM), note: cpmLabel(avgCPM) },
+          { label: 'Overall Margin', value: `${totalMargin >= 0 ? '+' : ''}${moneyL(Math.abs(totalMargin))}`, color: marginColor(totalMargin), note: 'Project-combined, see Project Cost' },
           { label: 'Parts & Consumables', value: moneyL(totalParts), color: C.blue, note: 'Live from Inventory' },
-          { label: 'Periods Priced', value: `${allPeriods.length}`, color: C.purple, note: 'Rig × project × month' },
+          { label: 'Rigs Tracked', value: `${rigs.length}`, color: C.purple, note: 'With operational data' },
         ].map((k, i) => (
           <div key={i} style={{ padding: '16px 18px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>{k.label}</div>
@@ -122,32 +121,34 @@ export default function RigCostPage() {
                     )}
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', borderBottom: `1px solid ${C.border}` }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', borderBottom: `1px solid ${C.border}` }}>
                     {[
                       { label: 'Days Operated', value: ops.daysOperated },
                       { label: 'Meters Drilled', value: `${ops.metersDrilled}m` },
-                      { label: 'Fuel (L/day)', value: ops.fuelLitresPerDay },
+                      { label: 'Fuel', value: `${ops.fuelLitresPerDay} L/day → ${totalFuelLitres(ops).toLocaleString()} L` },
+                      { label: 'Downtime', value: `${ops.downtimeHoursPerDay}h/day → ${totalDowntimeHours(ops).toFixed(0)}h` },
                       { label: 'Maintenance', value: money(ops.maintenanceCost) },
                     ].map((f, i) => (
-                      <div key={i} style={{ padding: '10px 14px', borderRight: i < 3 ? `1px solid ${C.border}` : 'none' }}>
+                      <div key={i} style={{ padding: '10px 12px', borderRight: i < 4 ? `1px solid ${C.border}` : 'none' }}>
                         <div style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{f.label} <span style={{ color: '#334155' }}>· from ops</span></div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, fontFamily: 'monospace' }}>{f.value}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, fontFamily: 'monospace' }}>{f.value}</div>
                       </div>
                     ))}
                   </div>
 
                   {cost && (
                     <>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)' }}>
                         {[
                           { label: 'Rig Cost', value: cost.rigCost, color: C.orange },
                           { label: 'Labour', value: cost.labour, color: C.blue },
                           { label: 'Fuel', value: cost.fuel, color: C.amber },
+                          { label: 'Maintenance', value: cost.maintenance, color: C.purple },
                           { label: 'Mob + Demob', value: cost.mobDemob, color: C.muted },
                           { label: 'Parts (Inventory)', value: cost.parts, color: C.green },
                         ].map((c, i) => (
-                          <div key={i} style={{ padding: '10px 12px', borderRight: i < 4 ? `1px solid ${C.border}` : 'none', textAlign: 'center' }}>
-                            <div style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{c.label}</div>
+                          <div key={i} style={{ padding: '10px 10px', borderRight: i < 5 ? `1px solid ${C.border}` : 'none', textAlign: 'center' }}>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{c.label}</div>
                             <div style={{ fontSize: 12, fontWeight: 800, color: c.color, fontFamily: 'monospace' }}>{money(c.value)}</div>
                           </div>
                         ))}
@@ -196,7 +197,7 @@ function RateModal({ ops, existing, onClose, onSave }: { ops: OperationalRecord;
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, padding: 28, width: 520 }}>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, padding: 28, width: 540 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
           <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{existing ? 'Edit' : 'Set'} Rates</div>
           <button onClick={onClose} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer' }}><X size={16} /></button>
@@ -209,6 +210,7 @@ function RateModal({ ops, existing, onClose, onSave }: { ops: OperationalRecord;
             <div>Days operated: <strong style={{ color: C.text }}>{ops.daysOperated}</strong></div>
             <div>Meters drilled: <strong style={{ color: C.text }}>{ops.metersDrilled}m</strong></div>
             <div>Fuel: <strong style={{ color: C.text }}>{ops.fuelLitresPerDay} L/day</strong></div>
+            <div>Downtime: <strong style={{ color: C.text }}>{ops.downtimeHoursPerDay}h/day</strong></div>
             <div>Maintenance: <strong style={{ color: C.text }}>{money(ops.maintenanceCost)}</strong></div>
           </div>
         </div>
