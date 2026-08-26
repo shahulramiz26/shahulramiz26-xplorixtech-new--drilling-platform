@@ -15,10 +15,25 @@ export interface LineItem { partNumber: string; name: string; category: string; 
 
 export type POStatus = 'Draft' | 'Ordered' | 'Received'
 export interface POItem extends LineItem { qtyReceived: number }
+
+// ── ISSUE TRACKING ─────────────────────────────────────────────────────────
+// A PO is a commitment to buy. Receiving puts stock in the store. Neither is
+// a cost. The cost happens when stock is ISSUED to a rig — which is often a
+// different month, and often in more than one go. That's why issues are a
+// list of dated events rather than a flag on the line item.
+export interface IssueLine { itemIndex: number; qty: number }
+export interface IssueRecord {
+  id: string
+  date: string          // YYYY-MM-DD — the date the cost belongs to
+  issuedBy: string
+  lines: IssueLine[]
+}
+
 export interface PurchaseOrder {
   id: string; poNumber: string; supplierId: string; project: string; rig: string
   orderDate: string; status: POStatus; items: POItem[]
   receivedBy?: string; receivedDate?: string; onTime?: boolean; quality?: 'ok' | 'minor' | 'rejected'
+  issues?: IssueRecord[]   // optional — POs created before this feature still work
 }
 
 export type SupplierStatus = 'Active' | 'Inactive'
@@ -46,29 +61,51 @@ export const SUPPLIERS: Supplier[] = [
 // Deliberately includes rigs with history on more than one project — a rig
 // stays locked to a project while it's open, then moves on to the next one
 // once it closes, so its spend history can span several projects over time.
+//
+// Issue records are seeded on some POs to show the three states a received
+// order can be in: fully issued, partly issued, and still sitting in store.
 export const SEED_POS: PurchaseOrder[] = [
+  // Partly issued — 3 of 5 bits went out, 2 still in store
   { id: 'po1', poNumber: 'PO-1001', supplierId: 'sup1', project: 'Site A - North Field', rig: 'Rig A1', orderDate: '2026-07-15', status: 'Received', receivedBy: 'D. Singh', receivedDate: '2026-07-18', onTime: true, quality: 'ok',
-    items: [{ partNumber: 'NX-DB-01', name: 'NX Drill Bit', category: 'Drill Bits', manufacturer: 'Apex Drilling Supplies', unit: 'Each', unitCost: 12000, qty: 5, qtyReceived: 5 }] },
+    items: [{ partNumber: 'NX-DB-01', name: 'NX Drill Bit', category: 'Drill Bits', manufacturer: 'Apex Drilling Supplies', unit: 'Each', unitCost: 12000, qty: 5, qtyReceived: 5 }],
+    issues: [{ id: 'iss1', date: '2026-07-21', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 3 }] }] },
   { id: 'po2', poNumber: 'PO-1002', supplierId: 'sup3', project: 'Site B - South Ridge', rig: 'Rig B1', orderDate: '2026-07-20', status: 'Ordered',
     items: [{ partNumber: 'FL-MM-01', name: 'Drilling Mud Mix', category: 'Fluids & Chemicals', manufacturer: 'Summit Fluids Co', unit: 'Bucket', unitCost: 8200, qty: 10, qtyReceived: 0 }] },
   { id: 'po3', poNumber: 'PO-1003', supplierId: 'sup5', project: 'Site C - East Basin', rig: 'Rig C1', orderDate: '2026-07-22', status: 'Draft',
     items: [{ partNumber: 'FT-FW-01', name: 'Fuel Water Separator', category: 'Filtration', manufacturer: 'Filtermax Inc', unit: 'Each', unitCost: 1950, qty: 12, qtyReceived: 0 }] },
+  // Fully issued, same month as receipt
   { id: 'po4', poNumber: 'PO-1004', supplierId: 'sup2', project: 'Site A - North Field', rig: 'Rig A2', orderDate: '2026-07-10', status: 'Received', receivedBy: 'D. Singh', receivedDate: '2026-07-12', onTime: false, quality: 'ok',
-    items: [{ partNumber: 'CB-RS-01', name: 'Reaming Shell', category: 'Core Barrel', manufacturer: 'Northline Equipment', unit: 'Each', unitCost: 9800, qty: 4, qtyReceived: 4 }] },
+    items: [{ partNumber: 'CB-RS-01', name: 'Reaming Shell', category: 'Core Barrel', manufacturer: 'Northline Equipment', unit: 'Each', unitCost: 9800, qty: 4, qtyReceived: 4 }],
+    issues: [{ id: 'iss2', date: '2026-07-13', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 4 }] }] },
+  // Received in June, issued across June and July — the exact case that makes
+  // "cost = PO value in the month it was raised" wrong
   { id: 'po5', poNumber: 'PO-1005', supplierId: 'sup1', project: 'Site B - South Ridge', rig: 'Rig B1', orderDate: '2026-06-28', status: 'Received', receivedBy: 'M. Alvarez', receivedDate: '2026-06-30', onTime: true, quality: 'minor',
-    items: [{ partNumber: 'NX-DB-01', name: 'NX Drill Bit', category: 'Drill Bits', manufacturer: 'Apex Drilling Supplies', unit: 'Each', unitCost: 12000, qty: 3, qtyReceived: 3 }] },
+    items: [{ partNumber: 'NX-DB-01', name: 'NX Drill Bit', category: 'Drill Bits', manufacturer: 'Apex Drilling Supplies', unit: 'Each', unitCost: 12000, qty: 3, qtyReceived: 3 }],
+    issues: [
+      { id: 'iss3', date: '2026-06-30', issuedBy: 'M. Alvarez', lines: [{ itemIndex: 0, qty: 1 }] },
+      { id: 'iss4', date: '2026-07-08', issuedBy: 'M. Alvarez', lines: [{ itemIndex: 0, qty: 2 }] },
+    ] },
   // Rig A1's earlier project, before it moved to Site A
   { id: 'po6', poNumber: 'PO-1006', supplierId: 'sup5', project: 'Site B - South Ridge', rig: 'Rig A1', orderDate: '2026-05-12', status: 'Received', receivedBy: 'M. Alvarez', receivedDate: '2026-05-14', onTime: true, quality: 'ok',
-    items: [{ partNumber: 'FT-AF-01', name: 'Air Filter', category: 'Filtration', manufacturer: 'Filtermax Inc', unit: 'Each', unitCost: 2600, qty: 8, qtyReceived: 8 }] },
+    items: [{ partNumber: 'FT-AF-01', name: 'Air Filter', category: 'Filtration', manufacturer: 'Filtermax Inc', unit: 'Each', unitCost: 2600, qty: 8, qtyReceived: 8 }],
+    issues: [{ id: 'iss5', date: '2026-05-15', issuedBy: 'M. Alvarez', lines: [{ itemIndex: 0, qty: 8 }] }] },
   // Rig B1's earlier project, before it moved to Site B
   { id: 'po7', poNumber: 'PO-1007', supplierId: 'sup4', project: 'Site C - East Basin', rig: 'Rig B1', orderDate: '2026-04-20', status: 'Received', receivedBy: 'R. Alonzo', receivedDate: '2026-04-22', onTime: true, quality: 'ok',
-    items: [{ partNumber: 'HY-HH-01', name: 'Hydraulic Hose 1"', category: 'Hydraulics', manufacturer: 'Ironclad Parts Ltd', unit: 'Each', unitCost: 4200, qty: 5, qtyReceived: 5 }] },
-  // Rig A2's earlier project
+    items: [{ partNumber: 'HY-HH-01', name: 'Hydraulic Hose 1"', category: 'Hydraulics', manufacturer: 'Ironclad Parts Ltd', unit: 'Each', unitCost: 4200, qty: 5, qtyReceived: 5 }],
+    issues: [{ id: 'iss6', date: '2026-04-23', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 5 }] }] },
+  // Rig A2's earlier project — bulk consumable drawn down over three months
   { id: 'po8', poNumber: 'PO-1008', supplierId: 'sup4', project: 'Site C - East Basin', rig: 'Rig A2', orderDate: '2026-03-18', status: 'Received', receivedBy: 'R. Alonzo', receivedDate: '2026-03-19', onTime: true, quality: 'ok',
-    items: [{ partNumber: 'CN-GR-01', name: 'Grease Cartridge', category: 'Consumables', manufacturer: 'Ironclad Parts Ltd', unit: 'Each', unitCost: 480, qty: 30, qtyReceived: 30 }] },
+    items: [{ partNumber: 'CN-GR-01', name: 'Grease Cartridge', category: 'Consumables', manufacturer: 'Ironclad Parts Ltd', unit: 'Each', unitCost: 480, qty: 30, qtyReceived: 30 }],
+    issues: [
+      { id: 'iss7', date: '2026-03-20', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 10 }] },
+      { id: 'iss8', date: '2026-04-06', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 12 }] },
+      { id: 'iss9', date: '2026-05-04', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 8 }] },
+    ] },
   // Rig C1's earlier project
   { id: 'po9', poNumber: 'PO-1009', supplierId: 'sup3', project: 'Site A - North Field', rig: 'Rig C1', orderDate: '2026-02-10', status: 'Received', receivedBy: 'D. Singh', receivedDate: '2026-02-11', onTime: true, quality: 'ok',
-    items: [{ partNumber: 'FL-PA-01', name: 'Polymer Additive', category: 'Fluids & Chemicals', manufacturer: 'Summit Fluids Co', unit: 'Kg', unitCost: 3100, qty: 20, qtyReceived: 20 }] },
+    items: [{ partNumber: 'FL-PA-01', name: 'Polymer Additive', category: 'Fluids & Chemicals', manufacturer: 'Summit Fluids Co', unit: 'Kg', unitCost: 3100, qty: 20, qtyReceived: 20 }],
+    issues: [{ id: 'iss10', date: '2026-02-14', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 20 }] }] },
+  // Received, nothing issued yet — sitting in the store
   { id: 'po10', poNumber: 'PO-1010', supplierId: 'sup2', project: 'Site C - East Basin', rig: 'Rig C2', orderDate: '2026-07-25', status: 'Received', receivedBy: 'R. Alonzo', receivedDate: '2026-07-27', onTime: true, quality: 'ok',
     items: [{ partNumber: 'CB-CL-01', name: 'Core Lifter', category: 'Core Barrel', manufacturer: 'Northline Equipment', unit: 'Each', unitCost: 550, qty: 25, qtyReceived: 25 }] },
 ]
@@ -88,10 +125,12 @@ interface Ctx {
   createPO: (po: { supplierId: string; project: string; rig: string; orderDate: string; items: LineItem[] }, status: 'Draft' | 'Ordered') => void
   placeOrder: (poId: string) => void
   receivePO: (poId: string, receivedBy: string, onTime: boolean, quality: 'ok' | 'minor' | 'rejected') => void
+  issueItems: (poId: string, record: Omit<IssueRecord, 'id'>) => void
   addSupplier: (s: Omit<Supplier, 'id'>) => void
 }
 const InventoryContext = createContext<Ctx | null>(null)
-const KEY = 'xplorix_demo_inventory_v5'
+// Bumped to v6 — v5 cached state has no issue records
+const KEY = 'xplorix_demo_inventory_v6'
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
@@ -101,7 +140,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   const createPO: Ctx['createPO'] = (po, status) => {
     const poNumber = `PO-${1000 + state.purchaseOrders.length + 1}`
-    setState(s => ({ ...s, purchaseOrders: [{ ...po, id: uid('po'), poNumber, status, items: po.items.map(i => ({ ...i, qtyReceived: 0 })) }, ...s.purchaseOrders] }))
+    setState(s => ({ ...s, purchaseOrders: [{ ...po, id: uid('po'), poNumber, status, items: po.items.map(i => ({ ...i, qtyReceived: 0 })), issues: [] }, ...s.purchaseOrders] }))
   }
 
   const placeOrder: Ctx['placeOrder'] = poId => setState(s => ({ ...s, purchaseOrders: s.purchaseOrders.map(p => p.id === poId && p.status === 'Draft' ? { ...p, status: 'Ordered' } : p) }))
@@ -115,15 +154,112 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     }))
   }
 
+  // Stock leaving the store for a rig. This — not the PO, not the receipt —
+  // is what Finance treats as a cost, on the date recorded here.
+  const issueItems: Ctx['issueItems'] = (poId, record) => {
+    setState(s => ({
+      ...s,
+      purchaseOrders: s.purchaseOrders.map(po => po.id === poId
+        ? { ...po, issues: [...(po.issues ?? []), { ...record, id: uid('iss') }] }
+        : po),
+    }))
+  }
+
   const addSupplier: Ctx['addSupplier'] = s => setState(st => ({ ...st, suppliers: [...st.suppliers, { ...s, id: uid('sup') }] }))
 
-  return <InventoryContext.Provider value={{ state, createPO, placeOrder, receivePO, addSupplier }}>{children}</InventoryContext.Provider>
+  return <InventoryContext.Provider value={{ state, createPO, placeOrder, receivePO, issueItems, addSupplier }}>{children}</InventoryContext.Provider>
 }
 export function useInventory() { const c = useContext(InventoryContext); if (!c) throw new Error('useInventory must be used inside InventoryProvider'); return c }
 
 // ── SELECTORS ────────────────────────────────────────────────────────────
 export function poOrderedValue(po: PurchaseOrder) { return po.items.reduce((s, i) => s + i.qty * i.unitCost, 0) }
 export function poReceivedValue(po: PurchaseOrder) { return po.items.reduce((s, i) => s + i.qtyReceived * i.unitCost, 0) }
+
+// ── ISSUE SELECTORS ──────────────────────────────────────────────────────
+
+/** Safe accessor — POs created before this feature have no issues array. */
+export function poIssues(po: PurchaseOrder): IssueRecord[] { return po.issues ?? [] }
+
+/** How much of one line item has gone out to the rig, across all issue events. */
+export function qtyIssuedForItem(po: PurchaseOrder, itemIndex: number): number {
+  return poIssues(po).reduce((sum, rec) => sum + (rec.lines.find(l => l.itemIndex === itemIndex)?.qty ?? 0), 0)
+}
+
+/** How much of one line item is still sitting in the store. */
+export function qtyRemainingForItem(po: PurchaseOrder, itemIndex: number): number {
+  return Math.max(0, po.items[itemIndex].qty - qtyIssuedForItem(po, itemIndex))
+}
+
+/** Value of everything issued from this PO, ever. */
+export function poIssuedValue(po: PurchaseOrder): number {
+  return po.items.reduce((sum, it, i) => sum + qtyIssuedForItem(po, i) * it.unitCost, 0)
+}
+
+/** Value still in the store from this PO — working capital not yet consumed. */
+export function poUnissuedValue(po: PurchaseOrder): number {
+  return po.items.reduce((sum, it, i) => sum + qtyRemainingForItem(po, i) * it.unitCost, 0)
+}
+
+export function isFullyIssued(po: PurchaseOrder): boolean {
+  return po.items.every((_, i) => qtyRemainingForItem(po, i) === 0)
+}
+
+/** Received, but still has stock waiting to go out. */
+export function isAwaitingIssue(po: PurchaseOrder): boolean {
+  return po.status === 'Received' && !isFullyIssued(po)
+}
+
+/** Value of a single issue event. */
+export function issueRecordValue(po: PurchaseOrder, rec: IssueRecord): number {
+  return rec.lines.reduce((sum, l) => sum + l.qty * (po.items[l.itemIndex]?.unitCost ?? 0), 0)
+}
+
+/**
+ * THE FUNCTION FINANCE CALLS.
+ *
+ * Consumables actually used by a rig on a project between two dates.
+ * Replaces "sum every PO raised for this rig on this project", which both
+ * ignored dates and counted stock that never left the store.
+ *
+ * Dates are plain YYYY-MM-DD strings, so string comparison is correct.
+ */
+export function consumablesUsed(
+  purchaseOrders: PurchaseOrder[],
+  rig: string,
+  project: string,
+  fromISO: string,
+  toISO: string
+): number {
+  return purchaseOrders
+    .filter(po => po.rig === rig && po.project === project)
+    .reduce((sum, po) => sum + poIssues(po)
+      .filter(rec => rec.date >= fromISO && rec.date <= toISO)
+      .reduce((s, rec) => s + issueRecordValue(po, rec), 0), 0)
+}
+
+/**
+ * Turn a Finance month label into a date range.
+ * Handles "March 2026" and "Mar 2026". If operations-store already stores
+ * months as "2026-03", build the range from that directly instead.
+ */
+export function monthToRange(monthLabel: string): { from: string; to: string } {
+  const [name, yearStr] = monthLabel.trim().split(/\s+/)
+  const year = parseInt(yearStr, 10)
+  const idx = new Date(`${name} 1, ${year}`).getMonth()
+  const lastDay = new Date(year, idx + 1, 0).getDate()
+  const mm = String(idx + 1).padStart(2, '0')
+  return { from: `${year}-${mm}-01`, to: `${year}-${mm}-${String(lastDay).padStart(2, '0')}` }
+}
+
+/** Total value a rig has consumed, all projects, all time. */
+export function rigConsumedSpend(state: State, rig: string): number {
+  return state.purchaseOrders.filter(po => po.rig === rig).reduce((s, po) => s + poIssuedValue(po), 0)
+}
+
+/** Value sitting in the store against a rig, not yet consumed. */
+export function rigStockInStore(state: State, rig: string): number {
+  return state.purchaseOrders.filter(po => po.rig === rig).reduce((s, po) => s + poUnissuedValue(po), 0)
+}
 
 export function supplierPerf(state: State, supplierId: string) {
   const received = state.purchaseOrders.filter(po => po.supplierId === supplierId && po.status === 'Received')
@@ -263,4 +399,3 @@ export function ManualPartEntry({ onAdd }: { onAdd: (item: LineItem) => void }) 
     </div>
   )
 }
-
