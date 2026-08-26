@@ -331,6 +331,27 @@ export function allRigs(state: State): string[] {
 export function rigTotalSpend(state: State, rig: string) {
   return rigConsumedSpend(state, rig)
 }
+
+/**
+ * DEPRECATED — kept only so existing dashboard code still builds.
+ *
+ * "Ordered but not yet received" can no longer belong to a rig: a PO is
+ * raised for a project, and which rig consumes the stock isn't decided until
+ * it's issued. These read from `po.rig`, which only legacy orders carry, so
+ * they return 0 for anything created since.
+ *
+ * Replace the call sites with projectOutstanding / projectStockInStore, or
+ * with rigConsumedSpend if the tile is meant to describe the rig.
+ */
+export function rigOutstanding(state: State, rig: string) {
+  return state.purchaseOrders.filter(po => po.rig === rig)
+    .reduce((s, po) => s + (poOrderedValue(po) - poReceivedValue(po)), 0)
+}
+
+/** DEPRECATED — see rigOutstanding. Use projectStockInStore instead. */
+export function rigStockInStore(state: State, rig: string) {
+  return state.purchaseOrders.filter(po => po.rig === rig).reduce((s, po) => s + poUnissuedValue(po), 0)
+}
 // A rig can carry history across more than one project over its lifetime
 // (it moves on once a project closes) — this breaks its spend down by
 // every project it's ever been on, not just the one it's on right now.
