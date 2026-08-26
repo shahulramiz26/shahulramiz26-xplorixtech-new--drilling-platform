@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, X, Truck, ChevronRight, PackageOpen, ArrowRight } from 'lucide-react'
 import {
   useInventory, poOrderedValue, money, SubNav, S, inputStyle, Badge, poStatusColor,
@@ -95,7 +95,9 @@ export default function PurchaseOrdersPage() {
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color: '#F8FAFC', fontFamily: 'monospace' }}>{po.poNumber}</span>
                     <Badge text={po.status} c={poStatusColor[po.status]} />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#F97316', padding: '2px 8px', borderRadius: 5, background: 'rgba(249,115,22,0.08)' }}>{po.rig}</span>
+                    {rigsIssuedTo(po).map(r => (
+                      <span key={r} style={{ fontSize: 11, fontWeight: 700, color: '#F97316', padding: '2px 8px', borderRadius: 5, background: 'rgba(249,115,22,0.08)' }}>{r}</span>
+                    ))}
                     {received && fullyIssued && <Badge text="Issued" c={{ color: ISSUED, bg: 'rgba(168,85,247,0.1)', border: 'rgba(168,85,247,0.3)' }} />}
                     {received && !fullyIssued && issuedValue > 0 && <Badge text={`${pct}% issued`} c={{ color: ISSUED, bg: 'rgba(168,85,247,0.1)', border: 'rgba(168,85,247,0.3)' }} />}
                   </div>
@@ -103,7 +105,7 @@ export default function PurchaseOrdersPage() {
                   {po.receivedBy && <div style={{ fontSize: 11, color: '#10B981', marginTop: 2 }}>✓ Received by {po.receivedBy} on {po.receivedDate}</div>}
                   {received && issuedValue > 0 && (
                     <div style={{ fontSize: 11, color: ISSUED, marginTop: 2 }}>
-                      → {money(issuedValue)} issued to {rigsIssuedTo(po).join(', ')}{!fullyIssued && ` · ${money(poUnissuedValue(po))} still in store`}
+                      → {money(issuedValue)} issued{!fullyIssued && ` · ${money(poUnissuedValue(po))} still in store`}
                     </div>
                   )}
                 </div>
@@ -113,7 +115,7 @@ export default function PurchaseOrdersPage() {
                 </div>
                 {po.status === 'Draft' && <button onClick={e => { e.stopPropagation(); placeOrder(po.id) }} style={{ padding: '7px 14px', borderRadius: 8, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60A5FA', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Place Order</button>}
                 {po.status === 'Ordered' && <button onClick={e => { e.stopPropagation(); setReceiveId(po.id) }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10B981', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}><Truck size={12} /> Receive</button>}
-                {received && !fullyIssued && <button onClick={e => { e.stopPropagation(); setIssueId(po.id) }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.25)', color: ISSUED, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}><PackageOpen size={12} /> Issue to rig</button>}
+                {received && !fullyIssued && <button onClick={e => { e.stopPropagation(); setIssueId(po.id) }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.25)', color: ISSUED, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}><PackageOpen size={12} /> Issue stock</button>}
                 <ChevronRight size={16} style={{ color: '#64748B', transform: isExpanded ? 'rotate(90deg)' : 'none' }} />
               </div>
 
@@ -184,15 +186,18 @@ function IssueModal({ po, onClose, onConfirm }: { po: any; onClose: () => void; 
   const { state } = useInventory()
   const today = new Date().toISOString().split('T')[0]
   const [date, setDate] = useState(today)
-  const [rig, setRig] = useState<string>(po.rig)
+  const [rig, setRig] = useState<string>('')
   const [by, setBy] = useState('')
   const [qtys, setQtys] = useState<number[]>(po.items.map((_: LineItem, i: number) => qtyRemainingForItem(po, i)))
   const [error, setError] = useState('')
 
-  // Rigs currently on this project, plus the PO's own rig in case it has
-  // since moved off — the store still needs to be able to issue to it.
+  // Rigs currently working this project. Includes the PO's rig only if it's a
+  // legacy order raised before the rig moved to the issue.
   const projectRigs = state.projects.find(p => p.name === po.project)?.rigs ?? []
-  const rigOptions = Array.from(new Set([po.rig, ...projectRigs].filter(Boolean)))
+  const rigOptions: string[] = Array.from(new Set([...projectRigs, po.rig].filter(Boolean)))
+
+  // One rig on the project means there's nothing to choose — pick it.
+  useEffect(() => { if (!rig && rigOptions.length === 1) setRig(rigOptions[0]) }, [rig, rigOptions])
 
   const setQty = (i: number, v: number) => setQtys(prev => prev.map((q, j) => (j === i ? v : q)))
   const value = po.items.reduce((s: number, it: LineItem, i: number) => s + (qtys[i] || 0) * it.unitCost, 0)
@@ -225,7 +230,7 @@ function IssueModal({ po, onClose, onConfirm }: { po: any; onClose: () => void; 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {rigOptions.map(r => (
                 <button key={r} onClick={() => { setRig(r); setError('') }} style={{ padding: '9px 16px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', background: rig === r ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${rig === r ? 'rgba(168,85,247,0.45)' : '#1E293B'}`, color: rig === r ? ISSUED : '#94A3B8' }}>
-                  {r}{r === po.rig ? <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 600 }}> · on the PO</span> : ''}
+                  {r}
                 </button>
               ))}
             </div>
@@ -276,11 +281,6 @@ function IssueModal({ po, onClose, onConfirm }: { po: any; onClose: () => void; 
           </div>
         </div>
 
-        {rig !== po.rig && (
-          <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 12 }}>
-            This PO was raised for {po.rig}. The cost will follow {rig} instead.
-          </div>
-        )}
         {beforeReceipt && (
           <div style={{ fontSize: 11, color: '#F59E0B', marginBottom: 12 }}>
             This date is before the stock was received on {po.receivedDate}. Change it if that isn&apos;t right.
@@ -305,19 +305,11 @@ function NewPOModal({ onClose, onSave }: { onClose: () => void; onSave: (po: any
   const { state } = useInventory()
   const [supplierId, setSupplierId] = useState(state.suppliers[0].id)
   const [project, setProject] = useState(state.projects[0].name)
-  const currentProject = state.projects.find(p => p.name === project)!
-  const [rig, setRig] = useState(currentProject.rigs[0] || '')
   const [items, setItems] = useState<LineItem[]>([])
   const total = items.reduce((s, i) => s + i.qty * i.unitCost, 0)
   const removeItem = (i: number) => setItems(prev => prev.filter((_, j) => j !== i))
 
-  const handleProjectChange = (name: string) => {
-    setProject(name)
-    const p = state.projects.find(pr => pr.name === name)!
-    setRig(p.rigs[0] || '')
-  }
-
-  const save = (status: 'Draft' | 'Ordered') => { if (items.length === 0 || !rig) return; onSave({ supplierId, project, rig, orderDate: new Date().toISOString().split('T')[0], items }, status); onClose() }
+  const save = (status: 'Draft' | 'Ordered') => { if (items.length === 0) return; onSave({ supplierId, project, orderDate: new Date().toISOString().split('T')[0], items }, status); onClose() }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
@@ -326,17 +318,11 @@ function NewPOModal({ onClose, onSave }: { onClose: () => void; onSave: (po: any
           <div style={{ fontSize: 18, fontWeight: 800, color: '#F8FAFC' }}>New Purchase Order</div>
           <button onClick={onClose} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid #1E293B', color: '#64748B', cursor: 'pointer' }}><X size={16} /></button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 8 }}>
           <div><div style={{ ...S.label, marginBottom: 6 }}>Supplier</div><select value={supplierId} onChange={e => setSupplierId(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>{state.suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-          <div><div style={{ ...S.label, marginBottom: 6 }}>Project</div><select value={project} onChange={e => handleProjectChange(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>{state.projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}</select></div>
-          <div><div style={{ ...S.label, marginBottom: 6 }}>Rig</div>
-            {currentProject.rigs.length > 0 ? (
-              <select value={rig} onChange={e => setRig(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>{currentProject.rigs.map(r => <option key={r} value={r}>{r}</option>)}</select>
-            ) : (
-              <div style={{ ...inputStyle, color: '#EF4444' }}>No rigs assigned</div>
-            )}
-          </div>
+          <div><div style={{ ...S.label, marginBottom: 6 }}>Project</div><select value={project} onChange={e => setProject(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>{state.projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}</select></div>
         </div>
+        <div style={{ fontSize: 11, color: '#64748B', marginBottom: 18 }}>You&apos;ll choose the rig when the stock is issued from the store.</div>
 
         <div style={{ marginBottom: 14 }}>
           <div style={{ ...S.label, marginBottom: 8 }}>Add a part (typed manually — no catalogue lookup)</div>
@@ -377,7 +363,7 @@ function ReceiveModal({ po, onClose, onConfirm }: { po: any; onClose: () => void
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: '#0D1117', border: '1px solid #1E293B', borderRadius: 20, padding: 28, width: 440 }}>
         <div style={{ fontSize: 18, fontWeight: 800, color: '#F8FAFC', marginBottom: 4 }}>Confirm Receipt</div>
-        <div style={{ fontSize: 12, color: '#64748B', marginBottom: 18 }}>{po.poNumber} · {po.rig} — marks the full order as received into the store</div>
+        <div style={{ fontSize: 12, color: '#64748B', marginBottom: 18 }}>{po.poNumber} · {po.project} — marks the full order as received into the store</div>
 
         <div style={{ border: '1px solid #1E293B', borderRadius: 10, marginBottom: 18, overflow: 'hidden' }}>
           {po.items.map((it: LineItem, i: number) => (
