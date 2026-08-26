@@ -25,6 +25,7 @@ export interface IssueLine { itemIndex: number; qty: number }
 export interface IssueRecord {
   id: string
   date: string          // YYYY-MM-DD — the date the cost belongs to
+  rig?: string          // the rig the stock actually went to; falls back to the PO's rig
   issuedBy: string
   lines: IssueLine[]
 }
@@ -68,7 +69,10 @@ export const SEED_POS: PurchaseOrder[] = [
   // Partly issued — 3 of 5 bits went out, 2 still in store
   { id: 'po1', poNumber: 'PO-1001', supplierId: 'sup1', project: 'Site A - North Field', rig: 'Rig A1', orderDate: '2026-07-15', status: 'Received', receivedBy: 'D. Singh', receivedDate: '2026-07-18', onTime: true, quality: 'ok',
     items: [{ partNumber: 'NX-DB-01', name: 'NX Drill Bit', category: 'Drill Bits', manufacturer: 'Apex Drilling Supplies', unit: 'Each', unitCost: 12000, qty: 5, qtyReceived: 5 }],
-    issues: [{ id: 'iss1', date: '2026-07-21', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 3 }] }] },
+    issues: [
+      { id: 'iss1', date: '2026-07-21', rig: 'Rig A1', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 2 }] },
+      { id: 'iss1b', date: '2026-07-24', rig: 'Rig A2', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 1 }] },
+    ] },
   { id: 'po2', poNumber: 'PO-1002', supplierId: 'sup3', project: 'Site B - South Ridge', rig: 'Rig B1', orderDate: '2026-07-20', status: 'Ordered',
     items: [{ partNumber: 'FL-MM-01', name: 'Drilling Mud Mix', category: 'Fluids & Chemicals', manufacturer: 'Summit Fluids Co', unit: 'Bucket', unitCost: 8200, qty: 10, qtyReceived: 0 }] },
   { id: 'po3', poNumber: 'PO-1003', supplierId: 'sup5', project: 'Site C - East Basin', rig: 'Rig C1', orderDate: '2026-07-22', status: 'Draft',
@@ -76,35 +80,35 @@ export const SEED_POS: PurchaseOrder[] = [
   // Fully issued, same month as receipt
   { id: 'po4', poNumber: 'PO-1004', supplierId: 'sup2', project: 'Site A - North Field', rig: 'Rig A2', orderDate: '2026-07-10', status: 'Received', receivedBy: 'D. Singh', receivedDate: '2026-07-12', onTime: false, quality: 'ok',
     items: [{ partNumber: 'CB-RS-01', name: 'Reaming Shell', category: 'Core Barrel', manufacturer: 'Northline Equipment', unit: 'Each', unitCost: 9800, qty: 4, qtyReceived: 4 }],
-    issues: [{ id: 'iss2', date: '2026-07-13', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 4 }] }] },
+    issues: [{ id: 'iss2', date: '2026-07-13', rig: 'Rig A2', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 4 }] }] },
   // Received in June, issued across June and July — the exact case that makes
   // "cost = PO value in the month it was raised" wrong
   { id: 'po5', poNumber: 'PO-1005', supplierId: 'sup1', project: 'Site B - South Ridge', rig: 'Rig B1', orderDate: '2026-06-28', status: 'Received', receivedBy: 'M. Alvarez', receivedDate: '2026-06-30', onTime: true, quality: 'minor',
     items: [{ partNumber: 'NX-DB-01', name: 'NX Drill Bit', category: 'Drill Bits', manufacturer: 'Apex Drilling Supplies', unit: 'Each', unitCost: 12000, qty: 3, qtyReceived: 3 }],
     issues: [
-      { id: 'iss3', date: '2026-06-30', issuedBy: 'M. Alvarez', lines: [{ itemIndex: 0, qty: 1 }] },
-      { id: 'iss4', date: '2026-07-08', issuedBy: 'M. Alvarez', lines: [{ itemIndex: 0, qty: 2 }] },
+      { id: 'iss3', date: '2026-06-30', rig: 'Rig B1', issuedBy: 'M. Alvarez', lines: [{ itemIndex: 0, qty: 1 }] },
+      { id: 'iss4', date: '2026-07-08', rig: 'Rig B1', issuedBy: 'M. Alvarez', lines: [{ itemIndex: 0, qty: 2 }] },
     ] },
   // Rig A1's earlier project, before it moved to Site A
   { id: 'po6', poNumber: 'PO-1006', supplierId: 'sup5', project: 'Site B - South Ridge', rig: 'Rig A1', orderDate: '2026-05-12', status: 'Received', receivedBy: 'M. Alvarez', receivedDate: '2026-05-14', onTime: true, quality: 'ok',
     items: [{ partNumber: 'FT-AF-01', name: 'Air Filter', category: 'Filtration', manufacturer: 'Filtermax Inc', unit: 'Each', unitCost: 2600, qty: 8, qtyReceived: 8 }],
-    issues: [{ id: 'iss5', date: '2026-05-15', issuedBy: 'M. Alvarez', lines: [{ itemIndex: 0, qty: 8 }] }] },
+    issues: [{ id: 'iss5', date: '2026-05-15', rig: 'Rig A1', issuedBy: 'M. Alvarez', lines: [{ itemIndex: 0, qty: 8 }] }] },
   // Rig B1's earlier project, before it moved to Site B
   { id: 'po7', poNumber: 'PO-1007', supplierId: 'sup4', project: 'Site C - East Basin', rig: 'Rig B1', orderDate: '2026-04-20', status: 'Received', receivedBy: 'R. Alonzo', receivedDate: '2026-04-22', onTime: true, quality: 'ok',
     items: [{ partNumber: 'HY-HH-01', name: 'Hydraulic Hose 1"', category: 'Hydraulics', manufacturer: 'Ironclad Parts Ltd', unit: 'Each', unitCost: 4200, qty: 5, qtyReceived: 5 }],
-    issues: [{ id: 'iss6', date: '2026-04-23', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 5 }] }] },
+    issues: [{ id: 'iss6', date: '2026-04-23', rig: 'Rig B1', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 5 }] }] },
   // Rig A2's earlier project — bulk consumable drawn down over three months
   { id: 'po8', poNumber: 'PO-1008', supplierId: 'sup4', project: 'Site C - East Basin', rig: 'Rig A2', orderDate: '2026-03-18', status: 'Received', receivedBy: 'R. Alonzo', receivedDate: '2026-03-19', onTime: true, quality: 'ok',
     items: [{ partNumber: 'CN-GR-01', name: 'Grease Cartridge', category: 'Consumables', manufacturer: 'Ironclad Parts Ltd', unit: 'Each', unitCost: 480, qty: 30, qtyReceived: 30 }],
     issues: [
-      { id: 'iss7', date: '2026-03-20', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 10 }] },
-      { id: 'iss8', date: '2026-04-06', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 12 }] },
-      { id: 'iss9', date: '2026-05-04', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 8 }] },
+      { id: 'iss7', date: '2026-03-20', rig: 'Rig A2', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 10 }] },
+      { id: 'iss8', date: '2026-04-06', rig: 'Rig A2', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 12 }] },
+      { id: 'iss9', date: '2026-05-04', rig: 'Rig A2', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 8 }] },
     ] },
   // Rig C1's earlier project
   { id: 'po9', poNumber: 'PO-1009', supplierId: 'sup3', project: 'Site A - North Field', rig: 'Rig C1', orderDate: '2026-02-10', status: 'Received', receivedBy: 'D. Singh', receivedDate: '2026-02-11', onTime: true, quality: 'ok',
     items: [{ partNumber: 'FL-PA-01', name: 'Polymer Additive', category: 'Fluids & Chemicals', manufacturer: 'Summit Fluids Co', unit: 'Kg', unitCost: 3100, qty: 20, qtyReceived: 20 }],
-    issues: [{ id: 'iss10', date: '2026-02-14', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 20 }] }] },
+    issues: [{ id: 'iss10', date: '2026-02-14', rig: 'Rig C1', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 20 }] }] },
   // Received, nothing issued yet — sitting in the store
   { id: 'po10', poNumber: 'PO-1010', supplierId: 'sup2', project: 'Site C - East Basin', rig: 'Rig C2', orderDate: '2026-07-25', status: 'Received', receivedBy: 'R. Alonzo', receivedDate: '2026-07-27', onTime: true, quality: 'ok',
     items: [{ partNumber: 'CB-CL-01', name: 'Core Lifter', category: 'Core Barrel', manufacturer: 'Northline Equipment', unit: 'Each', unitCost: 550, qty: 25, qtyReceived: 25 }] },
@@ -129,8 +133,8 @@ interface Ctx {
   addSupplier: (s: Omit<Supplier, 'id'>) => void
 }
 const InventoryContext = createContext<Ctx | null>(null)
-// Bumped to v6 — v5 cached state has no issue records
-const KEY = 'xplorix_demo_inventory_v6'
+// Bumped to v7 — issue records now carry the rig they went to
+const KEY = 'xplorix_demo_inventory_v7'
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
@@ -215,11 +219,33 @@ export function issueRecordValue(po: PurchaseOrder, rec: IssueRecord): number {
 }
 
 /**
+ * The rig an issue actually went to. Older issues (and any raised before the
+ * rig was asked for) fall back to the rig named on the PO.
+ */
+export function issueRig(po: PurchaseOrder, rec: IssueRecord): string {
+  return rec.rig || po.rig
+}
+
+/** Value issued from this PO to one specific rig. */
+export function poIssuedValueToRig(po: PurchaseOrder, rig: string): number {
+  return poIssues(po).filter(rec => issueRig(po, rec) === rig)
+    .reduce((s, rec) => s + issueRecordValue(po, rec), 0)
+}
+
+/** Every rig this PO's stock has gone out to — usually one, sometimes more. */
+export function rigsIssuedTo(po: PurchaseOrder): string[] {
+  return Array.from(new Set(poIssues(po).map(rec => issueRig(po, rec))))
+}
+
+/**
  * THE FUNCTION FINANCE CALLS.
  *
  * Consumables actually used by a rig on a project between two dates.
  * Replaces "sum every PO raised for this rig on this project", which both
  * ignored dates and counted stock that never left the store.
+ *
+ * Matches on the ISSUE's rig, not the PO's — one PO bought for a project can
+ * be split across several rigs, and each rig only carries what it received.
  *
  * Dates are plain YYYY-MM-DD strings, so string comparison is correct.
  */
@@ -231,9 +257,9 @@ export function consumablesUsed(
   toISO: string
 ): number {
   return purchaseOrders
-    .filter(po => po.rig === rig && po.project === project)
+    .filter(po => po.project === project)
     .reduce((sum, po) => sum + poIssues(po)
-      .filter(rec => rec.date >= fromISO && rec.date <= toISO)
+      .filter(rec => issueRig(po, rec) === rig && rec.date >= fromISO && rec.date <= toISO)
       .reduce((s, rec) => s + issueRecordValue(po, rec), 0), 0)
 }
 
@@ -253,7 +279,7 @@ export function monthToRange(monthLabel: string): { from: string; to: string } {
 
 /** Total value a rig has consumed, all projects, all time. */
 export function rigConsumedSpend(state: State, rig: string): number {
-  return state.purchaseOrders.filter(po => po.rig === rig).reduce((s, po) => s + poIssuedValue(po), 0)
+  return state.purchaseOrders.reduce((s, po) => s + poIssuedValueToRig(po, rig), 0)
 }
 
 /** Value sitting in the store against a rig, not yet consumed. */
