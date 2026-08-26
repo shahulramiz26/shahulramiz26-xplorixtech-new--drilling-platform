@@ -7,7 +7,7 @@ import {
   PartDetailCard, ManualPartEntry,
   // --- added: see inventory-store-additions.ts ---
   poIssues, qtyIssuedForItem, qtyRemainingForItem, poIssuedValue, poUnissuedValue,
-  isFullyIssued, isAwaitingIssue, issueRecordValue,
+  isFullyIssued, isAwaitingIssue, issueRecordValue, issueRig, rigsIssuedTo,
 } from '../../../../lib/inventory-store'
 import type { POStatus, LineItem, IssueRecord } from '../../../../lib/inventory-store'
 
@@ -103,7 +103,7 @@ export default function PurchaseOrdersPage() {
                   {po.receivedBy && <div style={{ fontSize: 11, color: '#10B981', marginTop: 2 }}>✓ Received by {po.receivedBy} on {po.receivedDate}</div>}
                   {received && issuedValue > 0 && (
                     <div style={{ fontSize: 11, color: ISSUED, marginTop: 2 }}>
-                      → {money(issuedValue)} issued to {po.rig}{!fullyIssued && ` · ${money(poUnissuedValue(po))} still in store`}
+                      → {money(issuedValue)} issued to {rigsIssuedTo(po).join(', ')}{!fullyIssued && ` · ${money(poUnissuedValue(po))} still in store`}
                     </div>
                   )}
                 </div>
@@ -152,7 +152,9 @@ export default function PurchaseOrdersPage() {
                               <div style={{ fontSize: 12, color: '#F8FAFC', fontWeight: 600 }}>
                                 {rec.lines.map(l => `${l.qty} ${po.items[l.itemIndex]?.unit ?? ''} ${po.items[l.itemIndex]?.name ?? 'item'}`).join(' · ')}
                               </div>
-                              <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{rec.date} · issued by {rec.issuedBy}</div>
+                              <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                                {rec.date} · <span style={{ color: '#F97316', fontWeight: 700 }}>{issueRig(po, rec)}</span> · issued by {rec.issuedBy}
+                              </div>
                             </div>
                             <div style={{ fontSize: 12, fontWeight: 700, color: ISSUED, fontFamily: 'monospace' }}>{money(issueRecordValue(po, rec))}</div>
                           </div>
@@ -179,11 +181,18 @@ export default function PurchaseOrdersPage() {
 // ---------------------------------------------------------------------------
 
 function IssueModal({ po, onClose, onConfirm }: { po: any; onClose: () => void; onConfirm: (rec: Omit<IssueRecord, 'id'>) => void }) {
+  const { state } = useInventory()
   const today = new Date().toISOString().split('T')[0]
   const [date, setDate] = useState(today)
+  const [rig, setRig] = useState<string>(po.rig)
   const [by, setBy] = useState('')
   const [qtys, setQtys] = useState<number[]>(po.items.map((_: LineItem, i: number) => qtyRemainingForItem(po, i)))
   const [error, setError] = useState('')
+
+  // Rigs currently on this project, plus the PO's own rig in case it has
+  // since moved off — the store still needs to be able to issue to it.
+  const projectRigs = state.projects.find(p => p.name === po.project)?.rigs ?? []
+  const rigOptions = Array.from(new Set([po.rig, ...projectRigs].filter(Boolean)))
 
   const setQty = (i: number, v: number) => setQtys(prev => prev.map((q, j) => (j === i ? v : q)))
   const value = po.items.reduce((s: number, it: LineItem, i: number) => s + (qtys[i] || 0) * it.unitCost, 0)
@@ -191,23 +200,39 @@ function IssueModal({ po, onClose, onConfirm }: { po: any; onClose: () => void; 
   const beforeReceipt = po.receivedDate && date < po.receivedDate
 
   const confirm = () => {
+    if (!rig) return setError('Choose which rig this stock is going to.')
     if (!by.trim()) return setError('Enter who is issuing this stock.')
     if (!date) return setError('Pick the date the stock left the store.')
     const over = po.items.findIndex((_: LineItem, i: number) => (qtys[i] || 0) > qtyRemainingForItem(po, i))
     if (over >= 0) return setError(`Only ${qtyRemainingForItem(po, over)} ${po.items[over].unit} of ${po.items[over].name} left in store.`)
     const lines = qtys.map((qty, itemIndex) => ({ itemIndex, qty })).filter(l => l.qty > 0)
     if (lines.length === 0) return setError('Enter a quantity for at least one item.')
-    onConfirm({ date, issuedBy: by.trim(), lines })
+    onConfirm({ date, rig, issuedBy: by.trim(), lines })
   }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: '#0D1117', border: '1px solid #1E293B', borderRadius: 20, padding: 28, width: 520, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#F8FAFC' }}>Issue to {po.rig}</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#F8FAFC' }}>Issue stock</div>
           <button onClick={onClose} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid #1E293B', color: '#64748B', cursor: 'pointer' }}><X size={16} /></button>
         </div>
         <div style={{ fontSize: 12, color: '#64748B', marginBottom: 18 }}>{po.poNumber} · {po.project}</div>
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ ...S.label, marginBottom: 6 }}>Issue to rig *</div>
+          {rigOptions.length > 0 ? (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {rigOptions.map(r => (
+                <button key={r} onClick={() => { setRig(r); setError('') }} style={{ padding: '9px 16px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', background: rig === r ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${rig === r ? 'rgba(168,85,247,0.45)' : '#1E293B'}`, color: rig === r ? ISSUED : '#94A3B8' }}>
+                  {r}{r === po.rig ? <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 600 }}> · on the PO</span> : ''}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{ ...inputStyle, color: '#EF4444' }}>No rigs assigned to this project</div>
+          )}
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 }}>
           <div>
@@ -245,12 +270,17 @@ function IssueModal({ po, onClose, onConfirm }: { po: any; onClose: () => void; 
         <div style={{ padding: '11px 14px', borderRadius: 10, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.18)', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 6 }}>
-              Lands on {po.rig} cost for <ArrowRight size={11} /> <strong style={{ color: '#F8FAFC' }}>{monthLabel}</strong>
+              Lands on <strong style={{ color: '#F97316' }}>{rig || '—'}</strong> cost for <ArrowRight size={11} /> <strong style={{ color: '#F8FAFC' }}>{monthLabel}</strong>
             </span>
             <span style={{ fontSize: 15, fontWeight: 800, color: ISSUED, fontFamily: 'monospace' }}>{money(value)}</span>
           </div>
         </div>
 
+        {rig !== po.rig && (
+          <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 12 }}>
+            This PO was raised for {po.rig}. The cost will follow {rig} instead.
+          </div>
+        )}
         {beforeReceipt && (
           <div style={{ fontSize: 11, color: '#F59E0B', marginBottom: 12 }}>
             This date is before the stock was received on {po.receivedDate}. Change it if that isn&apos;t right.
@@ -260,7 +290,7 @@ function IssueModal({ po, onClose, onConfirm }: { po: any; onClose: () => void; 
 
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={onClose} style={{ flex: 1, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid #1E293B', color: '#94A3B8', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={confirm} style={{ flex: 2, padding: 12, borderRadius: 10, background: `linear-gradient(135deg,${ISSUED},#7E22CE)`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none' }}>Issue to rig</button>
+          <button onClick={confirm} style={{ flex: 2, padding: 12, borderRadius: 10, background: `linear-gradient(135deg,${ISSUED},#7E22CE)`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none' }}>Issue to {rig || 'rig'}</button>
         </div>
       </div>
     </div>
