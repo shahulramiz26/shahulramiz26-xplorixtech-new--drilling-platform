@@ -3,7 +3,8 @@
 import { useState, useMemo } from 'react'
 import {
   Search, BadgeCheck, MapPin, X, Plus, Users, Briefcase, Clock,
-  CalendarDays, ShieldCheck, Send, Eye, ChevronRight, Plane, RotateCw,
+  CalendarDays, ShieldCheck, Send, Eye, ChevronRight, ChevronDown,
+  Plane, RotateCw, SlidersHorizontal,
 } from 'lucide-react'
 import {
   CREW, JOBS, CREW_ROLES, ROTATIONS, RIG_FAMILIES, CERTIFICATIONS,
@@ -20,7 +21,107 @@ const C = {
 }
 const display = "'Space Grotesk', sans-serif"
 
-/* ---------------- shared bits ---------------- */
+const WINDOWS: [string, number][] = [['2 weeks', 14], ['30 days', 30], ['90 days', 90], ['Any', 9999]]
+
+/* ================================================================== *
+ * Rail primitives
+ * ================================================================== */
+function RailSection({ title, children, defaultOpen = true, count }: {
+  title: string; children: React.ReactNode; defaultOpen?: boolean; count?: number
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div style={{ borderBottom: `1px solid ${C.border}`, padding: '14px 0' }}>
+      <button onClick={() => setOpen(!open)} style={{
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+        marginBottom: open ? 11 : 0, fontFamily: 'inherit',
+      }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.dim, fontWeight: 700 }}>
+            {title}
+          </span>
+          {!!count && (
+            <span style={{
+              minWidth: 16, height: 16, padding: '0 5px', borderRadius: 8,
+              background: C.accentDim, border: `1px solid ${C.accentBorder}`, color: C.accent,
+              fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>{count}</span>
+          )}
+        </span>
+        <ChevronDown size={14} style={{ color: C.faint, transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .2s' }} />
+      </button>
+      {open && children}
+    </div>
+  )
+}
+
+function Check({ label, count, on, onClick, sub }: {
+  label: string; count?: number; on: boolean; onClick: () => void; sub?: string
+}) {
+  return (
+    <button onClick={onClick} style={{
+      width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '6px 8px',
+      borderRadius: 8, cursor: 'pointer', background: on ? C.accentSoft : 'transparent',
+      border: 'none', fontFamily: 'inherit', textAlign: 'left',
+    }}>
+      <span style={{
+        width: 15, height: 15, borderRadius: 4, flexShrink: 0,
+        border: `1.5px solid ${on ? C.accent : C.faint}`, background: on ? C.accent : 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {on && <svg width="9" height="9" viewBox="0 0 10 10"><path d="M1 5l2.5 2.5L9 2" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 12.5, color: on ? C.text : C.dim, fontWeight: on ? 600 : 400, display: 'block' }}>
+          {label}
+        </span>
+        {sub && <span style={{ fontSize: 10.5, color: C.faint }}>{sub}</span>}
+      </span>
+      {count !== undefined && (
+        <span style={{ fontSize: 11, color: count === 0 ? C.faint : C.muted, fontVariantNumeric: 'tabular-nums' }}>
+          {count}
+        </span>
+      )}
+    </button>
+  )
+}
+
+/** Long option lists collapse to five with a show-all toggle. */
+function CollapsibleChecks({ options, selected, onToggle, counts, initial = 5 }: {
+  options: string[]
+  selected: string[]
+  onToggle: (v: string) => void
+  counts: (v: string) => number
+  initial?: number
+}) {
+  const [all, setAll] = useState(false)
+  const shown = all ? options : options.slice(0, initial)
+  const hiddenSelected = options.slice(initial).filter((o) => selected.includes(o)).length
+
+  return (
+    <>
+      {shown.map((o) => (
+        <Check key={o} label={o} count={counts(o)} on={selected.includes(o)} onClick={() => onToggle(o)} />
+      ))}
+      {options.length > initial && (
+        <button onClick={() => setAll(!all)} style={{
+          background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px',
+          color: C.accent, fontSize: 11.5, fontWeight: 600, fontFamily: 'inherit',
+        }}>
+          {all ? 'Show less' : `Show ${options.length - initial} more`}
+          {!all && hiddenSelected > 0 && (
+            <span style={{ color: C.muted, fontWeight: 400 }}> · {hiddenSelected} selected</span>
+          )}
+        </button>
+      )}
+    </>
+  )
+}
+
+/* ================================================================== *
+ * Cards
+ * ================================================================== */
 function Pill({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'neutral' | 'accent' | 'green' | 'amber' }) {
   const map = {
     neutral: ['rgba(255,255,255,0.04)', C.dim, C.border],
@@ -38,21 +139,6 @@ function Pill({ children, tone = 'neutral' }: { children: React.ReactNode; tone?
   )
 }
 
-function StatBlock({ value, label, tone }: { value: string | number; label: string; tone?: string }) {
-  return (
-    <div>
-      <div style={{
-        fontSize: 22, fontWeight: 700, color: tone ?? C.text, fontFamily: display,
-        letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums',
-      }}>{value}</div>
-      <div style={{ fontSize: 10.5, color: C.muted, letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600, marginTop: 2 }}>
-        {label}
-      </div>
-    </div>
-  )
-}
-
-/* ---------------- crew card ---------------- */
 function CrewCard({ c, onRequest }: { c: CrewProfile; onRequest: (c: CrewProfile) => void }) {
   const [hover, setHover] = useState(false)
   const avail = availabilityLabel(c.availableFrom)
@@ -87,7 +173,6 @@ function CrewCard({ c, onRequest }: { c: CrewProfile; onRequest: (c: CrewProfile
         </div>
       </div>
 
-      {/* availability — the hard constraint, so it leads */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
         padding: '10px 12px', borderRadius: 10, marginBottom: 13,
@@ -103,7 +188,6 @@ function CrewCard({ c, onRequest }: { c: CrewProfile; onRequest: (c: CrewProfile
         <span style={{ fontSize: 10.5, color: C.faint }}>{freshness(c.lastConfirmed)}</span>
       </div>
 
-      {/* verified metreage — the thing only XPLORIX can attest to */}
       {c.verifiedMetres !== null ? (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 9, padding: '11px 12px',
@@ -159,7 +243,6 @@ function CrewCard({ c, onRequest }: { c: CrewProfile; onRequest: (c: CrewProfile
   )
 }
 
-/* ---------------- job row ---------------- */
 function JobRow({ j }: { j: JobPosting }) {
   const [hover, setHover] = useState(false)
   const tone = j.status === 'Live' ? 'green' : j.status === 'Draft' ? 'amber' : 'neutral'
@@ -231,48 +314,83 @@ function JobRow({ j }: { j: JobPosting }) {
   )
 }
 
-/* ---------------- page ---------------- */
+/* ================================================================== *
+ * Page
+ * ================================================================== */
 export default function CrewPage() {
   const [tab, setTab] = useState<'pool' | 'jobs'>('pool')
   const [query, setQuery] = useState('')
-  const [role, setRole] = useState<string | null>(null)
-  const [rotation, setRotation] = useState<string | null>(null)
-  const [rig, setRig] = useState<string | null>(null)
-  const [within, setWithin] = useState<number | null>(null)   // days
+  const [roles, setRoles] = useState<string[]>([])
+  const [rotations, setRotations] = useState<string[]>([])
+  const [rigs, setRigs] = useState<string[]>([])
+  const [certs, setCerts] = useState<string[]>([])
+  const [windowDays, setWindowDays] = useState(9999)
   const [verifiedOnly, setVerifiedOnly] = useState(false)
+  const [passportOnly, setPassportOnly] = useState(false)
+  const [sort, setSort] = useState('available')
+  const [railOpen, setRailOpen] = useState(false)
   const [contactFor, setContactFor] = useState<CrewProfile | null>(null)
   const [showPost, setShowPost] = useState(false)
 
+  const toggle = (arr: string[], v: string, set: (a: string[]) => void) =>
+    set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v])
+
+  const daysOut = (iso: string) =>
+    (new Date(iso).getTime() - new Date('2026-08-30').getTime()) / 86_400_000
+
   const crew = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return CREW.filter((c) => {
-      if (role && c.role !== role) return false
-      if (rotation && !c.rotationPrefs.includes(rotation)) return false
-      if (rig && !c.rigFamilies.includes(rig)) return false
+    const out = CREW.filter((c) => {
+      if (roles.length && !roles.includes(c.role)) return false
+      if (rotations.length && !c.rotationPrefs.some((r) => rotations.includes(r))) return false
+      if (rigs.length && !c.rigFamilies.some((r) => rigs.includes(r))) return false
+      if (certs.length && !certs.every((r) => c.certifications.includes(r))) return false
       if (verifiedOnly && c.verifiedMetres === null) return false
-      if (within !== null) {
-        const d = (new Date(c.availableFrom).getTime() - new Date('2026-08-30').getTime()) / 86_400_000
-        if (d > within) return false
-      }
+      if (passportOnly && !c.passportValid) return false
+      if (daysOut(c.availableFrom) > windowDays) return false
       if (q) {
-        const hay = `${c.displayName} ${c.role} ${c.basedIn} ${c.rigFamilies.join(' ')} ${c.summary}`.toLowerCase()
+        const hay = `${c.displayName} ${c.role} ${c.basedIn} ${c.nationality} ${c.rigFamilies.join(' ')} ${c.summary}`.toLowerCase()
         if (!hay.includes(q)) return false
       }
       return true
-    }).sort((a, b) => new Date(a.availableFrom).getTime() - new Date(b.availableFrom).getTime())
-  }, [query, role, rotation, rig, within, verifiedOnly])
+    })
+    if (sort === 'available') out.sort((a, b) => +new Date(a.availableFrom) - +new Date(b.availableFrom))
+    if (sort === 'experience') out.sort((a, b) => b.yearsExperience - a.yearsExperience)
+    if (sort === 'verified') out.sort((a, b) => (b.verifiedMetres ?? -1) - (a.verifiedMetres ?? -1))
+    return out
+  }, [query, roles, rotations, rigs, certs, windowDays, verifiedOnly, passportOnly, sort])
 
-  const clear = () => { setRole(null); setRotation(null); setRig(null); setWithin(null); setVerifiedOnly(false); setQuery('') }
-  const hasFilters = !!(role || rotation || rig || within !== null || verifiedOnly || query)
+  /* counts reflect the other active filters, so a zero tells you it is
+     genuinely empty rather than just unselected */
+  const countBy = (pred: (c: CrewProfile) => boolean) =>
+    CREW.filter((c) => daysOut(c.availableFrom) <= windowDays && pred(c)).length
+
+  const chips: { label: string; clear: () => void }[] = [
+    ...(windowDays !== 9999 ? [{
+      label: `Within ${WINDOWS.find(([, d]) => d === windowDays)?.[0]}`,
+      clear: () => setWindowDays(9999),
+    }] : []),
+    ...roles.map((r) => ({ label: r, clear: () => toggle(roles, r, setRoles) })),
+    ...rotations.map((r) => ({ label: r, clear: () => toggle(rotations, r, setRotations) })),
+    ...rigs.map((r) => ({ label: r, clear: () => toggle(rigs, r, setRigs) })),
+    ...certs.map((r) => ({ label: r, clear: () => toggle(certs, r, setCerts) })),
+    ...(verifiedOnly ? [{ label: 'XPLORIX verified', clear: () => setVerifiedOnly(false) }] : []),
+    ...(passportOnly ? [{ label: 'Passport valid', clear: () => setPassportOnly(false) }] : []),
+  ]
+
+  const clearAll = () => {
+    setRoles([]); setRotations([]); setRigs([]); setCerts([])
+    setWindowDays(9999); setVerifiedOnly(false); setPassportOnly(false); setQuery('')
+  }
 
   return (
     <div style={{ maxWidth: 1400 }}>
 
-      {/* header */}
+      {/* ---------- header ---------- */}
       <div style={{
-        position: 'relative', overflow: 'hidden', borderRadius: 18, padding: '28px 32px',
+        position: 'relative', overflow: 'hidden', borderRadius: 18, padding: '26px 30px',
         background: `linear-gradient(135deg, ${C.panelHi} 0%, ${C.bg} 70%)`,
-        border: `1px solid ${C.border}`, marginBottom: 22,
+        border: `1px solid ${C.border}`, marginBottom: 20,
       }}>
         <div aria-hidden style={{
           position: 'absolute', inset: 0, opacity: 0.5,
@@ -283,39 +401,49 @@ export default function CrewPage() {
           transform: 'rotate(15deg)', background: 'linear-gradient(135deg, rgba(249,115,22,0.12), transparent 60%)',
         }} />
 
-        <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 10.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: C.accent, fontWeight: 700, marginBottom: 10 }}>
+            <div style={{ fontSize: 10.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: C.accent, fontWeight: 700, marginBottom: 9 }}>
               XPLORIX Crew
             </div>
-            <h1 style={{ fontSize: 30, fontWeight: 700, color: C.text, fontFamily: display, letterSpacing: '-0.03em', margin: '0 0 10px', lineHeight: 1.12, maxWidth: 560 }}>
+            <h1 style={{ fontSize: 27, fontWeight: 700, color: C.text, fontFamily: display, letterSpacing: '-0.03em', margin: '0 0 8px', lineHeight: 1.15, maxWidth: 520 }}>
               Crew who can run your rig from day one
             </h1>
-            <p style={{ fontSize: 14, color: C.muted, margin: 0, maxWidth: 500, lineHeight: 1.65 }}>
-              Matched on rig experience, rotation and availability date — not job titles. Production
-              figures are verified against rigs logged on XPLORIX.
+            <p style={{ fontSize: 13.5, color: C.muted, margin: 0, maxWidth: 470, lineHeight: 1.6 }}>
+              Matched on rig experience, rotation and availability date. Production verified
+              against rigs logged on XPLORIX.
             </p>
           </div>
 
-          <button onClick={() => setShowPost(true)} style={{
-            display: 'flex', alignItems: 'center', gap: 8, padding: '11px 20px', borderRadius: 11,
-            background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff', border: 'none',
-            fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit',
-            boxShadow: '0 4px 20px rgba(249,115,22,0.3)', whiteSpace: 'nowrap',
-          }}>
-            <Plus size={16} /> Post a job
-          </button>
-        </div>
-
-        <div style={{ position: 'relative', display: 'flex', gap: 30, marginTop: 24, flexWrap: 'wrap' }}>
-          <StatBlock value={CREW_STATS.available} label="Available now" />
-          <StatBlock value={CREW_STATS.verified} label="XPLORIX verified" tone={C.accent} />
-          <StatBlock value={CREW_STATS.liveJobs} label="Your live jobs" />
-          <StatBlock value={CREW_STATS.newApplicants} label="New applicants" tone={C.green} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 26, flexWrap: 'wrap' }}>
+            {[
+              [CREW_STATS.available, 'In pool', C.text],
+              [CREW_STATS.verified, 'Verified', C.accent],
+              [CREW_STATS.liveJobs, 'Live jobs', C.text],
+              [CREW_STATS.newApplicants, 'New applicants', C.green],
+            ].map(([v, k, col]) => (
+              <div key={String(k)}>
+                <div style={{ fontSize: 21, fontWeight: 700, color: col as string, fontFamily: display, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+                  {v}
+                </div>
+                <div style={{ fontSize: 10, color: C.muted, letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600, marginTop: 2 }}>
+                  {k}
+                </div>
+              </div>
+            ))}
+            <button onClick={() => setShowPost(true)} style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '11px 20px', borderRadius: 11,
+              background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff', border: 'none',
+              fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit',
+              boxShadow: '0 4px 20px rgba(249,115,22,0.3)', whiteSpace: 'nowrap',
+            }}>
+              <Plus size={16} /> Post a job
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* tabs */}
+      {/* ---------- tabs ---------- */}
       <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, width: 'fit-content', marginBottom: 20 }}>
         {([['pool', 'Availability pool', Users], ['jobs', 'My job postings', Briefcase]] as const).map(([id, label, Icon]) => {
           const on = tab === id
@@ -331,71 +459,212 @@ export default function CrewPage() {
 
       {/* ============ POOL ============ */}
       {tab === 'pool' && (
-        <>
-          <div style={{
-            padding: 18, borderRadius: 14, background: C.panel,
-            border: `1px solid ${C.border}`, marginBottom: 20,
-          }}>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+
+          {/* ---- rail ---- */}
+          <aside className={railOpen ? 'xpc-rail xpc-rail-open' : 'xpc-rail'}
+            style={{
+              width: 252, flexShrink: 0, position: 'sticky', top: 88,
+              maxHeight: 'calc(100vh - 110px)', overflowY: 'auto',
+              background: C.panel, border: `1px solid ${C.border}`,
+              borderRadius: 14, padding: '4px 14px 14px', scrollbarWidth: 'thin',
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0 0' }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: C.text, fontFamily: display }}>Filters</span>
+              {chips.length > 0 && (
+                <button onClick={clearAll} style={{
+                  background: 'none', border: 'none', color: C.accent, fontSize: 11.5,
+                  fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                }}>Reset</button>
+              )}
+            </div>
+
+            {/* availability is the hard constraint, so it leads and never collapses */}
+            <div style={{ borderBottom: `1px solid ${C.border}`, padding: '14px 0' }}>
+              <div style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.dim, fontWeight: 700, marginBottom: 10 }}>
+                Available within
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 5 }}>
+                {WINDOWS.map(([label, d]) => {
+                  const on = windowDays === d
+                  return (
+                    <button key={label} onClick={() => setWindowDays(d)} style={{
+                      padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
+                      fontWeight: 600, fontFamily: 'inherit',
+                      background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${on ? C.accentBorder : C.border}`,
+                      color: on ? C.accent : C.dim,
+                    }}>{label}</button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <RailSection title="Role" count={roles.length}>
+              <CollapsibleChecks
+                options={CREW_ROLES as unknown as string[]}
+                selected={roles}
+                onToggle={(v) => toggle(roles, v, setRoles)}
+                counts={(v) => countBy((c) => c.role === v)}
+              />
+            </RailSection>
+
+            <RailSection title="Rig experience" count={rigs.length}>
+              <CollapsibleChecks
+                options={RIG_FAMILIES}
+                selected={rigs}
+                onToggle={(v) => toggle(rigs, v, setRigs)}
+                counts={(v) => countBy((c) => c.rigFamilies.includes(v))}
+              />
+            </RailSection>
+
+            <RailSection title="Rotation" count={rotations.length} defaultOpen={false}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, padding: '0 8px' }}>
+                {ROTATIONS.map((r) => {
+                  const on = rotations.includes(r)
+                  return (
+                    <button key={r} onClick={() => toggle(rotations, r, setRotations)} style={{
+                      padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 11.5,
+                      fontWeight: 600, fontFamily: 'inherit',
+                      background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${on ? C.accentBorder : C.border}`, color: on ? C.accent : C.dim,
+                    }}>{r}</button>
+                  )
+                })}
+              </div>
+            </RailSection>
+
+            <RailSection title="Certifications" count={certs.length} defaultOpen={false}>
+              <CollapsibleChecks
+                options={CERTIFICATIONS}
+                selected={certs}
+                onToggle={(v) => toggle(certs, v, setCerts)}
+                counts={(v) => countBy((c) => c.certifications.includes(v))}
+                initial={4}
+              />
+              <div style={{ fontSize: 10.5, color: C.faint, padding: '6px 8px 0', lineHeight: 1.5 }}>
+                All selected certifications must be held.
+              </div>
+            </RailSection>
+
+            <RailSection title="Record">
+              <Check label="XPLORIX-verified production" on={verifiedOnly}
+                sub="Metreage logged on platform rigs"
+                count={countBy((c) => c.verifiedMetres !== null)}
+                onClick={() => setVerifiedOnly(!verifiedOnly)} />
+              <Check label="Valid passport" on={passportOnly}
+                sub="Can mobilise internationally"
+                count={countBy((c) => c.passportValid)}
+                onClick={() => setPassportOnly(!passportOnly)} />
+            </RailSection>
+          </aside>
+
+          {/* ---- results ---- */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+
+            {/* search */}
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderRadius: 11,
-              background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, marginBottom: 16,
+              display: 'flex', alignItems: 'center', gap: 10, padding: '12px 15px',
+              borderRadius: 12, marginBottom: 14,
+              background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
             }}>
               <Search size={16} style={{ color: C.muted, flexShrink: 0 }} />
               <input value={query} onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by rig, location or experience — LF90, Copperbelt, DTH"
+                placeholder="Search by name, location or experience — LF90, Copperbelt, DTH"
                 style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: C.text, fontSize: 13.5, fontFamily: 'inherit', minWidth: 0 }} />
-              {query && <button onClick={() => setQuery('')} aria-label="Clear" style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', display: 'flex' }}><X size={15} /></button>}
-            </div>
-
-            <FilterRow label="Available within" options={[['2 weeks', 14], ['30 days', 30], ['90 days', 90]]}
-              value={within} onChange={setWithin} />
-            <FilterRow label="Role" options={CREW_ROLES.map((r) => [r, r])} value={role} onChange={setRole} />
-            <FilterRow label="Rotation" options={ROTATIONS.map((r) => [r, r])} value={rotation} onChange={setRotation} />
-            <FilterRow label="Rig experience" options={RIG_FAMILIES.map((r) => [r, r])} value={rig} onChange={setRig} />
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 14, borderTop: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
-              <button onClick={() => setVerifiedOnly(!verifiedOnly)} style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '7px 13px', borderRadius: 9,
-                cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit',
-                background: verifiedOnly ? C.accentDim : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${verifiedOnly ? C.accentBorder : C.border}`,
-                color: verifiedOnly ? C.accent : C.dim,
-              }}>
-                <ShieldCheck size={14} /> XPLORIX-verified production only
-              </button>
-              {hasFilters && (
-                <button onClick={clear} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  Reset
+              {query && (
+                <button onClick={() => setQuery('')} aria-label="Clear search"
+                  style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', display: 'flex' }}>
+                  <X size={15} />
                 </button>
               )}
             </div>
-          </div>
 
-          <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>
-            <strong style={{ color: C.text, fontWeight: 700 }}>{crew.length}</strong>{' '}
-            {crew.length === 1 ? 'person' : 'people'} available · sorted by earliest start
-          </div>
+            {/* toolbar */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button onClick={() => setRailOpen(!railOpen)} className="xpc-rail-toggle"
+                  style={{
+                    display: 'none', alignItems: 'center', gap: 7, padding: '9px 14px', borderRadius: 10,
+                    background: chips.length ? C.accentDim : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${chips.length ? C.accentBorder : C.border}`,
+                    color: chips.length ? C.accent : C.dim, fontSize: 13, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}>
+                  <SlidersHorizontal size={15} /> Filters{chips.length ? ` (${chips.length})` : ''}
+                </button>
+                <div style={{ fontSize: 13, color: C.muted }}>
+                  <strong style={{ color: C.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{crew.length}</strong>
+                  {' '}{crew.length === 1 ? 'person' : 'people'} available
+                </div>
+              </div>
 
-          {crew.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: 16 }}>
-              {crew.map((c) => <CrewCard key={c.id} c={c} onRequest={setContactFor} />)}
+              <select value={sort} onChange={(e) => setSort(e.target.value)}
+                style={{
+                  padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${C.border}`, color: C.dim, fontSize: 12.5,
+                  fontFamily: 'inherit', cursor: 'pointer', outline: 'none', fontWeight: 600,
+                }}>
+                <option value="available">Earliest available</option>
+                <option value="experience">Most experience</option>
+                <option value="verified">Most verified metres</option>
+              </select>
             </div>
-          ) : (
-            <EmptyState
-              title="Nobody matches those constraints"
-              body="Try widening the availability window or removing a rig family. You can also post the job — matched crew are notified automatically."
-              action="Post a job" onAction={() => setShowPost(true)}
-            />
-          )}
 
-          <div style={{
-            marginTop: 24, padding: 16, borderRadius: 12, fontSize: 12, color: C.muted,
-            background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}`, lineHeight: 1.65,
-          }}>
-            Everyone here has opted in to being visible and confirmed their availability within the
-            last 30 days. Contact details are released only after the person accepts your request.
+            {/* active chips */}
+            {chips.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 16 }}>
+                {chips.map((c, i) => (
+                  <button key={i} onClick={c.clear} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 10px',
+                    borderRadius: 999, cursor: 'pointer', fontSize: 11.5, fontWeight: 600,
+                    background: C.accentSoft, border: `1px solid ${C.accentBorder}`,
+                    color: C.accent, fontFamily: 'inherit',
+                  }}>{c.label}<X size={12} /></button>
+                ))}
+              </div>
+            )}
+
+            {crew.length > 0 ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+                {crew.map((c) => <CrewCard key={c.id} c={c} onRequest={setContactFor} />)}
+              </div>
+            ) : (
+              <div style={{ padding: '56px 24px', textAlign: 'center', borderRadius: 14, background: C.panel, border: `1px dashed ${C.border}` }}>
+                <div style={{
+                  width: 46, height: 46, borderRadius: 12, margin: '0 auto 16px',
+                  background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}><Users size={20} style={{ color: C.muted }} /></div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 6, fontFamily: display }}>
+                  Nobody matches those constraints
+                </div>
+                <p style={{ fontSize: 13, color: C.muted, maxWidth: 360, margin: '0 auto 18px', lineHeight: 1.6 }}>
+                  Widen the availability window or drop a rig family. You can also post the job —
+                  matched crew are notified automatically.
+                </p>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button onClick={clearAll} style={{
+                    padding: '9px 18px', borderRadius: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${C.border}`, color: C.dim, fontWeight: 600, fontSize: 13, fontFamily: 'inherit',
+                  }}>Reset filters</button>
+                  <button onClick={() => setShowPost(true)} style={{
+                    padding: '9px 18px', borderRadius: 10, cursor: 'pointer', background: C.accentSoft,
+                    border: `1px solid ${C.accentBorder}`, color: C.accent, fontWeight: 600, fontSize: 13, fontFamily: 'inherit',
+                  }}>Post a job</button>
+                </div>
+              </div>
+            )}
+
+            <div style={{
+              marginTop: 22, padding: 15, borderRadius: 12, fontSize: 12, color: C.muted,
+              background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}`, lineHeight: 1.65,
+            }}>
+              Everyone here has opted in to being visible and confirmed their availability within
+              the last 30 days. Contact details are released only after the person accepts your request.
+            </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* ============ JOBS ============ */}
@@ -417,60 +686,25 @@ export default function CrewPage() {
 
       {contactFor && <ContactModal c={contactFor} onClose={() => setContactFor(null)} />}
       {showPost && <PostJobModal onClose={() => setShowPost(false)} />}
+
+      <style>{`
+        @media (max-width: 1024px) {
+          .xpc-rail { display: none; }
+          .xpc-rail-open {
+            display: block !important; position: fixed !important; inset: 64px 0 0 auto !important;
+            width: 300px !important; z-index: 60; border-radius: 0 !important;
+            max-height: none !important; height: calc(100vh - 64px) !important;
+          }
+          .xpc-rail-toggle { display: flex !important; }
+        }
+      `}</style>
     </div>
   )
 }
 
-/* ---------------- helpers ---------------- */
-function FilterRow<T extends string | number>({ label, options, value, onChange }: {
-  label: string
-  options: [string, T][]
-  value: T | null
-  onChange: (v: T | null) => void
-}) {
-  return (
-    <div style={{ marginBottom: 13 }}>
-      <div style={{ fontSize: 9.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.faint, fontWeight: 700, marginBottom: 8 }}>
-        {label}
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {options.map(([text, v]) => {
-          const on = value === v
-          return (
-            <button key={text} onClick={() => onChange(on ? null : v)} style={{
-              padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
-              fontWeight: 600, fontFamily: 'inherit',
-              background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
-              border: `1px solid ${on ? C.accentBorder : C.border}`, color: on ? C.accent : C.dim,
-            }}>{text}</button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function EmptyState({ title, body, action, onAction }: {
-  title: string; body: string; action: string; onAction: () => void
-}) {
-  return (
-    <div style={{ padding: '56px 24px', textAlign: 'center', borderRadius: 14, background: C.panel, border: `1px dashed ${C.border}` }}>
-      <div style={{
-        width: 46, height: 46, borderRadius: 12, margin: '0 auto 16px',
-        background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}><Users size={20} style={{ color: C.muted }} /></div>
-      <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 6, fontFamily: display }}>{title}</div>
-      <p style={{ fontSize: 13, color: C.muted, maxWidth: 360, margin: '0 auto 18px', lineHeight: 1.6 }}>{body}</p>
-      <button onClick={onAction} style={{
-        padding: '9px 18px', borderRadius: 10, cursor: 'pointer', background: C.accentSoft,
-        border: `1px solid ${C.accentBorder}`, color: C.accent, fontWeight: 600, fontSize: 13, fontFamily: 'inherit',
-      }}>{action}</button>
-    </div>
-  )
-}
-
-/* ---------------- modals ---------------- */
+/* ================================================================== *
+ * Modals
+ * ================================================================== */
 const shell: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 100, padding: 20,
   background: 'rgba(0,0,0,0.74)', backdropFilter: 'blur(6px)',
