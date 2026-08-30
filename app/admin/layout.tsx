@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Users, FolderOpen, Settings,
   Truck, CreditCard, BarChart3, LogOut, Menu,
   ChevronRight, Search, DollarSign, X, Boxes, FileText, Brain,
-  Store, MessageSquareQuote, Bookmark,
+  Store, MessageSquareQuote, Bookmark, HardHat,
 } from 'lucide-react'
 import NotificationCenter from '../components/NotificationCenter'
 import { CurrencyProvider } from '../components/currency-context'
@@ -47,6 +47,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: 'Exchange',
     items: [
       { href: '/admin/marketplace',            label: 'Marketplace',   icon: Store              },
+      { href: '/admin/crew',                   label: 'Crew & Jobs',   icon: HardHat, badge: 8  },
       { href: '/admin/marketplace/inquiries',  label: 'My Inquiries',  icon: MessageSquareQuote, badge: 3 },
       { href: '/admin/marketplace/saved',      label: 'Saved',         icon: Bookmark           },
     ],
