@@ -1,46 +1,48 @@
 /* ------------------------------------------------------------------ *
- * XPLORIX Exchange — billboards (paid placements)
+ * XPLORIX Exchange — supplier advertising
  *
  * Planned tables:
- *   billboards        id, partner_id, placement, headline, subline,
- *                     cta_label, href, accent, image_url, tier,
- *                     starts_on, ends_on, weight, status
- *   billboard_events  id, billboard_id, type (impression|click),
- *                     actor_company_id, placement, created_at
+ *   campaigns         id, partner_id, placement, tier, eyebrow, headline,
+ *                     subline, points[], cta_label, href, accent, brand_mark,
+ *                     image_url, starts_on, ends_on, weight, status
+ *   campaign_events   id, campaign_id, type (impression|click),
+ *                     actor_company_id, slide_index, created_at
  *
- * Rules enforced here rather than left to the UI:
- *   - every paid slot renders a "Sponsored" label
- *   - unsold inventory falls back to a house ad, never a blank box
- *   - placement is bought; ranking in results is not for sale
+ * Rules held here rather than left to the UI:
+ *   - every paid slide carries a visible "Sponsored" label
+ *   - unsold inventory falls back to a house slide, never a blank frame
+ *   - suppliers buy a slot; results ranking is never for sale
  * ------------------------------------------------------------------ */
 
-export type Placement = 'hero' | 'banner' | 'grid'
-export type Tier = 'Standard' | 'Premium' | 'Takeover' | 'House'
+export type Placement = 'carousel' | 'grid'
+export type Tier = 'Spotlight' | 'Premium' | 'Standard' | 'House'
 
-export interface Billboard {
+export interface Campaign {
   id: string
-  partnerId: string | null      // null = house ad
+  partnerId: string | null        // null = house slide
   partnerName: string
+  partnerCountry: string
   verified: boolean
   placement: Placement
   tier: Tier
-  eyebrow: string               // small label above the headline
+  eyebrow: string
   headline: string
   subline: string
+  points: string[]                // up to 3 short proof points
   ctaLabel: string
   href: string
-  accent: string                // partner brand colour, used sparingly
-  imageUrl?: string             // optional; falls back to a typographic plate
+  accent: string                  // supplier brand colour
+  brandMark: string               // large typographic mark on the right
+  imageUrl?: string               // optional product photo behind the panel
   startsOn: string
   endsOn: string
-  weight: number                // rotation share within a placement
+  weight: number                  // rotation share
   impressions: number
   clicks: number
 }
 
 /* ---------------- Rate card ----------------
-   Kept in code so the Partner Console and the invoice logic read
-   from one source. Rates are monthly, USD. */
+   One source of truth for the Partner Console and invoicing. USD/month. */
 
 export const SLOT_SPECS: Record<Placement, {
   label: string
@@ -49,23 +51,16 @@ export const SLOT_SPECS: Record<Placement, {
   monthlyRate: number
   maxConcurrent: number
 }> = {
-  hero: {
-    label: 'Hero billboard',
-    description: 'Top of the Exchange, beside the search. Seen by every buyer on entry.',
-    size: '360 × 260',
-    monthlyRate: 1800,
-    maxConcurrent: 3,
-  },
-  banner: {
-    label: 'Banner',
-    description: 'Full width, between featured and results. Category targeting available.',
-    size: '1100 × 110',
-    monthlyRate: 900,
-    maxConcurrent: 4,
+  carousel: {
+    label: 'Exchange billboard',
+    description: 'Full width at the top of the Exchange, auto-rotating. Every buyer sees it on entry.',
+    size: '1180 × 360',
+    monthlyRate: 2400,
+    maxConcurrent: 6,
   },
   grid: {
     label: 'In-grid placement',
-    description: 'One card inside the results grid, clearly marked. Never affects ranking.',
+    description: 'One marked card inside the results grid. Never affects ranking.',
     size: '258 × 400',
     monthlyRate: 650,
     maxConcurrent: 6,
@@ -74,93 +69,119 @@ export const SLOT_SPECS: Record<Placement, {
 
 /* ---------------- Live campaigns ---------------- */
 
-export const BILLBOARDS: Billboard[] = [
+export const CAMPAIGNS: Campaign[] = [
   {
-    id: 'b1', partnerId: 'p6', partnerName: 'Perth Core Systems', verified: true,
-    placement: 'hero', tier: 'Premium',
+    id: 'cp1', partnerId: 'p6', partnerName: 'Perth Core Systems', partnerCountry: 'Australia',
+    verified: true, placement: 'carousel', tier: 'Spotlight',
     eyebrow: 'New season stock',
-    headline: 'Impregnated core bits, series 4 to 10',
-    subline: 'BQ through PQ held in Perth and Kalgoorlie. Dispatch within 24 hours across APAC.',
-    ctaLabel: 'View the range',
-    href: '/admin/marketplace?partner=p6',
-    accent: '#38BDF8',
+    headline: 'Impregnated core bits, series 4 through 10',
+    subline: 'BQ to PQ crowns held in Perth and Kalgoorlie, matched to your ground conditions.',
+    points: ['24 hour dispatch across APAC', '120 units in stock', 'Volume pricing from 10'],
+    ctaLabel: 'View the range', href: '/admin/marketplace?category=bits',
+    accent: '#38BDF8', brandMark: 'PCS',
     startsOn: '2026-08-01', endsOn: '2026-10-31', weight: 3,
     impressions: 18420, clicks: 604,
   },
   {
-    id: 'b2', partnerId: 'p1', partnerName: 'Meridian Drilling Supplies', verified: true,
-    placement: 'hero', tier: 'Standard',
-    eyebrow: 'Monsoon stock clearance',
-    headline: 'NQ and HQ rods at 12% off',
-    subline: 'Heat treated, gauge checked, 220 rods ready to ship from Bengaluru.',
-    ctaLabel: 'See rod stock',
-    href: '/admin/marketplace?category=rods',
-    accent: '#F97316',
-    startsOn: '2026-08-15', endsOn: '2026-09-30', weight: 2,
+    id: 'cp2', partnerId: 'p1', partnerName: 'Meridian Drilling Supplies', partnerCountry: 'India',
+    verified: true, placement: 'carousel', tier: 'Premium',
+    eyebrow: 'Monsoon clearance',
+    headline: 'NQ and HQ wireline rods at 12% off',
+    subline: 'Heat treated alloy steel, threads gauge checked before every dispatch.',
+    points: ['220 rods ready to ship', 'Ex-Bengaluru, 3 day delivery', 'Bulk rates above 50'],
+    ctaLabel: 'See rod stock', href: '/admin/marketplace?category=rods',
+    accent: '#F97316', brandMark: 'MDS',
+    startsOn: '2026-08-15', endsOn: '2026-09-30', weight: 3,
     impressions: 9310, clicks: 388,
   },
   {
-    id: 'b3', partnerId: 'p4', partnerName: 'Kivu Mining Supply SARL', verified: true,
-    placement: 'banner', tier: 'Standard',
+    id: 'cp3', partnerId: 'p4', partnerName: 'Kivu Mining Supply SARL', partnerCountry: 'DRC',
+    verified: true, placement: 'carousel', tier: 'Standard',
     eyebrow: 'Katanga and Lualaba',
-    headline: 'Rig transport, customs and mobilisation across the copper belt',
-    subline: 'Lowbed to 30 tonnes, permits and border crossings handled.',
-    ctaLabel: 'Request a route quote',
-    href: '/admin/marketplace/rig-transport-mobilisation-drc',
-    accent: '#34D399',
+    headline: 'Rig transport and customs across the copper belt',
+    subline: 'Lowbed relocation to 30 tonnes with permits and border crossings handled end to end.',
+    points: ['30 tonne capacity', 'Zambia border cleared', 'Escort included'],
+    ctaLabel: 'Request a route quote', href: '/admin/marketplace/rig-transport-mobilisation-drc',
+    accent: '#34D399', brandMark: 'KMS',
     startsOn: '2026-07-01', endsOn: '2026-12-31', weight: 2,
     impressions: 12040, clicks: 271,
   },
   {
-    id: 'b4', partnerId: 'p2', partnerName: 'Kalyan Exploration Equipment', verified: true,
-    placement: 'grid', tier: 'Standard',
+    id: 'cp4', partnerId: 'p2', partnerName: 'Kalyan Exploration Equipment', partnerCountry: 'India',
+    verified: true, placement: 'carousel', tier: 'Premium',
+    eyebrow: 'Operated hire',
+    headline: 'Two core rigs available in Karnataka from October',
+    subline: 'Driller and two assistants included, NQ and HQ capable to 900 metres.',
+    points: ['Crew included', 'Production into your dashboard', '30 day minimum'],
+    ctaLabel: 'Check availability', href: '/admin/marketplace/core-drilling-rig-rental-karnataka',
+    accent: '#FBBF24', brandMark: 'KEE',
+    startsOn: '2026-08-10', endsOn: '2026-11-30', weight: 2,
+    impressions: 5120, clicks: 196,
+  },
+  {
+    id: 'cp5', partnerId: 'p5', partnerName: 'Copperbelt Drilling Traders', partnerCountry: 'Zambia',
+    verified: true, placement: 'carousel', tier: 'Standard',
+    eyebrow: 'Held in Kitwe',
+    headline: 'Casing and rod stock for the Copperbelt',
+    subline: 'HWT and PWT casing plus BQ to HQ rods, delivered across Zambia and southern DRC.',
+    points: ['Delivery within a week', '90 lengths in stock', 'Flush joint'],
+    ctaLabel: 'Browse stock', href: '/admin/marketplace?category=rods',
+    accent: '#A78BFA', brandMark: 'CDT',
+    startsOn: '2026-08-05', endsOn: '2026-11-15', weight: 2,
+    impressions: 7440, clicks: 158,
+  },
+  {
+    id: 'cp6', partnerId: 'p3', partnerName: 'Sahara Rig Services FZE', partnerCountry: 'UAE',
+    verified: false, placement: 'carousel', tier: 'Standard',
+    eyebrow: 'Recovery in bad ground',
+    headline: 'HQ3 and NQ3 triple tube barrel assemblies',
+    subline: 'Complete assemblies with split tube, for fractured and broken formations.',
+    points: ['Three week lead time', 'Export from Sharjah', 'Split tube included'],
+    ctaLabel: 'Enquire now', href: '/admin/marketplace/hq3-core-barrel-assembly',
+    accent: '#F472B6', brandMark: 'SRS',
+    startsOn: '2026-08-20', endsOn: '2026-10-20', weight: 1,
+    impressions: 3110, clicks: 64,
+  },
+
+  /* in-grid */
+  {
+    id: 'cp7', partnerId: 'p2', partnerName: 'Kalyan Exploration Equipment', partnerCountry: 'India',
+    verified: true, placement: 'grid', tier: 'Standard',
     eyebrow: 'Operated hire',
     headline: 'Two core rigs available in Karnataka',
     subline: 'Crew included, production reported straight into your XPLORIX dashboard.',
-    ctaLabel: 'Check availability',
-    href: '/admin/marketplace/core-drilling-rig-rental-karnataka',
-    accent: '#FBBF24',
+    points: [],
+    ctaLabel: 'Check availability', href: '/admin/marketplace/core-drilling-rig-rental-karnataka',
+    accent: '#FBBF24', brandMark: 'KEE',
     startsOn: '2026-08-10', endsOn: '2026-11-30', weight: 2,
     impressions: 5120, clicks: 196,
   },
 ]
 
-/* ---------------- House ads (unsold inventory) ---------------- */
+/* ---------------- House slides (unsold inventory) ---------------- */
 
-export const HOUSE_ADS: Billboard[] = [
+export const HOUSE_CAMPAIGNS: Campaign[] = [
   {
-    id: 'h1', partnerId: null, partnerName: 'XPLORIX', verified: false,
-    placement: 'hero', tier: 'House',
+    id: 'hs1', partnerId: null, partnerName: 'XPLORIX', partnerCountry: '',
+    verified: false, placement: 'carousel', tier: 'House',
     eyebrow: 'Supply the industry',
-    headline: 'Sell to every drilling contractor on XPLORIX',
-    subline: 'List equipment, parts and services. Quote requests arrive with the buyer\'s rig count and country already attached.',
-    ctaLabel: 'Become a partner',
-    href: '/partner/register',
-    accent: '#F97316',
+    headline: 'Advertise here — reach every drilling contractor on XPLORIX',
+    subline: 'Put your equipment in front of buyers who arrive with rig counts and budgets already attached.',
+    points: ['Verified buyers only', 'Monthly slot, not per click', 'Full impression reporting'],
+    ctaLabel: 'Become a partner', href: '/partner/register',
+    accent: '#F97316', brandMark: 'XPX',
     startsOn: '2026-01-01', endsOn: '2099-01-01', weight: 1,
     impressions: 0, clicks: 0,
   },
   {
-    id: 'h2', partnerId: null, partnerName: 'XPLORIX', verified: false,
-    placement: 'banner', tier: 'House',
-    eyebrow: 'Cannot find it',
-    headline: 'Post a wanted request and we will put it to the supplier network',
-    subline: 'Tell us the spec. Verified partners respond with pricing and lead times.',
-    ctaLabel: 'Post a request',
-    href: '/admin/marketplace/wanted/new',
-    accent: '#F97316',
-    startsOn: '2026-01-01', endsOn: '2099-01-01', weight: 1,
-    impressions: 0, clicks: 0,
-  },
-  {
-    id: 'h3', partnerId: null, partnerName: 'XPLORIX', verified: false,
-    placement: 'grid', tier: 'House',
+    id: 'hs2', partnerId: null, partnerName: 'XPLORIX', partnerCountry: '',
+    verified: false, placement: 'grid', tier: 'House',
     eyebrow: 'Crew shortage',
     headline: 'Find a driller who can run your rig from day one',
     subline: 'Matched on rig experience and availability date, with production verified by XPLORIX.',
-    ctaLabel: 'Browse available crew',
-    href: '/admin/crew',
-    accent: '#F97316',
+    points: [],
+    ctaLabel: 'Browse available crew', href: '/admin/crew',
+    accent: '#F97316', brandMark: 'XPX',
     startsOn: '2026-01-01', endsOn: '2099-01-01', weight: 1,
     impressions: 0, clicks: 0,
   },
@@ -170,37 +191,42 @@ export const HOUSE_ADS: Billboard[] = [
 
 const TODAY = '2026-08-30'
 
-function isActive(b: Billboard): boolean {
-  return b.startsOn <= TODAY && b.endsOn >= TODAY
-}
+const isActive = (c: Campaign) => c.startsOn <= TODAY && c.endsOn >= TODAY
 
 /**
- * Weighted pick for a placement. `rotationKey` keeps the choice stable
- * within a render pass but lets callers rotate between slots.
- * Falls back to a house ad when nothing is sold.
+ * All active slides for the billboard, ordered by tier then weight so
+ * Spotlight campaigns lead the rotation. Falls back to house slides.
  */
-export function pickBillboard(placement: Placement, rotationKey = 0): Billboard {
-  const pool = BILLBOARDS.filter((b) => b.placement === placement && isActive(b))
+export function carouselSlides(): Campaign[] {
+  const live = CAMPAIGNS.filter((c) => c.placement === 'carousel' && isActive(c))
+  if (live.length === 0) return HOUSE_CAMPAIGNS.filter((c) => c.placement === 'carousel')
+  const order: Tier[] = ['Spotlight', 'Premium', 'Standard', 'House']
+  return [...live].sort(
+    (a, b) => order.indexOf(a.tier) - order.indexOf(b.tier) || b.weight - a.weight
+  )
+}
+
+export function pickCampaign(placement: Placement, rotationKey = 0): Campaign {
+  const pool = CAMPAIGNS.filter((c) => c.placement === placement && isActive(c))
   if (pool.length === 0) {
-    const house = HOUSE_ADS.filter((h) => h.placement === placement)
+    const house = HOUSE_CAMPAIGNS.filter((h) => h.placement === placement)
     return house[rotationKey % house.length]
   }
-  const expanded = pool.flatMap((b) => Array<Billboard>(b.weight).fill(b))
+  const expanded = pool.flatMap((c) => Array<Campaign>(c.weight).fill(c))
   return expanded[rotationKey % expanded.length]
 }
 
-export function activeCount(placement: Placement): number {
-  return BILLBOARDS.filter((b) => b.placement === placement && isActive(b)).length
-}
-
-/** Stub — replace with a POST to /api/billboard-events. */
-export function trackBillboard(id: string, type: 'impression' | 'click') {
+/** Stub — replace with a POST to /api/campaign-events. */
+export function trackCampaign(id: string, type: 'impression' | 'click', slideIndex?: number) {
   if (typeof window === 'undefined') return
   // eslint-disable-next-line no-console
-  console.debug('[billboard]', type, id)
+  console.debug('[campaign]', type, id, slideIndex ?? '')
 }
 
-export function ctr(b: Billboard): string {
-  if (!b.impressions) return '—'
-  return `${((b.clicks / b.impressions) * 100).toFixed(2)}%`
+export function ctr(c: Campaign): string {
+  if (!c.impressions) return '—'
+  return `${((c.clicks / c.impressions) * 100).toFixed(2)}%`
 }
+
+/** Seconds each slide is held before advancing. */
+export const SLIDE_DURATION = 6
