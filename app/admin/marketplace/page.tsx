@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Fragment } from 'react'
 import Link from 'next/link'
 import {
   Search, BadgeCheck, MapPin, Bookmark, ArrowRight, Package, X,
@@ -12,6 +12,7 @@ import {
   MARKET_STATS, formatPrice, categoryCount, countryCount,
   type Listing, type FilterDef,
 } from './data'
+import BillboardSlot from './BillboardSlot'
 
 /* ---------------- tokens ---------------- */
 const C = {
@@ -402,7 +403,11 @@ export default function MarketplacePage() {
           transform: 'rotate(15deg)', background: 'linear-gradient(135deg, rgba(249,115,22,0.13), transparent 60%)',
         }} />
 
-        <div style={{ position: 'relative' }}>
+        <div className="xpl-hero" style={{
+          position: 'relative', display: 'grid',
+          gridTemplateColumns: 'minmax(0,1fr) 360px', gap: 34, alignItems: 'center',
+        }}>
+        <div>
           <div style={{ fontSize: 10.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: C.accent, fontWeight: 700, marginBottom: 10 }}>
             XPLORIX Exchange
           </div>
@@ -457,6 +462,14 @@ export default function MarketplacePage() {
             ))}
           </div>
         </div>
+
+          {/* paid placement — sold by slot, never by ranking */}
+          <BillboardSlot placement="hero" rotationKey={0} className="xpl-hero-ad" />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 26 }}>
+        <BillboardSlot placement="banner" rotationKey={0} />
       </div>
 
       {/* ============ FEATURED ============ */}
@@ -728,10 +741,15 @@ export default function MarketplacePage() {
             {results.length > 0 ? (
               view === 'grid' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(258px, 1fr))', gap: 16 }}>
-                  {results.map((l) => (
-                    <GridCard key={l.id} l={l} saved={saved.has(l.id)}
-                      onSave={(id) => setSaved((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })}
-                      onQuote={setQuoteFor} />
+                  {results.map((l, i) => (
+                    <Fragment key={l.id}>
+                      <GridCard l={l} saved={saved.has(l.id)}
+                        onSave={(id) => setSaved((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })}
+                        onQuote={setQuoteFor} />
+                      {i === 5 && results.length > 7 && (
+                        <BillboardSlot placement="grid" rotationKey={0} />
+                      )}
+                    </Fragment>
                   ))}
                 </div>
               ) : (
@@ -769,6 +787,13 @@ export default function MarketplacePage() {
       {quoteFor && <QuoteModal listing={quoteFor} onClose={() => setQuoteFor(null)} />}
 
       <style>{`
+        @media (max-width: 1180px) {
+          .xpl-hero { grid-template-columns: minmax(0,1fr) !important; gap: 24px !important; }
+          .xpl-hero-ad { min-height: 0 !important; }
+        }
+        @media (max-width: 620px) {
+          .xpl-hero-ad { display: none !important; }
+        }
         @media (max-width: 1024px) {
           .xpl-rail { display: none; }
           .xpl-rail-open {
