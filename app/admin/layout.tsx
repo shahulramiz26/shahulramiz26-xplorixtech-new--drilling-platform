@@ -8,32 +8,65 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Users, FolderOpen, Settings,
   Truck, CreditCard, BarChart3, LogOut, Menu,
-  ChevronRight, Search, DollarSign, X, Boxes, FileText, Brain
+  ChevronRight, Search, DollarSign, X, Boxes, FileText, Brain,
+  Store, MessageSquareQuote, Bookmark,
 } from 'lucide-react'
 import NotificationCenter from '../components/NotificationCenter'
 import { CurrencyProvider } from '../components/currency-context'
 import CurrencySwitcher from '../components/CurrencySwitcher'
 
-const navItems = [
-  { href: '/admin/dashboard',            label: 'Dashboard',            icon: LayoutDashboard },
-  { href: '/admin/finance',              label: 'Finance & Costing',    icon: DollarSign      },
-  { href: '/admin/inventory',            label: 'Inventory',            icon: Boxes           },
-  { href: '/admin/users',                label: 'User Management',      icon: Users           },
-  { href: '/admin/projects',             label: 'Projects',             icon: FolderOpen      },
-  { href: '/admin/rigs',                 label: 'Rigs & Equipment',     icon: Truck           },
-  { href: '/admin/billing',              label: 'Billing',              icon: CreditCard      },
-  { href: '/admin/analytics',            label: 'Analytics',            icon: BarChart3       },
-  { href: '/admin/xplorix-intelligence', label: 'XPLORIX Intelligence', icon: Brain           },
-  { href: '/admin/reports',              label: 'Performance Reports',  icon: FileText        },
-  { href: '/admin/settings',             label: 'Settings',             icon: Settings        },
+/* ------------------------------------------------------------------ *
+ * Nav is now grouped. Operations and Exchange are different mental
+ * modes — a flat 14-item list buries both.
+ * ------------------------------------------------------------------ */
+type NavItem = {
+  href: string
+  label: string
+  icon: React.ElementType
+  badge?: number
+}
+
+const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: 'Main Menu',
+    items: [
+      { href: '/admin/dashboard',            label: 'Dashboard',            icon: LayoutDashboard },
+      { href: '/admin/finance',              label: 'Finance & Costing',    icon: DollarSign      },
+      { href: '/admin/inventory',            label: 'Inventory',            icon: Boxes           },
+      { href: '/admin/users',                label: 'User Management',      icon: Users           },
+      { href: '/admin/projects',             label: 'Projects',             icon: FolderOpen      },
+      { href: '/admin/rigs',                 label: 'Rigs & Equipment',     icon: Truck           },
+      { href: '/admin/billing',              label: 'Billing',              icon: CreditCard      },
+      { href: '/admin/analytics',            label: 'Analytics',            icon: BarChart3       },
+      { href: '/admin/xplorix-intelligence', label: 'XPLORIX Intelligence', icon: Brain           },
+      { href: '/admin/reports',              label: 'Performance Reports',  icon: FileText        },
+      { href: '/admin/settings',             label: 'Settings',             icon: Settings        },
+    ],
+  },
+  {
+    title: 'Exchange',
+    items: [
+      { href: '/admin/marketplace',            label: 'Marketplace',   icon: Store              },
+      { href: '/admin/marketplace/inquiries',  label: 'My Inquiries',  icon: MessageSquareQuote, badge: 3 },
+      { href: '/admin/marketplace/saved',      label: 'Saved',         icon: Bookmark           },
+    ],
+  },
 ]
+
+const ALL_ITEMS = NAV_GROUPS.flatMap((g) => g.items)
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
 
-  const currentPage = navItems.find(n => pathname === n.href || pathname.startsWith(n.href + '/'))
+  // Longest match wins, so /admin/marketplace/saved doesn't light up Marketplace.
+  const currentPage = [...ALL_ITEMS]
+    .sort((a, b) => b.href.length - a.href.length)
+    .find((n) => pathname === n.href || pathname.startsWith(n.href + '/'))
+
   const pageLabel = currentPage?.label || pathname.split('/')[2] || 'Dashboard'
+
+  const isActive = (href: string) => currentPage?.href === href
 
   return (
     <CurrencyProvider>
@@ -79,39 +112,62 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           {/* Nav */}
           <nav className="flex-1 p-4 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#334155', letterSpacing: '0.15em', textTransform: 'uppercase', padding: '8px 16px 12px' }}>
-              Main Menu
-            </div>
-            <div className="flex flex-col gap-1">
-              {navItems.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                return (
-                  <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '11px 14px', borderRadius: 12,
-                      textDecoration: 'none', transition: 'all 0.2s',
-                      background: isActive ? 'linear-gradient(90deg, rgba(249,115,22,0.12), transparent)' : 'transparent',
-                      borderLeft: isActive ? '2px solid #F97316' : '2px solid transparent',
-                      color: isActive ? '#F8FAFC' : '#64748B',
-                    }}
-                    onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLElement).style.color = '#F8FAFC' } }}
-                    onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#64748B' } }}
-                  >
-                    <div style={{
-                      width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: isActive ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.04)',
-                      border: isActive ? '1px solid rgba(249,115,22,0.25)' : '1px solid transparent',
-                    }}>
-                      <item.icon size={16} style={{ color: isActive ? '#F97316' : 'inherit' }} />
-                    </div>
-                    <span style={{ fontSize: 14, fontWeight: 500, flex: 1 }}>{item.label}</span>
-                    {isActive && <ChevronRight size={14} style={{ color: '#F97316', opacity: 0.7 }} />}
-                  </Link>
-                )
-              })}
-            </div>
+            {NAV_GROUPS.map((group, gi) => (
+              <div key={group.title} style={{ marginTop: gi === 0 ? 0 : 20 }}>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: '#334155',
+                  letterSpacing: '0.15em', textTransform: 'uppercase',
+                  padding: '8px 16px 12px',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                }}>
+                  {group.title}
+                  {gi > 0 && <span style={{ flex: 1, height: 1, background: '#1E293B' }} />}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  {group.items.map((item) => {
+                    const active = isActive(item.href)
+                    return (
+                      <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '11px 14px', borderRadius: 12,
+                          textDecoration: 'none', transition: 'all 0.2s',
+                          background: active ? 'linear-gradient(90deg, rgba(249,115,22,0.12), transparent)' : 'transparent',
+                          borderLeft: active ? '2px solid #F97316' : '2px solid transparent',
+                          color: active ? '#F8FAFC' : '#64748B',
+                        }}
+                        onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLElement).style.color = '#F8FAFC' } }}
+                        onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#64748B' } }}
+                      >
+                        <div style={{
+                          width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: active ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.04)',
+                          border: active ? '1px solid rgba(249,115,22,0.25)' : '1px solid transparent',
+                        }}>
+                          <item.icon size={16} style={{ color: active ? '#F97316' : 'inherit' }} />
+                        </div>
+                        <span style={{ fontSize: 14, fontWeight: 500, flex: 1 }}>{item.label}</span>
+
+                        {item.badge && !active ? (
+                          <span style={{
+                            minWidth: 20, height: 20, padding: '0 6px', borderRadius: 10,
+                            background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.25)',
+                            color: '#F97316', fontSize: 11, fontWeight: 700,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            {item.badge}
+                          </span>
+                        ) : active ? (
+                          <ChevronRight size={14} style={{ color: '#F97316', opacity: 0.7 }} />
+                        ) : null}
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
 
           {/* Live status */}
@@ -157,7 +213,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <span style={{ color: '#334155', fontWeight: 500 }}>XPLORIX</span>
                   <ChevronRight size={14} style={{ color: '#334155' }} />
                   <span style={{ color: '#94A3B8', fontWeight: 600 }}>{pageLabel}</span>
-                  {pathname.split('/').length > 3 && (
+                  {pathname.split('/').length > 3 && !currentPage?.href.endsWith(pathname.split('/')[3]) && (
                     <>
                       <ChevronRight size={14} style={{ color: '#334155' }} />
                       <span style={{ color: '#F97316', fontWeight: 600, fontSize: 12 }}>
@@ -194,4 +250,3 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     </CurrencyProvider>
   )
 }
-
