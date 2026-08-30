@@ -12,7 +12,7 @@ import {
   MARKET_STATS, formatPrice, categoryCount, countryCount,
   type Listing, type FilterDef,
 } from './data'
-import BillboardSlot from './BillboardSlot'
+import BillboardCarousel, { GridPlacement } from './BillboardCarousel'
 
 /* ---------------- tokens ---------------- */
 const C = {
@@ -388,88 +388,28 @@ export default function MarketplacePage() {
   return (
     <div style={{ maxWidth: 1440 }}>
 
-      {/* ============ HERO ============ */}
+      {/* ============ BILLBOARD ============ */}
+      <BillboardCarousel />
+
+      {/* ============ SEARCH ============ */}
       <div style={{
-        position: 'relative', overflow: 'hidden', borderRadius: 18, padding: '30px 32px',
-        background: `linear-gradient(135deg, ${C.panelHi} 0%, ${C.bg} 70%)`,
-        border: `1px solid ${C.border}`, marginBottom: 22,
+        display: 'flex', alignItems: 'center', gap: 11, padding: '13px 18px',
+        borderRadius: 13, marginBottom: 24,
+        background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
       }}>
-        <div aria-hidden style={{
-          position: 'absolute', inset: 0, opacity: 0.5,
-          backgroundImage: 'repeating-linear-gradient(115deg, rgba(148,163,184,0.045) 0 1px, transparent 1px 14px)',
-        }} />
-        <div aria-hidden style={{
-          position: 'absolute', right: -80, top: -90, width: 340, height: 340, borderRadius: 50,
-          transform: 'rotate(15deg)', background: 'linear-gradient(135deg, rgba(249,115,22,0.13), transparent 60%)',
-        }} />
-
-        <div className="xpl-hero" style={{
-          position: 'relative', display: 'grid',
-          gridTemplateColumns: 'minmax(0,1fr) 360px', gap: 34, alignItems: 'center',
-        }}>
-        <div>
-          <div style={{ fontSize: 10.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: C.accent, fontWeight: 700, marginBottom: 10 }}>
-            XPLORIX Exchange
-          </div>
-          <h1 style={{
-            fontSize: 32, fontWeight: 700, color: C.text, fontFamily: display,
-            letterSpacing: '-0.03em', margin: '0 0 10px', lineHeight: 1.1, maxWidth: 620,
-          }}>
-            Every rig, bit and rod in the industry, in one place
-          </h1>
-          <p style={{ fontSize: 14, color: C.muted, margin: '0 0 22px', maxWidth: 520, lineHeight: 1.65 }}>
-            Listed by verified suppliers to exploration drilling. Request a quote and your
-            company profile goes across with it.
-          </p>
-
-          {/* search */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 11, padding: '14px 18px', borderRadius: 13,
-            background: 'rgba(8,11,16,0.7)', border: `1px solid ${C.border}`,
-            maxWidth: 640, backdropFilter: 'blur(8px)',
-          }}>
-            <Search size={18} style={{ color: C.muted, flexShrink: 0 }} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)}
-              placeholder="LF90, NQ rods, 6 inch DTH bit, rotation head overhaul…"
-              style={{
-                flex: 1, background: 'none', border: 'none', outline: 'none',
-                color: C.text, fontSize: 14.5, fontFamily: 'inherit', minWidth: 0,
-              }} />
-            {query && (
-              <button onClick={() => setQuery('')} aria-label="Clear"
-                style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', display: 'flex' }}>
-                <X size={16} />
-              </button>
-            )}
-          </div>
-
-          {/* stats */}
-          <div style={{ display: 'flex', gap: 30, marginTop: 24, flexWrap: 'wrap' }}>
-            {[
-              [MARKET_STATS.listings, 'Live listings'],
-              [MARKET_STATS.partners, 'Suppliers'],
-              [MARKET_STATS.countries, 'Countries'],
-              [`${MARKET_STATS.verifiedShare}%`, 'From verified partners'],
-            ].map(([v, k]) => (
-              <div key={String(k)}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: C.text, fontFamily: display, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
-                  {v}
-                </div>
-                <div style={{ fontSize: 10.5, color: C.muted, letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600, marginTop: 2 }}>
-                  {k}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-          {/* paid placement — sold by slot, never by ranking */}
-          <BillboardSlot placement="hero" rotationKey={0} className="xpl-hero-ad" />
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 26 }}>
-        <BillboardSlot placement="banner" rotationKey={0} />
+        <Search size={17} style={{ color: C.muted, flexShrink: 0 }} />
+        <input value={query} onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search the Exchange — LF90, NQ rods, 6 inch DTH bit, rotation head overhaul"
+          style={{
+            flex: 1, background: 'none', border: 'none', outline: 'none',
+            color: C.text, fontSize: 14, fontFamily: 'inherit', minWidth: 0,
+          }} />
+        {query && (
+          <button onClick={() => setQuery('')} aria-label="Clear search"
+            style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', display: 'flex' }}>
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       {/* ============ FEATURED ============ */}
@@ -691,6 +631,9 @@ export default function MarketplacePage() {
                 <div style={{ fontSize: 13, color: C.muted }}>
                   <strong style={{ color: C.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{results.length}</strong>
                   {' '}{results.length === 1 ? 'listing' : 'listings'}
+                  <span style={{ color: C.faint }}>
+                    {' '}from {MARKET_STATS.partners} suppliers across {MARKET_STATS.countries} countries
+                  </span>
                 </div>
               </div>
 
@@ -747,7 +690,7 @@ export default function MarketplacePage() {
                         onSave={(id) => setSaved((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })}
                         onQuote={setQuoteFor} />
                       {i === 5 && results.length > 7 && (
-                        <BillboardSlot placement="grid" rotationKey={0} />
+                        <GridPlacement rotationKey={0} />
                       )}
                     </Fragment>
                   ))}
@@ -787,13 +730,6 @@ export default function MarketplacePage() {
       {quoteFor && <QuoteModal listing={quoteFor} onClose={() => setQuoteFor(null)} />}
 
       <style>{`
-        @media (max-width: 1180px) {
-          .xpl-hero { grid-template-columns: minmax(0,1fr) !important; gap: 24px !important; }
-          .xpl-hero-ad { min-height: 0 !important; }
-        }
-        @media (max-width: 620px) {
-          .xpl-hero-ad { display: none !important; }
-        }
         @media (max-width: 1024px) {
           .xpl-rail { display: none; }
           .xpl-rail-open {
