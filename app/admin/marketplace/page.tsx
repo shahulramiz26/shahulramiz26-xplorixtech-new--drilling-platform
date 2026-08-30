@@ -3,71 +3,56 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import {
-  Search, SlidersHorizontal, BadgeCheck, MapPin, Bookmark,
-  ArrowRight, Package, X,
+  Search, BadgeCheck, MapPin, Bookmark, ArrowRight, Package, X,
+  LayoutGrid, List as ListIcon, ChevronDown, Clock, Eye, SlidersHorizontal,
+  Truck, Disc3, Minus, ArrowDownToLine, Wind, HardHat, Wrench, Flame,
 } from 'lucide-react'
 import {
-  LISTINGS, CATEGORIES, CONDITIONS, COUNTRIES,
-  formatPrice, type Listing,
+  LISTINGS, CATEGORIES, CATEGORY_FILTERS, CONDITIONS, COUNTRIES, REGIONS,
+  MARKET_STATS, formatPrice, categoryCount, countryCount,
+  type Listing, type FilterDef,
 } from './data'
 
-/* ------------------------------------------------------------------ */
-/* Tokens — inherited from the Admin Console shell                     */
-/* ------------------------------------------------------------------ */
+/* ---------------- tokens ---------------- */
 const C = {
-  accent: '#F97316',
-  accentDim: 'rgba(249,115,22,0.12)',
-  accentBorder: 'rgba(249,115,22,0.25)',
-  panel: '#0D1117',
-  border: '#1E293B',
-  text: '#F8FAFC',
-  dim: '#94A3B8',
-  muted: '#64748B',
-  faint: '#334155',
+  accent: '#F97316', accentSoft: 'rgba(249,115,22,0.10)',
+  accentDim: 'rgba(249,115,22,0.14)', accentBorder: 'rgba(249,115,22,0.28)',
+  panel: '#0D1117', panelHi: '#11161F', bg: '#080B10',
+  border: '#1E293B', borderSoft: 'rgba(30,41,59,0.6)',
+  text: '#F8FAFC', dim: '#94A3B8', muted: '#64748B', faint: '#334155',
   green: '#10B981',
 }
-
 const display = "'Space Grotesk', sans-serif"
 
-/* ------------------------------------------------------------------ */
-/* Equipment plate — stands in for photography until partners upload   */
-/* ------------------------------------------------------------------ */
-function EquipmentPlate({ listing, height = 168 }: { listing: Listing; height?: number }) {
+const ICONS: Record<string, React.ElementType> = {
+  Truck, Disc3, Minus, ArrowDownToLine, Wind, Package, HardHat, Wrench,
+}
+
+/* ---------------- equipment plate ---------------- */
+function Plate({ listing, height, big = false }: { listing: Listing; height: number; big?: boolean }) {
   return (
-    <div
-      style={{
-        height,
-        position: 'relative',
-        overflow: 'hidden',
-        background: 'linear-gradient(135deg, #11161F 0%, #0A0E14 100%)',
-        borderBottom: `1px solid ${C.border}`,
-        display: 'flex',
-        alignItems: 'flex-end',
-        padding: 16,
-      }}
-    >
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', inset: 0, opacity: 0.5,
-          backgroundImage:
-            'repeating-linear-gradient(115deg, rgba(148,163,184,0.05) 0px, rgba(148,163,184,0.05) 1px, transparent 1px, transparent 11px)',
-        }}
-      />
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', right: -30, top: -30,
-          width: 150, height: 150, transform: 'rotate(15deg)',
-          background: 'linear-gradient(135deg, rgba(249,115,22,0.10), transparent 65%)',
-          borderRadius: 24,
-        }}
-      />
+    <div style={{
+      height, position: 'relative', overflow: 'hidden',
+      background: `linear-gradient(140deg, ${C.panelHi} 0%, #0A0E14 100%)`,
+      display: 'flex', alignItems: 'flex-end', padding: big ? 22 : 15,
+    }}>
+      <div aria-hidden style={{
+        position: 'absolute', inset: 0, opacity: 0.55,
+        backgroundImage: 'repeating-linear-gradient(115deg, rgba(148,163,184,0.05) 0 1px, transparent 1px 12px)',
+      }} />
+      <div aria-hidden style={{
+        position: 'absolute', right: -40, top: -40, width: big ? 260 : 160, height: big ? 260 : 160,
+        transform: 'rotate(15deg)', borderRadius: 32,
+        background: 'linear-gradient(135deg, rgba(249,115,22,0.11), transparent 62%)',
+      }} />
       <div style={{ position: 'relative' }}>
-        <div style={{ fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase', color: C.faint, fontWeight: 700 }}>
+        <div style={{ fontSize: 9.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: C.faint, fontWeight: 700 }}>
           {listing.brand}
         </div>
-        <div style={{ fontSize: 26, fontWeight: 700, color: 'rgba(248,250,252,0.13)', fontFamily: display, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+        <div style={{
+          fontSize: big ? 40 : 25, fontWeight: 700, fontFamily: display,
+          color: 'rgba(248,250,252,0.12)', letterSpacing: '-0.03em', lineHeight: 1.05,
+        }}>
           {listing.model}
         </div>
       </div>
@@ -75,159 +60,734 @@ function EquipmentPlate({ listing, height = 168 }: { listing: Listing; height?: 
   )
 }
 
-function ConditionPill({ condition }: { condition: string }) {
-  const map: Record<string, { bg: string; fg: string; bd: string }> = {
-    New: { bg: 'rgba(16,185,129,0.10)', fg: '#34D399', bd: 'rgba(16,185,129,0.22)' },
-    Used: { bg: 'rgba(148,163,184,0.10)', fg: '#94A3B8', bd: 'rgba(148,163,184,0.20)' },
-    Refurbished: { bg: 'rgba(245,158,11,0.10)', fg: '#FBBF24', bd: 'rgba(245,158,11,0.22)' },
+function ConditionPill({ condition, size = 'sm' }: { condition: string; size?: 'sm' | 'xs' }) {
+  const map: Record<string, [string, string, string]> = {
+    New: ['rgba(16,185,129,0.10)', '#34D399', 'rgba(16,185,129,0.22)'],
+    Used: ['rgba(148,163,184,0.10)', '#94A3B8', 'rgba(148,163,184,0.20)'],
+    Refurbished: ['rgba(245,158,11,0.10)', '#FBBF24', 'rgba(245,158,11,0.22)'],
   }
-  const s = map[condition] ?? map.Used
+  const [bg, fg, bd] = map[condition] ?? map.Used
   return (
     <span style={{
-      fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
-      padding: '3px 8px', borderRadius: 6, background: s.bg, color: s.fg, border: `1px solid ${s.bd}`,
-      whiteSpace: 'nowrap',
-    }}>
-      {condition}
-    </span>
+      fontSize: size === 'xs' ? 9.5 : 10, fontWeight: 700, letterSpacing: '0.08em',
+      textTransform: 'uppercase', padding: '3px 8px', borderRadius: 6,
+      background: bg, color: fg, border: `1px solid ${bd}`, whiteSpace: 'nowrap',
+    }}>{condition}</span>
   )
 }
 
-/* ------------------------------------------------------------------ */
-/* Listing card — the spec strip is the point                          */
-/* ------------------------------------------------------------------ */
-function ListingCard({
-  listing, saved, onToggleSave, onQuote,
-}: {
-  listing: Listing
-  saved: boolean
-  onToggleSave: (id: string) => void
-  onQuote: (l: Listing) => void
+function SpecStrip({ listing, dense = false }: { listing: Listing; dense?: boolean }) {
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1,
+      background: C.border, border: `1px solid ${C.border}`, borderRadius: 9, overflow: 'hidden',
+    }}>
+      {listing.headlineSpecs.map((s) => (
+        <div key={s.label} style={{ background: '#0A0E14', padding: dense ? '7px 8px' : '9px 8px' }}>
+          <div style={{ fontSize: 9, color: C.faint, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700 }}>
+            {s.label}
+          </div>
+          <div style={{ fontSize: 12.5, color: C.text, fontWeight: 600, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
+            {s.value}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ---------------- cards ---------------- */
+function GridCard({ l, saved, onSave, onQuote }: {
+  l: Listing; saved: boolean; onSave: (id: string) => void; onQuote: (l: Listing) => void
 }) {
   const [hover, setHover] = useState(false)
-
   return (
     <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{
-        borderRadius: 14,
-        overflow: 'hidden',
-        background: C.panel,
-        border: `1px solid ${hover ? 'rgba(249,115,22,0.28)' : C.border}`,
+        borderRadius: 14, overflow: 'hidden', background: C.panel,
+        border: `1px solid ${hover ? C.accentBorder : C.border}`,
         transform: hover ? 'translateY(-3px)' : 'none',
-        transition: 'transform .22s ease, border-color .22s ease, box-shadow .22s ease',
-        boxShadow: hover ? '0 14px 34px rgba(0,0,0,0.45)' : 'none',
-        display: 'flex', flexDirection: 'column',
+        boxShadow: hover ? '0 16px 36px rgba(0,0,0,0.5)' : 'none',
+        transition: 'all .22s ease', display: 'flex', flexDirection: 'column',
       }}
     >
-      <div style={{ position: 'relative' }}>
-        <Link href={`/admin/marketplace/${listing.slug}`} style={{ textDecoration: 'none', display: 'block' }}>
-          <EquipmentPlate listing={listing} />
+      <div style={{ position: 'relative', borderBottom: `1px solid ${C.border}` }}>
+        <Link href={`/admin/marketplace/${l.slug}`} style={{ display: 'block' }}>
+          <Plate listing={l} height={158} />
         </Link>
-        <div style={{ position: 'absolute', top: 12, left: 12 }}>
-          <ConditionPill condition={listing.condition} />
+        <div style={{ position: 'absolute', top: 11, left: 11, display: 'flex', gap: 6 }}>
+          <ConditionPill condition={l.condition} />
+          {l.featured && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9.5, fontWeight: 700,
+              letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 6,
+              background: C.accentDim, color: C.accent, border: `1px solid ${C.accentBorder}`,
+            }}><Flame size={10} /> Featured</span>
+          )}
         </div>
-        <button
-          onClick={() => onToggleSave(listing.id)}
-          aria-label={saved ? 'Remove from saved' : 'Save listing'}
+        <button onClick={() => onSave(l.id)} aria-label={saved ? 'Remove from saved' : 'Save listing'}
           style={{
-            position: 'absolute', top: 10, right: 10,
-            width: 30, height: 30, borderRadius: 8, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: saved ? C.accentDim : 'rgba(8,11,16,0.7)',
+            position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderRadius: 8,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: saved ? C.accentDim : 'rgba(8,11,16,0.72)',
             border: `1px solid ${saved ? C.accentBorder : C.border}`,
-            color: saved ? C.accent : C.muted,
-            backdropFilter: 'blur(6px)',
-          }}
-        >
+            color: saved ? C.accent : C.muted, backdropFilter: 'blur(6px)',
+          }}>
           <Bookmark size={14} fill={saved ? C.accent : 'none'} />
         </button>
       </div>
 
-      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', flex: 1 }}>
-        <div style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.faint, fontWeight: 700, marginBottom: 6 }}>
-          {listing.categoryLabel}
+      <div style={{ padding: 15, display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7, gap: 8 }}>
+          <span style={{ fontSize: 9.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.faint, fontWeight: 700 }}>
+            {l.categoryLabel}
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: C.faint }}>
+            <Eye size={11} />{l.views}
+          </span>
         </div>
 
-        <Link
-          href={`/admin/marketplace/${listing.slug}`}
-          style={{ textDecoration: 'none', color: C.text, fontSize: 15, fontWeight: 600, lineHeight: 1.35, fontFamily: display }}
-        >
-          {listing.title}
+        <Link href={`/admin/marketplace/${l.slug}`}
+          style={{ color: C.text, fontSize: 14.5, fontWeight: 600, lineHeight: 1.35, fontFamily: display, marginBottom: 13 }}>
+          {l.title}
         </Link>
 
-        {/* Spec strip — what a drilling engineer actually buys on */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 1, margin: '14px 0', background: C.border,
-          border: `1px solid ${C.border}`, borderRadius: 9, overflow: 'hidden',
-        }}>
-          {listing.headlineSpecs.map((s) => (
-            <div key={s.label} style={{ background: '#0A0E14', padding: '9px 8px' }}>
-              <div style={{ fontSize: 9, color: C.faint, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700 }}>
-                {s.label}
-              </div>
-              <div style={{ fontSize: 12.5, color: C.text, fontWeight: 600, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
-                {s.value}
-              </div>
-            </div>
-          ))}
-        </div>
+        <SpecStrip listing={l} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: C.muted, marginBottom: 12 }}>
-          <MapPin size={12} style={{ flexShrink: 0 }} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {listing.location}
-          </span>
-          {listing.year && <span style={{ color: C.faint }}>· {listing.year}</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: C.muted, margin: '12px 0' }}>
+          <MapPin size={11} style={{ flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.location}</span>
+          {l.year && <span style={{ color: C.faint }}>· {l.year}</span>}
         </div>
 
         <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 11 }}>
             <div style={{
-              fontSize: listing.priceType === 'on_request' ? 13 : 16,
-              fontWeight: 700, fontFamily: display,
-              color: listing.priceType === 'on_request' ? C.dim : C.text,
-              fontVariantNumeric: 'tabular-nums',
-            }}>
-              {formatPrice(listing)}
-            </div>
-            {listing.partner.verified && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: C.green, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                <BadgeCheck size={13} /> Verified
+              fontSize: l.priceType === 'on_request' ? 12.5 : 16, fontWeight: 700, fontFamily: display,
+              color: l.priceType === 'on_request' ? C.dim : C.text, fontVariantNumeric: 'tabular-nums',
+            }}>{formatPrice(l)}</div>
+            {l.partner.verified && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: C.green, fontWeight: 600 }}>
+                <BadgeCheck size={12} /> Verified
               </span>
             )}
           </div>
-
-          <button
-            onClick={() => onQuote(listing)}
-            style={{
-              width: '100%', padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
-              fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-              background: hover ? 'linear-gradient(135deg, #F97316, #EA580C)' : 'rgba(249,115,22,0.10)',
-              color: hover ? '#fff' : C.accent,
-              border: `1px solid ${hover ? 'transparent' : C.accentBorder}`,
-              transition: 'all .22s ease',
-            }}
-          >
-            Request quote <ArrowRight size={14} />
-          </button>
+          <button onClick={() => onQuote(l)} style={{
+            width: '100%', padding: '9px 14px', borderRadius: 10, cursor: 'pointer',
+            fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            background: hover ? 'linear-gradient(135deg,#F97316,#EA580C)' : C.accentSoft,
+            color: hover ? '#fff' : C.accent,
+            border: `1px solid ${hover ? 'transparent' : C.accentBorder}`, transition: 'all .22s',
+          }}>Request quote <ArrowRight size={13} /></button>
         </div>
       </div>
     </div>
   )
 }
 
-/* ------------------------------------------------------------------ */
-/* Quote drawer — pre-filled from the tenant's own XPLORIX profile     */
-/* ------------------------------------------------------------------ */
+function RowCard({ l, saved, onSave, onQuote }: {
+  l: Listing; saved: boolean; onSave: (id: string) => void; onQuote: (l: Listing) => void
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'grid', gridTemplateColumns: '180px minmax(0,1fr) 200px',
+        background: C.panel, borderRadius: 13, overflow: 'hidden',
+        border: `1px solid ${hover ? C.accentBorder : C.border}`, transition: 'border-color .2s',
+      }}>
+      <Link href={`/admin/marketplace/${l.slug}`} style={{ display: 'block', borderRight: `1px solid ${C.border}` }}>
+        <Plate listing={l} height={150} />
+      </Link>
+
+      <div style={{ padding: 16, minWidth: 0 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+          <ConditionPill condition={l.condition} size="xs" />
+          <span style={{ fontSize: 9.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.faint, fontWeight: 700 }}>
+            {l.categoryLabel}
+          </span>
+        </div>
+        <Link href={`/admin/marketplace/${l.slug}`}
+          style={{ color: C.text, fontSize: 15.5, fontWeight: 600, fontFamily: display, display: 'block', marginBottom: 10 }}>
+          {l.title}
+        </Link>
+        <div style={{ maxWidth: 400, marginBottom: 10 }}><SpecStrip listing={l} dense /></div>
+        <div style={{ display: 'flex', gap: 14, fontSize: 11.5, color: C.muted, flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={11} />{l.location}, {l.country}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={11} />{l.postedDaysAgo}d ago</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Eye size={11} />{l.views}</span>
+        </div>
+      </div>
+
+      <div style={{ padding: 16, borderLeft: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
+        <div>
+          <div style={{
+            fontSize: l.priceType === 'on_request' ? 13 : 19, fontWeight: 700, fontFamily: display,
+            color: C.text, fontVariantNumeric: 'tabular-nums',
+          }}>{formatPrice(l)}</div>
+          <div style={{ fontSize: 11, color: C.green, marginTop: 3, fontWeight: 600 }}>{l.availability}</div>
+        </div>
+        <div style={{ fontSize: 11.5, color: C.muted, display: 'flex', alignItems: 'center', gap: 4 }}>
+          {l.partner.verified && <BadgeCheck size={12} style={{ color: C.green, flexShrink: 0 }} />}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.partner.name}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 7 }}>
+          <button onClick={() => onQuote(l)} style={{
+            flex: 1, padding: '9px', borderRadius: 9, cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
+            fontFamily: 'inherit', background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff', border: 'none',
+          }}>Request quote</button>
+          <button onClick={() => onSave(l.id)} aria-label="Save" style={{
+            width: 36, borderRadius: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: saved ? C.accentDim : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${saved ? C.accentBorder : C.border}`, color: saved ? C.accent : C.muted,
+          }}><Bookmark size={14} fill={saved ? C.accent : 'none'} /></button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ---------------- filter rail pieces ---------------- */
+function RailSection({ title, children, defaultOpen = true }: {
+  title: string; children: React.ReactNode; defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div style={{ borderBottom: `1px solid ${C.border}`, padding: '14px 0' }}>
+      <button onClick={() => setOpen(!open)} style={{
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: open ? 12 : 0,
+        fontFamily: 'inherit',
+      }}>
+        <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.dim, fontWeight: 700 }}>
+          {title}
+        </span>
+        <ChevronDown size={14} style={{ color: C.faint, transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .2s' }} />
+      </button>
+      {open && children}
+    </div>
+  )
+}
+
+function Check({ label, count, on, onClick }: {
+  label: string; count?: number; on: boolean; onClick: () => void
+}) {
+  return (
+    <button onClick={onClick} style={{
+      width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '6px 8px',
+      borderRadius: 8, cursor: 'pointer', background: on ? C.accentSoft : 'transparent',
+      border: 'none', fontFamily: 'inherit', textAlign: 'left',
+    }}>
+      <span style={{
+        width: 15, height: 15, borderRadius: 4, flexShrink: 0,
+        border: `1.5px solid ${on ? C.accent : C.faint}`, background: on ? C.accent : 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {on && <svg width="9" height="9" viewBox="0 0 10 10"><path d="M1 5l2.5 2.5L9 2" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+      </span>
+      <span style={{ fontSize: 12.5, color: on ? C.text : C.dim, flex: 1, fontWeight: on ? 600 : 400 }}>{label}</span>
+      {count !== undefined && <span style={{ fontSize: 11, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>{count}</span>}
+    </button>
+  )
+}
+
+function RangeSlider({ def, value, onChange }: {
+  def: Extract<FilterDef, { type: 'range' }>; value: number; onChange: (v: number) => void
+}) {
+  return (
+    <div style={{ padding: '2px 8px 6px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
+        <span style={{ fontSize: 12, color: C.dim }}>{def.label}</span>
+        <span style={{ fontSize: 12, color: value > def.min ? C.accent : C.faint, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+          {value > def.min ? `≥ ${value.toLocaleString()} ${def.unit}` : 'Any'}
+        </span>
+      </div>
+      <input type="range" min={def.min} max={def.max} step={def.step} value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{ width: '100%', accentColor: C.accent, cursor: 'pointer' }} />
+    </div>
+  )
+}
+
+/* ---------------- page ---------------- */
+export default function MarketplacePage() {
+  const [query, setQuery] = useState('')
+  const [category, setCategory] = useState('all')
+  const [subCategory, setSubCategory] = useState<string | null>(null)
+  const [conditions, setConditions] = useState<string[]>([])
+  const [countries, setCountries] = useState<string[]>([])
+  const [region, setRegion] = useState<string | null>(null)
+  const [verifiedOnly, setVerifiedOnly] = useState(false)
+  const [priceMax, setPriceMax] = useState(800000)
+  const [dynamic, setDynamic] = useState<Record<string, string | number>>({})
+  const [sort, setSort] = useState('recent')
+  const [view, setView] = useState<'grid' | 'list'>('grid')
+  const [saved, setSaved] = useState<Set<string>>(new Set())
+  const [quoteFor, setQuoteFor] = useState<Listing | null>(null)
+  const [railOpen, setRailOpen] = useState(false)
+
+  const toggle = <T,>(arr: T[], v: T, set: (a: T[]) => void) =>
+    set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v])
+
+  const activeCat = CATEGORIES.find((c) => c.id === category)
+  const dynamicDefs = category !== 'all' ? CATEGORY_FILTERS[category] ?? [] : []
+
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    let out = LISTINGS.filter((l) => {
+      if (category !== 'all' && l.categoryId !== category) return false
+      if (subCategory && l.subCategoryId !== subCategory) return false
+      if (conditions.length && !conditions.includes(l.condition)) return false
+      if (countries.length && !countries.includes(l.country)) return false
+      if (region && COUNTRIES.find((c) => c.name === l.country)?.region !== region) return false
+      if (verifiedOnly && !l.partner.verified) return false
+      if (l.priceUSD !== null && l.priceUSD > priceMax) return false
+      for (const [k, v] of Object.entries(dynamic)) {
+        if (v === '' || v === undefined) continue
+        const lv = l.filterValues[k]
+        if (lv === undefined) return false
+        if (typeof v === 'number') { if (Number(lv) < v) return false }
+        else if (String(lv) !== v) return false
+      }
+      if (q) {
+        const hay = `${l.title} ${l.brand} ${l.model} ${l.categoryLabel} ${l.location} ${l.country} ${l.partner.name}`.toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+    if (sort === 'recent') out = [...out].sort((a, b) => a.postedDaysAgo - b.postedDaysAgo)
+    if (sort === 'price_low') out = [...out].sort((a, b) => (a.priceUSD ?? Infinity) - (b.priceUSD ?? Infinity))
+    if (sort === 'price_high') out = [...out].sort((a, b) => (b.priceUSD ?? 0) - (a.priceUSD ?? 0))
+    if (sort === 'popular') out = [...out].sort((a, b) => b.views - a.views)
+    return out
+  }, [query, category, subCategory, conditions, countries, region, verifiedOnly, priceMax, dynamic, sort])
+
+  const featured = LISTINGS.filter((l) => l.featured).slice(0, 4)
+
+  const chips: { label: string; clear: () => void }[] = [
+    ...(category !== 'all' ? [{ label: activeCat?.label ?? '', clear: () => { setCategory('all'); setSubCategory(null); setDynamic({}) } }] : []),
+    ...(subCategory ? [{ label: activeCat?.subs.find((s) => s.id === subCategory)?.label ?? '', clear: () => setSubCategory(null) }] : []),
+    ...conditions.map((c) => ({ label: c, clear: () => toggle(conditions, c, setConditions) })),
+    ...countries.map((c) => ({ label: c, clear: () => toggle(countries, c, setCountries) })),
+    ...(region ? [{ label: region, clear: () => setRegion(null) }] : []),
+    ...(verifiedOnly ? [{ label: 'Verified only', clear: () => setVerifiedOnly(false) }] : []),
+    ...Object.entries(dynamic).filter(([, v]) => v !== '' && v !== undefined).map(([k, v]) => ({
+      label: `${dynamicDefs.find((d) => d.key === k)?.label ?? k}: ${v}`,
+      clear: () => setDynamic((p) => { const n = { ...p }; delete n[k]; return n }),
+    })),
+  ]
+
+  const clearAll = () => {
+    setCategory('all'); setSubCategory(null); setConditions([]); setCountries([])
+    setRegion(null); setVerifiedOnly(false); setDynamic({}); setPriceMax(800000); setQuery('')
+  }
+
+  return (
+    <div style={{ maxWidth: 1440 }}>
+
+      {/* ============ HERO ============ */}
+      <div style={{
+        position: 'relative', overflow: 'hidden', borderRadius: 18, padding: '30px 32px',
+        background: `linear-gradient(135deg, ${C.panelHi} 0%, ${C.bg} 70%)`,
+        border: `1px solid ${C.border}`, marginBottom: 22,
+      }}>
+        <div aria-hidden style={{
+          position: 'absolute', inset: 0, opacity: 0.5,
+          backgroundImage: 'repeating-linear-gradient(115deg, rgba(148,163,184,0.045) 0 1px, transparent 1px 14px)',
+        }} />
+        <div aria-hidden style={{
+          position: 'absolute', right: -80, top: -90, width: 340, height: 340, borderRadius: 50,
+          transform: 'rotate(15deg)', background: 'linear-gradient(135deg, rgba(249,115,22,0.13), transparent 60%)',
+        }} />
+
+        <div style={{ position: 'relative' }}>
+          <div style={{ fontSize: 10.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: C.accent, fontWeight: 700, marginBottom: 10 }}>
+            XPLORIX Exchange
+          </div>
+          <h1 style={{
+            fontSize: 32, fontWeight: 700, color: C.text, fontFamily: display,
+            letterSpacing: '-0.03em', margin: '0 0 10px', lineHeight: 1.1, maxWidth: 620,
+          }}>
+            Every rig, bit and rod in the industry, in one place
+          </h1>
+          <p style={{ fontSize: 14, color: C.muted, margin: '0 0 22px', maxWidth: 520, lineHeight: 1.65 }}>
+            Listed by verified suppliers to exploration drilling. Request a quote and your
+            company profile goes across with it.
+          </p>
+
+          {/* search */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 11, padding: '14px 18px', borderRadius: 13,
+            background: 'rgba(8,11,16,0.7)', border: `1px solid ${C.border}`,
+            maxWidth: 640, backdropFilter: 'blur(8px)',
+          }}>
+            <Search size={18} style={{ color: C.muted, flexShrink: 0 }} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)}
+              placeholder="LF90, NQ rods, 6 inch DTH bit, rotation head overhaul…"
+              style={{
+                flex: 1, background: 'none', border: 'none', outline: 'none',
+                color: C.text, fontSize: 14.5, fontFamily: 'inherit', minWidth: 0,
+              }} />
+            {query && (
+              <button onClick={() => setQuery('')} aria-label="Clear"
+                style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', display: 'flex' }}>
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* stats */}
+          <div style={{ display: 'flex', gap: 30, marginTop: 24, flexWrap: 'wrap' }}>
+            {[
+              [MARKET_STATS.listings, 'Live listings'],
+              [MARKET_STATS.partners, 'Suppliers'],
+              [MARKET_STATS.countries, 'Countries'],
+              [`${MARKET_STATS.verifiedShare}%`, 'From verified partners'],
+            ].map(([v, k]) => (
+              <div key={String(k)}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: C.text, fontFamily: display, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+                  {v}
+                </div>
+                <div style={{ fontSize: 10.5, color: C.muted, letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600, marginTop: 2 }}>
+                  {k}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ============ FEATURED ============ */}
+      {category === 'all' && !query && (
+        <div style={{ marginBottom: 26 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 13 }}>
+            <Flame size={15} style={{ color: C.accent }} />
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: C.text, fontFamily: display, margin: 0 }}>
+              Featured this week
+            </h2>
+            <span style={{ flex: 1, height: 1, background: C.border }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+            {featured.map((l) => (
+              <Link key={l.id} href={`/admin/marketplace/${l.slug}`}
+                style={{
+                  borderRadius: 13, overflow: 'hidden', background: C.panel,
+                  border: `1px solid ${C.border}`, display: 'block',
+                }}>
+                <Plate listing={l} height={92} />
+                <div style={{ padding: '12px 14px', borderTop: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 13, color: C.text, fontWeight: 600, lineHeight: 1.35, marginBottom: 6 }}>
+                    {l.title}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: C.dim, fontWeight: 600 }}>{formatPrice(l)}</span>
+                    <span style={{ fontSize: 11, color: C.faint }}>{l.country}</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ============ BODY ============ */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 24 }} className="xpl-body">
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+
+          {/* ---- filter rail ---- */}
+          <aside
+            className={railOpen ? 'xpl-rail xpl-rail-open' : 'xpl-rail'}
+            style={{
+              width: 252, flexShrink: 0, position: 'sticky', top: 88,
+              maxHeight: 'calc(100vh - 110px)', overflowY: 'auto',
+              background: C.panel, border: `1px solid ${C.border}`,
+              borderRadius: 14, padding: '4px 14px 14px', scrollbarWidth: 'thin',
+            }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '14px 0 0',
+            }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: C.text, fontFamily: display }}>Filters</span>
+              {chips.length > 0 && (
+                <button onClick={clearAll} style={{
+                  background: 'none', border: 'none', color: C.accent, fontSize: 11.5,
+                  fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                }}>Reset</button>
+              )}
+            </div>
+
+            <RailSection title="Category">
+              <button onClick={() => { setCategory('all'); setSubCategory(null); setDynamic({}) }}
+                style={{
+                  width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '7px 8px', borderRadius: 8, cursor: 'pointer', marginBottom: 2,
+                  background: category === 'all' ? C.accentSoft : 'transparent', border: 'none',
+                  color: category === 'all' ? C.accent : C.dim, fontSize: 12.5,
+                  fontWeight: category === 'all' ? 600 : 400, fontFamily: 'inherit',
+                }}>
+                All equipment
+                <span style={{ fontSize: 11, color: C.faint }}>{LISTINGS.length}</span>
+              </button>
+
+              {CATEGORIES.map((cat) => {
+                const Icon = ICONS[cat.icon] ?? Package
+                const on = category === cat.id
+                return (
+                  <div key={cat.id}>
+                    <button onClick={() => { setCategory(on ? 'all' : cat.id); setSubCategory(null); setDynamic({}) }}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '7px 8px',
+                        borderRadius: 8, cursor: 'pointer', marginBottom: 2, border: 'none',
+                        background: on ? C.accentSoft : 'transparent', fontFamily: 'inherit', textAlign: 'left',
+                      }}>
+                      <Icon size={14} style={{ color: on ? C.accent : C.faint, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12.5, color: on ? C.accent : C.dim, flex: 1, fontWeight: on ? 600 : 400 }}>
+                        {cat.label}
+                      </span>
+                      <span style={{ fontSize: 11, color: C.faint, fontVariantNumeric: 'tabular-nums' }}>
+                        {categoryCount(cat.id)}
+                      </span>
+                    </button>
+
+                    {on && (
+                      <div style={{ marginLeft: 22, borderLeft: `1px solid ${C.border}`, paddingLeft: 8, marginBottom: 6 }}>
+                        {cat.subs.map((s) => (
+                          <button key={s.id} onClick={() => setSubCategory(subCategory === s.id ? null : s.id)}
+                            style={{
+                              width: '100%', textAlign: 'left', padding: '5px 7px', borderRadius: 6,
+                              cursor: 'pointer', border: 'none', background: subCategory === s.id ? C.accentSoft : 'transparent',
+                              color: subCategory === s.id ? C.accent : C.muted, fontSize: 12,
+                              fontWeight: subCategory === s.id ? 600 : 400, fontFamily: 'inherit',
+                            }}>{s.label}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </RailSection>
+
+            {/* dynamic, category-specific filters */}
+            {dynamicDefs.length > 0 && (
+              <RailSection title={`${activeCat?.label} specs`}>
+                {dynamicDefs.map((def) =>
+                  def.type === 'range' ? (
+                    <RangeSlider key={def.key} def={def}
+                      value={Number(dynamic[def.key] ?? def.min)}
+                      onChange={(v) => setDynamic((p) => ({ ...p, [def.key]: v }))} />
+                  ) : (
+                    <div key={def.key} style={{ padding: '2px 8px 10px' }}>
+                      <div style={{ fontSize: 12, color: C.dim, marginBottom: 7 }}>{def.label}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                        {def.options.map((o) => {
+                          const on = dynamic[def.key] === o
+                          return (
+                            <button key={o} onClick={() => setDynamic((p) => {
+                              const n = { ...p }; on ? delete n[def.key] : (n[def.key] = o); return n
+                            })} style={{
+                              padding: '4px 9px', borderRadius: 7, cursor: 'pointer', fontSize: 11.5,
+                              fontWeight: 600, fontFamily: 'inherit',
+                              background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
+                              border: `1px solid ${on ? C.accentBorder : C.border}`,
+                              color: on ? C.accent : C.dim,
+                            }}>{o}</button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                )}
+              </RailSection>
+            )}
+
+            <RailSection title="Condition">
+              {CONDITIONS.map((c) => (
+                <Check key={c} label={c} on={conditions.includes(c)}
+                  count={LISTINGS.filter((l) => l.condition === c).length}
+                  onClick={() => toggle(conditions, c, setConditions)} />
+              ))}
+            </RailSection>
+
+            <RailSection title="Region">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, padding: '0 8px' }}>
+                {REGIONS.map((r) => {
+                  const on = region === r
+                  return (
+                    <button key={r} onClick={() => setRegion(on ? null : r)} style={{
+                      padding: '4px 9px', borderRadius: 7, cursor: 'pointer', fontSize: 11.5,
+                      fontWeight: 600, fontFamily: 'inherit',
+                      background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${on ? C.accentBorder : C.border}`, color: on ? C.accent : C.dim,
+                    }}>{r}</button>
+                  )
+                })}
+              </div>
+            </RailSection>
+
+            <RailSection title="Country" defaultOpen={false}>
+              <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                {COUNTRIES.filter((c) => countryCount(c.name) > 0).map((c) => (
+                  <Check key={c.code} label={c.name} count={countryCount(c.name)}
+                    on={countries.includes(c.name)}
+                    onClick={() => toggle(countries, c.name, setCountries)} />
+                ))}
+              </div>
+            </RailSection>
+
+            <RailSection title="Budget">
+              <div style={{ padding: '2px 8px 6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
+                  <span style={{ fontSize: 12, color: C.dim }}>Up to</span>
+                  <span style={{ fontSize: 12, color: priceMax < 800000 ? C.accent : C.faint, fontWeight: 600 }}>
+                    {priceMax >= 800000 ? 'Any' : `$${priceMax.toLocaleString()}`}
+                  </span>
+                </div>
+                <input type="range" min={0} max={800000} step={10000} value={priceMax}
+                  onChange={(e) => setPriceMax(Number(e.target.value))}
+                  style={{ width: '100%', accentColor: C.accent, cursor: 'pointer' }} />
+                <div style={{ fontSize: 10.5, color: C.faint, marginTop: 6, lineHeight: 1.5 }}>
+                  Indicative USD. Listings priced on request are always included.
+                </div>
+              </div>
+            </RailSection>
+
+            <RailSection title="Supplier">
+              <Check label="Verified partners only" on={verifiedOnly} onClick={() => setVerifiedOnly(!verifiedOnly)} />
+            </RailSection>
+          </aside>
+
+          {/* ---- results ---- */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+
+            {/* toolbar */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 12, marginBottom: 14, flexWrap: 'wrap',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button onClick={() => setRailOpen(!railOpen)} className="xpl-rail-toggle"
+                  style={{
+                    display: 'none', alignItems: 'center', gap: 7, padding: '9px 14px', borderRadius: 10,
+                    background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
+                    color: C.dim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  }}>
+                  <SlidersHorizontal size={15} /> Filters
+                </button>
+                <div style={{ fontSize: 13, color: C.muted }}>
+                  <strong style={{ color: C.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{results.length}</strong>
+                  {' '}{results.length === 1 ? 'listing' : 'listings'}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <select value={sort} onChange={(e) => setSort(e.target.value)}
+                  style={{
+                    padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${C.border}`, color: C.dim, fontSize: 12.5,
+                    fontFamily: 'inherit', cursor: 'pointer', outline: 'none', fontWeight: 600,
+                  }}>
+                  <option value="recent">Recently listed</option>
+                  <option value="popular">Most viewed</option>
+                  <option value="price_low">Price, low to high</option>
+                  <option value="price_high">Price, high to low</option>
+                </select>
+
+                <div style={{ display: 'flex', gap: 2, padding: 3, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+                  {(['grid', 'list'] as const).map((v) => {
+                    const Icon = v === 'grid' ? LayoutGrid : ListIcon
+                    const on = view === v
+                    return (
+                      <button key={v} onClick={() => setView(v)} aria-label={`${v} view`} style={{
+                        width: 30, height: 28, borderRadius: 7, cursor: 'pointer', border: 'none',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: on ? C.accentDim : 'transparent', color: on ? C.accent : C.muted,
+                      }}><Icon size={14} /></button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* active chips */}
+            {chips.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 16 }}>
+                {chips.map((c, i) => (
+                  <button key={i} onClick={c.clear} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 10px',
+                    borderRadius: 999, cursor: 'pointer', fontSize: 11.5, fontWeight: 600,
+                    background: C.accentSoft, border: `1px solid ${C.accentBorder}`,
+                    color: C.accent, fontFamily: 'inherit',
+                  }}>{c.label}<X size={12} /></button>
+                ))}
+              </div>
+            )}
+
+            {/* results */}
+            {results.length > 0 ? (
+              view === 'grid' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(258px, 1fr))', gap: 16 }}>
+                  {results.map((l) => (
+                    <GridCard key={l.id} l={l} saved={saved.has(l.id)}
+                      onSave={(id) => setSaved((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })}
+                      onQuote={setQuoteFor} />
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {results.map((l) => (
+                    <RowCard key={l.id} l={l} saved={saved.has(l.id)}
+                      onSave={(id) => setSaved((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })}
+                      onQuote={setQuoteFor} />
+                  ))}
+                </div>
+              )
+            ) : (
+              <div style={{ padding: '60px 24px', textAlign: 'center', borderRadius: 14, background: C.panel, border: `1px dashed ${C.border}` }}>
+                <div style={{
+                  width: 46, height: 46, borderRadius: 12, margin: '0 auto 16px',
+                  background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}><Package size={20} style={{ color: C.muted }} /></div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 6, fontFamily: display }}>
+                  Nothing matches those filters
+                </div>
+                <p style={{ fontSize: 13, color: C.muted, maxWidth: 340, margin: '0 auto 18px', lineHeight: 1.6 }}>
+                  Widen the search, or post a wanted request and we will put it to the supplier network.
+                </p>
+                <button onClick={clearAll} style={{
+                  padding: '9px 18px', borderRadius: 10, cursor: 'pointer', background: C.accentSoft,
+                  border: `1px solid ${C.accentBorder}`, color: C.accent, fontWeight: 600, fontSize: 13, fontFamily: 'inherit',
+                }}>Reset filters</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {quoteFor && <QuoteModal listing={quoteFor} onClose={() => setQuoteFor(null)} />}
+
+      <style>{`
+        @media (max-width: 1024px) {
+          .xpl-rail { display: none; }
+          .xpl-rail-open {
+            display: block !important; position: fixed !important; inset: 64px 0 0 auto !important;
+            width: 300px !important; z-index: 60; border-radius: 0 !important;
+            max-height: none !important; height: calc(100vh - 64px) !important;
+          }
+          .xpl-rail-toggle { display: flex !important; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+/* ---------------- quote modal ---------------- */
 function QuoteModal({ listing, onClose }: { listing: Listing; onClose: () => void }) {
   const [sent, setSent] = useState(false)
   const [qty, setQty] = useState('1')
   const [needBy, setNeedBy] = useState('')
-  const [message, setMessage] = useState('')
 
   const field: React.CSSProperties = {
     width: '100%', padding: '10px 12px', borderRadius: 9,
@@ -240,32 +800,23 @@ function QuoteModal({ listing, onClose }: { listing: Listing; onClose: () => voi
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 100,
-        background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: 520, maxHeight: '88vh', overflowY: 'auto',
-          background: C.panel, border: `1px solid ${C.border}`, borderRadius: 16,
-        }}
-      >
-        <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 100, padding: 20,
+      background: 'rgba(0,0,0,0.74)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 520, maxHeight: '88vh', overflowY: 'auto',
+        background: C.panel, border: `1px solid ${C.border}`, borderRadius: 16,
+      }}>
+        <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <div style={{ fontSize: 17, fontWeight: 700, color: C.text, fontFamily: display }}>
               {sent ? 'Request sent' : 'Request a quote'}
             </div>
-            <div style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>
-              {listing.title}
-            </div>
+            <div style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>{listing.title}</div>
           </div>
-          <button onClick={onClose} aria-label="Close"
-            style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 4, display: 'flex' }}>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', display: 'flex', height: 'fit-content' }}>
             <X size={18} />
           </button>
         </div>
@@ -276,41 +827,26 @@ function QuoteModal({ listing, onClose }: { listing: Listing; onClose: () => voi
               width: 46, height: 46, borderRadius: 12, margin: '0 auto 14px',
               background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <BadgeCheck size={22} style={{ color: C.green }} />
-            </div>
+            }}><BadgeCheck size={22} style={{ color: C.green }} /></div>
             <div style={{ fontSize: 14, color: C.text, fontWeight: 600, marginBottom: 6 }}>
               {listing.partner.name} has your request
             </div>
-            <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6, maxWidth: 340, margin: '0 auto 20px' }}>
-              They will contact you about pricing and availability. Track the status under My inquiries.
+            <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.6, maxWidth: 350, margin: '0 auto 20px' }}>
+              They typically reply within {listing.partner.responseHours} hours. Track the status under My inquiries.
             </p>
-            <Link href="/admin/marketplace/inquiries" onClick={onClose}
-              style={{
-                display: 'inline-block', padding: '10px 20px', borderRadius: 10,
-                background: 'linear-gradient(135deg, #F97316, #EA580C)', color: '#fff',
-                fontWeight: 700, fontSize: 13, textDecoration: 'none',
-              }}>
-              View my inquiries
-            </Link>
+            <Link href="/admin/marketplace/inquiries" onClick={onClose} style={{
+              display: 'inline-block', padding: '10px 20px', borderRadius: 10,
+              background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff', fontWeight: 700, fontSize: 13,
+            }}>View my inquiries</Link>
           </div>
         ) : (
           <div style={{ padding: 22 }}>
-            {/* The differentiator: none of this is typed by the customer */}
-            <div style={{
-              padding: 14, borderRadius: 11, marginBottom: 20,
-              background: 'rgba(249,115,22,0.05)', border: `1px solid rgba(249,115,22,0.14)`,
-            }}>
+            <div style={{ padding: 14, borderRadius: 11, marginBottom: 20, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.14)' }}>
               <div style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.accent, fontWeight: 700, marginBottom: 10 }}>
                 Sent with your request
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px' }}>
-                {[
-                  ['Company', 'Apex Drilling Solutions'],
-                  ['Country', 'India'],
-                  ['Active rigs', '14'],
-                  ['Contact', 'Admin User'],
-                ].map(([k, v]) => (
+                {[['Company', 'Apex Drilling Solutions'], ['Country', 'India'], ['Active rigs', '14'], ['Contact', 'Admin User']].map(([k, v]) => (
                   <div key={k}>
                     <div style={{ fontSize: 10, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>{k}</div>
                     <div style={{ fontSize: 13, color: C.text, fontWeight: 600, marginTop: 2 }}>{v}</div>
@@ -320,293 +856,26 @@ function QuoteModal({ listing, onClose }: { listing: Listing; onClose: () => voi
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-              <div>
-                <label style={label}>Quantity</label>
-                <input style={field} value={qty} onChange={(e) => setQty(e.target.value)} inputMode="numeric" />
-              </div>
-              <div>
-                <label style={label}>Required by</label>
-                <input style={field} type="date" value={needBy} onChange={(e) => setNeedBy(e.target.value)} />
-              </div>
+              <div><label style={label}>Quantity</label>
+                <input style={field} value={qty} onChange={(e) => setQty(e.target.value)} inputMode="numeric" /></div>
+              <div><label style={label}>Required by</label>
+                <input style={field} type="date" value={needBy} onChange={(e) => setNeedBy(e.target.value)} /></div>
             </div>
 
             <div style={{ marginBottom: 20 }}>
               <label style={label}>Message</label>
-              <textarea
-                style={{ ...field, minHeight: 96, resize: 'vertical' }}
-                placeholder="Anything the supplier should know — site conditions, delivery terms, inspection window."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-              />
+              <textarea style={{ ...field, minHeight: 92, resize: 'vertical' }}
+                placeholder="Site conditions, delivery terms, inspection window." />
             </div>
 
-            <button
-              onClick={() => setSent(true)}
-              style={{
-                width: '100%', padding: '12px', borderRadius: 10, cursor: 'pointer',
-                background: 'linear-gradient(135deg, #F97316, #EA580C)', color: '#fff',
-                border: 'none', fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
-                boxShadow: '0 4px 20px rgba(249,115,22,0.3)',
-              }}
-            >
-              Send request
-            </button>
+            <button onClick={() => setSent(true)} style={{
+              width: '100%', padding: 12, borderRadius: 10, cursor: 'pointer',
+              background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff',
+              border: 'none', fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
+              boxShadow: '0 4px 20px rgba(249,115,22,0.3)',
+            }}>Send request</button>
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/* Page                                                                */
-/* ------------------------------------------------------------------ */
-export default function MarketplacePage() {
-  const [query, setQuery] = useState('')
-  const [category, setCategory] = useState('all')
-  const [condition, setCondition] = useState<string | null>(null)
-  const [country, setCountry] = useState<string | null>(null)
-  const [sort, setSort] = useState('recent')
-  const [showFilters, setShowFilters] = useState(false)
-  const [saved, setSaved] = useState<Set<string>>(new Set())
-  const [quoteFor, setQuoteFor] = useState<Listing | null>(null)
-
-  const toggleSave = (id: string) =>
-    setSaved((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    let out = LISTINGS.filter((l) => {
-      if (category !== 'all' && l.categoryId !== category) return false
-      if (condition && l.condition !== condition) return false
-      if (country && l.country !== country) return false
-      if (q) {
-        const hay = `${l.title} ${l.brand} ${l.model} ${l.categoryLabel} ${l.location}`.toLowerCase()
-        if (!hay.includes(q)) return false
-      }
-      return true
-    })
-    if (sort === 'recent') out = [...out].sort((a, b) => a.postedDaysAgo - b.postedDaysAgo)
-    if (sort === 'price_low') out = [...out].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity))
-    return out
-  }, [query, category, condition, country, sort])
-
-  const activeFilters = [condition, country].filter(Boolean).length
-  const clearAll = () => { setCondition(null); setCountry(null); setQuery(''); setCategory('all') }
-
-  return (
-    <div style={{ maxWidth: 1280 }}>
-
-      {/* ---------- Header ---------- */}
-      <div style={{ marginBottom: 26 }}>
-        <div style={{ fontSize: 10.5, letterSpacing: '0.22em', textTransform: 'uppercase', color: C.accent, fontWeight: 700, marginBottom: 8 }}>
-          XPLORIX Exchange
-        </div>
-        <h1 style={{ fontSize: 30, fontWeight: 700, color: C.text, fontFamily: display, letterSpacing: '-0.025em', margin: 0, lineHeight: 1.15 }}>
-          Equipment, parts and services
-        </h1>
-        <p style={{ fontSize: 14, color: C.muted, marginTop: 8, maxWidth: 560, lineHeight: 1.6 }}>
-          Listed by verified suppliers to the exploration drilling industry. Request a quote and
-          your company details go across automatically.
-        </p>
-      </div>
-
-      {/* ---------- Search ---------- */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
-        <div style={{
-          flex: '1 1 340px', display: 'flex', alignItems: 'center', gap: 10,
-          padding: '13px 16px', borderRadius: 12,
-          background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
-        }}>
-          <Search size={17} style={{ color: C.muted, flexShrink: 0 }} />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by model, brand or part — LF90, DTH bit, NQ rods"
-            style={{
-              flex: 1, background: 'none', border: 'none', outline: 'none',
-              color: C.text, fontSize: 14, fontFamily: 'inherit', minWidth: 0,
-            }}
-          />
-          {query && (
-            <button onClick={() => setQuery('')} aria-label="Clear search"
-              style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', display: 'flex', padding: 0 }}>
-              <X size={15} />
-            </button>
-          )}
-        </div>
-
-        <button
-          onClick={() => setShowFilters((v) => !v)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8, padding: '13px 18px',
-            borderRadius: 12, cursor: 'pointer', fontSize: 13.5, fontWeight: 600, fontFamily: 'inherit',
-            background: activeFilters ? C.accentDim : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${activeFilters ? C.accentBorder : C.border}`,
-            color: activeFilters ? C.accent : C.dim,
-          }}
-        >
-          <SlidersHorizontal size={16} />
-          Filters
-          {activeFilters > 0 && (
-            <span style={{
-              minWidth: 18, height: 18, borderRadius: 9, background: C.accent, color: '#fff',
-              fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px',
-            }}>{activeFilters}</span>
-          )}
-        </button>
-      </div>
-
-      {/* ---------- Category rail ---------- */}
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 16, scrollbarWidth: 'none' }}>
-        {CATEGORIES.map((c) => {
-          const on = category === c.id
-          return (
-            <button
-              key={c.id}
-              onClick={() => setCategory(c.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap',
-                padding: '8px 15px', borderRadius: 999, cursor: 'pointer',
-                fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-                background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${on ? C.accentBorder : C.border}`,
-                color: on ? C.accent : C.dim,
-                transition: 'all .18s',
-              }}
-            >
-              {c.label}
-              <span style={{ fontSize: 11, color: on ? 'rgba(249,115,22,0.65)' : C.faint, fontVariantNumeric: 'tabular-nums' }}>
-                {c.count}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ---------- Filter panel ---------- */}
-      {showFilters && (
-        <div style={{
-          padding: 18, borderRadius: 13, marginBottom: 20,
-          background: C.panel, border: `1px solid ${C.border}`,
-          display: 'flex', gap: 30, flexWrap: 'wrap', alignItems: 'flex-start',
-        }}>
-          <FilterGroup title="Condition" options={CONDITIONS} value={condition} onChange={setCondition} />
-          <FilterGroup title="Country" options={COUNTRIES} value={country} onChange={setCountry} />
-          <FilterGroup
-            title="Sort by"
-            options={['recent', 'price_low']}
-            labels={{ recent: 'Recently listed', price_low: 'Price, low to high' }}
-            value={sort}
-            onChange={(v) => setSort(v ?? 'recent')}
-            allowNull={false}
-          />
-        </div>
-      )}
-
-      {/* ---------- Result count ---------- */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
-        <div style={{ fontSize: 13, color: C.muted }}>
-          <strong style={{ color: C.text, fontWeight: 600 }}>{results.length}</strong>{' '}
-          {results.length === 1 ? 'listing' : 'listings'}
-        </div>
-        {(activeFilters > 0 || query || category !== 'all') && (
-          <button onClick={clearAll}
-            style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Clear all
-          </button>
-        )}
-      </div>
-
-      {/* ---------- Grid ---------- */}
-      {results.length > 0 ? (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(288px, 1fr))',
-          gap: 18,
-        }}>
-          {results.map((l) => (
-            <ListingCard
-              key={l.id}
-              listing={l}
-              saved={saved.has(l.id)}
-              onToggleSave={toggleSave}
-              onQuote={setQuoteFor}
-            />
-          ))}
-        </div>
-      ) : (
-        <div style={{
-          padding: '56px 24px', textAlign: 'center',
-          borderRadius: 14, background: C.panel, border: `1px dashed ${C.border}`,
-        }}>
-          <div style={{
-            width: 46, height: 46, borderRadius: 12, margin: '0 auto 16px',
-            background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Package size={20} style={{ color: C.muted }} />
-          </div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 6, fontFamily: display }}>
-            Nothing matches those filters
-          </div>
-          <p style={{ fontSize: 13, color: C.muted, maxWidth: 320, margin: '0 auto 18px', lineHeight: 1.6 }}>
-            Try a wider search, or tell us what you are looking for and we will source it from our supplier network.
-          </p>
-          <button onClick={clearAll}
-            style={{
-              padding: '9px 18px', borderRadius: 10, cursor: 'pointer',
-              background: 'rgba(249,115,22,0.10)', border: `1px solid ${C.accentBorder}`,
-              color: C.accent, fontWeight: 600, fontSize: 13, fontFamily: 'inherit',
-            }}>
-            Clear filters
-          </button>
-        </div>
-      )}
-
-      {quoteFor && <QuoteModal listing={quoteFor} onClose={() => setQuoteFor(null)} />}
-    </div>
-  )
-}
-
-function FilterGroup({
-  title, options, value, onChange, labels, allowNull = true,
-}: {
-  title: string
-  options: string[]
-  value: string | null
-  onChange: (v: string | null) => void
-  labels?: Record<string, string>
-  allowNull?: boolean
-}) {
-  return (
-    <div>
-      <div style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.muted, fontWeight: 700, marginBottom: 10 }}>
-        {title}
-      </div>
-      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-        {options.map((o) => {
-          const on = value === o
-          return (
-            <button
-              key={o}
-              onClick={() => onChange(on && allowNull ? null : o)}
-              style={{
-                padding: '6px 13px', borderRadius: 8, cursor: 'pointer',
-                fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit',
-                background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${on ? C.accentBorder : C.border}`,
-                color: on ? C.accent : C.dim,
-              }}
-            >
-              {labels?.[o] ?? o}
-            </button>
-          )
-        })}
       </div>
     </div>
   )
