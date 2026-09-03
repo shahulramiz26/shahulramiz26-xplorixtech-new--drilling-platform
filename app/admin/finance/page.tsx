@@ -21,12 +21,14 @@ export default function RigCostPage() {
   // each rig's own margin separately would repeat the same bug we fixed:
   // double-counting the cheap first meterage band once per rig.
   const projectMonths = allProjectMonths()
-  const results = projectMonths.map(({ project, month }) => projectCostForMonth(project, month, state.rigRates, state.clientRates[project], inv.purchaseOrders))
+  const results = projectMonths.map(({ project, month }) => projectCostForMonth(project, month, state.rigRates, state.clientRates[project], inv.purchaseOrders, state.holes))
   const pricedResults = results.filter(r => r.contributions.length > 0)
   const totalMargin = pricedResults.filter(r => r.hasClientRate).reduce((s, r) => s + r.totalMargin, 0)
   const totalParts = pricedResults.reduce((s, r) => s + r.contributions.reduce((cs, c) => cs + c.cost.parts, 0), 0)
   const allRigCPMs = pricedResults.flatMap(r => r.contributions.map(c => c.cost.cpm))
   const avgCPM = allRigCPMs.length > 0 ? Math.round(allRigCPMs.reduce((s, v) => s + v, 0) / allRigCPMs.length) : 0
+  const totalFixed = pricedResults.reduce((s, r) => s + r.contributions.reduce((cs, c) => cs + c.cost.fixedCost, 0), 0)
+  const totalVariable = pricedResults.reduce((s, r) => s + r.contributions.reduce((cs, c) => cs + c.cost.variableCost, 0), 0)
 
   const records = operationalRecordsForRig(selectedRig)
   const currentProject = currentProjectForRig(inv.projects, selectedRig)
@@ -61,6 +63,19 @@ export default function RigCostPage() {
             <div style={{ fontSize: 10, color: C.faint, marginTop: 3 }}>{k.note}</div>
           </div>
         ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
+        <div style={{ padding: '16px 18px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Fixed Cost <span style={{ color: '#334155' }}>· rig + labour</span></div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: C.orange, fontFamily: 'monospace' }}>{moneyL(totalFixed)}</div>
+          <div style={{ fontSize: 10, color: C.faint, marginTop: 3 }}>Across all priced rig-months</div>
+        </div>
+        <div style={{ padding: '16px 18px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Variable Cost <span style={{ color: '#334155' }}>· fuel + maint. + mob/demob + parts</span></div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: C.amber, fontFamily: 'monospace' }}>{moneyL(totalVariable)}</div>
+          <div style={{ fontSize: 10, color: C.faint, marginTop: 3 }}>Across all priced rig-months</div>
+        </div>
       </div>
 
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '18px 20px' }}>
@@ -169,6 +184,16 @@ export default function RigCostPage() {
                           <Package size={10} /> Parts pulled live from Inventory Purchase Orders for {ops.rig} on {ops.project}
                         </div>
                       )}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', borderTop: `1px solid ${C.border}` }}>
+                        <div style={{ padding: '10px 18px', borderRight: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 11, color: C.faint }}>Fixed (rig + labour)</span>
+                          <span style={{ fontSize: 13, fontWeight: 800, color: C.orange, fontFamily: 'monospace' }}>{money(cost.fixedCost)}</span>
+                        </div>
+                        <div style={{ padding: '10px 18px', display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 11, color: C.faint }}>Variable (fuel/maint./mob-demob/parts)</span>
+                          <span style={{ fontSize: 13, fontWeight: 800, color: C.amber, fontFamily: 'monospace' }}>{money(cost.variableCost)}</span>
+                        </div>
+                      </div>
                       <div style={{ padding: '10px 18px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: 12, color: C.faint }}>Total cost this month</span>
                         <span style={{ fontSize: 14, fontWeight: 900, color: C.red, fontFamily: 'monospace' }}>{money(cost.total)}</span>
@@ -246,4 +271,3 @@ function RateModal({ ops, existing, onClose, onSave }: { ops: OperationalRecord;
     </div>
   )
 }
-
