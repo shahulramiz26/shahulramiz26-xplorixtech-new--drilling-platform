@@ -23,6 +23,15 @@ export interface RigRateInputs {
   demobilisation: number   // cost TO YOU of moving the rig out, one-time
 }
 
+// A rate a client pays per meter for a given formation type (e.g. "Soft",
+// "Medium", "Hard" — or whatever names a given government contract uses).
+// Free-form list, not a fixed enum, so any customer's formation schedule
+// fits without touching code.
+export interface FormationRate {
+  formation: string
+  ratePerMeter: number
+}
+
 // What you bill the client, per project. This is the only real "contract" —
 // a rig doesn't have one, only a project/client relationship does.
 export interface ClientRate {
@@ -34,6 +43,28 @@ export interface ClientRate {
   band3Rate: number
   standbyRate: number
   drillingDayRate: number; standbyDayRate: number; repairDayRate: number
+  // Government-contract formation surcharge — ADDED on top of the band rate,
+  // per meter, based on which formation that meter was drilled through.
+  // Only applies to meterage contracts. Empty list = no formation billing
+  // (older/simple contracts keep working exactly as before).
+  formationRates: FormationRate[]
+}
+
+// A single borehole — the real billing unit on government contracts, where
+// invoices are built per hole from a formation/depth measurement book, not
+// from a rig's monthly rollup. Entered directly here in Finance (not pulled
+// from operations), since the formation-by-formation meter breakdown is
+// billing detail the ops dashboards don't track.
+export interface Hole {
+  id: string
+  rig: string
+  project: string
+  month: string
+  holeNumber: string
+  metersByFormation: { formation: string; meters: number }[]
+}
+export function holeTotalMeters(h: Hole): number {
+  return h.metersByFormation.reduce((s, m) => s + m.meters, 0)
 }
 
 // ── SAMPLE DATA ──────────────────────────────────────────────────────────
@@ -44,9 +75,32 @@ export const PROJECT_CLIENTS: Record<string, string> = {
 }
 
 export const SEED_CLIENT_RATES: Record<string, ClientRate> = {
-  'Site A - North Field': { project: 'Site A - North Field', client: 'CMPDI', contractType: 'meterage', band1To: 200, band1Rate: 850, band2To: 400, band2Rate: 950, band3Rate: 1050, standbyRate: 8000, drillingDayRate: 28000, standbyDayRate: 12000, repairDayRate: 8000 },
-  'Site B - South Ridge': { project: 'Site B - South Ridge', client: 'DGML', contractType: 'meterage', band1To: 200, band1Rate: 800, band2To: 400, band2Rate: 900, band3Rate: 1000, standbyRate: 7000, drillingDayRate: 25000, standbyDayRate: 10000, repairDayRate: 7000 },
-  'Site C - East Basin': { project: 'Site C - East Basin', client: 'MECL', contractType: 'dayrate', band1To: 200, band1Rate: 0, band2To: 400, band2Rate: 0, band3Rate: 0, standbyRate: 0, drillingDayRate: 28000, standbyDayRate: 12000, repairDayRate: 8000 },
+  'Site A - North Field': {
+    project: 'Site A - North Field', client: 'CMPDI', contractType: 'meterage',
+    band1To: 200, band1Rate: 850, band2To: 400, band2Rate: 950, band3Rate: 1050, standbyRate: 8000,
+    drillingDayRate: 28000, standbyDayRate: 12000, repairDayRate: 8000,
+    formationRates: [
+      { formation: 'Soft', ratePerMeter: 150 },
+      { formation: 'Medium', ratePerMeter: 300 },
+      { formation: 'Hard', ratePerMeter: 450 },
+    ],
+  },
+  'Site B - South Ridge': {
+    project: 'Site B - South Ridge', client: 'DGML', contractType: 'meterage',
+    band1To: 200, band1Rate: 800, band2To: 400, band2Rate: 900, band3Rate: 1000, standbyRate: 7000,
+    drillingDayRate: 25000, standbyDayRate: 10000, repairDayRate: 7000,
+    formationRates: [
+      { formation: 'Soft', ratePerMeter: 140 },
+      { formation: 'Medium', ratePerMeter: 280 },
+      { formation: 'Hard', ratePerMeter: 420 },
+    ],
+  },
+  'Site C - East Basin': {
+    project: 'Site C - East Basin', client: 'MECL', contractType: 'dayrate',
+    band1To: 200, band1Rate: 0, band2To: 400, band2Rate: 0, band3Rate: 0, standbyRate: 0,
+    drillingDayRate: 28000, standbyDayRate: 12000, repairDayRate: 8000,
+    formationRates: [],
+  },
 }
 
 export const SEED_RIG_RATES: RigRateInputs[] = [
@@ -62,23 +116,32 @@ export const SEED_RIG_RATES: RigRateInputs[] = [
   { id: 'rr10', rig: 'Rig C2', project: 'Site C - East Basin', month: '2026-08', rigDayRate: 9200, labourPerDay: 2400, fuelPricePerLitre: 98, mobilisation: 0, demobilisation: 0 },
 ]
 
+export const SEED_HOLES: Hole[] = [
+  { id: 'h1', rig: 'Rig A1', project: 'Site A - North Field', month: '2026-07', holeNumber: 'BH-01', metersByFormation: [{ formation: 'Soft', meters: 40 }, { formation: 'Hard', meters: 60 }] },
+  { id: 'h2', rig: 'Rig A1', project: 'Site A - North Field', month: '2026-07', holeNumber: 'BH-02', metersByFormation: [{ formation: 'Medium', meters: 90 }] },
+]
+
 // ── STORE ──────────────────────────────────────────────────────────────────
-interface State { rigRates: RigRateInputs[]; clientRates: Record<string, ClientRate> }
-function initial(): State { return { rigRates: SEED_RIG_RATES, clientRates: SEED_CLIENT_RATES } }
+interface State { rigRates: RigRateInputs[]; clientRates: Record<string, ClientRate>; holes: Hole[] }
+function initial(): State { return { rigRates: SEED_RIG_RATES, clientRates: SEED_CLIENT_RATES, holes: SEED_HOLES } }
 const uid = (p: string) => `${p}_${Date.now()}_${Math.floor(Math.random() * 9999)}`
 
 interface Ctx {
   state: State
   setRigRate: (r: Omit<RigRateInputs, 'id'> & { id?: string }) => void
   setClientRate: (project: string, rate: ClientRate) => void
+  setHole: (h: Omit<Hole, 'id'> & { id?: string }) => void
+  deleteHole: (id: string) => void
 }
 const FinanceContext = createContext<Ctx | null>(null)
-const KEY = 'xplorix_demo_finance_v3'
+const KEY = 'xplorix_demo_finance_v4'
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
   const [loaded, setLoaded] = useState(false)
-  useEffect(() => { try { const raw = localStorage.getItem(KEY); if (raw) setState(JSON.parse(raw)) } catch (e) {} setLoaded(true) }, [])
+  // Merge over `initial()` (not replace) so people upgrading from an older
+  // saved version (no `holes` key yet) don't crash on a missing field.
+  useEffect(() => { try { const raw = localStorage.getItem(KEY); if (raw) setState(s => ({ ...initial(), ...JSON.parse(raw) })) } catch (e) {} setLoaded(true) }, [])
   useEffect(() => { if (loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch (e) {} }, [state, loaded])
 
   const setRigRate: Ctx['setRigRate'] = r => setState(s => {
@@ -88,12 +151,23 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   })
   const setClientRate: Ctx['setClientRate'] = (project, rate) => setState(s => ({ ...s, clientRates: { ...s.clientRates, [project]: rate } }))
 
-  return <FinanceContext.Provider value={{ state, setRigRate, setClientRate }}>{children}</FinanceContext.Provider>
+  const setHole: Ctx['setHole'] = h => setState(s => {
+    if (h.id) return { ...s, holes: s.holes.map(x => x.id === h.id ? ({ ...h, id: h.id } as Hole) : x) }
+    return { ...s, holes: [{ ...h, id: uid('hole') } as Hole, ...s.holes] }
+  })
+  const deleteHole: Ctx['deleteHole'] = id => setState(s => ({ ...s, holes: s.holes.filter(h => h.id !== id) }))
+
+  return <FinanceContext.Provider value={{ state, setRigRate, setClientRate, setHole, deleteHole }}>{children}</FinanceContext.Provider>
 }
 export function useFinance() { const c = useContext(FinanceContext); if (!c) throw new Error('useFinance must be used inside FinanceProvider'); return c }
 
 // ── CALCULATIONS ─────────────────────────────────────────────────────────
-export interface CostBreakdown { rigCost: number; labour: number; fuel: number; maintenance: number; mobDemob: number; parts: number; total: number; cpm: number }
+
+// Fixed cost = capacity you're committed to paying regardless of output
+// (rig rental/depreciation + labour). Variable cost = everything that
+// scales with actually running the job (fuel, maintenance, mobilisation/
+// demobilisation, parts). `total` is unchanged — still the sum of everything.
+export interface CostBreakdown { rigCost: number; labour: number; fuel: number; maintenance: number; mobDemob: number; parts: number; fixedCost: number; variableCost: number; total: number; cpm: number }
 export function costBreakdown(ops: OperationalRecord, rates: RigRateInputs, inventoryPOs: PurchaseOrder[]): CostBreakdown {
   const days = totalDaysOperated(ops)
   const rigCost = rates.rigDayRate * days
@@ -102,9 +176,11 @@ export function costBreakdown(ops: OperationalRecord, rates: RigRateInputs, inve
   const maintenance = ops.maintenanceCost
   const mobDemob = rates.mobilisation + rates.demobilisation
   const parts = inventoryPOs.filter(po => po.rig === ops.rig && po.project === ops.project).reduce((s, po) => s + poReceivedValue(po), 0)
-  const total = rigCost + labour + fuel + maintenance + mobDemob + parts
+  const fixedCost = rigCost + labour
+  const variableCost = fuel + maintenance + mobDemob + parts
+  const total = fixedCost + variableCost
   const cpm = ops.metersDrilled > 0 ? total / ops.metersDrilled : 0
-  return { rigCost, labour, fuel, maintenance, mobDemob, parts, total, cpm }
+  return { rigCost, labour, fuel, maintenance, mobDemob, parts, fixedCost, variableCost, total, cpm }
 }
 
 export function calcClientRevenue(rate: ClientRate, opts: { meters: number; standbyDays?: number; drillingDays?: number; repairDays?: number }) {
@@ -121,23 +197,66 @@ export function calcClientRevenue(rate: ClientRate, opts: { meters: number; stan
   return drillingDays * rate.drillingDayRate + standbyDays * rate.standbyDayRate + repairDays * rate.repairDayRate
 }
 
-// Project Cost — combines every rig working a project in a given month
-// BEFORE applying the client rate. This matters for meterage contracts:
-// the bands apply to the project's combined output, not each rig's meters
-// priced separately (pricing each rig separately would double up the
-// cheaper Band 1 allowance once per rig, which is wrong).
-// Day-rate contracts don't have this problem — each rig's days can be
-// priced independently and summed, since there's no shared tier to split.
+// Formation surcharge for one hole: meters in each formation × that
+// formation's contract rate, ADDED on top of band-tier revenue (per the
+// client's own billing rule: formation and band rates are additive).
+// A formation name on the hole that has no matching rate on the contract
+// contributes ₹0 and is reported back via `unmatchedFormations` so the UI
+// can flag it — never silently guessed.
+export function formationRevenueForHole(hole: Hole, rate: ClientRate): number {
+  return hole.metersByFormation.reduce((sum, mf) => {
+    const fr = rate.formationRates.find(f => f.formation.trim().toLowerCase() === mf.formation.trim().toLowerCase())
+    return sum + mf.meters * (fr?.ratePerMeter ?? 0)
+  }, 0)
+}
+export function unmatchedFormations(hole: Hole, rate: ClientRate): string[] {
+  return hole.metersByFormation
+    .filter(mf => !rate.formationRates.some(f => f.formation.trim().toLowerCase() === mf.formation.trim().toLowerCase()))
+    .map(mf => mf.formation)
+}
+
+// Per-hole revenue = band-tier revenue (tiered on that hole's own total
+// meters, same math as before) + formation surcharge. Standby is billed at
+// the project level (it isn't tied to a specific hole), so it's excluded
+// here and added once at the project level instead.
+export interface HoleRevenueResult { hole: Hole; totalMeters: number; bandRevenue: number; formationRevenue: number; total: number; unmatched: string[] }
+export function holeRevenue(hole: Hole, rate: ClientRate): HoleRevenueResult {
+  const totalMeters = holeTotalMeters(hole)
+  if (rate.contractType !== 'meterage') return { hole, totalMeters, bandRevenue: 0, formationRevenue: 0, total: 0, unmatched: [] }
+  const bandRevenue = calcClientRevenue(rate, { meters: totalMeters })
+  const formationRevenue = formationRevenueForHole(hole, rate)
+  return { hole, totalMeters, bandRevenue, formationRevenue, total: bandRevenue + formationRevenue, unmatched: unmatchedFormations(hole, rate) }
+}
+
+export function holesForProjectMonth(holes: Hole[], project: string, month: string): Hole[] {
+  return holes.filter(h => h.project === project && h.month === month)
+}
+
+// Project Cost — combines every rig working a project in a given month for
+// the COST side (unchanged: bands would double-count Band 1's cheap rate if
+// split per rig, so cost stays combined-then-priced as before).
+//
+// The REVENUE side now comes from holes, once holes exist for that project
+// + month — that's the real per-hole billing view. If no holes have been
+// entered yet, revenue falls back to the old ops-combined band estimate
+// (no formation surcharge, since formation is only ever recorded on a
+// hole) so the page still shows a usable number while holes are being
+// entered, with `usingHoleFallback: true` so the UI can say so.
 export interface RigContribution { rig: string; ops: OperationalRecord; cost: CostBreakdown }
 export interface ProjectCostResult {
   project: string; month: string
   contributions: RigContribution[]     // rigs that have rates set
   missingRates: OperationalRecord[]    // rigs operating this month with no rates set yet
   combinedMeters: number; combinedCost: number; projectCPM: number
-  hasClientRate: boolean; revenue: number; clientRatePerMeter: number
+  hasClientRate: boolean
+  holes: HoleRevenueResult[]           // hole-by-hole revenue breakdown, this project+month
+  holesRevenue: number                 // sum of hole revenue (meterage only, excludes standby)
+  holesMeters: number
+  usingHoleFallback: boolean           // true = no holes entered, revenue is an ops-based estimate
+  revenue: number; clientRatePerMeter: number
   marginPerMeter: number; totalMargin: number
 }
-export function projectCostForMonth(project: string, month: string, rigRates: RigRateInputs[], clientRate: ClientRate | undefined, inventoryPOs: PurchaseOrder[]): ProjectCostResult {
+export function projectCostForMonth(project: string, month: string, rigRates: RigRateInputs[], clientRate: ClientRate | undefined, inventoryPOs: PurchaseOrder[], holes: Hole[]): ProjectCostResult {
   const records = operationalRecordsForProjectMonth(project, month)
   const contributions: RigContribution[] = []
   const missingRates: OperationalRecord[] = []
@@ -149,26 +268,56 @@ export function projectCostForMonth(project: string, month: string, rigRates: Ri
   const combinedMeters = contributions.reduce((s, c) => s + c.ops.metersDrilled, 0)
   const combinedCost = contributions.reduce((s, c) => s + c.cost.total, 0)
   const projectCPM = combinedMeters > 0 ? combinedCost / combinedMeters : 0
+  const totalStandbyDays = contributions.reduce((s, c) => s + c.ops.standbyDays, 0)
+
+  const monthHoles = holesForProjectMonth(holes, project, month)
+  const holeResults = clientRate ? monthHoles.map(h => holeRevenue(h, clientRate)) : []
+  const holesMeters = holeResults.reduce((s, h) => s + h.totalMeters, 0)
+  const holesRevenue = holeResults.reduce((s, h) => s + h.total, 0)
 
   let revenue = 0
+  let usingHoleFallback = false
   if (clientRate) {
-    revenue = clientRate.contractType === 'meterage'
-      ? calcClientRevenue(clientRate, { meters: combinedMeters })
-      : contributions.reduce((s, c) => s + calcClientRevenue(clientRate, { meters: 0, drillingDays: c.ops.drillingDays, standbyDays: c.ops.standbyDays, repairDays: c.ops.repairDays }), 0)
+    if (clientRate.contractType === 'meterage') {
+      if (monthHoles.length > 0) {
+        revenue = holesRevenue + totalStandbyDays * clientRate.standbyRate
+      } else {
+        usingHoleFallback = true
+        revenue = calcClientRevenue(clientRate, { meters: combinedMeters, standbyDays: totalStandbyDays })
+      }
+    } else {
+      revenue = contributions.reduce((s, c) => s + calcClientRevenue(clientRate, { meters: 0, drillingDays: c.ops.drillingDays, standbyDays: c.ops.standbyDays, repairDays: c.ops.repairDays }), 0)
+    }
   }
   const clientRatePerMeter = combinedMeters > 0 ? revenue / combinedMeters : 0
   const marginPerMeter = clientRatePerMeter - projectCPM
   const totalMargin = revenue - combinedCost
 
-  return { project, month, contributions, missingRates, combinedMeters, combinedCost, projectCPM, hasClientRate: !!clientRate, revenue, clientRatePerMeter, marginPerMeter, totalMargin }
+  return { project, month, contributions, missingRates, combinedMeters, combinedCost, projectCPM, hasClientRate: !!clientRate, holes: holeResults, holesRevenue, holesMeters, usingHoleFallback, revenue, clientRatePerMeter, marginPerMeter, totalMargin }
 }
 
 // Line-item breakdown of a project's revenue for a given month — built from
 // the exact same math as projectCostForMonth's revenue figure, so an
 // invoice generated from this can never disagree with what's on screen.
+// Hole-by-hole (band + formation lines per hole) once holes exist; falls
+// back to the old combined-band breakdown when they don't.
 export interface RevenueLineItem { label: string; qty: string; rate: string; amount: number }
 export function projectRevenueLineItems(result: ProjectCostResult, clientRate: ClientRate): RevenueLineItem[] {
   const items: RevenueLineItem[] = []
+
+  if (clientRate.contractType === 'meterage' && !result.usingHoleFallback && result.holes.length > 0) {
+    result.holes.forEach(hr => {
+      if (hr.bandRevenue > 0) items.push({ label: `${hr.hole.holeNumber} — Meterage (band)`, qty: `${hr.totalMeters}m`, rate: 'tiered', amount: hr.bandRevenue })
+      hr.hole.metersByFormation.forEach(mf => {
+        const fr = clientRate.formationRates.find(f => f.formation.trim().toLowerCase() === mf.formation.trim().toLowerCase())
+        if (fr && mf.meters > 0) items.push({ label: `${hr.hole.holeNumber} — ${mf.formation} formation`, qty: `${mf.meters}m`, rate: `₹${fr.ratePerMeter}/m`, amount: mf.meters * fr.ratePerMeter })
+      })
+    })
+    const standbyTotal = result.contributions.reduce((s, c) => s + c.ops.standbyDays, 0)
+    if (standbyTotal > 0) items.push({ label: 'Standby Days', qty: `${standbyTotal} days`, rate: `₹${clientRate.standbyRate}/day`, amount: standbyTotal * clientRate.standbyRate })
+    return items
+  }
+
   const meters = result.combinedMeters
   if (clientRate.contractType === 'meterage') {
     const b1 = Math.min(meters, clientRate.band1To)
@@ -231,4 +380,3 @@ export function FinanceNav({ active }: { active: string }) {
 export function cpmColor(cpm: number) { return cpm < 900 ? C.green : cpm < 1100 ? C.amber : C.red }
 export function cpmLabel(cpm: number) { return cpm < 900 ? 'Good' : cpm < 1100 ? 'Watch' : 'Alert' }
 export function marginColor(m: number) { return m >= 0 ? C.green : C.red }
-
