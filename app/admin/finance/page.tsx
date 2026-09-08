@@ -4,18 +4,18 @@ import { useState, useMemo, useEffect, Fragment, ReactNode } from 'react'
 import { useInventory } from '../../../lib/inventory-store'
 import {
   CostingProvider, useCosting,
-  C, LAYER, iStyle, derivedStyle, money, moneyL, perUnit, pct,
+  C, LAYER, iStyle, derivedStyle, money, perUnit, pct,
   cpuColor, marginColor, statusColor, holeStatusColor,
-  monthLabel, dayLabel, fullDate, monthOf, daysInMonth,
+  monthLabel, dayLabel, fullDate, monthOf, daysInMonth, shiftMonth,
+  projectCode, rigCode, holesFromDays,
   rigsFor, monthsFor, versionOn, newestFirst, uid,
   ownershipBreakdown, dayCost, rollup, withCumulative, holeResult,
   partsPerUnitFor, isBillable,
   blankOwnership, blankOperating, blankClientRate,
   PROJECT_CLIENTS, ROCK_CATEGORIES, HOLE_SIZES, DAY_STATUS_LABEL,
   type DayCost, type DayCostMTD, type Rollup, type OwnershipBreakdown,
-  type RigOwnership, type OperatingRate, type ClientRate, type Hole, type HoleStatus,
+  type RigOwnership, type OperatingRate, type ClientRate, type HoleStatus,
   type HoleResult, type Invoice, type InvoiceLine, type RateRow, type RateAdjustment,
-  type VersionKind,
 } from '../../../lib/costing-store'
 
 /* ==========================================================================
@@ -260,15 +260,6 @@ function Section({ title, note, children }: { title: string; note?: string; chil
   )
 }
 
-function KV({ k, v, tone = C.text, bold }: { k: string; v: string; tone?: string; bold?: boolean }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-      <span style={{ fontSize: 11, color: C.faint }}>{k}</span>
-      <span style={{ fontSize: 13, fontWeight: bold ? 800 : 600, color: tone, fontFamily: 'ui-monospace, monospace' }}>{v}</span>
-    </div>
-  )
-}
-
 /* ==========================================================================
  * 2  The costing view
  *
@@ -355,11 +346,7 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
     const days = withCumulative(raw)
     const roll = rollup(raw)
 
-    const holes = state.holes
-      .filter(h => h.rig === rig && h.project === project)
-      .map(h => holeResult(h, raw))
-      .filter(h => h.days.length > 0)
-      .sort((a, b) => a.hole.startDate.localeCompare(b.hole.startDate))
+    const holes = holesFromDays(raw, state.holeStatus).map(h => holeResult(h, raw))
 
     const orphan = raw.filter(d => !d.holeNumber)
 
@@ -388,10 +375,9 @@ function useProjectHoles(project: string): HoleResult[] {
 
   return useMemo(() => {
     const crVersions = state.clientRates.filter(c => c.project === project)
-    const projectHoles = state.holes.filter(h => h.project === project)
     const keys = new Set<string>()
     state.shiftLogs
-      .filter(l => l.project === project && projectHoles.some(h => h.holeNumber === l.holeNumber))
+      .filter(l => l.project === project && l.holeNumber)
       .forEach(l => keys.add(`${l.rig}|${monthOf(l.date)}`))
 
     const allDays: DayCost[] = []
@@ -421,9 +407,8 @@ function useProjectHoles(project: string): HoleResult[] {
       }
     })
 
-    return projectHoles
+    return holesFromDays(allDays, state.holeStatus)
       .map(h => holeResult(h, allDays))
-      .filter(h => h.days.length > 0)
       .sort((a, b) => (b.hole.endDate || '9999').localeCompare(a.hole.endDate || '9999'))
   }, [state, inv.purchaseOrders, project])
 }
@@ -473,14 +458,14 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
         <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
           <Field label="Project">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {projects.map(p => <Pick key={p} on={project === p} onClick={() => setProject(p)} title={p} sub={PROJECT_CLIENTS[p] || '—'} />)}
+              {projects.map(p => <Pick key={p} on={project === p} onClick={() => setProject(p)} title={projectCode(p)} sub={PROJECT_CLIENTS[p] || '—'} />)}
             </div>
           </Field>
           <Field label="Rig">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {rigs.length === 0
                 ? <span style={{ fontSize: 12, color: C.faint }}>No rigs on this project yet.</span>
-                : rigs.map(r => <Pick key={r} on={rig === r} onClick={() => setRig(r)} title={r}
+                : rigs.map(r => <Pick key={r} on={rig === r} onClick={() => setRig(r)} title={rigCode(r)}
                     sub={state.ownership.some(o => o.rig === r) ? 'rig cost set' : 'no rig cost'} />)}
             </div>
           </Field>
@@ -872,338 +857,149 @@ function ClientPanel({ project, versions, onSave }: {
  * 4  Rates history
  * ========================================================================== */
 
+/* RATES HISTORY — a list of changes, not of states.
+ *
+ * Each row is diffed against the previous entry of the same kind, so it reads
+ * "₹12,650 → ₹14,100" rather than making you compare two rows by eye. There is
+ * no delete: forward-only dates exist so nothing already costed can be
+ * rewritten, and a delete button would walk straight through that. */
 function RatesHistoryModal({ project, rig, onClose }: { project: string; rig: string; onClose: () => void }) {
-  const { state, deleteVersion } = useCosting()
-  const today = new Date().toISOString().slice(0, 10)
+  const { state } = useCosting()
 
-  const rows: { kind: VersionKind; id: string; from: string; scope: string; what: string; detail: string; note?: string; live: boolean }[] = []
+  interface Row { id: string; from: string; rigs: string; what: string; tone: string; changed: string[]; why: string }
+  const rows: Row[] = []
 
-  const ownV = newestFirst(state.ownership.filter(o => o.rig === rig))
-  ownV.forEach((o, i) => {
+  const own = newestFirst(state.ownership.filter(o => o.rig === rig))
+  own.forEach((o, i) => {
+    const prev = own[i + 1]
     const b = ownershipBreakdown(o, monthOf(o.effectiveFrom))
-    rows.push({
-      kind: 'ownership', id: o.id, from: o.effectiveFrom, scope: o.rig, what: 'Rig cost',
-      detail: `${money(b.perMonth)}/month · ${money(b.perDay)}/day · ${o.costBasis} basis`,
-      note: o.note, live: i === 0 && o.effectiveFrom <= today,
-    })
+    const changed: string[] = []
+    if (!prev) changed.push(`First set — ${money(b.perDay)}/day`)
+    else {
+      const pb = ownershipBreakdown(prev, monthOf(o.effectiveFrom))
+      if (Math.round(pb.depPerMonth) !== Math.round(b.depPerMonth)) changed.push(`Depreciation ${money(pb.depPerMonth)} → ${money(b.depPerMonth)}`)
+      if (Math.round(pb.emi) !== Math.round(b.emi)) changed.push(`EMI ${money(pb.emi)} → ${money(b.emi)}`)
+      if (Math.round(pb.perDay) !== Math.round(b.perDay)) changed.push(`Per day ${money(pb.perDay)} → ${money(b.perDay)}${delta(pb.perDay, b.perDay)}`)
+      if (!changed.length) changed.push('No change to the daily figure')
+    }
+    rows.push({ id: o.id, from: o.effectiveFrom, rigs: rigCode(o.rig), what: 'Rig cost', tone: LAYER.ownership, changed, why: o.note || '—' })
   })
 
-  const opV = newestFirst(state.operating.filter(o => o.rig === rig && o.project === project))
-  opV.forEach((o, i) => rows.push({
-    kind: 'operating', id: o.id, from: o.effectiveFrom, scope: `${o.rig} · ${o.project}`, what: 'Operating cost',
-    detail: `Fuel ₹${o.fuelPricePerLitre}/L · labour ${money(o.labourRate)} · lodging ${money(o.lodgingRate)} · transport ${money(o.transportRate)}`,
-    note: o.note, live: i === 0 && o.effectiveFrom <= today,
-  }))
+  const ops = newestFirst(state.operating.filter(o => o.rig === rig && o.project === project))
+  ops.forEach((o, i) => {
+    const prev = ops[i + 1]
+    const changed: string[] = []
+    if (!prev) changed.push(`First set — fuel ₹${o.fuelPricePerLitre}/L, labour ${money(o.labourRate)}`)
+    else {
+      if (prev.fuelPricePerLitre !== o.fuelPricePerLitre) changed.push(`Fuel ₹${prev.fuelPricePerLitre} → ₹${o.fuelPricePerLitre}/L${delta(prev.fuelPricePerLitre, o.fuelPricePerLitre)}`)
+      if (prev.labourRate !== o.labourRate) changed.push(`Labour ${money(prev.labourRate)} → ${money(o.labourRate)}${delta(prev.labourRate, o.labourRate)}`)
+      if (prev.lodgingRate !== o.lodgingRate) changed.push(`Lodging ${money(prev.lodgingRate)} → ${money(o.lodgingRate)}`)
+      if (prev.transportRate !== o.transportRate) changed.push(`Transport ${money(prev.transportRate)} → ${money(o.transportRate)}`)
+      if (prev.waterPricePerLitre !== o.waterPricePerLitre) changed.push(`Water ₹${prev.waterPricePerLitre} → ₹${o.waterPricePerLitre}/L`)
+      if (prev.additivePricePerKg !== o.additivePricePerKg) changed.push(`Additives ₹${prev.additivePricePerKg} → ₹${o.additivePricePerKg}/kg`)
+      if (prev.chargePerMetre !== o.chargePerMetre) changed.push(o.chargePerMetre ? 'Switched to charging per metre' : 'Switched to charging per day')
+      if (!changed.length) changed.push('No change')
+    }
+    rows.push({ id: o.id, from: o.effectiveFrom, rigs: rigCode(o.rig), what: 'Operating cost', tone: LAYER.operating, changed, why: o.note || '—' })
+  })
 
-  const crV = newestFirst(state.clientRates.filter(c => c.project === project))
-  crV.forEach((c, i) => rows.push({
-    kind: 'clientRate', id: c.id, from: c.effectiveFrom, scope: c.project, what: 'Client cost',
-    detail: c.rateRows.map(r => `${r.holeSize} ${r.formation} ${perUnit(r.rate)}`).join(' · ') + ` · standby ${money(c.standbyPerDay)}/day`,
-    note: c.note, live: i === 0 && c.effectiveFrom <= today,
-  }))
+  // Client cost belongs to the project, so it applies to every rig drilling it.
+  const projectRigs = rigsFor(state.shiftLogs, project).map(rigCode)
+  const crs = newestFirst(state.clientRates.filter(c => c.project === project))
+  crs.forEach((c, i) => {
+    const prev = crs[i + 1]
+    const changed: string[] = []
+    if (!prev) changed.push(`First set — ${c.rateRows.length} rate lines`)
+    else {
+      c.rateRows.forEach(r => {
+        const pr = prev.rateRows.find(x => x.holeSize === r.holeSize && x.formation === r.formation)
+        if (!pr) changed.push(`Added ${r.holeSize} ${r.formation} ${perUnit(r.rate)}`)
+        else if (pr.rate !== r.rate) changed.push(`${r.holeSize} ${r.formation} ${perUnit(pr.rate)} → ${perUnit(r.rate)}${delta(pr.rate, r.rate)}`)
+      })
+      prev.rateRows.forEach(pr => {
+        if (!c.rateRows.some(r => r.holeSize === pr.holeSize && r.formation === pr.formation)) changed.push(`Removed ${pr.holeSize} ${pr.formation}`)
+      })
+      if (prev.standbyPerDay !== c.standbyPerDay) changed.push(`Standby ${money(prev.standbyPerDay)} → ${money(c.standbyPerDay)}/day`)
+      if (!changed.length) changed.push('No change')
+    }
+    rows.push({
+      id: c.id, from: c.effectiveFrom,
+      rigs: projectRigs.length ? projectRigs.slice(0, 3).join(', ') + (projectRigs.length > 3 ? ` +${projectRigs.length - 3}` : '') : '—',
+      what: 'Client cost', tone: LAYER.revenue, changed, why: c.note || '—',
+    })
+  })
 
   rows.sort((a, b) => b.from.localeCompare(a.from))
 
   return (
-    <Modal title="Rates history" subtitle={`${rig} · ${project} — every rate change, and what was in force when`} width={900} onClose={onClose}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        <Note tone={C.blue}>
-          Costing looks up the rate in force on each day, so changing a rate never rewrites work already done.
-          A hole closed in March keeps its March rate, and an invoice you have already sent cannot quietly stop matching the screen.
-        </Note>
-
-        {rows.length === 0 ? <Empty>No rates set yet.</Empty> : (
-          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
-            <table style={tableStyle}>
-              <thead>
-                <tr><th style={th}>Effective from</th><th style={th}>What</th><th style={th}>Scope</th><th style={th}>Detail</th><th style={th} /></tr>
-              </thead>
-              <tbody>
-                {rows.map(r => (
-                  <tr key={r.id} style={{ borderBottom: rowBorder }}>
-                    <td style={{ ...td, color: C.text, fontWeight: 700 }}>
-                      {fullDate(r.from)}
-                      {r.live && <span style={{ marginLeft: 8 }}><Tag tone={C.green}>in force</Tag></span>}
-                      {r.from > today && <span style={{ marginLeft: 8 }}><Tag tone={C.blue}>scheduled</Tag></span>}
-                    </td>
-                    <td style={td}><Tag tone={r.what === 'Client cost' ? LAYER.revenue : r.what === 'Rig cost' ? LAYER.ownership : LAYER.operating}>{r.what}</Tag></td>
-                    <td style={td}>{r.scope}</td>
-                    <td style={{ ...td, whiteSpace: 'normal', maxWidth: 340, lineHeight: 1.6 }}>
-                      {r.detail}
-                      {r.note && <div style={{ fontSize: 10, color: C.dim, marginTop: 3 }}>{r.note}</div>}
-                    </td>
-                    <td style={{ ...td, textAlign: 'right' }}>
-                      <Btn size="sm" tone="danger" onClick={() => deleteVersion(r.kind, r.id)}>Delete</Btn>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+    <Modal title="Rates history" subtitle={`${rigCode(rig)} · ${projectCode(project)} — what changed, when, and why`} width={960} onClose={onClose}>
+      {rows.length === 0 ? <Empty>No rates set yet.</Empty> : (
+        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+          <table style={tableStyle}>
+            <thead>
+              <tr><th style={th}>Date</th><th style={th}>Rig</th><th style={th}>What</th><th style={th}>What changed</th><th style={th}>Why</th></tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.id} style={{ borderBottom: rowBorder, verticalAlign: 'top' }}>
+                  <td style={{ ...td, color: C.text, fontWeight: 700 }}>{fullDate(r.from)}</td>
+                  <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{r.rigs}</td>
+                  <td style={td}><Tag tone={r.tone}>{r.what}</Tag></td>
+                  <td style={{ ...td, whiteSpace: 'normal', maxWidth: 300, color: C.muted, lineHeight: 1.7 }}>
+                    {r.changed.map((c, k) => <div key={k}>{c}</div>)}
+                  </td>
+                  <td style={{ ...td, whiteSpace: 'normal', maxWidth: 220, color: C.text, lineHeight: 1.6 }}>{r.why}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Modal>
   )
+}
+
+function delta(from: number, to: number) {
+  if (!from) return ''
+  const p = ((to - from) / from) * 100
+  return ` (${p >= 0 ? '+' : ''}${p.toFixed(1)}%)`
 }
 
 /* ==========================================================================
  * 5  Tabs
  * ========================================================================== */
 
-function OverviewTab({ v, rig, month, onSetRates }: { v: RigMonthView; rig: string; month: string; onSetRates: () => void }) {
+/* PERFORMANCE — how the month is going, day by day.
+ *
+ * Two things only: the table and the graph. A zero-metre day shows its cost
+ * with CPM as "—", never zero, because the rig still cost money that day.
+ *
+ * Every figure left of Service cost comes from a log. Everything right of it
+ * is that quantity priced by the rate version in force on that day. */
+
+function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month: string }) {
+  const [open, setOpen] = useState<string | null>(null)
   if (!v.hasLogs) {
-    return <Card><Empty>No driller logs for {rig} in {monthLabel(month)}.<br />Costing reads metres, hours, crew and fuel from the log — once shifts are recorded, they cost out here automatically.</Empty></Card>
+    return <Card><Empty>No driller logs for {rigCode(rig)} in {monthLabel(month)}.<br />Costing reads metres, hours, crew and fuel from the log — once shifts are recorded they cost out here.</Empty></Card>
   }
 
-  const r = v.roll
-  const unit = 'm'
-  const rate = r.revenuePerUnit
-  const ownershipGap = r.ownershipCPU - v.budgetOwnershipCPU
-
-  // Metres drilled with no matching rate line bill at zero, so it is surfaced
-  // rather than quietly lost.
-  const unmatchedDays = v.days.filter(d => d.unmatched)
-  const unmatchedUnits = unmatchedDays.reduce((a, d) => a + d.units, 0)
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {(!v.ownership || !v.operating) && (
-        <Note tone={C.amber}>
-          {!v.ownership && <>No rig cost set for {rig}, so ownership counts as zero and every figure below is understated. </>}
-          {!v.operating && <>No operating rates set. </>}
-          <button onClick={onSetRates} style={{ background: 'none', border: 'none', color: C.amber, textDecoration: 'underline', cursor: 'pointer', padding: 0, font: 'inherit' }}>Set rates</button>
-        </Note>
-      )}
-
-      {r.missingDays > 0 && (
-        <Note tone={C.red}>
-          {r.missingDays} {r.missingDays === 1 ? 'day has' : 'days have'} no shift log. They are costed as standby but bill nothing —
-          a missing submission must never invent revenue. Get the logs in, or confirm those days were standby.
-        </Note>
-      )}
-
-      {unmatchedUnits > 0 && (
-        <Note tone={C.red}>
-          {unmatchedUnits} m drilled with no matching rate line — the logs record a size and formation the client rate has no
-          row for, so those metres bill at zero. Add the missing line in Set rates rather than letting it reach an invoice.
-        </Note>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 14 }}>
-        <Stat label="Metres drilled" value={`${r.units} ${unit}`} note={`${r.drillingDays} drilling days`} big />
-        <Stat label="Full cost" value={moneyL(r.total)} note="operating + ownership" color={LAYER.full} big />
-        <Stat label="Cost per metre" value={perUnit(r.cpu)}
-          note="what one unit actually costs" color={rate ? cpuColor(r.cpu, rate) : LAYER.full} big />
-        <Stat label="Margin" value={r.revenue > 0 ? moneyL(r.margin) : '—'}
-          note={r.revenue > 0 ? `${pct(r.marginPct)} of ${moneyL(r.revenue)}` : 'no client rate set'}
-          color={r.revenue > 0 ? marginColor(r.margin) : C.faint} big />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14 }}>
-        <LayerCard tone={LAYER.operating} title="Operating cost" value={moneyL(r.operating)} rate={perUnit(r.operatingCPU)}
-          note="Fuel, water, additives, crew, repairs, parts. What running the rig consumed." />
-        <LayerCard tone={LAYER.ownership} title="Ownership cost" value={moneyL(r.ownership)} rate={perUnit(r.ownershipCPU)}
-          note={`${v.ob.basisLabel || 'not configured'}. Due whether or not a metre gets drilled.`} />
-        <LayerCard tone={LAYER.full} title="Full cost" value={moneyL(r.total)} rate={perUnit(r.cpu)}
-          note="The only figure that should ever be compared against a client rate." />
-      </div>
-
-      {v.ownership && v.ownership.expectedUnitsPerMonth > 0 && (
-        <Card title="Budget against actual"
-          subtitle="Ownership per metre assumes a monthly output. Miss it and the same fixed cost lands on fewer metres."
-          accent={Math.abs(v.productionVariancePct) > 5 ? C.amber : undefined}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 20 }}>
-            <Compare label="Metres" budget={`${v.ownership.expectedUnitsPerMonth} ${unit}`} actual={`${r.units} ${unit}`}
-              delta={`${v.productionVariancePct >= 0 ? '+' : ''}${v.productionVariancePct.toFixed(1)}%`}
-              tone={v.productionVariancePct >= 0 ? C.green : C.red} />
-            <Compare label="Operating days" budget={`${v.ownership.expectedOperatingDays}`} actual={`${r.days - r.missingDays}`}
-              delta={`${(r.days - r.missingDays) - v.ownership.expectedOperatingDays >= 0 ? '+' : ''}${(r.days - r.missingDays) - v.ownership.expectedOperatingDays}`}
-              tone={(r.days - r.missingDays) >= v.ownership.expectedOperatingDays ? C.green : C.amber} />
-            <Compare label="Ownership per metre" budget={perUnit(v.budgetOwnershipCPU)} actual={perUnit(r.ownershipCPU)}
-              delta={`${ownershipGap >= 0 ? '+' : ''}${money(ownershipGap)}/${unit}`} tone={ownershipGap <= 0 ? C.green : C.red} />
-            <Compare label="Ownership charged" budget={money(v.ob.perMonth)} actual={money(r.ownership)}
-              delta={r.ownership > v.ob.perMonth ? `over by ${money(r.ownership - v.ob.perMonth)}` : `under by ${money(v.ob.perMonth - r.ownership)}`}
-              tone={C.amber} />
-          </div>
-          <div style={{ marginTop: 18 }}>
-            <Note tone={C.amber}>
-              The divisor is held steady all month so a day&apos;s cost doesn&apos;t change every time the rig drills. That means the
-              total charged to days rarely equals the {money(v.ob.perMonth)} actually due — here it came to {money(r.ownership)},
-              a difference of {money(Math.abs(r.ownership - v.ob.perMonth))}. Reconcile it at month close rather than letting it drift into hole costs.
-            </Note>
-          </div>
-        </Card>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 20, alignItems: 'start' }}>
-        <Card title="Where the money went" subtitle={`${rig} · ${monthLabel(month)}`} pad={false}
-          right={<Btn size="sm" onClick={onSetRates}>Set rates</Btn>}>
-          <table style={tableStyle}>
-            <thead><tr><th style={th}>Cost line</th><th style={th}>From</th><th style={thR}>Amount</th><th style={thR}>Per {unit}</th><th style={thR}>Share</th></tr></thead>
-            <tbody>
-              {[
-                { k: 'Fuel', v: r.fuel, src: `${r.fuelLitres.toLocaleString('en-IN')} L, driller's log` },
-                { k: 'Water & additives', v: r.water + r.additives, src: "driller's log" },
-                { k: 'Crew', v: r.labour, src: 'crew count from the log' },
-                { k: 'Repairs', v: r.repairs, src: 'maintenance log' },
-                { k: 'Parts & tooling', v: r.parts, src: 'inventory' },
-              ].map(x => (
-                <tr key={x.k} style={{ borderBottom: rowBorder }}>
-                  <td style={{ ...td, color: C.text, fontWeight: 600 }}>{x.k}</td>
-                  <td style={{ ...td, fontSize: 10, color: C.dim }}>{x.src}</td>
-                  <td style={tdN}>{money(x.v)}</td>
-                  <td style={{ ...tdN, color: C.faint }}>{r.units > 0 ? perUnit(x.v / r.units) : '—'}</td>
-                  <td style={{ ...tdN, color: C.faint }}>{r.total > 0 ? pct((x.v / r.total) * 100) : '—'}</td>
-                </tr>
-              ))}
-              <tr style={{ borderBottom: rowBorder, background: 'rgba(245,158,11,0.05)' }}>
-                <td style={{ ...td, color: LAYER.operating, fontWeight: 800 }} colSpan={2}>Operating cost</td>
-                <td style={{ ...tdN, color: LAYER.operating, fontWeight: 800 }}>{money(r.operating)}</td>
-                <td style={{ ...tdN, color: LAYER.operating }}>{perUnit(r.operatingCPU)}</td>
-                <td style={{ ...tdN, color: C.faint }}>{r.total > 0 ? pct((r.operating / r.total) * 100) : '—'}</td>
-              </tr>
-              <tr style={{ borderBottom: rowBorder, background: 'rgba(139,92,246,0.05)' }}>
-                <td style={{ ...td, color: LAYER.ownership, fontWeight: 800 }} colSpan={2}>
-                  Ownership cost
-                  <span style={{ fontSize: 10, color: C.dim, fontWeight: 400 }}> · {money(v.ob.perDay)}/day</span>
-                </td>
-                <td style={{ ...tdN, color: LAYER.ownership, fontWeight: 800 }}>{money(r.ownership)}</td>
-                <td style={{ ...tdN, color: LAYER.ownership }}>{perUnit(r.ownershipCPU)}</td>
-                <td style={{ ...tdN, color: C.faint }}>{r.total > 0 ? pct((r.ownership / r.total) * 100) : '—'}</td>
-              </tr>
-              <tr style={{ background: 'rgba(249,115,22,0.08)' }}>
-                <td style={{ ...td, color: LAYER.full, fontWeight: 900, fontSize: 13 }} colSpan={2}>Full cost</td>
-                <td style={{ ...tdN, color: LAYER.full, fontWeight: 900, fontSize: 13 }}>{money(r.total)}</td>
-                <td style={{ ...tdN, color: LAYER.full, fontWeight: 900, fontSize: 13 }}>{perUnit(r.cpu)}</td>
-                <td style={tdN} />
-              </tr>
-            </tbody>
-          </table>
-        </Card>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <Card title="Rig ownership" subtitle={v.ownership ? `${rig} · ${v.ownership.costBasis} basis · from ${fullDate(v.ownership.effectiveFrom)}` : 'not set up yet'}>
-            {v.ownership ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-                <KV k="Landed price" v={money(v.ob.landedPrice)} />
-                <KV k="Depreciation" v={`${money(v.ob.depPerMonth)}/mth`} />
-                <KV k="EMI" v={v.ob.emi > 0 ? `${money(v.ob.emi)}/mth` : 'closed'} tone={v.ob.emi > 0 ? C.text : C.green} />
-                <KV k="Insurance" v={`${money(v.ob.insurancePerMonth)}/mth`} />
-                <div style={{ height: 1, background: C.border }} />
-                <KV k="Ownership" v={`${money(v.ob.perMonth)}/mth`} tone={LAYER.ownership} bold />
-                <KV k="Allocated" v={`${money(v.ob.perDay)}/day`} tone={LAYER.ownership} bold />
-                {v.ob.emiActive && v.ob.emiMonthsLeft >= 0 && v.ob.emiMonthsLeft <= 24 && (
-                  <Note tone={C.green}>{v.ob.emiMonthsLeft} EMI payments left. After that ownership falls to {money((v.ob.perMonth - v.ob.emi) / Math.max(1, v.ownership.expectedOperatingDays))}/day.</Note>
-                )}
-              </div>
-            ) : <Empty>Set the purchase price, depreciation and loan terms and XPLORIX works out the daily cost.</Empty>}
-          </Card>
-
-          <Card title="Client rate" subtitle={v.clientRate ? `from ${fullDate(v.clientRate.effectiveFrom)}` : 'not set'}>
-            {v.clientRate ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-                {v.clientRate.rateRows.map(rr => (
-                  <KV key={rr.id} k={`${rr.holeSize} · ${rr.formation}`} v={perUnit(rr.rate)} tone={LAYER.revenue} />
-                ))}
-                <KV k="Standby" v={`${money(v.clientRate.standbyPerDay)}/day`} />
-                <KV k="Revenue this month" v={money(r.revenue)} tone={LAYER.revenue} />
-                <div style={{ height: 1, background: C.border }} />
-                <KV k="Full cost" v={perUnit(r.cpu)} tone={LAYER.full} />
-                <KV k="Realised rate" v={perUnit(r.revenuePerUnit)} tone={LAYER.revenue} />
-                <KV k="Margin" v={pct(r.marginPct)} tone={marginColor(r.margin)} bold />
-              </div>
-            ) : <Empty>Set the client rate to see revenue and margin.</Empty>}
-          </Card>
-
-          {v.unallocated > 0 && (
-            <Card title="Cost carried by no hole" subtitle={`${v.unallocatedDays} days`} accent={C.amber}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: C.amber, fontFamily: 'ui-monospace, monospace' }}>{money(v.unallocated)}</div>
-              <div style={{ fontSize: 11, color: C.faint, marginTop: 8, lineHeight: 1.7 }}>
-                Standby and breakdown days between holes. Shown rather than spread around, because spreading it would make every
-                hole look slightly worse and hide where the loss really is.
-              </div>
-            </Card>
-          )}
-        </div>
-      </div>
-
-    </div>
-  )
-}
-
-function LayerCard({ tone, title, value, rate, note }: { tone: string; title: string; value: string; rate: string; note: string }) {
-  return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${tone}`, borderRadius: 14, padding: '18px 20px' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{title}</span>
-        <span style={{ fontSize: 13, fontWeight: 800, color: tone, fontFamily: 'ui-monospace, monospace' }}>{rate}</span>
-      </div>
-      <div style={{ fontSize: 22, fontWeight: 900, color: tone, fontFamily: 'ui-monospace, monospace', margin: '10px 0 8px' }}>{value}</div>
-      <div style={{ fontSize: 11, color: C.faint, lineHeight: 1.6 }}>{note}</div>
-    </div>
-  )
-}
-
-function Compare({ label, budget, actual, delta, tone }: { label: string; budget: string; actual: string; delta: string; tone: string }) {
-  return (
-    <div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 9 }}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, color: C.dim, fontFamily: 'ui-monospace, monospace' }}>{budget}</span>
-        <span style={{ fontSize: 11, color: C.dim }}>→</span>
-        <span style={{ fontSize: 16, fontWeight: 800, color: C.text, fontFamily: 'ui-monospace, monospace' }}>{actual}</span>
-      </div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: tone, marginTop: 5 }}>{delta}</div>
-    </div>
-  )
-}
-
-/* ── DAILY ────────────────────────────────────────────────────────────────
- * A zero-metre day shows its cost with cost-per-unit as "—", never zero: the
- * rig still cost money that day. And a day's rate is never shown alone —
- * today, month to date and the hole run together, because one metre against a
- * full day of cost reads as an enormous rate that means nothing. */
-
-function DailyTab({ v, rig, month }: { v: RigMonthView; rig: string; month: string }) {
-  const [open, setOpen] = useState<string | null>(null)
-  if (!v.hasLogs) return <Card><Empty>No driller logs for {rig} in {monthLabel(month)}.</Empty></Card>
-
-  const unit = 'm'
   const days = v.days
-  const last = days[days.length - 1]
-  const lastDrilled = [...days].reverse().find(d => d.units > 0)
   const rate = v.roll.revenuePerUnit
-  const currentHole = v.holes.find(h => h.hole.holeNumber === lastDrilled?.holeNumber)
-  const zeroDays = days.filter(d => d.units === 0)
-  const zeroCost = zeroDays.reduce((s, d) => s + d.total, 0)
+  const r = v.roll
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14 }}>
-        <Stat label={`Last drilling day · ${lastDrilled ? dayLabel(lastDrilled.date) : '—'}`}
-          value={lastDrilled?.cpu != null ? perUnit(lastDrilled.cpu) : '—'}
-          note={lastDrilled ? `${lastDrilled.units} ${unit} · ${money(lastDrilled.total)}` : 'nothing drilled yet'}
-          color={lastDrilled?.cpu != null && rate ? cpuColor(lastDrilled.cpu, rate) : C.text} big />
-        <Stat label="Month to date" value={last?.mtdCPU != null ? perUnit(last.mtdCPU) : '—'}
-          note={`${v.roll.units} ${unit} · ${money(v.roll.total)}`}
-          color={last?.mtdCPU != null && rate ? cpuColor(last.mtdCPU, rate) : LAYER.full} big />
-        <Stat label={currentHole ? `Current hole · ${currentHole.hole.holeNumber}` : 'Current hole'}
-          value={currentHole && currentHole.roll.cpu > 0 ? perUnit(currentHole.roll.cpu) : '—'}
-          note={currentHole ? `${currentHole.roll.units} ${unit} · ${money(currentHole.roll.total)}` : 'no hole in progress'}
-          color={currentHole && rate ? cpuColor(currentHole.roll.cpu, rate) : C.text} big />
-      </div>
-
-      <CPUChart days={days} rate={rate} />
-
-      <Card title="Day by day" subtitle={`${rig} · ${monthLabel(month)} · click a day for the full breakdown`} pad={false}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <Card title="Performance" subtitle={`${rigCode(rig)} · ${monthLabel(month)} · click a day for the full breakdown`} pad={false}>
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead>
               <tr>
-                <th style={th}>Date</th><th style={th}>Status</th><th style={th}>Hole</th>
-                <th style={thR}>Hours</th><th style={thR}>Metres</th><th style={thR}>Crew</th>
+                <th style={th}>Date</th><th style={th}>Hole</th><th style={th}>Status</th>
+                <th style={thR}>Crew</th><th style={thR}>Drill hrs</th><th style={thR}>Downtime</th><th style={thR}>Metres</th>
+                <th style={thR}>Maint hrs</th><th style={thR}>Service</th><th style={thR}>Parts</th>
+                <th style={thR}>Fuel</th><th style={thR}>Labour</th>
                 <th style={thR}>Operating</th><th style={thR}>Ownership</th><th style={thR}>Total</th>
-                <th style={thR}>Per {unit}</th><th style={thR}>MTD</th><th style={thR}>Revenue</th>
+                <th style={thR}>CPM</th><th style={thR}>Revenue</th>
               </tr>
             </thead>
             <tbody>
@@ -1217,77 +1013,65 @@ function DailyTab({ v, rig, month }: { v: RigMonthView; rig: string; month: stri
                     }}>
                       <td style={{ ...td, color: C.text, fontWeight: 600 }}>
                         {dayLabel(d.date)}
-                        {!d.submitted && <span style={{ marginLeft: 7 }}><Tag tone={C.red}>no log</Tag></span>}
+                        {!d.submitted && <span style={{ marginLeft: 6 }}><Tag tone={C.red}>no log</Tag></span>}
                       </td>
-                      <td style={td}><Tag tone={statusColor(d.status)}>{DAY_STATUS_LABEL[d.status]}</Tag></td>
                       <td style={{ ...td, color: d.holeNumber ? C.muted : C.dim }}>{d.holeNumber || '—'}</td>
-                      <td style={tdN}>{d.drillingHours || '—'}</td>
-                      <td style={{ ...tdN, color: d.units ? C.text : C.dim, fontWeight: 700 }}>{d.units || '—'}</td>
+                      <td style={td}><Tag tone={statusColor(d.status)}>{DAY_STATUS_LABEL[d.status]}</Tag></td>
                       <td style={tdN}>{d.labour.heads || '—'}</td>
+                      <td style={tdN}>{d.drillingHours || '—'}</td>
+                      <td style={{ ...tdN, color: d.downtimeHours ? C.red : C.dim }}>{d.downtimeHours || '—'}</td>
+                      <td style={{ ...tdN, color: d.units ? C.text : C.dim, fontWeight: 700 }}>{d.units || '—'}</td>
+                      <td style={tdN}>{d.maintenanceHours || '—'}</td>
+                      <td style={{ ...tdN, color: d.repairs ? C.purple : C.dim }}>{d.repairs ? money(d.repairs) : '—'}</td>
+                      <td style={{ ...tdN, color: d.parts ? C.muted : C.dim }}>{d.parts ? money(d.parts) : '—'}</td>
+                      <td style={tdN}>{money(d.fuel)}</td>
+                      <td style={tdN}>{money(d.labour.total)}</td>
                       <td style={{ ...tdN, color: LAYER.operating }}>{money(d.operating)}</td>
                       <td style={{ ...tdN, color: LAYER.ownership }}>{d.ownership > 0 ? money(d.ownership) : '—'}</td>
                       <td style={{ ...tdN, color: C.text, fontWeight: 800 }}>{money(d.total)}</td>
                       <td style={{ ...tdN, fontWeight: 800, color: d.cpu == null ? C.dim : rate ? cpuColor(d.cpu, rate) : C.text }}>
                         {d.cpu == null ? '—' : perUnit(d.cpu)}
                       </td>
-                      <td style={{ ...tdN, color: C.faint }}>{d.mtdCPU == null ? '—' : perUnit(d.mtdCPU)}</td>
                       <td style={{ ...tdN, color: d.revenue > 0 ? LAYER.revenue : C.dim }}>{d.revenue > 0 ? money(d.revenue) : '—'}</td>
                     </tr>
                     {isOpen && (
                       <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
-                        <td colSpan={12} style={{ padding: '18px 20px' }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 24 }}>
+                        <td colSpan={17} style={{ padding: '16px 18px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 22 }}>
                             <Detail title="From the log" tone={C.blue} rows={[
                               ['Shifts', `${d.shifts.length}`],
                               ['Day crew', `${d.labour.dayCrew}`],
                               ['Night crew', `${d.labour.nightCrew}`],
-                              ['Drilling hours', `${d.drillingHours}`],
-                              ['Downtime', `${d.downtimeHours} hrs`],
+                              ['Hole size', d.shifts[0]?.holeSize ?? '—'],
+                              ['Formation', d.shifts[0]?.formationType ?? '—'],
                               ['Core recovery', d.units > 0 ? pct((d.coreRecovery / d.units) * 100) : '—'],
                             ]} />
                             <Detail title="Operating" tone={LAYER.operating} rows={[
                               ['Fuel', `${money(d.fuel)} · ${d.fuelLitres} L`],
                               ['Water', money(d.water)],
                               ['Additives', money(d.additives)],
-                              ['Repairs', money(d.repairs)],
+                              ['Service', money(d.repairs)],
                               ['Parts & tooling', money(d.parts)],
                             ]} />
                             <Detail title="Crew" tone={C.teal} rows={d.labour.perMetre
-                              ? [['Per metre', 'charged on metres'], ['Labour', money(d.labour.labour)], ['Lodging', money(d.labour.lodging)], ['Transport', money(d.labour.transport)], ['Crew cost', money(d.labour.total)]]
-                              : [
-                                ['Labour', money(d.labour.labour)],
-                                ['Lodging', money(d.labour.lodging)],
-                                ['Transport', money(d.labour.transport)],
-                                ['Crew cost', money(d.labour.total)],
-                              ]} />
+                              ? [['Charged', 'per metre'], ['Labour', money(d.labour.labour)], ['Lodging', money(d.labour.lodging)], ['Transport', money(d.labour.transport)], ['Crew cost', money(d.labour.total)]]
+                              : [['Labour', money(d.labour.labour)], ['Lodging', money(d.labour.lodging)], ['Transport', money(d.labour.transport)], ['Crew cost', money(d.labour.total)]]} />
                             <Detail title="Day" tone={LAYER.full} rows={[
                               ['Operating', money(d.operating)],
                               ['Ownership', money(d.ownership)],
                               ['Full cost', money(d.total)],
-                              ['Cost per unit', d.cpu == null ? 'nothing drilled' : perUnit(d.cpu)],
-                              ['Client rate', d.rate > 0 ? perUnit(d.rate) : '—'],
+                              ['Cost per metre', d.cpu == null ? 'nothing drilled' : perUnit(d.cpu)],
+                              ['Client rate', d.rate > 0 ? perUnit(d.rate) : 'no matching rate line'],
                               ['Revenue', money(d.revenue)],
                             ]} />
                           </div>
                           {d.adjustmentPct !== 0 && (
-                            <div style={{ marginTop: 14 }}>
-                              <Note tone={C.amber}>A size adjustment of {d.adjustmentPct}% applied to this day&apos;s rate.</Note>
-                            </div>
+                            <div style={{ marginTop: 12 }}><Note tone={C.amber}>A size adjustment of {d.adjustmentPct}% applied to this day&apos;s rate.</Note></div>
                           )}
-                          {d.status === 'breakdown' && (
-                            <div style={{ marginTop: 14 }}>
-                              <Note tone={C.red}>
-                                Breakdown — {d.downtimeHours} hours lost and {money(d.total)} spent, none of it billable.
-                                {d.repairs > 0 && ` Repairs of ${money(d.repairs)} came from the maintenance log.`}
-                              </Note>
-                            </div>
-                          )}
-                          {d.status === 'standby' && d.submitted && (
-                            <div style={{ marginTop: 14 }}>
-                              <Note tone={C.amber}>
-                                Standby — the client stopped work, so this day cost {money(d.total)} and bills {money(d.revenue)}.
-                              </Note>
-                            </div>
+                          {d.unmatched && (
+                            <div style={{ marginTop: 12 }}><Note tone={C.red}>
+                              No rate line for {d.shifts[0]?.holeSize} + {d.shifts[0]?.formationType}, so these metres bill at zero. Add it in Set rates.
+                            </Note></div>
                           )}
                         </td>
                       </tr>
@@ -1298,41 +1082,28 @@ function DailyTab({ v, rig, month }: { v: RigMonthView; rig: string; month: stri
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                <td style={{ ...td, color: C.text, fontWeight: 800 }} colSpan={3}>{v.roll.days} days</td>
-                <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{v.roll.drillingHours}</td>
-                <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{v.roll.units}</td>
+                <td style={{ ...td, color: C.text, fontWeight: 800 }} colSpan={3}>{r.days} days</td>
                 <td style={tdN} />
-                <td style={{ ...tdN, fontWeight: 800, color: LAYER.operating }}>{money(v.roll.operating)}</td>
-                <td style={{ ...tdN, fontWeight: 800, color: LAYER.ownership }}>{money(v.roll.ownership)}</td>
-                <td style={{ ...tdN, fontWeight: 900, color: C.text }}>{money(v.roll.total)}</td>
-                <td style={{ ...tdN, fontWeight: 900, color: LAYER.full }}>{perUnit(v.roll.cpu)}</td>
-                <td style={tdN} />
-                <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue }}>{money(v.roll.revenue)}</td>
+                <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{r.drillingHours}</td>
+                <td style={{ ...tdN, fontWeight: 800, color: C.red }}>{r.downtimeHours}</td>
+                <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{r.units}</td>
+                <td style={{ ...tdN, fontWeight: 800 }}>{r.maintenanceHours || '—'}</td>
+                <td style={{ ...tdN, fontWeight: 800, color: C.purple }}>{money(r.repairs)}</td>
+                <td style={{ ...tdN, fontWeight: 800 }}>{money(r.parts)}</td>
+                <td style={{ ...tdN, fontWeight: 800 }}>{money(r.fuel)}</td>
+                <td style={{ ...tdN, fontWeight: 800 }}>{money(r.labour)}</td>
+                <td style={{ ...tdN, fontWeight: 800, color: LAYER.operating }}>{money(r.operating)}</td>
+                <td style={{ ...tdN, fontWeight: 800, color: LAYER.ownership }}>{money(r.ownership)}</td>
+                <td style={{ ...tdN, fontWeight: 900, color: C.text }}>{money(r.total)}</td>
+                <td style={{ ...tdN, fontWeight: 900, color: LAYER.full }}>{perUnit(r.cpu)}</td>
+                <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue }}>{money(r.revenue)}</td>
               </tr>
             </tfoot>
           </table>
         </div>
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 20 }}>
-        {zeroDays.length > 0 && (
-          <Card title="Days that produced nothing" accent={C.red}>
-            <div style={{ fontSize: 22, fontWeight: 900, color: C.red, fontFamily: 'ui-monospace, monospace' }}>{money(zeroCost)}</div>
-            <div style={{ fontSize: 11, color: C.faint, marginTop: 8, lineHeight: 1.7 }}>
-              Across {zeroDays.length} {zeroDays.length === 1 ? 'day' : 'days'} ({zeroDays.map(d => dayLabel(d.date)).join(', ')}).
-              Crew and ownership continued regardless. This is the cost a monthly average hides completely.
-            </div>
-          </Card>
-        )}
-        <Card title="Core recovery" accent={C.green}>
-          <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'ui-monospace, monospace', color: C.green }}>
-            {pct(v.roll.coreRecoveryPct)}
-          </div>
-          <div style={{ fontSize: 11, color: C.faint, marginTop: 8, lineHeight: 1.7 }}>
-            {v.roll.coreRecovery.toFixed(1)} m recovered from {v.roll.units} m drilled, straight from the driller&apos;s log.
-          </div>
-        </Card>
-      </div>
+      <CPUChart days={days} rate={rate} />
     </div>
   )
 }
@@ -1421,21 +1192,20 @@ function Legend({ color, label, line }: { color: string; label: string; line?: b
 
 /* ── HOLES ────────────────────────────────────────────────────────────── */
 
-function HolesTab({ v, onAddHole, onEditHole, onStatus }: {
+/* DRILLHOLES — every hole the driller's log mentions, costed and priced.
+ *
+ * The list is derived from the log, so there is nothing to add here: a hole
+ * appears the moment a shift is logged against its number, and the only thing
+ * stored is the decision to close, approve or invoice it. */
+function DrillholesTab({ v, onStatus }: {
   v: RigMonthView
-  onAddHole: () => void
-  onEditHole: (h: Hole) => void
-  onStatus: (id: string, s: HoleStatus) => void
+  onStatus: (holeNumber: string, s: HoleStatus) => void
 }) {
   const [open, setOpen] = useState<string | null>(null)
   const unit = 'm'
 
   if (v.holes.length === 0) {
-    return (
-      <Card title="Holes" subtitle="Nothing recorded for this rig on this project yet" right={<Btn size="sm" onClick={onAddHole}>Add a hole</Btn>}>
-        <Empty>Add a hole, and XPLORIX matches the driller&apos;s logs to it by hole number and works out the cost.</Empty>
-      </Card>
-    )
+    return <Card><Empty>No holes logged for this rig this month.<br />A hole appears here as soon as the driller logs a shift against its number.</Empty></Card>
   }
 
   const t = v.holes.reduce((a, h) => ({
@@ -1456,8 +1226,7 @@ function HolesTab({ v, onAddHole, onEditHole, onStatus }: {
         </Note>
       )}
 
-      <Card title="Holes" subtitle="Cost and metres from the driller's log, revenue at the rate in force each day" pad={false}
-        right={<Btn size="sm" onClick={onAddHole}>Add a hole</Btn>}>
+      <Card title="Drillholes" subtitle="Metres and cost from the driller's log, revenue at the rate in force each day" pad={false}>
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead>
@@ -1471,10 +1240,10 @@ function HolesTab({ v, onAddHole, onEditHole, onStatus }: {
             <tbody>
               {v.holes.map(h => {
                 const hole = h.hole
-                const isOpen = open === hole.id
+                const isOpen = open === hole.holeNumber
                 return (
-                  <Fragment key={hole.id}>
-                    <tr onClick={() => setOpen(isOpen ? null : hole.id)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'rgba(249,115,22,0.05)' : undefined }}>
+                  <Fragment key={hole.holeNumber}>
+                    <tr onClick={() => setOpen(isOpen ? null : hole.holeNumber)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'rgba(249,115,22,0.05)' : undefined }}>
                       <td style={{ ...td, color: C.text, fontWeight: 700 }}>
                         {hole.holeNumber}
                         {h.unmatchedDays > 0 && <span style={{ color: C.red, marginLeft: 7 }}>●</span>}
@@ -1590,15 +1359,14 @@ function HolesTab({ v, onAddHole, onEditHole, onStatus }: {
                           )}
 
                           <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                            <Btn size="sm" onClick={() => onEditHole(hole)}>Edit hole</Btn>
-                            {hole.status === 'drilling' && <Btn size="sm" tone="primary" onClick={() => onStatus(hole.id, 'closed')}>Close hole</Btn>}
+                            {hole.status === 'drilling' && <Btn size="sm" tone="primary" onClick={() => onStatus(hole.holeNumber, 'closed')}>Close hole</Btn>}
                             {hole.status === 'closed' && <>
-                              <Btn size="sm" tone="primary" onClick={() => onStatus(hole.id, 'approved')}>Approve for billing</Btn>
-                              <Btn size="sm" onClick={() => onStatus(hole.id, 'drilling')}>Reopen</Btn>
+                              <Btn size="sm" tone="primary" onClick={() => onStatus(hole.holeNumber, 'approved')}>Approve for billing</Btn>
+                              <Btn size="sm" onClick={() => onStatus(hole.holeNumber, 'drilling')}>Reopen</Btn>
                             </>}
                             {hole.status === 'approved' && <>
                               <span style={{ fontSize: 12, color: C.green }}>Ready to bill — pick it up in the Billing tab.</span>
-                              <Btn size="sm" onClick={() => onStatus(hole.id, 'closed')}>Withdraw approval</Btn>
+                              <Btn size="sm" onClick={() => onStatus(hole.holeNumber, 'closed')}>Withdraw approval</Btn>
                             </>}
                             {hole.status === 'invoiced' && <span style={{ fontSize: 12, color: C.purple }}>Invoiced</span>}
                           </div>
@@ -1659,7 +1427,7 @@ function BillingTab({ project, holes, clientRate, invoices, onCreate, onDelete }
   const ready = holes.filter(h => isBillable(h.hole))
   const waiting = holes.filter(h => h.hole.status === 'closed')
   const toggle = (id: string) => setPicked(s => { const n = new Set(Array.from(s)); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const chosen = ready.filter(h => picked.has(h.hole.id))
+  const chosen = ready.filter(h => picked.has(h.hole.holeNumber))
   const sel = {
     revenue: chosen.reduce((s, h) => s + h.roll.revenue, 0),
     cost: chosen.reduce((s, h) => s + h.roll.total, 0),
@@ -1681,7 +1449,7 @@ function BillingTab({ project, holes, clientRate, invoices, onCreate, onDelete }
         subtitle="Approved holes not yet invoiced. Cost sits beside revenue so nothing goes out at a loss unnoticed."
         right={ready.length > 0 ? (
           <div style={{ display: 'flex', gap: 8 }}>
-            <Btn size="sm" onClick={() => setPicked(picked.size === ready.length ? new Set() : new Set(ready.map(h => h.hole.id)))}>
+            <Btn size="sm" onClick={() => setPicked(picked.size === ready.length ? new Set() : new Set(ready.map(h => h.hole.holeNumber)))}>
               {picked.size === ready.length ? 'Clear' : 'Select all'}
             </Btn>
             <Btn size="sm" tone="primary" disabled={chosen.length === 0} onClick={() => setReview(true)}>
@@ -1698,9 +1466,9 @@ function BillingTab({ project, holes, clientRate, invoices, onCreate, onDelete }
             </thead>
             <tbody>
               {ready.map(h => {
-                const on = picked.has(h.hole.id)
+                const on = picked.has(h.hole.holeNumber)
                 return (
-                  <tr key={h.hole.id} onClick={() => toggle(h.hole.id)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: on ? 'rgba(249,115,22,0.06)' : undefined }}>
+                  <tr key={h.hole.holeNumber} onClick={() => toggle(h.hole.holeNumber)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: on ? 'rgba(249,115,22,0.06)' : undefined }}>
                     <td style={{ ...td, textAlign: 'center' }}>
                       <span style={{ display: 'inline-block', width: 15, height: 15, borderRadius: 4, border: `1.5px solid ${on ? C.orange : C.border}`, background: on ? C.orange : 'transparent', color: '#fff', fontSize: 10, lineHeight: '13px', textAlign: 'center' }}>{on ? '✓' : ''}</span>
                     </td>
@@ -1808,7 +1576,7 @@ function ReviewModal({ project, clientRate, holes, nextNumber, onClose, onCreate
       footer={<><Btn onClick={onClose}>Cancel</Btn>
         <Btn tone="primary" onClick={() => onCreate({
           id: uid('inv'), number, project, client: '', date,
-          holeIds: holes.map(h => h.hole.id), lines, subtotal, taxPercent, total,
+          holeNumbers: holes.map(h => h.hole.holeNumber), lines, subtotal, taxPercent, total,
         })}>Create invoice</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <Grid cols={3}>
@@ -1913,61 +1681,15 @@ td{padding:10px 12px;border-bottom:1px solid #eee;font-size:13px}
 }
 
 /* ==========================================================================
- * 6  Hole editor
- * ========================================================================== */
-
-function HoleModal({ rig, project, existing, onSave, onClose }: {
-  rig: string; project: string; existing?: Hole
-  onSave: (h: Omit<Hole, 'id'> & { id?: string }) => void; onClose: () => void
-}) {
-  const [holeNumber, setHoleNumber] = useState(existing?.holeNumber ?? '')
-  const [startDate, setStartDate] = useState(existing?.startDate ?? new Date().toISOString().slice(0, 10))
-  const [endDate, setEndDate] = useState(existing?.endDate ?? '')
-  const [status, setStatus] = useState<HoleStatus>(existing?.status ?? 'drilling')
-  const [targetDepth, setTargetDepth] = useState(existing?.targetDepth ?? 0)
-
-  return (
-    <Modal title={existing ? `Edit ${existing.holeNumber}` : 'Add a hole'} subtitle={`${rig} · ${project}`} width={640} onClose={onClose}
-      footer={<><Btn onClick={onClose}>Cancel</Btn>
-        <Btn tone="primary" disabled={!holeNumber.trim()} onClick={() => {
-          onSave({ id: existing?.id, holeNumber: holeNumber.trim(), rig, project, startDate, endDate: endDate || undefined, status, targetDepth, invoiceId: existing?.invoiceId })
-          onClose()
-        }}>{existing ? 'Save hole' : 'Add hole'}</Btn></>}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <Note tone={C.dim}>
-          Metres, days and cost all come from the driller&apos;s logs, matched to this hole by its number. Nothing measurable is
-          entered here — only which hole exists, when it ran, and whether it is ready to bill.
-        </Note>
-        <Grid cols={2}>
-          <TextField label="Hole number" value={holeNumber} onChange={setHoleNumber} placeholder="DH-004"
-            hint="Must match what the driller enters in the log" />
-          <NumField label="Target depth" value={targetDepth} onChange={setTargetDepth} suffix="m" />
-        </Grid>
-        <Grid cols={3}>
-          <DateField label="Started" value={startDate} onChange={setStartDate} />
-          <DateField label="Finished" value={endDate} onChange={setEndDate} hint="Leave empty while drilling" />
-          <Field label="Status">
-            <select value={status} onChange={e => setStatus(e.target.value as HoleStatus)} style={{ ...iStyle, cursor: 'pointer' }}>
-              <option value="drilling">Drilling</option><option value="closed">Closed</option>
-              <option value="approved">Approved</option><option value="invoiced">Invoiced</option>
-            </select>
-          </Field>
-        </Grid>
-      </div>
-    </Modal>
-  )
-}
-
-/* ==========================================================================
  * 7  The screen
  * ========================================================================== */
 
-const TABS = ['Overview', 'Daily', 'Holes', 'Billing'] as const
+const TABS = ['Performance', 'Drillholes', 'Invoicing'] as const
 type Tab = typeof TABS[number]
 
 function CostingScreen() {
   const { state: inv } = useInventory()
-  const { state, setHole, setHoleStatus, addInvoice, deleteInvoice } = useCosting()
+  const { state, setHoleStatus, addInvoice, deleteInvoice } = useCosting()
 
   const projects: string[] = inv.projects.map((p: { name: string }) => p.name)
   const [project, setProject] = useState(projects[0] ?? '')
@@ -1981,14 +1703,13 @@ function CostingScreen() {
   const [rig, setRig] = useState(rigs[0] ?? '')
   const months = useMemo(() => monthsFor(state.shiftLogs, rig, project), [state.shiftLogs, rig, project])
   const [month, setMonth] = useState(months[months.length - 1] ?? '')
-  const [tab, setTab] = useState<Tab>('Overview')
+  const [tab, setTab] = useState<Tab>('Performance')
 
   useEffect(() => { if (!rigs.includes(rig)) setRig(rigs[0] ?? '') }, [rigs, rig])
   useEffect(() => { if (!months.includes(month)) setMonth(months[months.length - 1] ?? '') }, [months, month])
 
   const [showRates, setShowRates] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  const [holeModal, setHoleModal] = useState<{ existing?: Hole } | null>(null)
 
   const v = useRigMonthView(project, rig, month)
   const projectHoles = useProjectHoles(project)
@@ -2014,28 +1735,27 @@ function CostingScreen() {
         </div>
       </div>
 
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <Row label="Project">
-          {projects.map(p => <Pick key={p} on={project === p} onClick={() => setProject(p)} title={p} sub={PROJECT_CLIENTS[p] || '—'} />)}
-        </Row>
-        {rigs.length > 0 && (
-          <Row label="Rig">
-            {rigs.map(r => <Pick key={r} on={rig === r} onClick={() => setRig(r)} title={r}
-              sub={state.ownership.some(o => o.rig === r) ? 'rig cost set' : 'no rig cost'} />)}
-          </Row>
-        )}
-        {months.length > 0 && (
-          <Row label="Month">
-            {months.map(m => (
-              <button key={m} onClick={() => setMonth(m)} style={{
-                padding: '5px 14px', borderRadius: 18, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                background: month === m ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${month === m ? 'rgba(249,115,22,0.3)' : C.border}`,
-                color: month === m ? C.orange : C.faint,
-              }}>{monthLabel(m)}</button>
-            ))}
-          </Row>
-        )}
+      <div style={{
+        background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
+        padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap',
+      }}>
+        <Chain label="Project">
+          {projects.map(p => <Chip key={p} on={project === p} onClick={() => setProject(p)} label={projectCode(p)} />)}
+        </Chain>
+        <span style={{ width: 1, height: 22, background: C.border }} />
+        <Chain label="Rig">
+          {rigs.map(r => <Chip key={r} on={rig === r} onClick={() => setRig(r)} label={rigCode(r)} />)}
+        </Chain>
+        <div style={{ flex: 1 }} />
+        {/* Any month is reachable, not just ones with logs — a month with none
+            simply shows an empty table rather than being hidden. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Arrow dir="◀" onClick={() => setMonth(shiftMonth(month, -1))} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.text, minWidth: 128, textAlign: 'center', fontFamily: 'inherit' }}>
+            {monthLabel(month)}
+          </span>
+          <Arrow dir="▶" onClick={() => setMonth(shiftMonth(month, 1))} />
+        </div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
@@ -2048,23 +1768,12 @@ function CostingScreen() {
             }}>{t}</button>
           ))}
         </div>
-        {v.hasLogs && (
-          <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-            <Head k="Metres" v={`${v.roll.units}`} />
-            <Head k="Full cost" v={money(v.roll.total)} />
-            <Head k="Cost / m" v={perUnit(v.roll.cpu)} tone={C.orange} />
-            {v.roll.revenue > 0 && <Head k="Margin" v={pct(v.roll.marginPct)} tone={marginColor(v.roll.margin)} />}
-          </div>
-        )}
+
       </div>
 
-      {tab === 'Overview' && <OverviewTab v={v} rig={rig} month={month} onSetRates={() => setShowRates(true)} />}
-      {tab === 'Daily' && <DailyTab v={v} rig={rig} month={month} />}
-      {tab === 'Holes' && (
-        <HolesTab v={v} onAddHole={() => setHoleModal({})} onEditHole={h => setHoleModal({ existing: h })}
-          onStatus={(id, s) => setHoleStatus(id, s)} />
-      )}
-      {tab === 'Billing' && (
+      {tab === 'Performance' && <PerformanceTab v={v} rig={rig} month={month} />}
+      {tab === 'Drillholes' && <DrillholesTab v={v} onStatus={setHoleStatus} />}
+      {tab === 'Invoicing' && (
         <BillingTab project={project} holes={projectHoles} clientRate={v.clientRate}
           invoices={invoices} onCreate={addInvoice} onDelete={deleteInvoice} />
       )}
@@ -2078,19 +1787,6 @@ function CostingScreen() {
           onClose={() => setShowRates(false)} />
       )}
       {showHistory && <RatesHistoryModal project={project} rig={rig} onClose={() => setShowHistory(false)} />}
-      {holeModal && (
-        <HoleModal rig={rig} project={project} existing={holeModal.existing}
-          onSave={h => setHole(h)} onClose={() => setHoleModal(null)} />
-      )}
-    </div>
-  )
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.12em', width: 62, paddingTop: 12, flexShrink: 0 }}>{label}</div>
-      <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', flex: 1 }}>{children}</div>
     </div>
   )
 }
@@ -2102,18 +1798,38 @@ function Pick({ on, onClick, title, sub }: { on: boolean; onClick: () => void; t
       background: on ? `linear-gradient(135deg, ${C.orange}, ${C.orangeD})` : 'rgba(255,255,255,0.03)',
       border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted,
     }}>
-      <div style={{ fontSize: 13, fontWeight: 700 }}>{title}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{title}</div>
       <div style={{ fontSize: 10, opacity: 0.75, marginTop: 2 }}>{sub}</div>
     </button>
   )
 }
 
-function Head({ k, v, tone = C.text }: { k: string; v: string; tone?: string }) {
+function Chain({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div style={{ textAlign: 'right' }}>
-      <div style={{ fontSize: 9, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{k}</div>
-      <div style={{ fontSize: 14, fontWeight: 800, color: tone, fontFamily: 'ui-monospace, monospace', marginTop: 3 }}>{v}</div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</span>
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>{children}</div>
     </div>
+  )
+}
+
+function Chip({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'ui-monospace, monospace',
+      fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+      background: on ? C.orange : 'rgba(255,255,255,0.03)',
+      border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted,
+    }}>{label}</button>
+  )
+}
+
+function Arrow({ dir, onClick }: { dir: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: '5px 9px', borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit', fontSize: 11,
+      background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, color: C.muted,
+    }}>{dir}</button>
   )
 }
 
