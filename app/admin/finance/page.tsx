@@ -72,7 +72,7 @@ function Stat({ label, value, note, color = C.text, big }: {
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, height: 15 }}>{label}</div>
       {children}
       {hint && <div style={{ fontSize: 10, color: C.dim, marginTop: 4, lineHeight: 1.5 }}>{hint}</div>}
     </div>
@@ -253,7 +253,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
     <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
       <div>
         <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{title}</div>
-        {note && <div style={{ fontSize: 11, color: C.faint, marginTop: 4, maxWidth: 640, lineHeight: 1.6 }}>{note}</div>}
+        {note && <div style={{ fontSize: 11, color: C.faint, marginTop: 4, maxWidth: 640, lineHeight: 1.6, minHeight: 17 }}>{note}</div>}
       </div>
       {children}
     </div>
@@ -570,8 +570,10 @@ function RigCostPanel({ rig, month, versions, onSave }: {
     <div>
       <InForce text={latest ? `${money(ownershipBreakdown(latest, month).perDay)}/day since ${fullDate(latest.effectiveFrom)}` : 'nothing set yet'} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 26, marginTop: 18 }}>
-        <Section title="Landed cost">
+      {/* Both columns: one-line header, then a 2x2 grid, so the two sides line
+          up on both axes. Depreciation's fourth cell is deliberately empty. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 26, marginTop: 18, alignItems: 'start' }}>
+        <Section title="Landed cost" note="What the rig cost to put on site.">
           <Grid cols={2}>
             <NumField label="Basic price" value={f.basicPrice} onChange={n => u({ basicPrice: n })} suffix="₹" />
             <NumField label="GST" value={f.gstPercent} onChange={n => u({ gstPercent: n })} suffix="%" />
