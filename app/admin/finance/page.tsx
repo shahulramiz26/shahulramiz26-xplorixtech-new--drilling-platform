@@ -9,13 +9,12 @@ import {
   monthLabel, dayLabel, fullDate, monthOf, daysInMonth,
   rigsFor, monthsFor, versionOn, newestFirst, uid,
   ownershipBreakdown, dayCost, rollup, withCumulative, holeResult,
-  partsPerUnitFor, mobDemobCost, isBillable,
+  partsPerUnitFor, isBillable,
   blankOwnership, blankOperating, blankClientRate,
   PROJECT_CLIENTS, ROCK_CATEGORIES, HOLE_SIZES, DAY_STATUS_LABEL,
   type DayCost, type DayCostMTD, type Rollup, type OwnershipBreakdown,
   type RigOwnership, type OperatingRate, type ClientRate, type Hole, type HoleStatus,
-  type HoleResult, type MobDemobEvent, type Invoice, type InvoiceLine,
-  type DepthSlab, type SizeAdjustment, type RateUnit, type ContractType,
+  type HoleResult, type Invoice, type InvoiceLine, type RateRow, type RateAdjustment,
   type VersionKind,
 } from '../../../lib/costing-store'
 
@@ -45,7 +44,7 @@ function Card({ title, subtitle, right, children, pad = true, accent }: {
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', borderLeft: accent ? `3px solid ${accent}` : undefined }}>
       {title && (
-        <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ padding: '11px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{title}</div>
             {subtitle && <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>{subtitle}</div>}
@@ -53,7 +52,7 @@ function Card({ title, subtitle, right, children, pad = true, accent }: {
           {right}
         </div>
       )}
-      <div style={pad ? { padding: 20 } : undefined}>{children}</div>
+      <div style={pad ? { padding: 16 } : undefined}>{children}</div>
     </div>
   )
 }
@@ -62,9 +61,9 @@ function Stat({ label, value, note, color = C.text, big }: {
   label: string; value: string; note?: string; color?: string; big?: boolean
 }) {
   return (
-    <div style={{ padding: '16px 18px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 7 }}>{label}</div>
-      <div style={{ fontSize: big ? 24 : 19, fontWeight: 900, color, fontFamily: 'ui-monospace, monospace', lineHeight: 1.15 }}>{value}</div>
+    <div style={{ padding: '12px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 5 }}>{label}</div>
+      <div style={{ fontSize: big ? 21 : 17, fontWeight: 900, color, fontFamily: 'ui-monospace, monospace', lineHeight: 1.15 }}>{value}</div>
       {note && <div style={{ fontSize: 10, color: C.faint, marginTop: 5 }}>{note}</div>}
     </div>
   )
@@ -73,7 +72,7 @@ function Stat({ label, value, note, color = C.text, big }: {
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>{label}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</div>
       {children}
       {hint && <div style={{ fontSize: 10, color: C.dim, marginTop: 4, lineHeight: 1.5 }}>{hint}</div>}
     </div>
@@ -88,8 +87,8 @@ function NumField({ label, value, onChange, hint, color = C.text, suffix }: {
       <div style={{ position: 'relative' }}>
         <input type="number" value={Number.isFinite(value) ? value : 0}
           onChange={e => onChange(parseFloat(e.target.value) || 0)}
-          style={{ ...iStyle, color, fontWeight: 700, fontFamily: 'ui-monospace, monospace', paddingRight: suffix ? 48 : 12 }} />
-        {suffix && <span style={{ position: 'absolute', right: 11, top: 10, fontSize: 11, color: C.dim, pointerEvents: 'none' }}>{suffix}</span>}
+          style={{ ...iStyle, color, fontWeight: 700, fontFamily: 'ui-monospace, monospace', paddingRight: suffix ? 42 : 10 }} />
+        {suffix && <span style={{ position: 'absolute', right: 9, top: 7, fontSize: 10.5, color: C.dim, pointerEvents: 'none' }}>{suffix}</span>}
       </div>
     </Field>
   )
@@ -164,14 +163,14 @@ function Switch({ on, onChange, label, hint }: {
   on: boolean; onChange: (v: boolean) => void; label: string; hint?: string
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0' }}>
       <button onClick={() => onChange(!on)} role="switch" aria-checked={on} style={{
-        width: 44, height: 26, borderRadius: 13, flexShrink: 0, marginTop: 1, cursor: 'pointer',
+        width: 38, height: 22, borderRadius: 11, flexShrink: 0, marginTop: 1, cursor: 'pointer',
         border: 'none', padding: 0, position: 'relative',
         background: on ? C.orange : '#2A3444', transition: 'background 0.18s',
       }}>
         <span style={{
-          position: 'absolute', top: 3, left: on ? 21 : 3, width: 20, height: 20,
+          position: 'absolute', top: 3, left: on ? 19 : 3, width: 16, height: 16,
           borderRadius: '50%', background: '#fff', transition: 'left 0.18s',
           boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
         }} />
@@ -180,22 +179,6 @@ function Switch({ on, onChange, label, hint }: {
         <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{label}</div>
         {hint && <div style={{ fontSize: 11, color: C.faint, marginTop: 3, lineHeight: 1.5 }}>{hint}</div>}
       </div>
-    </div>
-  )
-}
-
-function Toggle<T extends string>({ options, value, onChange, labels }: {
-  options: readonly T[]; value: T; onChange: (v: T) => void; labels?: Record<string, string>
-}) {
-  return (
-    <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 4 }}>
-      {options.map(o => (
-        <button key={o} onClick={() => onChange(o)} style={{
-          flex: 1, padding: '8px 14px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-          border: 'none', whiteSpace: 'nowrap', fontFamily: 'inherit',
-          background: value === o ? C.orange : 'transparent', color: value === o ? '#fff' : C.faint,
-        }}>{labels?.[o] ?? o}</button>
-      ))}
     </div>
   )
 }
@@ -212,7 +195,7 @@ function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md' }: {
     <button onClick={onClick} disabled={disabled} style={{
       display: 'inline-flex', alignItems: 'center', gap: 6, cursor: disabled ? 'not-allowed' : 'pointer',
       borderRadius: 9, fontWeight: 700, fontFamily: 'inherit', opacity: disabled ? 0.45 : 1,
-      padding: size === 'sm' ? '7px 13px' : '10px 18px', fontSize: size === 'sm' ? 12 : 13,
+      padding: size === 'sm' ? '5px 11px' : '8px 15px', fontSize: size === 'sm' ? 11.5 : 12.5,
       whiteSpace: 'nowrap', ...tones[tone],
     }}>{children}</button>
   )
@@ -220,23 +203,23 @@ function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md' }: {
 
 function Note({ tone = C.blue, children }: { tone?: string; children: ReactNode }) {
   return (
-    <div style={{ padding: '11px 15px', borderRadius: 10, background: `${tone}0F`, border: `1px solid ${tone}33`, fontSize: 12, color: tone, lineHeight: 1.6 }}>{children}</div>
+    <div style={{ padding: '9px 13px', borderRadius: 9, background: `${tone}0F`, border: `1px solid ${tone}33`, fontSize: 11.5, color: tone, lineHeight: 1.55 }}>{children}</div>
   )
 }
 
 function Empty({ children }: { children: ReactNode }) {
-  return <div style={{ padding: '46px 24px', textAlign: 'center', color: C.faint, fontSize: 13, lineHeight: 1.7 }}>{children}</div>
+  return <div style={{ padding: '34px 20px', textAlign: 'center', color: C.faint, fontSize: 12.5, lineHeight: 1.7 }}>{children}</div>
 }
 
 /* Dense financial tables: numerals monospace and right aligned, so a column
  * reads as a column of figures rather than of words. */
 const th: React.CSSProperties = {
-  padding: '10px 14px', textAlign: 'left', fontSize: 10, color: C.faint, fontWeight: 700,
+  padding: '7px 12px', textAlign: 'left', fontSize: 10, color: C.faint, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap',
   borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)',
 }
 const thR: React.CSSProperties = { ...th, textAlign: 'right' }
-const td: React.CSSProperties = { padding: '10px 14px', fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }
+const td: React.CSSProperties = { padding: '7px 12px', fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }
 const tdN: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse' }
 const rowBorder = '1px solid rgba(30,41,59,0.5)'
@@ -247,27 +230,27 @@ function Modal({ title, subtitle, width = 760, onClose, children, footer }: {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, width, maxWidth: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '20px 26px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ padding: '16px 20px 13px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: C.text }}>{title}</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{title}</div>
             {subtitle && <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>{subtitle}</div>}
           </div>
           <button onClick={onClose} style={{ padding: 7, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0, fontFamily: 'inherit' }}>✕</button>
         </div>
-        <div style={{ padding: 26, overflowY: 'auto', flex: 1 }}>{children}</div>
-        {footer && <div style={{ padding: '16px 26px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>{footer}</div>}
+        <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>{children}</div>
+        {footer && <div style={{ padding: '13px 20px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>{footer}</div>}
       </div>
     </div>
   )
 }
 
 function Grid({ cols, children }: { cols: number; children: ReactNode }) {
-  return <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gap: 14 }}>{children}</div>
+  return <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gap: 12 }}>{children}</div>
 }
 
 function Section({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
       <div>
         <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{title}</div>
         {note && <div style={{ fontSize: 11, color: C.faint, marginTop: 4, maxWidth: 640, lineHeight: 1.6 }}>{note}</div>}
@@ -300,11 +283,9 @@ interface RigMonthView {
   ob: OwnershipBreakdown
   operating?: OperatingRate
   clientRate?: ClientRate
-  unit: RateUnit
   days: DayCostMTD[]
   roll: Rollup
   holes: HoleResult[]
-  mobDemob: MobDemobEvent[]
   unallocated: number
   unallocatedDays: number
   budgetOwnershipCPU: number
@@ -329,8 +310,8 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
     const logs = state.shiftLogs.filter(l => l.rig === rig && l.project === project && monthOf(l.date) === month)
     if (logs.length === 0) {
       return {
-        hasLogs: false, ob: EMPTY_OB, unit: 'm' as RateUnit, days: [], roll: rollup([]),
-        holes: [], mobDemob: [], unallocated: 0, unallocatedDays: 0,
+        hasLogs: false, ob: EMPTY_OB, days: [], roll: rollup([]),
+        holes: [], unallocated: 0, unallocatedDays: 0,
         budgetOwnershipCPU: 0, productionVariancePct: 0, loggedFormation: '',
       }
     }
@@ -347,7 +328,6 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
     const ob = ownership ? ownershipBreakdown(ownership, month) : EMPTY_OB
     const operating = versionOn(opVersions, monthEnd)
     const clientRate = versionOn(crVersions, monthEnd)
-    const unit = clientRate?.unit ?? 'm'
 
     const totalUnits = logs.reduce((s, l) => s + l.metresDrilled, 0)
     const partsPerU = partsPerUnitFor(rig, project, totalUnits, inv.purchaseOrders)
@@ -375,10 +355,9 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
     const days = withCumulative(raw)
     const roll = rollup(raw)
 
-    const minRec = clientRate?.minCoreRecoveryPct ?? 0
     const holes = state.holes
       .filter(h => h.rig === rig && h.project === project)
-      .map(h => holeResult(h, raw, minRec))
+      .map(h => holeResult(h, raw))
       .filter(h => h.days.length > 0)
       .sort((a, b) => a.hole.startDate.localeCompare(b.hole.startDate))
 
@@ -390,8 +369,7 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
     const loggedFormation = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
 
     return {
-      hasLogs: true, ownership, ob, operating, clientRate, unit, days, roll, holes,
-      mobDemob: state.mobDemob.filter(e => e.rig === rig && e.project === project),
+      hasLogs: true, ownership, ob, operating, clientRate, days, roll, holes,
       unallocated: orphan.reduce((s, d) => s + d.total, 0),
       unallocatedDays: orphan.length,
       budgetOwnershipCPU: ownership && ownership.expectedUnitsPerMonth > 0 ? ob.perMonth / ownership.expectedUnitsPerMonth : 0,
@@ -443,9 +421,8 @@ function useProjectHoles(project: string): HoleResult[] {
       }
     })
 
-    const minRec = newestFirst(crVersions)[0]?.minCoreRecoveryPct ?? 0
     return projectHoles
-      .map(h => holeResult(h, allDays, minRec))
+      .map(h => holeResult(h, allDays))
       .filter(h => h.days.length > 0)
       .sort((a, b) => (b.hole.endDate || '9999').localeCompare(a.hole.endDate || '9999'))
   }, [state, inv.purchaseOrders, project])
@@ -455,7 +432,7 @@ function useProjectHoles(project: string): HoleResult[] {
  * 3  Set rates
  * ========================================================================== */
 
-type Section = 'landed' | 'depreciation' | 'finance' | 'operating' | 'client'
+type Section = 'rig' | 'operating' | 'client'
 
 /* Effective dates are forward-only: a new set of rates can start today or
  * later, never before the last one. That is what makes history trustworthy —
@@ -520,8 +497,7 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
   const opVersions = newestFirst(state.operating.filter(o => o.rig === rig && o.project === project))
   const crVersions = newestFirst(state.clientRates.filter(c => c.project === project))
 
-  const isRig = section === 'landed' || section === 'depreciation' || section === 'finance'
-  const scope = isRig ? `${rig} · every project`
+  const scope = section === 'rig' ? `${rig} · every project`
     : section === 'operating' ? `${rig} · ${project}`
     : `${project} · every rig`
 
@@ -531,11 +507,7 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
 
         {/* Sidebar */}
         <div style={{ width: 210, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <SideGroup label="Rig cost" note="rarely changes" />
-          <SideItem on={section === 'landed'} onClick={() => setSection('landed')} label="Landed cost" indent />
-          <SideItem on={section === 'depreciation'} onClick={() => setSection('depreciation')} label="Depreciation" indent />
-          <SideItem on={section === 'finance'} onClick={() => setSection('finance')} label="Finance" indent />
-          <div style={{ height: 10 }} />
+          <SideItem on={section === 'rig'} onClick={() => setSection('rig')} label="Rig cost" />
           <SideItem on={section === 'operating'} onClick={() => setSection('operating')} label="Operating cost" />
           <SideItem on={section === 'client'} onClick={() => setSection('client')} label="Client cost" />
 
@@ -552,27 +524,22 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
 
         {/* Panel */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {isRig && <RigCostPanel rig={rig} month={month} section={section} versions={ownVersions} onSave={saveOwnership} />}
-          {section === 'operating' && <OperatingPanel rig={rig} project={project} versions={opVersions} onSave={saveOperating} />}
-          {section === 'client' && <ClientPanel project={project} versions={crVersions} onSave={saveClientRate} />}
+          {section === 'rig' && <RigCostPanel rig={rig} month={month} versions={ownVersions}
+            onSave={(o, from, why) => saveOwnership({ ...o, effectiveFrom: from, note: why })} />}
+          {section === 'operating' && <OperatingPanel rig={rig} project={project} versions={opVersions}
+            onSave={(o, from, why) => saveOperating({ ...o, effectiveFrom: from, note: why })} />}
+          {section === 'client' && <ClientPanel project={project} versions={crVersions}
+            onSave={(c, from, why) => saveClientRate({ ...c, effectiveFrom: from, note: why })} />}
         </div>
       </div>
     </Modal>
   )
 }
 
-function SideGroup({ label, note }: { label: string; note: string }) {
-  return (
-    <div style={{ padding: '6px 12px 4px', fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-      {label} <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>· {note}</span>
-    </div>
-  )
-}
-
-function SideItem({ on, onClick, label, indent }: { on: boolean; onClick: () => void; label: string; indent?: boolean }) {
+function SideItem({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
     <button onClick={onClick} style={{
-      textAlign: 'left', padding: `9px 12px 9px ${indent ? 24 : 12}px`, borderRadius: 9,
+      textAlign: 'left', padding: '8px 12px', borderRadius: 8,
       fontSize: 13, fontWeight: on ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit',
       background: on ? 'rgba(249,115,22,0.12)' : 'transparent',
       border: 'none', borderLeft: `2px solid ${on ? C.orange : 'transparent'}`,
@@ -581,65 +548,30 @@ function SideItem({ on, onClick, label, indent }: { on: boolean; onClick: () => 
   )
 }
 
-/* Header shown above every rate form: what is in force now, when the new
- * rates start, and why they changed. No version picker — with forward-only
- * dates there is only ever one thing to do, which is add the next set. */
-function RateHeader({ inForce, effectiveFrom, minDate, onDate, note, onNote }: {
-  inForce: string
-  effectiveFrom: string; minDate: string; onDate: (v: string) => void
-  note: string; onNote: (v: string) => void
-}) {
-  const tooEarly = effectiveFrom < minDate
+function SaveRow({ onSave, label }: { onSave: () => void; label: string }) {
   return (
-    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-      <div style={{ fontSize: 11, color: C.faint }}>
-        Currently in force: <span style={{ color: C.text, fontFamily: 'ui-monospace, monospace' }}>{inForce}</span>
-      </div>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <div style={{ width: 190 }}>
-          <Field label="New rates start">
-            <input type="date" value={effectiveFrom} min={minDate} onChange={e => onDate(e.target.value)}
-              style={{ ...iStyle, colorScheme: 'dark', borderColor: tooEarly ? C.red : C.border }} />
-          </Field>
-        </div>
-        <div style={{ flex: 1, minWidth: 220 }}>
-          <Field label="Why">
-            <input value={note} onChange={e => onNote(e.target.value)} placeholder="e.g. committee reclassification, fuel revision" style={{ ...iStyle, fontSize: 12 }} />
-          </Field>
-        </div>
-      </div>
-      {tooEarly && <Note tone={C.red}>Rates can only start on {fullDate(minDate)} or later — earlier work keeps the rate it was done under.</Note>}
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+      <Btn tone="primary" onClick={onSave}>{label}</Btn>
     </div>
   )
 }
 
-function SaveRow({ onSave, disabled, label }: { onSave: () => void; disabled?: boolean; label: string }) {
-  const [saved, setSaved] = useState(false)
-  return (
-    <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'flex-end', marginTop: 22 }}>
-      {saved && <span style={{ fontSize: 12, color: C.green }}>Saved</span>}
-      <Btn tone="primary" disabled={disabled} onClick={() => { onSave(); setSaved(true); setTimeout(() => setSaved(false), 2000) }}>{label}</Btn>
-    </div>
-  )
-}
-
-function RigCostPanel({ rig, month, section, versions, onSave }: {
-  rig: string; month: string; section: Section; versions: RigOwnership[]; onSave: (o: RigOwnership) => void
+function RigCostPanel({ rig, month, versions, onSave }: {
+  rig: string; month: string; versions: RigOwnership[]; onSave: (o: RigOwnership, from: string, why: string) => void
 }) {
   const latest = versions[0]
   const minDate = nextAllowedDate(latest?.effectiveFrom)
-  const [f, setF] = useState<RigOwnership>(() => latest ? { ...latest, id: uid('own'), effectiveFrom: minDate, note: '' } : blankOwnership(rig, minDate))
+  const [f, setF] = useState<RigOwnership>(() => latest ? { ...latest, id: uid('own') } : blankOwnership(rig, minDate))
+  const [confirm, setConfirm] = useState(false)
   const u = (p: Partial<RigOwnership>) => setF(x => ({ ...x, ...p }))
   const b = ownershipBreakdown(f, month)
-  const inForce = latest ? `${money(ownershipBreakdown(latest, month).perDay)}/day since ${fullDate(latest.effectiveFrom)}` : 'nothing set yet'
 
   return (
     <div>
-      <RateHeader inForce={inForce} effectiveFrom={f.effectiveFrom} minDate={minDate}
-        onDate={v => u({ effectiveFrom: v })} note={f.note ?? ''} onNote={n => u({ note: n })} />
+      <InForce text={latest ? `${money(ownershipBreakdown(latest, month).perDay)}/day since ${fullDate(latest.effectiveFrom)}` : 'nothing set yet'} />
 
-      {section === 'landed' && (
-        <Section title="What the rig cost to put on site">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 26, marginTop: 18 }}>
+        <Section title="Landed cost">
           <Grid cols={2}>
             <NumField label="Basic price" value={f.basicPrice} onChange={n => u({ basicPrice: n })} suffix="₹" />
             <NumField label="GST" value={f.gstPercent} onChange={n => u({ gstPercent: n })} suffix="%" />
@@ -649,34 +581,29 @@ function RigCostPanel({ rig, month, section, versions, onSave }: {
               onClear={() => u({ landedPriceOverride: undefined })} />
           </Grid>
         </Section>
-      )}
-
-      {section === 'depreciation' && (
         <Section title="Depreciation" note="Straight line on the landed price.">
-          <Grid cols={3}>
+          <Grid cols={2}>
             <NumField label="Rate per year" value={f.depreciationRatePct} onChange={n => u({ depreciationRatePct: n })} suffix="%" />
             <Derived label="Per year" value={money(b.depPerYear)} color={C.muted} />
             <Derived label="Per month" value={money(b.depPerMonth)} color={C.purple}
               overridden={f.depPerMonthOverride} onOverride={n => u({ depPerMonthOverride: n })}
               onClear={() => u({ depPerMonthOverride: undefined })} />
+            <div />
           </Grid>
         </Section>
-      )}
+      </div>
 
-      {section === 'finance' && (
+      <div style={{ marginTop: 22 }}>
         <Section title="Finance" note="Enter the EMI you actually pay each month.">
-          <Grid cols={2}>
+          <Grid cols={4}>
             <NumField label="EMI per month" value={f.emiPerMonth} onChange={n => u({ emiPerMonth: n })} suffix="₹" color={C.blue} />
-            <Field label="EMI ends" hint="Optional. Without it a closed loan keeps charging forever and the rig looks permanently expensive.">
+            <Field label="EMI ends" hint="Optional. Without it a closed loan keeps charging forever.">
               <input type="month" value={f.emiEndsMonth ?? ''} onChange={e => u({ emiEndsMonth: e.target.value || undefined })}
                 style={{ ...iStyle, colorScheme: 'dark' }} />
             </Field>
             <NumField label="Insurance per year" value={f.insurancePerYear} onChange={n => u({ insurancePerYear: n })} suffix="₹" />
             <NumField label="Other fixed / month" value={f.otherFixedPerMonth} onChange={n => u({ otherFixedPerMonth: n })} suffix="₹" />
           </Grid>
-          {f.emiPerMonth > 0 && f.allocationBasis === 'expectedUnit' && f.expectedUnitsPerMonth > 0 && (
-            <Note tone={C.blue}>That EMI works out at {perUnit(f.emiPerMonth / f.expectedUnitsPerMonth)} across {f.expectedUnitsPerMonth} expected metres.</Note>
-          )}
           {f.emiPerMonth > 0 && b.emiMonthsLeft >= 0 && (
             <Note tone={b.emiActive ? C.blue : C.green}>
               {b.emiActive
@@ -685,84 +612,121 @@ function RigCostPanel({ rig, month, section, versions, onSave }: {
             </Note>
           )}
         </Section>
-      )}
+      </div>
 
-      <div style={{ marginTop: 24 }}>
-        <Section title="How the cost is counted and spread">
-          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '6px 18px' }}>
+      <div style={{ marginTop: 22 }}>
+        <Section title="Charging rules">
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '2px 14px' }}>
             <Switch on={f.costBasis === 'cash'} onChange={v => u({ costBasis: v ? 'cash' : 'accounting' })}
               label="Include the EMI"
-              hint="On, ownership is depreciation + EMI — how the money actually leaves the business. Off counts depreciation only, since the loan repays the same capital depreciation writes off." />
+              hint="On, ownership is depreciation + EMI — how the money actually leaves the business. Off counts depreciation only." />
             <div style={{ height: 1, background: C.border }} />
             <Switch on={f.allocationBasis === 'expectedUnit'} onChange={v => u({ allocationBasis: v ? 'expectedUnit' : 'operatingDay' })}
               label="Charge per metre instead of per day"
-              hint="Off, ownership lands on every day the rig is on site, so a standby day still carries it. On, it lands only on metres drilled — which is what a spreadsheet does, and it makes a breakdown day look free." />
+              hint="Off, ownership lands on every day the rig is on site, so a standby day still carries it. On, it lands only on metres drilled — which makes a breakdown day look free." />
           </div>
-          <Grid cols={2}>
+          <Grid cols={4}>
             <NumField label="Expected operating days" value={f.expectedOperatingDays} onChange={n => u({ expectedOperatingDays: n })} suffix="/mth" />
             <NumField label="Expected metres" value={f.expectedUnitsPerMonth} onChange={n => u({ expectedUnitsPerMonth: n })} suffix="m/mth" />
+            <div /><div />
           </Grid>
         </Section>
       </div>
 
-      <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginTop: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: C.text }}>What XPLORIX will charge</span>
-          <Tag tone={C.purple}>ownership</Tag>
-        </div>
-        <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
-          <Pair k="Depreciation" v={money(b.depPerMonth)} />
-          <Pair k="EMI" v={b.emi > 0 ? money(b.emi) : '—'} dim={b.emi === 0} />
-          <Pair k="Insurance" v={money(b.insurancePerMonth)} />
-          <Pair k="Other fixed" v={money(b.otherFixedPerMonth)} dim={b.otherFixedPerMonth === 0} />
-        </div>
-        <div style={{ height: 1, background: C.border, margin: '16px 0' }} />
-        <div style={{ fontSize: 13, color: C.muted, fontFamily: 'ui-monospace, monospace', display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-          <span>{money(b.perMonth)}</span>
-          <span style={{ color: C.dim }}>{b.basisLabel}</span>
-          <span style={{ color: C.dim }}>=</span>
-          <span style={{ color: C.purple, fontWeight: 900, fontSize: 19 }}>
-            {f.allocationBasis === 'expectedUnit' ? perUnit(b.perUnit) : `${money(b.perDay)}/day`}
-          </span>
-        </div>
-      </div>
+      <Result title="What XPLORIX will charge" tag="ownership"
+        pairs={[['Depreciation', money(b.depPerMonth), false], ['EMI', b.emi > 0 ? money(b.emi) : '—', b.emi === 0],
+                ['Insurance', money(b.insurancePerMonth), false], ['Other fixed', money(b.otherFixedPerMonth), b.otherFixedPerMonth === 0]]}
+        total={money(b.perMonth)} basis={b.basisLabel}
+        answer={f.allocationBasis === 'expectedUnit' ? perUnit(b.perUnit) : `${money(b.perDay)}/day`} />
 
-      <SaveRow label="Save rig cost" disabled={f.effectiveFrom < minDate} onSave={() => onSave(f)} />
+      <SaveRow label="Save rig cost" onSave={() => setConfirm(true)} />
+      {confirm && <SaveDialog minDate={minDate} replacing={latest ? `${money(ownershipBreakdown(latest, month).perDay)}/day` : 'nothing'}
+        onCancel={() => setConfirm(false)} onSave={(from, why) => { onSave(f, from, why); setConfirm(false) }} />}
     </div>
   )
 }
 
-function Pair({ k, v, dim }: { k: string; v: string; dim?: boolean }) {
+function InForce({ text }: { text: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-      <span style={{ fontSize: 11, color: C.faint }}>{k}</span>
-      <span style={{ fontSize: 13, fontWeight: 700, color: dim ? C.dim : C.text, fontFamily: 'ui-monospace, monospace' }}>{v}</span>
+    <div style={{ fontSize: 11, color: C.faint }}>
+      Currently in force: <span style={{ color: C.text, fontFamily: 'ui-monospace, monospace' }}>{text}</span>
     </div>
+  )
+}
+
+function Result({ title, tag, pairs, total, basis, answer }: {
+  title: string; tag: string; pairs: [string, string, boolean][]; total: string; basis: string; answer: string
+}) {
+  return (
+    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginTop: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12 }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: C.text }}>{title}</span>
+        <Tag tone={C.purple}>{tag}</Tag>
+      </div>
+      <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap' }}>
+        {pairs.map(([k, v, dim]) => (
+          <div key={k} style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+            <span style={{ fontSize: 11, color: C.faint }}>{k}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: dim ? C.dim : C.text, fontFamily: 'ui-monospace, monospace' }}>{v}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ height: 1, background: C.border, margin: '13px 0' }} />
+      <div style={{ fontSize: 13, color: C.muted, fontFamily: 'ui-monospace, monospace', display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+        <span>{total}</span><span style={{ color: C.dim }}>{basis}</span><span style={{ color: C.dim }}>=</span>
+        <span style={{ color: C.purple, fontWeight: 900, fontSize: 18 }}>{answer}</span>
+      </div>
+    </div>
+  )
+}
+
+/* Date and reason are asked at the moment of saving, not while you are
+ * entering numbers. Forward-only: a new set of rates starts today or later,
+ * never before the last one, so nothing already costed can be rewritten. */
+function SaveDialog({ minDate, replacing, onCancel, onSave }: {
+  minDate: string; replacing: string; onCancel: () => void; onSave: (from: string, why: string) => void
+}) {
+  const [from, setFrom] = useState(minDate)
+  const [why, setWhy] = useState('')
+  const tooEarly = from < minDate
+  return (
+    <Modal title="When do these rates start?" subtitle={`Replacing ${replacing}`} width={520} onClose={onCancel}
+      footer={<><Btn onClick={onCancel}>Cancel</Btn>
+        <Btn tone="primary" disabled={tooEarly || !why.trim()} onClick={() => onSave(from, why.trim())}>Save rates</Btn></>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <DateField label="New rates start" value={from} onChange={setFrom} />
+        <TextField label="Why" value={why} onChange={setWhy} placeholder="e.g. committee reclassification, fuel revision"
+          hint="Shows in Rates history, so a year from now the change explains itself." />
+        {tooEarly
+          ? <Note tone={C.red}>Rates can only start on {fullDate(minDate)} or later — earlier work keeps the rate it was done under.</Note>
+          : <Note tone={C.dim}>Work before {fullDate(from)} keeps the rate it was done under. Nothing already costed changes.</Note>}
+      </div>
+    </Modal>
   )
 }
 
 function OperatingPanel({ rig, project, versions, onSave }: {
-  rig: string; project: string; versions: OperatingRate[]; onSave: (o: OperatingRate) => void
+  rig: string; project: string; versions: OperatingRate[]; onSave: (o: OperatingRate, from: string, why: string) => void
 }) {
   const latest = versions[0]
   const minDate = nextAllowedDate(latest?.effectiveFrom)
-  const [f, setF] = useState<OperatingRate>(() => latest ? { ...latest, id: uid('op'), effectiveFrom: minDate, note: '' } : blankOperating(rig, project, minDate))
+  const [f, setF] = useState<OperatingRate>(() => latest ? { ...latest, id: uid('op') } : blankOperating(rig, project, minDate))
+  const [confirm, setConfirm] = useState(false)
   const u = (p: Partial<OperatingRate>) => setF(x => ({ ...x, ...p }))
-  const inForce = latest
-    ? `fuel ₹${latest.fuelPricePerLitre}/L, day shift ${money(latest.dayShiftRate)} since ${fullDate(latest.effectiveFrom)}`
-    : 'nothing set yet'
+  const per = f.chargePerMetre ? '₹/m' : ''
 
   return (
     <div>
-      <RateHeader inForce={inForce} effectiveFrom={f.effectiveFrom} minDate={minDate}
-        onDate={v => u({ effectiveFrom: v })} note={f.note ?? ''} onNote={n => u({ note: n })} />
+      <InForce text={latest ? `fuel ₹${latest.fuelPricePerLitre}/L, labour ${money(latest.labourRate)} since ${fullDate(latest.effectiveFrom)}` : 'nothing set yet'} />
 
-      <Note tone={C.dim}>
-        Fuel, water, additives, metres and crew count come from the driller&apos;s log. Repairs come from the maintenance log,
-        parts and tooling from inventory. Only the rates below are set here.
-      </Note>
+      <div style={{ marginTop: 14 }}>
+        <Note tone={C.dim}>
+          Fuel, water, additives, metres and crew count come from the driller&apos;s log. Repairs come from the maintenance log,
+          parts and tooling from inventory. Only the rates below are set here.
+        </Note>
+      </div>
 
-      <div style={{ marginTop: 20 }}>
+      <div style={{ marginTop: 18 }}>
         <Section title="Unit prices" note="Consumption comes from the log; these turn it into rupees.">
           <Grid cols={3}>
             <NumField label="Fuel" value={f.fuelPricePerLitre} onChange={n => u({ fuelPricePerLitre: n })} suffix="₹/L" color={C.amber} />
@@ -772,169 +736,132 @@ function OperatingPanel({ rig, project, versions, onSave }: {
         </Section>
       </div>
 
-      <div style={{ marginTop: 24 }}>
-        <Section title="Crew" note="Crew count per shift comes from the driller's log. Set only what a head or a shift is paid.">
-          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '6px 18px' }}>
-            <Switch on={f.wageBasis === 'perHead'} onChange={v => u({ wageBasis: v ? 'perHead' : 'perShift' })}
-              label="Pay per head" hint="On, every person on shift is paid the shift rate. Off, a flat amount per shift run whatever the headcount." />
-            <div style={{ height: 1, background: C.border }} />
-            <Switch on={f.accommodationBasis === 'perHead'} onChange={v => u({ accommodationBasis: v ? 'perHead' : 'flat' })}
-              label="Lodging per head" hint="On, charged for every head on site that night. Off, a flat camp charge per day." />
+      <div style={{ marginTop: 20 }}>
+        <Section title="Labour">
+          <Grid cols={3}>
+            <NumField label="Labour cost" value={f.labourRate} onChange={n => u({ labourRate: n })}
+              suffix={per || '₹'} color={C.blue} hint={f.chargePerMetre ? 'per metre drilled' : 'per head, per shift'} />
+            <NumField label="Lodging cost" value={f.lodgingRate} onChange={n => u({ lodgingRate: n })}
+              suffix={per || '₹'} hint={f.chargePerMetre ? 'per metre drilled' : 'per head, per night'} />
+            <NumField label="Transportation cost" value={f.transportRate} onChange={n => u({ transportRate: n })}
+              suffix={per || '₹/day'} hint={f.chargePerMetre ? 'per metre drilled' : 'per day on site'} />
+          </Grid>
+        </Section>
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <Section title="Charging rules">
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '2px 14px' }}>
+            <Switch on={f.chargePerMetre} onChange={v => u({ chargePerMetre: v })}
+              label="Charge per metre instead of per day"
+              hint="Off, labour follows the crew count in the log and a standby day still costs. On, the three rates above are charged against metres drilled and crew count stops affecting cost." />
           </div>
-          <Grid cols={3}>
-            <NumField label="Day shift" value={f.dayShiftRate} onChange={n => u({ dayShiftRate: n })} suffix="₹" color={C.blue} />
-            <NumField label="Night shift" value={f.nightShiftRate} onChange={n => u({ nightShiftRate: n })} suffix="₹" color={C.blue} hint="Night premium here" />
-            <NumField label="Lodging" value={f.accommodationRate} onChange={n => u({ accommodationRate: n })} suffix="₹" />
-            <NumField label="Transportation" value={f.crewTransportPerDay} onChange={n => u({ crewTransportPerDay: n })} suffix="₹/day" />
-            <NumField label="Supervision" value={f.supervisionPerDay} onChange={n => u({ supervisionPerDay: n })} suffix="₹/day" />
-            <div />
-          </Grid>
         </Section>
       </div>
 
-      <div style={{ marginTop: 24 }}>
-        <Section title="Days the rig doesn't drill"
-          note="A flat all-in cost for the day, used instead of the crew calculation so nothing is counted twice. Standby is the client stopping work and is billable; breakdown is the rig's own fault and never is.">
-          <Grid cols={3}>
-            <NumField label="Standby" value={f.standbyCostPerDay} onChange={n => u({ standbyCostPerDay: n })} suffix="₹/day" color={C.amber} />
-            <NumField label="Breakdown" value={f.breakdownCostPerDay} onChange={n => u({ breakdownCostPerDay: n })} suffix="₹/day" color={C.red} />
-            <div />
-          </Grid>
-        </Section>
-      </div>
-
-      <SaveRow label="Save operating cost" disabled={f.effectiveFrom < minDate} onSave={() => onSave(f)} />
+      <SaveRow label="Save operating cost" onSave={() => setConfirm(true)} />
+      {confirm && <SaveDialog minDate={minDate} replacing={latest ? `fuel ₹${latest.fuelPricePerLitre}/L` : 'nothing'}
+        onCancel={() => setConfirm(false)} onSave={(from, why) => { onSave(f, from, why); setConfirm(false) }} />}
     </div>
   )
 }
 
+/* One row per tender line: a size, a formation, a rate. Adjustments hang off
+ * their own row because that is how the tender writes them. */
 function ClientPanel({ project, versions, onSave }: {
-  project: string; versions: ClientRate[]; onSave: (c: ClientRate) => void
+  project: string; versions: ClientRate[]; onSave: (c: ClientRate, from: string, why: string) => void
 }) {
   const latest = versions[0]
   const minDate = nextAllowedDate(latest?.effectiveFrom)
-  const [f, setF] = useState<ClientRate>(() => latest ? { ...latest, id: uid('cr'), effectiveFrom: minDate, note: '' } : blankClientRate(project, minDate))
+  const [f, setF] = useState<ClientRate>(() => latest ? { ...latest, id: uid('cr') } : blankClientRate(project, minDate))
+  const [confirm, setConfirm] = useState(false)
   const u = (p: Partial<ClientRate>) => setF(x => ({ ...x, ...p }))
-  const inForce = latest
-    ? (latest.contractType === 'government'
-      ? `${latest.category} at ${perUnit(latest.rate, latest.unit)} since ${fullDate(latest.effectiveFrom)}`
-      : `${latest.slabs.length} depth slabs since ${fullDate(latest.effectiveFrom)}`)
-    : 'nothing set yet'
+  const updRow = (i: number, p: Partial<RateRow>) => u({ rateRows: f.rateRows.map((r, j) => j === i ? { ...r, ...p } : r) })
+  const updAdj = (i: number, j: number, p: Partial<RateAdjustment>) =>
+    updRow(i, { adjustments: f.rateRows[i].adjustments.map((a, k) => k === j ? { ...a, ...p } : a) })
 
-  const updSlab = (i: number, p: Partial<DepthSlab>) => u({ slabs: f.slabs.map((x, j) => j === i ? { ...x, ...p } : x) })
-  const updAdj = (i: number, p: Partial<SizeAdjustment>) => u({ sizeAdjustments: f.sizeAdjustments.map((x, j) => j === i ? { ...x, ...p } : x) })
+  const inForce = latest && latest.rateRows.length
+    ? `${latest.rateRows.length} rate lines since ${fullDate(latest.effectiveFrom)}`
+    : 'nothing set yet'
 
   return (
     <div>
-      <RateHeader inForce={inForce} effectiveFrom={f.effectiveFrom} minDate={minDate}
-        onDate={v => u({ effectiveFrom: v })} note={f.note ?? ''} onNote={n => u({ note: n })} />
+      <InForce text={inForce} />
 
-      <Grid cols={2}>
-        <TextField label="Client" value={f.client} onChange={v => u({ client: v })} placeholder="e.g. CMPDI" />
-        <Field label="Unit">
-          <Toggle options={['m', 'ft'] as const} value={f.unit} onChange={(v: RateUnit) => u({ unit: v })}
-            labels={{ m: 'Per metre', ft: 'Per foot' }} />
-        </Field>
-      </Grid>
-
-      <div style={{ marginTop: 20 }}>
-        <Field label="Contract type" hint={f.contractType === 'government'
-          ? 'The technical committee assigns one rock category to the whole project, and every metre bills at that rate whatever the depth.'
-          : 'Depth slabs: the rate rises as the hole gets deeper.'}>
-          <Toggle options={['government', 'private'] as const} value={f.contractType}
-            onChange={(v: ContractType) => u({ contractType: v })} labels={{ government: 'Government', private: 'Private' }} />
-        </Field>
-      </div>
-
-      <div style={{ marginTop: 22 }}>
-        {f.contractType === 'government' ? (
-          <Section title="Committee classification">
-            <Grid cols={2}>
-              <Field label="Rock category">
-                <select value={f.category} onChange={e => u({ category: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}>
-                  {ROCK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  {f.category && !ROCK_CATEGORIES.includes(f.category) && <option value={f.category}>{f.category}</option>}
-                </select>
-              </Field>
-              <NumField label="Rate" value={f.rate} onChange={n => u({ rate: n })} suffix={`₹/${f.unit}`} color={C.orange} />
-            </Grid>
-          </Section>
-        ) : (
-          <Section title="Depth slabs" note="Each slab runs from its depth up to the next. Leave the last one open-ended.">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {f.slabs.map((sl, i) => (
-                <div key={sl.id} style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, color: C.dim, width: 32 }}>from</span>
-                  <input type="number" value={sl.fromDepth} onChange={e => updSlab(i, { fromDepth: parseFloat(e.target.value) || 0 })}
-                    style={{ ...iStyle, width: 84, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }} />
-                  <span style={{ fontSize: 11, color: C.dim }}>to</span>
-                  <input type="number" value={sl.toDepth ?? ''} placeholder="∞"
-                    onChange={e => updSlab(i, { toDepth: e.target.value === '' ? null : parseFloat(e.target.value) })}
-                    style={{ ...iStyle, width: 84, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }} />
-                  <span style={{ fontSize: 11, color: C.dim }}>{f.unit} →</span>
-                  <input type="number" value={sl.rate} onChange={e => updSlab(i, { rate: parseFloat(e.target.value) || 0 })}
-                    style={{ ...iStyle, flex: 1, color: C.orange, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }} />
-                  <span style={{ fontSize: 11, color: C.dim }}>₹/{f.unit}</span>
-                  {f.slabs.length > 1 && <Btn size="sm" tone="danger" onClick={() => u({ slabs: f.slabs.filter((_, j) => j !== i) })}>Remove</Btn>}
+      <div style={{ marginTop: 18 }}>
+        <Section title="Rates" note="One line per size and formation, straight off the tender schedule. The driller's log records both, so XPLORIX picks the matching line for each day.">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {f.rateRows.map((r, i) => (
+              <div key={r.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div style={{ width: 92 }}>
+                    <Field label="Size">
+                      <select value={r.holeSize} onChange={e => updRow(i, { holeSize: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}>
+                        {HOLE_SIZES.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                  <div style={{ width: 160 }}>
+                    <Field label="Formation">
+                      <select value={r.formation} onChange={e => updRow(i, { formation: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}>
+                        {ROCK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        {r.formation && !ROCK_CATEGORIES.includes(r.formation) && <option value={r.formation}>{r.formation}</option>}
+                      </select>
+                    </Field>
+                  </div>
+                  <div style={{ width: 140 }}>
+                    <NumField label="Rate" value={r.rate} onChange={n => updRow(i, { rate: n })} suffix="₹/m" color={C.orange} />
+                  </div>
+                  <div style={{ flex: 1 }} />
+                  <Btn size="sm" onClick={() => updRow(i, { adjustments: [...r.adjustments, { id: uid('a'), condition: 'above', depth: 400, adjustPct: -20 }] })}>
+                    Add adjustment
+                  </Btn>
+                  {f.rateRows.length > 1 && <Btn size="sm" tone="danger" onClick={() => u({ rateRows: f.rateRows.filter((_, j) => j !== i) })}>Remove</Btn>}
                 </div>
-              ))}
-              <div>
-                <Btn size="sm" onClick={() => {
-                  const last = f.slabs[f.slabs.length - 1]
-                  u({ slabs: [...f.slabs, { id: uid('s'), fromDepth: last?.toDepth ?? 0, toDepth: null, rate: 0 }] })
-                }}>Add slab</Btn>
-              </div>
-            </div>
-          </Section>
-        )}
-      </div>
 
-      <div style={{ marginTop: 24 }}>
-        <Section title="Other billable lines">
-          <Grid cols={2}>
-            <NumField label="Standby" value={f.standbyPerDay} onChange={n => u({ standbyPerDay: n })} suffix="₹/day" color={C.amber}
-              hint="Billed when the client stops work" />
-            <NumField label="Minimum core recovery" value={f.minCoreRecoveryPct} onChange={n => u({ minCoreRecoveryPct: n })} suffix="%"
-              hint="Below this the hole may be re-drilled at your cost" />
-            <NumField label="Mobilisation" value={f.mobilisation} onChange={n => u({ mobilisation: n })} suffix="₹" />
-            <NumField label="Demobilisation" value={f.demobilisation} onChange={n => u({ demobilisation: n })} suffix="₹" />
-          </Grid>
-        </Section>
-      </div>
-
-      <div style={{ marginTop: 24 }}>
-        <Section title="Size adjustments"
-          note="Optional. Some contracts cut the rate when a narrower bit is used shallower than expected — the size, depth and percentage all vary by project.">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {f.sizeAdjustments.map((a, i) => (
-              <div key={a.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: C.faint }}>When</span>
-                <select value={a.holeSize} onChange={e => updAdj(i, { holeSize: e.target.value })} style={{ ...iStyle, width: 86, cursor: 'pointer' }}>
-                  {HOLE_SIZES.map(h => <option key={h} value={h}>{h}</option>)}
-                </select>
-                <span style={{ fontSize: 12, color: C.faint }}>is used</span>
-                <select value={a.condition} onChange={e => updAdj(i, { condition: e.target.value as 'above' | 'below' })} style={{ ...iStyle, width: 100, cursor: 'pointer' }}>
-                  <option value="above">above</option><option value="below">below</option>
-                </select>
-                <input type="number" value={a.depth} onChange={e => updAdj(i, { depth: parseFloat(e.target.value) || 0 })}
-                  style={{ ...iStyle, width: 84, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }} />
-                <span style={{ fontSize: 12, color: C.faint }}>{f.unit}, adjust by</span>
-                <input type="number" value={a.adjustPct} onChange={e => updAdj(i, { adjustPct: parseFloat(e.target.value) || 0 })}
-                  style={{ ...iStyle, width: 74, textAlign: 'right', color: a.adjustPct < 0 ? C.red : C.green, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }} />
-                <span style={{ fontSize: 12, color: C.faint }}>%</span>
-                <Btn size="sm" tone="danger" onClick={() => u({ sizeAdjustments: f.sizeAdjustments.filter((_, j) => j !== i) })}>Remove</Btn>
+                {r.adjustments.map((a, j) => (
+                  <div key={a.id} style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                    <span style={{ fontSize: 12, color: C.faint }}>When drilled</span>
+                    <select value={a.condition} onChange={e => updAdj(i, j, { condition: e.target.value as 'above' | 'below' })} style={{ ...iStyle, width: 92, cursor: 'pointer' }}>
+                      <option value="above">above</option><option value="below">below</option>
+                    </select>
+                    <input type="number" value={a.depth} onChange={e => updAdj(i, j, { depth: parseFloat(e.target.value) || 0 })}
+                      style={{ ...iStyle, width: 80, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }} />
+                    <span style={{ fontSize: 12, color: C.faint }}>m, adjust rate by</span>
+                    <input type="number" value={a.adjustPct} onChange={e => updAdj(i, j, { adjustPct: parseFloat(e.target.value) || 0 })}
+                      style={{ ...iStyle, width: 72, textAlign: 'right', color: a.adjustPct < 0 ? C.red : C.green, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }} />
+                    <span style={{ fontSize: 12, color: C.faint }}>%</span>
+                    <span style={{ fontSize: 11, color: C.dim, fontFamily: 'ui-monospace, monospace' }}>
+                      → {perUnit(r.rate * (1 + a.adjustPct / 100))}
+                    </span>
+                    <Btn size="sm" tone="danger" onClick={() => updRow(i, { adjustments: r.adjustments.filter((_, k) => k !== j) })}>Remove</Btn>
+                  </div>
+                ))}
               </div>
             ))}
             <div>
-              <Btn size="sm" onClick={() => u({ sizeAdjustments: [...f.sizeAdjustments, { id: uid('sa'), holeSize: 'NQ', condition: 'above', depth: 400, adjustPct: -20 }] })}>
-                Add adjustment
+              <Btn size="sm" onClick={() => u({ rateRows: [...f.rateRows, { id: uid('r'), holeSize: 'HQ', formation: 'Hard rock', rate: 0, adjustments: [] }] })}>
+                Add rate
               </Btn>
             </div>
           </div>
         </Section>
       </div>
 
-      <SaveRow label="Save client cost" disabled={f.effectiveFrom < minDate} onSave={() => onSave(f)} />
+      <div style={{ marginTop: 20 }}>
+        <Section title="Other billable lines">
+          <Grid cols={3}>
+            <NumField label="Standby" value={f.standbyPerDay} onChange={n => u({ standbyPerDay: n })} suffix="₹/day" color={C.amber}
+              hint="Billed when the client stops work" />
+            <NumField label="Mobilisation" value={f.mobilisation} onChange={n => u({ mobilisation: n })} suffix="₹" />
+            <NumField label="Demobilisation" value={f.demobilisation} onChange={n => u({ demobilisation: n })} suffix="₹" />
+          </Grid>
+        </Section>
+      </div>
+
+      <SaveRow label="Save client cost" onSave={() => setConfirm(true)} />
+      {confirm && <SaveDialog minDate={minDate} replacing={inForce}
+        onCancel={() => setConfirm(false)} onSave={(from, why) => { onSave(f, from, why); setConfirm(false) }} />}
     </div>
   )
 }
@@ -962,16 +889,14 @@ function RatesHistoryModal({ project, rig, onClose }: { project: string; rig: st
   const opV = newestFirst(state.operating.filter(o => o.rig === rig && o.project === project))
   opV.forEach((o, i) => rows.push({
     kind: 'operating', id: o.id, from: o.effectiveFrom, scope: `${o.rig} · ${o.project}`, what: 'Operating cost',
-    detail: `Fuel ₹${o.fuelPricePerLitre}/L · day shift ₹${o.dayShiftRate} · night ₹${o.nightShiftRate} · standby ${money(o.standbyCostPerDay)}/day`,
+    detail: `Fuel ₹${o.fuelPricePerLitre}/L · labour ${money(o.labourRate)} · lodging ${money(o.lodgingRate)} · transport ${money(o.transportRate)}`,
     note: o.note, live: i === 0 && o.effectiveFrom <= today,
   }))
 
   const crV = newestFirst(state.clientRates.filter(c => c.project === project))
   crV.forEach((c, i) => rows.push({
     kind: 'clientRate', id: c.id, from: c.effectiveFrom, scope: c.project, what: 'Client cost',
-    detail: c.contractType === 'government'
-      ? `${c.category} · ${perUnit(c.rate, c.unit)} · standby ${money(c.standbyPerDay)}/day`
-      : `${c.slabs.length} depth slabs · ${perUnit(c.slabs[0]?.rate ?? 0, c.unit)} to ${perUnit(c.slabs[c.slabs.length - 1]?.rate ?? 0, c.unit)}`,
+    detail: c.rateRows.map(r => `${r.holeSize} ${r.formation} ${perUnit(r.rate)}`).join(' · ') + ` · standby ${money(c.standbyPerDay)}/day`,
     note: c.note, live: i === 0 && c.effectiveFrom <= today,
   }))
 
@@ -1029,14 +954,14 @@ function OverviewTab({ v, rig, month, onSetRates }: { v: RigMonthView; rig: stri
   }
 
   const r = v.roll
-  const unit = v.unit
+  const unit = 'm'
   const rate = r.revenuePerUnit
   const ownershipGap = r.ownershipCPU - v.budgetOwnershipCPU
 
-  // The committee's category against what the logs actually say.
-  const cat = v.clientRate?.category ?? ''
-  const catMismatch = cat && v.loggedFormation &&
-    !v.loggedFormation.toLowerCase().includes(cat.split(' ')[0].toLowerCase())
+  // Metres drilled with no matching rate line bill at zero, so it is surfaced
+  // rather than quietly lost.
+  const unmatchedDays = v.days.filter(d => d.unmatched)
+  const unmatchedUnits = unmatchedDays.reduce((a, d) => a + d.units, 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -1055,17 +980,17 @@ function OverviewTab({ v, rig, month, onSetRates }: { v: RigMonthView; rig: stri
         </Note>
       )}
 
-      {catMismatch && (
-        <Note tone={C.amber}>
-          The committee classified this project as <strong>{cat}</strong>, but the logs record most metres as <strong>{v.loggedFormation}</strong>.
-          If the classification is wrong every metre is underpriced, and there is no line item to recover it. This is the evidence you would need to ask for a revision.
+      {unmatchedUnits > 0 && (
+        <Note tone={C.red}>
+          {unmatchedUnits} m drilled with no matching rate line — the logs record a size and formation the client rate has no
+          row for, so those metres bill at zero. Add the missing line in Set rates rather than letting it reach an invoice.
         </Note>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 14 }}>
-        <Stat label={unit === 'm' ? 'Metres drilled' : 'Feet drilled'} value={`${r.units} ${unit}`} note={`${r.drillingDays} drilling days`} big />
+        <Stat label="Metres drilled" value={`${r.units} ${unit}`} note={`${r.drillingDays} drilling days`} big />
         <Stat label="Full cost" value={moneyL(r.total)} note="operating + ownership" color={LAYER.full} big />
-        <Stat label={`Cost per ${unit === 'm' ? 'metre' : 'foot'}`} value={perUnit(r.cpu, unit)}
+        <Stat label="Cost per metre" value={perUnit(r.cpu)}
           note="what one unit actually costs" color={rate ? cpuColor(r.cpu, rate) : LAYER.full} big />
         <Stat label="Margin" value={r.revenue > 0 ? moneyL(r.margin) : '—'}
           note={r.revenue > 0 ? `${pct(r.marginPct)} of ${moneyL(r.revenue)}` : 'no client rate set'}
@@ -1073,26 +998,26 @@ function OverviewTab({ v, rig, month, onSetRates }: { v: RigMonthView; rig: stri
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14 }}>
-        <LayerCard tone={LAYER.operating} title="Operating cost" value={moneyL(r.operating)} rate={perUnit(r.operatingCPU, unit)}
+        <LayerCard tone={LAYER.operating} title="Operating cost" value={moneyL(r.operating)} rate={perUnit(r.operatingCPU)}
           note="Fuel, water, additives, crew, repairs, parts. What running the rig consumed." />
-        <LayerCard tone={LAYER.ownership} title="Ownership cost" value={moneyL(r.ownership)} rate={perUnit(r.ownershipCPU, unit)}
+        <LayerCard tone={LAYER.ownership} title="Ownership cost" value={moneyL(r.ownership)} rate={perUnit(r.ownershipCPU)}
           note={`${v.ob.basisLabel || 'not configured'}. Due whether or not a metre gets drilled.`} />
-        <LayerCard tone={LAYER.full} title="Full cost" value={moneyL(r.total)} rate={perUnit(r.cpu, unit)}
+        <LayerCard tone={LAYER.full} title="Full cost" value={moneyL(r.total)} rate={perUnit(r.cpu)}
           note="The only figure that should ever be compared against a client rate." />
       </div>
 
       {v.ownership && v.ownership.expectedUnitsPerMonth > 0 && (
         <Card title="Budget against actual"
-          subtitle="Ownership per unit assumes a monthly output. Miss it and the same fixed cost lands on fewer units."
+          subtitle="Ownership per metre assumes a monthly output. Miss it and the same fixed cost lands on fewer metres."
           accent={Math.abs(v.productionVariancePct) > 5 ? C.amber : undefined}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 20 }}>
-            <Compare label={unit === 'm' ? 'Metres' : 'Feet'} budget={`${v.ownership.expectedUnitsPerMonth} ${unit}`} actual={`${r.units} ${unit}`}
+            <Compare label="Metres" budget={`${v.ownership.expectedUnitsPerMonth} ${unit}`} actual={`${r.units} ${unit}`}
               delta={`${v.productionVariancePct >= 0 ? '+' : ''}${v.productionVariancePct.toFixed(1)}%`}
               tone={v.productionVariancePct >= 0 ? C.green : C.red} />
             <Compare label="Operating days" budget={`${v.ownership.expectedOperatingDays}`} actual={`${r.days - r.missingDays}`}
               delta={`${(r.days - r.missingDays) - v.ownership.expectedOperatingDays >= 0 ? '+' : ''}${(r.days - r.missingDays) - v.ownership.expectedOperatingDays}`}
               tone={(r.days - r.missingDays) >= v.ownership.expectedOperatingDays ? C.green : C.amber} />
-            <Compare label={`Ownership per ${unit}`} budget={perUnit(v.budgetOwnershipCPU, unit)} actual={perUnit(r.ownershipCPU, unit)}
+            <Compare label="Ownership per metre" budget={perUnit(v.budgetOwnershipCPU)} actual={perUnit(r.ownershipCPU)}
               delta={`${ownershipGap >= 0 ? '+' : ''}${money(ownershipGap)}/${unit}`} tone={ownershipGap <= 0 ? C.green : C.red} />
             <Compare label="Ownership charged" budget={money(v.ob.perMonth)} actual={money(r.ownership)}
               delta={r.ownership > v.ob.perMonth ? `over by ${money(r.ownership - v.ob.perMonth)}` : `under by ${money(v.ob.perMonth - r.ownership)}`}
@@ -1125,14 +1050,14 @@ function OverviewTab({ v, rig, month, onSetRates }: { v: RigMonthView; rig: stri
                   <td style={{ ...td, color: C.text, fontWeight: 600 }}>{x.k}</td>
                   <td style={{ ...td, fontSize: 10, color: C.dim }}>{x.src}</td>
                   <td style={tdN}>{money(x.v)}</td>
-                  <td style={{ ...tdN, color: C.faint }}>{r.units > 0 ? perUnit(x.v / r.units, unit) : '—'}</td>
+                  <td style={{ ...tdN, color: C.faint }}>{r.units > 0 ? perUnit(x.v / r.units) : '—'}</td>
                   <td style={{ ...tdN, color: C.faint }}>{r.total > 0 ? pct((x.v / r.total) * 100) : '—'}</td>
                 </tr>
               ))}
               <tr style={{ borderBottom: rowBorder, background: 'rgba(245,158,11,0.05)' }}>
                 <td style={{ ...td, color: LAYER.operating, fontWeight: 800 }} colSpan={2}>Operating cost</td>
                 <td style={{ ...tdN, color: LAYER.operating, fontWeight: 800 }}>{money(r.operating)}</td>
-                <td style={{ ...tdN, color: LAYER.operating }}>{perUnit(r.operatingCPU, unit)}</td>
+                <td style={{ ...tdN, color: LAYER.operating }}>{perUnit(r.operatingCPU)}</td>
                 <td style={{ ...tdN, color: C.faint }}>{r.total > 0 ? pct((r.operating / r.total) * 100) : '—'}</td>
               </tr>
               <tr style={{ borderBottom: rowBorder, background: 'rgba(139,92,246,0.05)' }}>
@@ -1141,13 +1066,13 @@ function OverviewTab({ v, rig, month, onSetRates }: { v: RigMonthView; rig: stri
                   <span style={{ fontSize: 10, color: C.dim, fontWeight: 400 }}> · {money(v.ob.perDay)}/day</span>
                 </td>
                 <td style={{ ...tdN, color: LAYER.ownership, fontWeight: 800 }}>{money(r.ownership)}</td>
-                <td style={{ ...tdN, color: LAYER.ownership }}>{perUnit(r.ownershipCPU, unit)}</td>
+                <td style={{ ...tdN, color: LAYER.ownership }}>{perUnit(r.ownershipCPU)}</td>
                 <td style={{ ...tdN, color: C.faint }}>{r.total > 0 ? pct((r.ownership / r.total) * 100) : '—'}</td>
               </tr>
               <tr style={{ background: 'rgba(249,115,22,0.08)' }}>
                 <td style={{ ...td, color: LAYER.full, fontWeight: 900, fontSize: 13 }} colSpan={2}>Full cost</td>
                 <td style={{ ...tdN, color: LAYER.full, fontWeight: 900, fontSize: 13 }}>{money(r.total)}</td>
-                <td style={{ ...tdN, color: LAYER.full, fontWeight: 900, fontSize: 13 }}>{perUnit(r.cpu, unit)}</td>
+                <td style={{ ...tdN, color: LAYER.full, fontWeight: 900, fontSize: 13 }}>{perUnit(r.cpu)}</td>
                 <td style={tdN} />
               </tr>
             </tbody>
@@ -1172,17 +1097,17 @@ function OverviewTab({ v, rig, month, onSetRates }: { v: RigMonthView; rig: stri
             ) : <Empty>Set the purchase price, depreciation and loan terms and XPLORIX works out the daily cost.</Empty>}
           </Card>
 
-          <Card title="Client rate" subtitle={v.clientRate ? `${v.clientRate.client} · ${v.clientRate.contractType} · from ${fullDate(v.clientRate.effectiveFrom)}` : 'not set'}>
+          <Card title="Client rate" subtitle={v.clientRate ? `from ${fullDate(v.clientRate.effectiveFrom)}` : 'not set'}>
             {v.clientRate ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-                {v.clientRate.contractType === 'government'
-                  ? <KV k={v.clientRate.category} v={perUnit(v.clientRate.rate, unit)} tone={LAYER.revenue} bold />
-                  : <KV k={`${v.clientRate.slabs.length} depth slabs`} v={`${perUnit(v.clientRate.slabs[0]?.rate ?? 0, unit)}+`} tone={LAYER.revenue} bold />}
+                {v.clientRate.rateRows.map(rr => (
+                  <KV key={rr.id} k={`${rr.holeSize} · ${rr.formation}`} v={perUnit(rr.rate)} tone={LAYER.revenue} />
+                ))}
                 <KV k="Standby" v={`${money(v.clientRate.standbyPerDay)}/day`} />
                 <KV k="Revenue this month" v={money(r.revenue)} tone={LAYER.revenue} />
                 <div style={{ height: 1, background: C.border }} />
-                <KV k="Full cost" v={perUnit(r.cpu, unit)} tone={LAYER.full} />
-                <KV k="Realised rate" v={perUnit(r.revenuePerUnit, unit)} tone={LAYER.revenue} />
+                <KV k="Full cost" v={perUnit(r.cpu)} tone={LAYER.full} />
+                <KV k="Realised rate" v={perUnit(r.revenuePerUnit)} tone={LAYER.revenue} />
                 <KV k="Margin" v={pct(r.marginPct)} tone={marginColor(r.margin)} bold />
               </div>
             ) : <Empty>Set the client rate to see revenue and margin.</Empty>}
@@ -1200,30 +1125,6 @@ function OverviewTab({ v, rig, month, onSetRates }: { v: RigMonthView; rig: stri
         </div>
       </div>
 
-      {v.mobDemob.length > 0 && (
-        <Card title="Mobilisation & demobilisation" pad={false}
-          subtitle="Dated lump sums, kept out of the per-unit rate — a one-off move spread across the month's metres makes every hole read wrong.">
-          <table style={tableStyle}>
-            <thead><tr><th style={th}>Event</th><th style={th}>Date</th><th style={th}>What it covered</th><th style={thR}>Cost</th><th style={thR}>Billable</th><th style={thR}>Net</th></tr></thead>
-            <tbody>
-              {v.mobDemob.map(e => {
-                const c = mobDemobCost(e)
-                const net = (e.billable ? e.billedAmount : 0) - c
-                return (
-                  <tr key={e.id} style={{ borderBottom: rowBorder }}>
-                    <td style={{ ...td, color: C.text, fontWeight: 600, textTransform: 'capitalize' }}>{e.type}</td>
-                    <td style={td}>{dayLabel(e.date)}</td>
-                    <td style={{ ...td, whiteSpace: 'normal', maxWidth: 420, lineHeight: 1.6 }}>{e.lines.map(l => `${l.label} ${money(l.amount)}`).join(' · ')}</td>
-                    <td style={{ ...tdN, color: C.red }}>{money(c)}</td>
-                    <td style={{ ...tdN, color: LAYER.revenue }}>{e.billable ? money(e.billedAmount) : '—'}</td>
-                    <td style={{ ...tdN, color: marginColor(net), fontWeight: 800 }}>{money(net)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </Card>
-      )}
     </div>
   )
 }
@@ -1265,7 +1166,7 @@ function DailyTab({ v, rig, month }: { v: RigMonthView; rig: string; month: stri
   const [open, setOpen] = useState<string | null>(null)
   if (!v.hasLogs) return <Card><Empty>No driller logs for {rig} in {monthLabel(month)}.</Empty></Card>
 
-  const unit = v.unit
+  const unit = 'm'
   const days = v.days
   const last = days[days.length - 1]
   const lastDrilled = [...days].reverse().find(d => d.units > 0)
@@ -1278,19 +1179,19 @@ function DailyTab({ v, rig, month }: { v: RigMonthView; rig: string; month: stri
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14 }}>
         <Stat label={`Last drilling day · ${lastDrilled ? dayLabel(lastDrilled.date) : '—'}`}
-          value={lastDrilled?.cpu != null ? perUnit(lastDrilled.cpu, unit) : '—'}
+          value={lastDrilled?.cpu != null ? perUnit(lastDrilled.cpu) : '—'}
           note={lastDrilled ? `${lastDrilled.units} ${unit} · ${money(lastDrilled.total)}` : 'nothing drilled yet'}
           color={lastDrilled?.cpu != null && rate ? cpuColor(lastDrilled.cpu, rate) : C.text} big />
-        <Stat label="Month to date" value={last?.mtdCPU != null ? perUnit(last.mtdCPU, unit) : '—'}
+        <Stat label="Month to date" value={last?.mtdCPU != null ? perUnit(last.mtdCPU) : '—'}
           note={`${v.roll.units} ${unit} · ${money(v.roll.total)}`}
           color={last?.mtdCPU != null && rate ? cpuColor(last.mtdCPU, rate) : LAYER.full} big />
         <Stat label={currentHole ? `Current hole · ${currentHole.hole.holeNumber}` : 'Current hole'}
-          value={currentHole && currentHole.roll.cpu > 0 ? perUnit(currentHole.roll.cpu, unit) : '—'}
+          value={currentHole && currentHole.roll.cpu > 0 ? perUnit(currentHole.roll.cpu) : '—'}
           note={currentHole ? `${currentHole.roll.units} ${unit} · ${money(currentHole.roll.total)}` : 'no hole in progress'}
           color={currentHole && rate ? cpuColor(currentHole.roll.cpu, rate) : C.text} big />
       </div>
 
-      <CPUChart days={days} rate={rate} unit={unit} />
+      <CPUChart days={days} rate={rate} />
 
       <Card title="Day by day" subtitle={`${rig} · ${monthLabel(month)} · click a day for the full breakdown`} pad={false}>
         <div style={{ overflowX: 'auto' }}>
@@ -1298,7 +1199,7 @@ function DailyTab({ v, rig, month }: { v: RigMonthView; rig: string; month: stri
             <thead>
               <tr>
                 <th style={th}>Date</th><th style={th}>Status</th><th style={th}>Hole</th>
-                <th style={thR}>Hours</th><th style={thR}>{unit === 'm' ? 'Metres' : 'Feet'}</th><th style={thR}>Crew</th>
+                <th style={thR}>Hours</th><th style={thR}>Metres</th><th style={thR}>Crew</th>
                 <th style={thR}>Operating</th><th style={thR}>Ownership</th><th style={thR}>Total</th>
                 <th style={thR}>Per {unit}</th><th style={thR}>MTD</th><th style={thR}>Revenue</th>
               </tr>
@@ -1325,9 +1226,9 @@ function DailyTab({ v, rig, month }: { v: RigMonthView; rig: string; month: stri
                       <td style={{ ...tdN, color: LAYER.ownership }}>{d.ownership > 0 ? money(d.ownership) : '—'}</td>
                       <td style={{ ...tdN, color: C.text, fontWeight: 800 }}>{money(d.total)}</td>
                       <td style={{ ...tdN, fontWeight: 800, color: d.cpu == null ? C.dim : rate ? cpuColor(d.cpu, rate) : C.text }}>
-                        {d.cpu == null ? '—' : perUnit(d.cpu, unit)}
+                        {d.cpu == null ? '—' : perUnit(d.cpu)}
                       </td>
-                      <td style={{ ...tdN, color: C.faint }}>{d.mtdCPU == null ? '—' : perUnit(d.mtdCPU, unit)}</td>
+                      <td style={{ ...tdN, color: C.faint }}>{d.mtdCPU == null ? '—' : perUnit(d.mtdCPU)}</td>
                       <td style={{ ...tdN, color: d.revenue > 0 ? LAYER.revenue : C.dim }}>{d.revenue > 0 ? money(d.revenue) : '—'}</td>
                     </tr>
                     {isOpen && (
@@ -1349,21 +1250,20 @@ function DailyTab({ v, rig, month }: { v: RigMonthView; rig: string; month: stri
                               ['Repairs', money(d.repairs)],
                               ['Parts & tooling', money(d.parts)],
                             ]} />
-                            <Detail title="Crew" tone={C.teal} rows={d.labour.flatRate
-                              ? [['Flat day rate', money(d.labour.total)], ['Basis', d.status === 'standby' ? 'standby' : 'breakdown']]
+                            <Detail title="Crew" tone={C.teal} rows={d.labour.perMetre
+                              ? [['Per metre', 'charged on metres'], ['Labour', money(d.labour.labour)], ['Lodging', money(d.labour.lodging)], ['Transport', money(d.labour.transport)], ['Crew cost', money(d.labour.total)]]
                               : [
-                                ['Wages', money(d.labour.wages)],
-                                ['Lodging', money(d.labour.accommodation)],
+                                ['Labour', money(d.labour.labour)],
+                                ['Lodging', money(d.labour.lodging)],
                                 ['Transport', money(d.labour.transport)],
-                                ['Supervision', money(d.labour.supervision)],
                                 ['Crew cost', money(d.labour.total)],
                               ]} />
                             <Detail title="Day" tone={LAYER.full} rows={[
                               ['Operating', money(d.operating)],
                               ['Ownership', money(d.ownership)],
                               ['Full cost', money(d.total)],
-                              ['Cost per unit', d.cpu == null ? 'nothing drilled' : perUnit(d.cpu, unit)],
-                              ['Client rate', d.rate > 0 ? perUnit(d.rate, unit) : '—'],
+                              ['Cost per unit', d.cpu == null ? 'nothing drilled' : perUnit(d.cpu)],
+                              ['Client rate', d.rate > 0 ? perUnit(d.rate) : '—'],
                               ['Revenue', money(d.revenue)],
                             ]} />
                           </div>
@@ -1403,7 +1303,7 @@ function DailyTab({ v, rig, month }: { v: RigMonthView; rig: string; month: stri
                 <td style={{ ...tdN, fontWeight: 800, color: LAYER.operating }}>{money(v.roll.operating)}</td>
                 <td style={{ ...tdN, fontWeight: 800, color: LAYER.ownership }}>{money(v.roll.ownership)}</td>
                 <td style={{ ...tdN, fontWeight: 900, color: C.text }}>{money(v.roll.total)}</td>
-                <td style={{ ...tdN, fontWeight: 900, color: LAYER.full }}>{perUnit(v.roll.cpu, unit)}</td>
+                <td style={{ ...tdN, fontWeight: 900, color: LAYER.full }}>{perUnit(v.roll.cpu)}</td>
                 <td style={tdN} />
                 <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue }}>{money(v.roll.revenue)}</td>
               </tr>
@@ -1422,15 +1322,12 @@ function DailyTab({ v, rig, month }: { v: RigMonthView; rig: string; month: stri
             </div>
           </Card>
         )}
-        <Card title="Core recovery" accent={v.roll.coreRecoveryPct < (v.clientRate?.minCoreRecoveryPct ?? 0) ? C.red : C.green}>
-          <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'ui-monospace, monospace', color: v.roll.coreRecoveryPct < (v.clientRate?.minCoreRecoveryPct ?? 0) ? C.red : C.green }}>
+        <Card title="Core recovery" accent={C.green}>
+          <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'ui-monospace, monospace', color: C.green }}>
             {pct(v.roll.coreRecoveryPct)}
           </div>
           <div style={{ fontSize: 11, color: C.faint, marginTop: 8, lineHeight: 1.7 }}>
-            {v.roll.coreRecovery.toFixed(1)} {unit} recovered from {v.roll.units} {unit} drilled.
-            {v.clientRate?.minCoreRecoveryPct
-              ? ` The contract requires ${v.clientRate.minCoreRecoveryPct}% — below that a hole may have to be re-drilled at your cost, which wipes out its margin entirely.`
-              : ' No minimum set in the client rate.'}
+            {v.roll.coreRecovery.toFixed(1)} m recovered from {v.roll.units} m drilled, straight from the driller&apos;s log.
           </div>
         </Card>
       </div>
@@ -1457,7 +1354,7 @@ function Detail({ title, tone, rows }: { title: string; tone: string; rows: stri
 /* Daily points, month-to-date line. Daily cost is genuinely spiky, so joining
  * the points would imply a continuity that isn't there; month to date really
  * is cumulative, so that one is a line. */
-function CPUChart({ days, rate, unit }: { days: DayCostMTD[]; rate: number; unit: RateUnit }) {
+function CPUChart({ days, rate }: { days: DayCostMTD[]; rate: number }) {
   const pts = days.filter(d => d.cpu != null)
   if (pts.length < 2) return null
 
@@ -1468,7 +1365,7 @@ function CPUChart({ days, rate, unit }: { days: DayCostMTD[]; rate: number; unit
   const mtd = days.map((d, i) => d.mtdCPU == null ? null : `${i === 0 || days[i - 1].mtdCPU == null ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.mtdCPU).toFixed(1)}`).filter(Boolean).join(' ')
 
   return (
-    <Card title={`Cost per ${unit === 'm' ? 'metre' : 'foot'} through the month`}
+    <Card title="Cost per metre through the month"
       subtitle="Points are single days. The line is month to date, which is the figure that actually settles." pad={false}>
       <div style={{ padding: '18px 20px 8px', overflowX: 'auto' }}>
         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: 620, height: 'auto', display: 'block' }}>
@@ -1529,7 +1426,7 @@ function HolesTab({ v, onAddHole, onEditHole, onStatus }: {
   onStatus: (id: string, s: HoleStatus) => void
 }) {
   const [open, setOpen] = useState<string | null>(null)
-  const unit = v.unit
+  const unit = 'm'
 
   if (v.holes.length === 0) {
     return (
@@ -1545,10 +1442,9 @@ function HolesTab({ v, onAddHole, onEditHole, onStatus }: {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {v.holes.some(h => h.recoveryShortfall) && (
+      {v.holes.some(h => h.unmatchedDays > 0) && (
         <Note tone={C.red}>
-          A hole is below the contract&apos;s minimum core recovery. Below that threshold the client can require a re-drill at your
-          cost, which wipes out the hole&apos;s margin entirely — worth settling before the hole is approved for billing.
+          A hole has metres with no matching rate line, so those metres bill at zero. Add the missing size and formation in Set rates.
         </Note>
       )}
       {v.holes.some(h => h.rates.length > 1) && (
@@ -1565,7 +1461,7 @@ function HolesTab({ v, onAddHole, onEditHole, onStatus }: {
             <thead>
               <tr>
                 <th style={th}>Hole</th><th style={th}>Dates</th><th style={th}>Status</th>
-                <th style={thR}>Days</th><th style={thR}>{unit === 'm' ? 'Metres' : 'Feet'}</th><th style={thR}>Recovery</th>
+                <th style={thR}>Days</th><th style={thR}>Metres</th><th style={thR}>Recovery</th>
                 <th style={thR}>Cost</th><th style={thR}>Cost/{unit}</th><th style={thR}>Rate</th>
                 <th style={thR}>Revenue</th><th style={thR}>Profit</th><th style={thR}>Margin</th>
               </tr>
@@ -1579,17 +1475,17 @@ function HolesTab({ v, onAddHole, onEditHole, onStatus }: {
                     <tr onClick={() => setOpen(isOpen ? null : hole.id)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'rgba(249,115,22,0.05)' : undefined }}>
                       <td style={{ ...td, color: C.text, fontWeight: 700 }}>
                         {hole.holeNumber}
-                        {h.recoveryShortfall && <span style={{ color: C.red, marginLeft: 7 }}>●</span>}
+                        {h.unmatchedDays > 0 && <span style={{ color: C.red, marginLeft: 7 }}>●</span>}
                         {h.rates.length > 1 && <span style={{ color: C.blue, marginLeft: 5 }}>●</span>}
                       </td>
                       <td style={td}>{dayLabel(hole.startDate)} → {hole.endDate ? dayLabel(hole.endDate) : 'open'}</td>
                       <td style={td}><Tag tone={holeStatusColor(hole.status)}>{hole.status}</Tag></td>
                       <td style={tdN}>{h.roll.days}</td>
                       <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{h.roll.units}</td>
-                      <td style={{ ...tdN, color: h.recoveryShortfall ? C.red : C.faint }}>{pct(h.coreRecoveryPct)}</td>
+                      <td style={{ ...tdN, color: C.faint }}>{pct(h.coreRecoveryPct)}</td>
                       <td style={{ ...tdN, color: LAYER.full }}>{money(h.roll.total)}</td>
-                      <td style={{ ...tdN, color: LAYER.full, fontWeight: 700 }}>{perUnit(h.roll.cpu, unit)}</td>
-                      <td style={{ ...tdN, color: C.faint }}>{h.rates.length > 1 ? `${h.rates.length} rates` : perUnit(h.rates[0] ?? 0, unit)}</td>
+                      <td style={{ ...tdN, color: LAYER.full, fontWeight: 700 }}>{perUnit(h.roll.cpu)}</td>
+                      <td style={{ ...tdN, color: C.faint }}>{h.rates.length > 1 ? `${h.rates.length} rates` : perUnit(h.rates[0] ?? 0)}</td>
                       <td style={{ ...tdN, color: LAYER.revenue }}>{money(h.roll.revenue)}</td>
                       <td style={{ ...tdN, color: marginColor(h.roll.margin), fontWeight: 800 }}>{money(h.roll.margin)}</td>
                       <td style={{ ...tdN, color: marginColor(h.roll.margin), fontWeight: 800 }}>{h.roll.revenue > 0 ? pct(h.roll.marginPct) : '—'}</td>
@@ -1638,7 +1534,7 @@ function HolesTab({ v, onAddHole, onEditHole, onStatus }: {
                                 What {hole.holeNumber} bills
                               </div>
                               <table style={tableStyle}>
-                                <thead><tr><th style={th}>Rate applied</th><th style={thR}>{unit === 'm' ? 'Metres' : 'Feet'}</th><th style={thR}>Amount</th></tr></thead>
+                                <thead><tr><th style={th}>Rate applied</th><th style={thR}>Metres</th><th style={thR}>Amount</th></tr></thead>
                                 <tbody>
                                   {h.rates.map(rt => {
                                     const dd = h.days.filter(d => Math.round(d.rate) === rt && d.units > 0)
@@ -1646,7 +1542,7 @@ function HolesTab({ v, onAddHole, onEditHole, onStatus }: {
                                     const amt = dd.reduce((s, d) => s + d.revenue, 0)
                                     return (
                                       <tr key={rt} style={{ borderBottom: rowBorder }}>
-                                        <td style={{ ...td, color: C.text }}>{perUnit(rt, unit)}<span style={{ color: C.dim, fontSize: 10 }}> · {dayLabel(dd[0].date)}–{dayLabel(dd[dd.length - 1].date)}</span></td>
+                                        <td style={{ ...td, color: C.text }}>{perUnit(rt)}<span style={{ color: C.dim, fontSize: 10 }}> · {dayLabel(dd[0].date)}–{dayLabel(dd[dd.length - 1].date)}</span></td>
                                         <td style={tdN}>{u}</td>
                                         <td style={{ ...tdN, color: LAYER.revenue, fontWeight: 700 }}>{money(amt)}</td>
                                       </tr>
@@ -1676,18 +1572,17 @@ function HolesTab({ v, onAddHole, onEditHole, onStatus }: {
                                   <Res k="Profit" v={money(h.roll.margin)} tone={marginColor(h.roll.margin)} big />
                                 </Grid>
                                 <div style={{ marginTop: 12, fontSize: 11, color: C.faint, lineHeight: 1.7 }}>
-                                  {h.roll.units} {unit} at {perUnit(h.roll.revenuePerUnit, unit)} against {perUnit(h.roll.cpu, unit)} —
-                                  a margin of {perUnit(h.roll.revenuePerUnit - h.roll.cpu, unit)}, or {pct(h.roll.marginPct)}.
+                                  {h.roll.units} {unit} at {perUnit(h.roll.revenuePerUnit)} against {perUnit(h.roll.cpu)} —
+                                  a margin of {perUnit(h.roll.revenuePerUnit - h.roll.cpu)}, or {pct(h.roll.marginPct)}.
                                 </div>
                               </div>
                             </div>
                           </div>
 
-                          {h.recoveryShortfall && (
+                          {h.unmatchedDays > 0 && (
                             <div style={{ marginTop: 16 }}>
                               <Note tone={C.red}>
-                                Core recovery is {pct(h.coreRecoveryPct)}, below the {v.clientRate?.minCoreRecoveryPct}% the contract requires.
-                                The client can ask for a re-drill at your cost, which would turn this hole&apos;s {money(h.roll.margin)} profit into a loss.
+                                {h.unmatchedDays} {h.unmatchedDays === 1 ? 'day has' : 'days have'} metres with no matching rate line, billing at zero.
                               </Note>
                             </div>
                           )}
@@ -1718,7 +1613,7 @@ function HolesTab({ v, onAddHole, onEditHole, onStatus }: {
                 <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{t.units}</td>
                 <td style={tdN} />
                 <td style={{ ...tdN, fontWeight: 800, color: LAYER.full }}>{money(t.cost)}</td>
-                <td style={{ ...tdN, fontWeight: 800, color: LAYER.full }}>{t.units > 0 ? perUnit(t.cost / t.units, unit) : '—'}</td>
+                <td style={{ ...tdN, fontWeight: 800, color: LAYER.full }}>{t.units > 0 ? perUnit(t.cost / t.units) : '—'}</td>
                 <td style={tdN} />
                 <td style={{ ...tdN, fontWeight: 800, color: LAYER.revenue }}>{money(t.revenue)}</td>
                 <td style={{ ...tdN, fontWeight: 900, color: marginColor(t.revenue - t.cost) }}>{money(t.revenue - t.cost)}</td>
@@ -1751,42 +1646,33 @@ function Res({ k, v, tone, big }: { k: string; v: string; tone: string; big?: bo
 
 /* ── BILLING ──────────────────────────────────────────────────────────── */
 
-function BillingTab({ project, holes, clientRate, mobDemob, invoices, onCreate, onDelete }: {
+function BillingTab({ project, holes, clientRate, invoices, onCreate, onDelete }: {
   project: string; holes: HoleResult[]; clientRate?: ClientRate
-  mobDemob: MobDemobEvent[]; invoices: Invoice[]
+  invoices: Invoice[]
   onCreate: (i: Invoice) => void; onDelete: (id: string) => void
 }) {
   const [picked, setPicked] = useState<Set<string>>(new Set())
-  const [pickedMD, setPickedMD] = useState<Set<string>>(new Set())
   const [review, setReview] = useState(false)
-  const unit = clientRate?.unit ?? 'm'
 
   const ready = holes.filter(h => isBillable(h.hole))
   const waiting = holes.filter(h => h.hole.status === 'closed')
-  const readyMD = mobDemob.filter(e => e.billable && !e.invoiceId)
-
   const toggle = (id: string) => setPicked(s => { const n = new Set(Array.from(s)); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const toggleMD = (id: string) => setPickedMD(s => { const n = new Set(Array.from(s)); n.has(id) ? n.delete(id) : n.add(id); return n })
-
   const chosen = ready.filter(h => picked.has(h.hole.id))
-  const chosenMD = readyMD.filter(e => pickedMD.has(e.id))
   const sel = {
-    revenue: chosen.reduce((s, h) => s + h.roll.revenue, 0) + chosenMD.reduce((s, e) => s + e.billedAmount, 0),
-    cost: chosen.reduce((s, h) => s + h.roll.total, 0) + chosenMD.reduce((s, e) => s + mobDemobCost(e), 0),
+    revenue: chosen.reduce((s, h) => s + h.roll.revenue, 0),
+    cost: chosen.reduce((s, h) => s + h.roll.total, 0),
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {waiting.length > 0 && (
         <Note tone={C.blue}>
           {waiting.length} {waiting.length === 1 ? 'hole is' : 'holes are'} closed but not approved
           ({waiting.map(h => h.hole.holeNumber).join(', ')}). Approve them in the Holes tab to bill.
         </Note>
       )}
-      {ready.some(h => h.recoveryShortfall) && (
-        <Note tone={C.red}>
-          A hole selected for billing is below the contract&apos;s minimum core recovery. Invoicing it invites a re-drill claim.
-        </Note>
+      {ready.some(h => h.unmatchedDays > 0) && (
+        <Note tone={C.red}>A hole ready to bill has metres with no matching rate line. Those metres will invoice at zero.</Note>
       )}
 
       <Card title="Ready to bill" pad={false}
@@ -1796,16 +1682,16 @@ function BillingTab({ project, holes, clientRate, mobDemob, invoices, onCreate, 
             <Btn size="sm" onClick={() => setPicked(picked.size === ready.length ? new Set() : new Set(ready.map(h => h.hole.id)))}>
               {picked.size === ready.length ? 'Clear' : 'Select all'}
             </Btn>
-            <Btn size="sm" tone="primary" disabled={chosen.length === 0 && chosenMD.length === 0} onClick={() => setReview(true)}>
-              Review{chosen.length + chosenMD.length > 0 ? ` (${chosen.length + chosenMD.length})` : ''}
+            <Btn size="sm" tone="primary" disabled={chosen.length === 0} onClick={() => setReview(true)}>
+              Review{chosen.length > 0 ? ` (${chosen.length})` : ''}
             </Btn>
           </div>
         ) : undefined}>
         {ready.length === 0 ? <Empty>Nothing approved and waiting. Close a hole, approve it, and it appears here.</Empty> : (
           <table style={tableStyle}>
             <thead>
-              <tr><th style={{ ...th, width: 44 }} /><th style={th}>Hole</th><th style={th}>Rig</th><th style={th}>Closed</th>
-                <th style={thR}>{unit === 'm' ? 'Metres' : 'Feet'}</th><th style={thR}>Recovery</th><th style={thR}>Cost</th>
+              <tr><th style={{ ...th, width: 40 }} /><th style={th}>Hole</th><th style={th}>Rig</th><th style={th}>Closed</th>
+                <th style={thR}>Metres</th><th style={thR}>Recovery</th><th style={thR}>Cost</th>
                 <th style={thR}>Revenue</th><th style={thR}>Profit</th><th style={thR}>Margin</th></tr>
             </thead>
             <tbody>
@@ -1814,13 +1700,13 @@ function BillingTab({ project, holes, clientRate, mobDemob, invoices, onCreate, 
                 return (
                   <tr key={h.hole.id} onClick={() => toggle(h.hole.id)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: on ? 'rgba(249,115,22,0.06)' : undefined }}>
                     <td style={{ ...td, textAlign: 'center' }}>
-                      <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: 5, border: `1.5px solid ${on ? C.orange : C.border}`, background: on ? C.orange : 'transparent', color: '#fff', fontSize: 11, lineHeight: '14px', textAlign: 'center' }}>{on ? '✓' : ''}</span>
+                      <span style={{ display: 'inline-block', width: 15, height: 15, borderRadius: 4, border: `1.5px solid ${on ? C.orange : C.border}`, background: on ? C.orange : 'transparent', color: '#fff', fontSize: 10, lineHeight: '13px', textAlign: 'center' }}>{on ? '✓' : ''}</span>
                     </td>
                     <td style={{ ...td, color: C.text, fontWeight: 700 }}>{h.hole.holeNumber}</td>
                     <td style={td}>{h.hole.rig}</td>
                     <td style={td}>{h.hole.endDate ? dayLabel(h.hole.endDate) : '—'}</td>
                     <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{h.roll.units}</td>
-                    <td style={{ ...tdN, color: h.recoveryShortfall ? C.red : C.faint }}>{pct(h.coreRecoveryPct)}</td>
+                    <td style={{ ...tdN, color: C.faint }}>{pct(h.coreRecoveryPct)}</td>
                     <td style={{ ...tdN, color: LAYER.full }}>{money(h.roll.total)}</td>
                     <td style={{ ...tdN, color: LAYER.revenue, fontWeight: 700 }}>{money(h.roll.revenue)}</td>
                     <td style={{ ...tdN, color: marginColor(h.roll.margin), fontWeight: 800 }}>{money(h.roll.margin)}</td>
@@ -1833,35 +1719,9 @@ function BillingTab({ project, holes, clientRate, mobDemob, invoices, onCreate, 
         )}
       </Card>
 
-      {readyMD.length > 0 && (
-        <Card title="Mobilisation & demobilisation" pad={false} subtitle="Billed on their own lines, never folded into the per-unit rate">
-          <table style={tableStyle}>
-            <thead><tr><th style={{ ...th, width: 44 }} /><th style={th}>Event</th><th style={th}>Rig</th><th style={th}>Date</th><th style={thR}>Cost</th><th style={thR}>Billable</th><th style={thR}>Net</th></tr></thead>
-            <tbody>
-              {readyMD.map(e => {
-                const on = pickedMD.has(e.id); const c = mobDemobCost(e); const net = e.billedAmount - c
-                return (
-                  <tr key={e.id} onClick={() => toggleMD(e.id)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: on ? 'rgba(249,115,22,0.06)' : undefined }}>
-                    <td style={{ ...td, textAlign: 'center' }}>
-                      <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: 5, border: `1.5px solid ${on ? C.orange : C.border}`, background: on ? C.orange : 'transparent', color: '#fff', fontSize: 11, lineHeight: '14px', textAlign: 'center' }}>{on ? '✓' : ''}</span>
-                    </td>
-                    <td style={{ ...td, color: C.text, fontWeight: 600, textTransform: 'capitalize' }}>{e.type}</td>
-                    <td style={td}>{e.rig}</td>
-                    <td style={td}>{dayLabel(e.date)}</td>
-                    <td style={{ ...tdN, color: C.red }}>{money(c)}</td>
-                    <td style={{ ...tdN, color: LAYER.revenue, fontWeight: 700 }}>{money(e.billedAmount)}</td>
-                    <td style={{ ...tdN, color: marginColor(net), fontWeight: 800 }}>{money(net)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </Card>
-      )}
-
-      {(chosen.length > 0 || chosenMD.length > 0) && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 14 }}>
-          <Stat label="Selected" value={`${chosen.length + chosenMD.length}`} />
+      {chosen.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12 }}>
+          <Stat label="Selected" value={`${chosen.length}`} />
           <Stat label="Revenue" value={money(sel.revenue)} color={LAYER.revenue} />
           <Stat label="Cost" value={money(sel.cost)} color={LAYER.full} />
           <Stat label="Profit" value={money(sel.revenue - sel.cost)} color={marginColor(sel.revenue - sel.cost)}
@@ -1895,23 +1755,25 @@ function BillingTab({ project, holes, clientRate, mobDemob, invoices, onCreate, 
       )}
 
       {review && (
-        <ReviewModal project={project} clientRate={clientRate} holes={chosen} mobDemob={chosenMD}
+        <ReviewModal project={project} clientRate={clientRate} holes={chosen}
           nextNumber={`INV-${String(invoices.length + 1).padStart(4, '0')}`}
           onClose={() => setReview(false)}
-          onCreate={inv => { onCreate(inv); setPicked(new Set()); setPickedMD(new Set()); setReview(false) }} />
+          onCreate={inv => { onCreate(inv); setPicked(new Set()); setReview(false) }} />
       )}
     </div>
   )
 }
 
-function ReviewModal({ project, clientRate, holes, mobDemob, nextNumber, onClose, onCreate }: {
-  project: string; clientRate?: ClientRate; holes: HoleResult[]; mobDemob: MobDemobEvent[]
+function ReviewModal({ project, clientRate, holes, nextNumber, onClose, onCreate }: {
+  project: string; clientRate?: ClientRate; holes: HoleResult[]
   nextNumber: string; onClose: () => void; onCreate: (i: Invoice) => void
 }) {
   const [number, setNumber] = useState(nextNumber)
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [taxPercent, setTax] = useState(18)
-  const unit = clientRate?.unit ?? 'm'
+  // Anything billable that isn't metres — mobilisation, demobilisation, a
+  // one-off the contract allows — is added here rather than tracked as a cost.
+  const [extras, setExtras] = useState<{ id: string; label: string; amount: number }[]>([])
 
   // Lines come from the same day costing the Holes tab renders, so an invoice
   // can never disagree with what was on screen.
@@ -1923,7 +1785,7 @@ function ReviewModal({ project, clientRate, holes, mobDemob, nextNumber, onClose
       const amt = dd.reduce((s, d) => s + d.revenue, 0)
       if (u > 0) lines.push({
         label: `${h.hole.holeNumber} · drilling, ${dayLabel(dd[0].date)} to ${dayLabel(dd[dd.length - 1].date)}`,
-        qty: `${u} ${unit}`, rate: perUnit(rt, unit), amount: amt,
+        qty: `${u} m`, rate: perUnit(rt), amount: amt,
       })
     })
     const sb = h.days.filter(d => d.status === 'standby' && d.revenue > 0)
@@ -1932,24 +1794,21 @@ function ReviewModal({ project, clientRate, holes, mobDemob, nextNumber, onClose
       rate: money(clientRate?.standbyPerDay ?? 0), amount: sb.reduce((s, d) => s + d.revenue, 0),
     })
   })
-  mobDemob.forEach(e => lines.push({
-    label: `${e.type === 'mobilisation' ? 'Mobilisation' : 'Demobilisation'} · ${e.rig}`,
-    qty: '1', rate: money(e.billedAmount), amount: e.billedAmount,
-  }))
+  extras.filter(e => e.label.trim() && e.amount).forEach(e =>
+    lines.push({ label: e.label.trim(), qty: '1', rate: money(e.amount), amount: e.amount }))
 
   const subtotal = lines.reduce((s, l) => s + l.amount, 0)
   const total = subtotal * (1 + taxPercent / 100)
-  const cost = holes.reduce((s, h) => s + h.roll.total, 0) + mobDemob.reduce((s, e) => s + mobDemobCost(e), 0)
+  const cost = holes.reduce((s, h) => s + h.roll.total, 0)
 
   return (
-    <Modal title="Review invoice" subtitle={`${project} · ${clientRate?.client || 'no client set'}`} width={860} onClose={onClose}
+    <Modal title="Review invoice" subtitle={project} width={840} onClose={onClose}
       footer={<><Btn onClick={onClose}>Cancel</Btn>
         <Btn tone="primary" onClick={() => onCreate({
-          id: uid('inv'), number, project, client: clientRate?.client ?? '', date,
-          holeIds: holes.map(h => h.hole.id), mobDemobIds: mobDemob.map(e => e.id),
-          lines, subtotal, taxPercent, total,
+          id: uid('inv'), number, project, client: '', date,
+          holeIds: holes.map(h => h.hole.id), lines, subtotal, taxPercent, total,
         })}>Create invoice</Btn></>}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <Grid cols={3}>
           <TextField label="Invoice number" value={number} onChange={setNumber} />
           <DateField label="Date" value={date} onChange={setDate} />
@@ -1975,12 +1834,37 @@ function ReviewModal({ project, clientRate, holes, mobDemob, nextNumber, onClose
               </tr>
               <tr><td style={td} colSpan={3}>Tax at {taxPercent}%</td><td style={tdN}>{money(subtotal * taxPercent / 100)}</td></tr>
               <tr style={{ background: 'rgba(59,130,246,0.06)' }}>
-                <td style={{ ...td, fontWeight: 900, color: LAYER.revenue, fontSize: 14 }} colSpan={3}>Total</td>
-                <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue, fontSize: 14 }}>{money(total)}</td>
+                <td style={{ ...td, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }} colSpan={3}>Total</td>
+                <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }}>{money(total)}</td>
               </tr>
             </tfoot>
           </table>
         </div>
+
+        <Section title="Other lines" note="Mobilisation, demobilisation, or anything else the contract lets you bill that isn't metres.">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {extras.map((e, i) => (
+              <div key={e.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input value={e.label} placeholder="Description"
+                  onChange={ev => setExtras(x => x.map((y, j) => j === i ? { ...y, label: ev.target.value } : y))}
+                  style={{ ...iStyle, flex: 2 }} />
+                <input type="number" value={e.amount}
+                  onChange={ev => setExtras(x => x.map((y, j) => j === i ? { ...y, amount: parseFloat(ev.target.value) || 0 } : y))}
+                  style={{ ...iStyle, flex: 1, fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: LAYER.revenue }} />
+                <Btn size="sm" tone="danger" onClick={() => setExtras(x => x.filter((_, j) => j !== i))}>Remove</Btn>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Btn size="sm" onClick={() => setExtras(x => [...x, { id: uid('x'), label: '', amount: 0 }])}>Add line</Btn>
+              {clientRate && clientRate.mobilisation > 0 && (
+                <Btn size="sm" onClick={() => setExtras(x => [...x, { id: uid('x'), label: 'Mobilisation', amount: clientRate.mobilisation }])}>Mobilisation</Btn>
+              )}
+              {clientRate && clientRate.demobilisation > 0 && (
+                <Btn size="sm" onClick={() => setExtras(x => [...x, { id: uid('x'), label: 'Demobilisation', amount: clientRate.demobilisation }])}>Demobilisation</Btn>
+              )}
+            </div>
+          </div>
+        </Section>
 
         <Grid cols={4}>
           <Stat label="Revenue" value={money(subtotal)} color={LAYER.revenue} />
@@ -2113,7 +1997,7 @@ function CostingScreen() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, padding: 24, paddingBottom: 64 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: 20, paddingBottom: 56 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 900, color: C.text, margin: 0 }}>Costing</h1>
@@ -2128,7 +2012,7 @@ function CostingScreen() {
         </div>
       </div>
 
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Row label="Project">
           {projects.map(p => <Pick key={p} on={project === p} onClick={() => setProject(p)} title={p} sub={PROJECT_CLIENTS[p] || '—'} />)}
         </Row>
@@ -2142,7 +2026,7 @@ function CostingScreen() {
           <Row label="Month">
             {months.map(m => (
               <button key={m} onClick={() => setMonth(m)} style={{
-                padding: '7px 16px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                padding: '5px 14px', borderRadius: 18, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
                 background: month === m ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.03)',
                 border: `1px solid ${month === m ? 'rgba(249,115,22,0.3)' : C.border}`,
                 color: month === m ? C.orange : C.faint,
@@ -2156,7 +2040,7 @@ function CostingScreen() {
         <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 4 }}>
           {TABS.map(t => (
             <button key={t} onClick={() => setTab(t)} style={{
-              padding: '9px 22px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              padding: '7px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
               border: 'none', fontFamily: 'inherit',
               background: tab === t ? C.orange : 'transparent', color: tab === t ? '#fff' : C.muted,
             }}>{t}</button>
@@ -2164,9 +2048,9 @@ function CostingScreen() {
         </div>
         {v.hasLogs && (
           <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-            <Head k={v.unit === 'm' ? 'Metres' : 'Feet'} v={`${v.roll.units}`} />
+            <Head k="Metres" v={`${v.roll.units}`} />
             <Head k="Full cost" v={money(v.roll.total)} />
-            <Head k={`Cost / ${v.unit}`} v={perUnit(v.roll.cpu, v.unit)} tone={C.orange} />
+            <Head k="Cost / m" v={perUnit(v.roll.cpu)} tone={C.orange} />
             {v.roll.revenue > 0 && <Head k="Margin" v={pct(v.roll.marginPct)} tone={marginColor(v.roll.margin)} />}
           </div>
         )}
@@ -2180,8 +2064,7 @@ function CostingScreen() {
       )}
       {tab === 'Billing' && (
         <BillingTab project={project} holes={projectHoles} clientRate={v.clientRate}
-          mobDemob={state.mobDemob.filter(e => e.project === project)} invoices={invoices}
-          onCreate={addInvoice} onDelete={deleteInvoice} />
+          invoices={invoices} onCreate={addInvoice} onDelete={deleteInvoice} />
       )}
 
       {showRates && (
@@ -2213,7 +2096,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 function Pick({ on, onClick, title, sub }: { on: boolean; onClick: () => void; title: string; sub: string }) {
   return (
     <button onClick={onClick} style={{
-      padding: '9px 17px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+      padding: '7px 14px', borderRadius: 9, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
       background: on ? `linear-gradient(135deg, ${C.orange}, ${C.orangeD})` : 'rgba(255,255,255,0.03)',
       border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted,
     }}>
