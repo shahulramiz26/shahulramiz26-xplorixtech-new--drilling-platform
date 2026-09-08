@@ -135,42 +135,43 @@ export interface OperatingRate {
   effectiveFrom: string
   note?: string
 
-  // Unit prices only — quantities come from the driller's log
+  // Unit prices only — the quantities come from the driller's log
   fuelPricePerLitre: number
   waterPricePerLitre: number
   additivePricePerKg: number
 
-  // Labour — crew COUNT comes from the log, only rates live here
-  wageBasis: 'perHead' | 'perShift'
-  dayShiftRate: number
-  nightShiftRate: number
-  accommodationBasis: 'perHead' | 'flat'
-  accommodationRate: number
-  crewTransportPerDay: number
-  supervisionPerDay: number
-
-  // A non-drilling day costs a flat all-in amount instead of the crew
-  // calculation, so nothing is counted twice.
-  standbyCostPerDay: number
-  breakdownCostPerDay: number
+  // Labour. Crew count per shift comes from the log; only the rates are here.
+  labourRate: number      // per head per shift, or per metre
+  lodgingRate: number     // per head per night, or per metre
+  transportRate: number   // per day, or per metre
+  // On, the three rates above are charged against metres drilled instead of
+  // against days and heads. Crew count then stops affecting cost, which is
+  // simpler but throws away what the log knows.
+  chargePerMetre: boolean
 }
 
 // ── CLIENT RATE (Set rates → Client cost) ─────────────────────────────────
 
-export type ContractType = 'government' | 'private'
-export type RateUnit = 'm' | 'ft'
-
-export interface DepthSlab { id: string; fromDepth: number; toDepth: number | null; rate: number }
-
-/* "NQ drilled above 400 m loses 20%". Nothing about that is standard — size,
- * depth and percentage all change by project — so it is written as a rule
- * rather than built in. Zero, one or several per project. */
-export interface SizeAdjustment {
+/* A rate line, straight off the tender: a size, a formation, and a rate.
+ * "Drilling in soft rock, HQ size — ₹5,500 per m" is one row.
+ *
+ * Adjustments hang off their own row, not the project, because the tender's
+ * conditions are written per line: "in case NQ size drilling is done before
+ * 400 m depth, the rate shall decrease by 20%". Nothing about that is
+ * standard, so the size, depth and percentage are all typed. */
+export interface RateAdjustment {
   id: string
-  holeSize: string
   condition: 'above' | 'below'
   depth: number
-  adjustPct: number         // negative reduces the rate
+  adjustPct: number       // negative reduces the rate
+}
+
+export interface RateRow {
+  id: string
+  holeSize: string        // NQ / HQ / PQ / BQ / AQ
+  formation: string       // soft / medium / hard / very hard
+  rate: number            // ₹ per metre
+  adjustments: RateAdjustment[]
 }
 
 export interface ClientRate {
@@ -178,23 +179,21 @@ export interface ClientRate {
   project: string
   effectiveFrom: string
   note?: string
-  client: string
-  contractType: ContractType
-  unit: RateUnit
-
-  // Government: the technical committee assigns one category to the whole
-  // project and every metre bills at that one rate.
-  category: string
-  rate: number
-
-  // Private: depth slabs, rate rising with depth.
-  slabs: DepthSlab[]
-
+  rateRows: RateRow[]
   standbyPerDay: number
   mobilisation: number
   demobilisation: number
-  sizeAdjustments: SizeAdjustment[]
-  minCoreRecoveryPct: number
+}
+
+/* The driller's log says "Very Hard Formation"; a tender says "Very hard rock".
+ * Same thing, so both are reduced to their bare words before matching. */
+export function normFormation(v: string) {
+  return v.toLowerCase().replace(/formation|strata|rock/g, '').replace(/\s+/g, ' ').trim()
+}
+
+export function rateRowFor(cr: ClientRate | undefined, holeSize: string, formation: string): RateRow | undefined {
+  if (!cr) return undefined
+  return cr.rateRows.find(r => r.holeSize === holeSize && normFormation(r.formation) === normFormation(formation))
 }
 
 // ── HOLE ──────────────────────────────────────────────────────────────────
@@ -215,21 +214,6 @@ export interface Hole {
   invoiceId?: string
 }
 
-// ── MOB / DEMOB ───────────────────────────────────────────────────────────
-export interface MobDemobLine { id: string; label: string; amount: number }
-export interface MobDemobEvent {
-  id: string
-  rig: string
-  project: string
-  type: 'mobilisation' | 'demobilisation'
-  date: string
-  lines: MobDemobLine[]
-  billable: boolean
-  billedAmount: number
-  invoiceId?: string
-}
-export function mobDemobCost(e: MobDemobEvent) { return e.lines.reduce((s, l) => s + l.amount, 0) }
-
 // ── INVOICE ───────────────────────────────────────────────────────────────
 export interface InvoiceLine { label: string; qty: string; rate: string; amount: number }
 export interface Invoice {
@@ -239,7 +223,6 @@ export interface Invoice {
   client: string
   date: string
   holeIds: string[]
-  mobDemobIds: string[]
   lines: InvoiceLine[]
   subtotal: number
   taxPercent: number
@@ -330,32 +313,29 @@ export function ownershipBreakdown(o: RigOwnership, ym: string): OwnershipBreakd
  * ========================================================================== */
 
 export interface LabourBreakdown {
-  wages: number; accommodation: number; transport: number; supervision: number
-  heads: number; dayCrew: number; nightCrew: number
-  total: number; flatRate: boolean
+  labour: number; lodging: number; transport: number
+  heads: number; dayCrew: number; nightCrew: number; total: number
+  perMetre: boolean
 }
 
-export function labourForDay(shifts: ShiftLog[], status: DayStatus, r: OperatingRate): LabourBreakdown {
+export function labourForDay(shifts: ShiftLog[], units: number, r: OperatingRate): LabourBreakdown {
   const dayCrew = shifts.filter(s => s.shift === 'Day').reduce((a, s) => a + s.crewCount, 0)
   const nightCrew = shifts.filter(s => s.shift === 'Night').reduce((a, s) => a + s.crewCount, 0)
   const heads = dayCrew + nightCrew
-  const base = { wages: 0, accommodation: 0, transport: 0, supervision: 0, heads, dayCrew, nightCrew }
 
-  // A non-drilling day carries a flat all-in cost, so crew is never counted
-  // twice on a day nobody drilled.
-  if (status === 'standby') return { ...base, total: r.standbyCostPerDay, flatRate: true }
-  if (status === 'breakdown') return { ...base, total: r.breakdownCostPerDay, flatRate: true }
-
-  const wages = r.wageBasis === 'perHead'
-    ? dayCrew * r.dayShiftRate + nightCrew * r.nightShiftRate
-    : (dayCrew > 0 ? r.dayShiftRate : 0) + (nightCrew > 0 ? r.nightShiftRate : 0)
-  const accommodation = r.accommodationBasis === 'perHead' ? heads * r.accommodationRate : (heads > 0 ? r.accommodationRate : 0)
-  const transport = heads > 0 ? r.crewTransportPerDay : 0
-  const supervision = heads > 0 ? r.supervisionPerDay : 0
-  return {
-    wages, accommodation, transport, supervision, heads, dayCrew, nightCrew,
-    flatRate: false, total: wages + accommodation + transport + supervision,
+  if (r.chargePerMetre) {
+    const labour = units * r.labourRate
+    const lodging = units * r.lodgingRate
+    const transport = units * r.transportRate
+    return { labour, lodging, transport, heads, dayCrew, nightCrew, perMetre: true, total: labour + lodging + transport }
   }
+
+  // Crew is on site and paid whether or not a metre gets drilled, so a standby
+  // day carries the same labour as a drilling day.
+  const labour = heads * r.labourRate
+  const lodging = heads * r.lodgingRate
+  const transport = heads > 0 ? r.transportRate : 0
+  return { labour, lodging, transport, heads, dayCrew, nightCrew, perMetre: false, total: labour + lodging + transport }
 }
 
 export interface DayCost {
@@ -372,9 +352,10 @@ export interface DayCost {
   repairs: number; parts: number
   operating: number; ownership: number; total: number
   cpu: number | null        // null, never 0, on a day with no metres
-  rate: number              // client rate in force on this day, after adjustment
+  rate: number              // rate in force on this day, after adjustment
   adjustmentPct: number
   revenue: number
+  unmatched: boolean        // metres drilled but no rate row matched
 }
 
 export function dayCost(
@@ -395,7 +376,7 @@ export function dayCost(
   const fuel = fuelLitres * op.fuelPricePerLitre
   const water = waterLitres * op.waterPricePerLitre
   const additives = additivesKg * op.additivePricePerKg
-  const labour = labourForDay(shifts, status, op)
+  const labour = labourForDay(shifts, units, op)
   const repairs = maint.reduce((a, m) => a + m.cost, 0)
   const parts = units * partsPerUnit
 
@@ -403,17 +384,19 @@ export function dayCost(
   const ownership = own.allocationBasis === 'expectedUnit' ? units * ob.perUnit : ob.perDay
   const total = operating + ownership
 
-  // Revenue uses the rate in force ON THIS DAY. That is what makes a rate
+  // Revenue uses the rate in force ON THIS DAY, which is what makes a rate
   // change part-way through a hole split correctly with no special case.
   const holeNumber = shifts.find(s => s.holeNumber)?.holeNumber ?? null
-  const base = cr ? baseRateFor(cr, depthSoFar) : 0
-  const adjustmentPct = cr ? adjustmentFor(cr, shifts, depthSoFar) : 0
-  const rate = base * (1 + adjustmentPct / 100)
+  const lead = shifts.find(s => s.metresDrilled > 0) ?? shifts[0]
+  const row = lead ? rateRowFor(cr, lead.holeSize, lead.formationType) : undefined
+  const adjustmentPct = row ? adjustmentFor(row, depthSoFar) : 0
+  const rate = (row?.rate ?? 0) * (1 + adjustmentPct / 100)
   // A standby day only bills when someone actually submitted a log saying the
   // client stopped work. A missing submission must never invent revenue.
   const revenue = status === 'standby'
     ? (submitted ? (cr?.standbyPerDay ?? 0) : 0)
     : units * rate
+  const unmatched = !!lead && lead.metresDrilled > 0 && !row
 
   return {
     date, rig, project, shifts, status, holeNumber, submitted,
@@ -423,28 +406,16 @@ export function dayCost(
     fuel, water, additives, labour, repairs, parts,
     operating, ownership, total,
     cpu: units > 0 ? total / units : null,
-    rate, adjustmentPct, revenue,
+    rate, adjustmentPct, revenue, unmatched,
   }
 }
 
-/* Government: one category, one rate, whatever the depth.
- * Private: depth slabs, rate rising with depth. */
-export function baseRateFor(cr: ClientRate, depth: number): number {
-  if (cr.contractType === 'government') return cr.rate
-  const slab = cr.slabs.find(s => depth >= s.fromDepth && (s.toDepth == null || depth < s.toDepth))
-  return slab?.rate ?? cr.slabs[cr.slabs.length - 1]?.rate ?? 0
-}
-
-export function adjustmentFor(cr: ClientRate, shifts: ShiftLog[], depth: number): number {
-  let pct = 0
-  cr.sizeAdjustments.forEach(a => {
-    const sizeUsed = shifts.some(s => s.holeSize === a.holeSize && s.metresDrilled > 0)
-    if (!sizeUsed) return
-    const depthHit = a.condition === 'above' ? depth < a.depth : depth >= a.depth
-    // "NQ used above 400 m" means shallower than 400 m — above in the hole.
-    if (depthHit) pct += a.adjustPct
-  })
-  return pct
+/* Adjustments are matched against how deep the hole already was when the day
+ * started. "NQ used above 400 m" means shallower than 400 m — above in the
+ * hole, not above the number. Several can stack. */
+export function adjustmentFor(row: RateRow, depth: number): number {
+  return row.adjustments.reduce((pct, a) =>
+    pct + ((a.condition === 'above' ? depth < a.depth : depth >= a.depth) ? a.adjustPct : 0), 0)
 }
 
 export function partsPerUnitFor(rig: string, project: string, totalUnits: number, pos: PurchaseOrder[]) {
@@ -523,19 +494,18 @@ export interface HoleResult {
   roll: Rollup
   depth: number
   coreRecoveryPct: number
-  recoveryShortfall: boolean
   rates: number[]           // more than one = the rate moved mid-hole
+  unmatchedDays: number     // metres drilled with no matching rate row
 }
 
-export function holeResult(hole: Hole, allDays: DayCost[], minRecoveryPct: number): HoleResult {
+export function holeResult(hole: Hole, allDays: DayCost[]): HoleResult {
   const days = allDays.filter(d => d.holeNumber === hole.holeNumber)
   const roll = rollup(days)
-  const rates = Array.from(new Set(days.filter(d => d.units > 0).map(d => Math.round(d.rate))))
   return {
     hole, days, roll, depth: roll.units,
     coreRecoveryPct: roll.coreRecoveryPct,
-    recoveryShortfall: roll.units > 0 && minRecoveryPct > 0 && roll.coreRecoveryPct < minRecoveryPct,
-    rates,
+    rates: Array.from(new Set(days.filter(d => d.units > 0).map(d => Math.round(d.rate)))),
+    unmatchedDays: days.filter(d => d.unmatched).length,
   }
 }
 
@@ -578,10 +548,7 @@ export const SEED_OWNERSHIP: RigOwnership[] = [
 const opRate = (id: string, rig: string, project: string, from: string, fuel: number): OperatingRate => ({
   id, rig, project, effectiveFrom: from,
   fuelPricePerLitre: fuel, waterPricePerLitre: 4, additivePricePerKg: 190,
-  wageBasis: 'perHead', dayShiftRate: 850, nightShiftRate: 950,
-  accommodationBasis: 'perHead', accommodationRate: 180,
-  crewTransportPerDay: 1250, supervisionPerDay: 1000,
-  standbyCostPerDay: 6500, breakdownCostPerDay: 8200,
+  labourRate: 900, lodgingRate: 180, transportRate: 1250, chargePerMetre: false,
 })
 
 export const SEED_OPERATING: OperatingRate[] = [
@@ -593,35 +560,37 @@ export const SEED_OPERATING: OperatingRate[] = [
 export const SEED_CLIENT_RATES: ClientRate[] = [
   {
     id: 'cr_a_1', project: 'Site A - North Field', effectiveFrom: '2026-06-01',
-    client: 'CMPDI', contractType: 'government', unit: 'm',
-    category: 'Hard rock', rate: 10000, slabs: [],
+    rateRows: [
+      { id: 'r1', holeSize: 'HQ', formation: 'Soft rock', rate: 5500, adjustments: [] },
+      { id: 'r2', holeSize: 'HQ', formation: 'Hard rock', rate: 10000, adjustments: [] },
+      { id: 'r3', holeSize: 'HQ', formation: 'Very hard rock', rate: 12650, adjustments: [] },
+      { id: 'r4', holeSize: 'NQ', formation: 'Very hard rock', rate: 12650,
+        adjustments: [{ id: 'a1', condition: 'above', depth: 400, adjustPct: -20 }] },
+    ],
     standbyPerDay: 18000, mobilisation: 175000, demobilisation: 140000,
-    sizeAdjustments: [{ id: 'sa1', holeSize: 'NQ', condition: 'above', depth: 400, adjustPct: -20 }],
-    minCoreRecoveryPct: 90,
-    note: 'Committee classification, tender item 2.2.1.1d',
+    note: 'Tender schedule 2.2.1.1c–e',
   },
   {
-    // Reclassified part-way through August. Holes drilled before the 15th keep
-    // the old rate; a hole spanning the date splits day by day automatically.
+    // Reclassified part-way through August. A hole spanning the date splits
+    // day by day automatically.
     id: 'cr_a_2', project: 'Site A - North Field', effectiveFrom: '2026-08-15',
-    client: 'CMPDI', contractType: 'government', unit: 'm',
-    category: 'Very hard rock', rate: 12650, slabs: [],
+    rateRows: [
+      { id: 'r1', holeSize: 'HQ', formation: 'Soft rock', rate: 6200, adjustments: [] },
+      { id: 'r2', holeSize: 'HQ', formation: 'Hard rock', rate: 11200, adjustments: [] },
+      { id: 'r3', holeSize: 'HQ', formation: 'Very hard rock', rate: 14100, adjustments: [] },
+      { id: 'r4', holeSize: 'NQ', formation: 'Very hard rock', rate: 14100,
+        adjustments: [{ id: 'a1', condition: 'above', depth: 400, adjustPct: -20 }] },
+    ],
     standbyPerDay: 18000, mobilisation: 175000, demobilisation: 140000,
-    sizeAdjustments: [{ id: 'sa1', holeSize: 'NQ', condition: 'above', depth: 400, adjustPct: -20 }],
-    minCoreRecoveryPct: 90,
-    note: 'Reclassified by technical committee, tender item 2.2.1.1e',
+    note: 'Revised schedule approved by MoC',
   },
   {
     id: 'cr_b_1', project: 'Site B - South Ridge', effectiveFrom: '2026-01-01',
-    client: 'DGML', contractType: 'private', unit: 'm',
-    category: '', rate: 0,
-    slabs: [
-      { id: 's1', fromDepth: 0, toDepth: 100, rate: 7800 },
-      { id: 's2', fromDepth: 100, toDepth: 200, rate: 8900 },
-      { id: 's3', fromDepth: 200, toDepth: null, rate: 10400 },
+    rateRows: [
+      { id: 'r1', holeSize: 'HQ', formation: 'Soft rock', rate: 4900, adjustments: [] },
+      { id: 'r2', holeSize: 'HQ', formation: 'Hard rock', rate: 8800, adjustments: [] },
     ],
     standbyPerDay: 14000, mobilisation: 150000, demobilisation: 120000,
-    sizeAdjustments: [], minCoreRecoveryPct: 85,
   },
 ]
 
@@ -702,20 +671,6 @@ export const SEED_MAINTENANCE: MaintenanceLog[] = [
   { id: 'm5', rig: 'Rig A2', project: 'Site A - North Field', date: '2026-08-18', maintenanceType: 'Breakdown', hours: 8, component: 'Electrical', action: 'Repair', cost: 41000 },
 ]
 
-export const SEED_MOBDEMOB: MobDemobEvent[] = [
-  {
-    id: 'mob1', rig: 'Rig A1', project: 'Site A - North Field', type: 'mobilisation',
-    date: '2026-07-29', billable: true, billedAmount: 175000,
-    lines: [
-      { id: 'l1', label: 'Rig transport, low-bed 340 km', amount: 82000 },
-      { id: 'l2', label: 'Support vehicle and compressor move', amount: 24000 },
-      { id: 'l3', label: 'Crew transport to site', amount: 18000 },
-      { id: 'l4', label: 'Site preparation and levelling', amount: 21000 },
-      { id: 'l5', label: 'Permits and statutory clearance', amount: 9000 },
-    ],
-  },
-]
-
 /* ==========================================================================
  * STORE
  * ========================================================================== */
@@ -727,7 +682,6 @@ interface State {
   operating: OperatingRate[]
   clientRates: ClientRate[]
   holes: Hole[]
-  mobDemob: MobDemobEvent[]
   invoices: Invoice[]
 }
 
@@ -735,8 +689,7 @@ function initial(): State {
   return {
     shiftLogs: SEED_SHIFT_LOGS, maintenance: SEED_MAINTENANCE,
     ownership: SEED_OWNERSHIP, operating: SEED_OPERATING,
-    clientRates: SEED_CLIENT_RATES, holes: SEED_HOLES,
-    mobDemob: SEED_MOBDEMOB, invoices: [],
+    clientRates: SEED_CLIENT_RATES, holes: SEED_HOLES, invoices: [],
   }
 }
 
@@ -799,12 +752,10 @@ export function CostingProvider({ children }: { children: ReactNode }) {
   const addInvoice: CtxValue['addInvoice'] = inv => setState(s => ({
     ...s, invoices: [inv, ...s.invoices],
     holes: s.holes.map(h => inv.holeIds.includes(h.id) ? { ...h, status: 'invoiced' as HoleStatus, invoiceId: inv.id } : h),
-    mobDemob: s.mobDemob.map(e => inv.mobDemobIds.includes(e.id) ? { ...e, invoiceId: inv.id } : e),
   }))
   const deleteInvoice: CtxValue['deleteInvoice'] = id => setState(s => ({
     ...s, invoices: s.invoices.filter(i => i.id !== id),
     holes: s.holes.map(h => h.invoiceId === id ? { ...h, status: 'approved' as HoleStatus, invoiceId: undefined } : h),
-    mobDemob: s.mobDemob.map(e => e.invoiceId === id ? { ...e, invoiceId: undefined } : e),
   }))
 
   return (
@@ -862,20 +813,14 @@ export function blankOperating(rig: string, project: string, from: string): Oper
   return {
     id: uid('op'), rig, project, effectiveFrom: from,
     fuelPricePerLitre: 0, waterPricePerLitre: 0, additivePricePerKg: 0,
-    wageBasis: 'perHead', dayShiftRate: 0, nightShiftRate: 0,
-    accommodationBasis: 'perHead', accommodationRate: 0,
-    crewTransportPerDay: 0, supervisionPerDay: 0,
-    standbyCostPerDay: 0, breakdownCostPerDay: 0,
+    labourRate: 0, lodgingRate: 0, transportRate: 0, chargePerMetre: false,
   }
 }
 export function blankClientRate(project: string, from: string): ClientRate {
   return {
     id: uid('cr'), project, effectiveFrom: from,
-    client: PROJECT_CLIENTS[project] || '', contractType: 'government', unit: 'm',
-    category: 'Hard rock', rate: 0,
-    slabs: [{ id: uid('s'), fromDepth: 0, toDepth: 100, rate: 0 }],
+    rateRows: [{ id: uid('r'), holeSize: 'HQ', formation: 'Hard rock', rate: 0, adjustments: [] }],
     standbyPerDay: 0, mobilisation: 0, demobilisation: 0,
-    sizeAdjustments: [], minCoreRecoveryPct: 90,
   }
 }
 
@@ -894,14 +839,14 @@ export const C = {
 export const LAYER = { operating: C.amber, ownership: C.purple, full: C.orange, revenue: C.blue }
 
 export const iStyle: React.CSSProperties = {
-  padding: '9px 12px', background: C.bg, border: `1px solid ${C.border}`,
-  borderRadius: 8, color: C.text, fontSize: 13, outline: 'none',
+  padding: '6px 10px', background: C.bg, border: `1px solid ${C.border}`,
+  borderRadius: 7, color: C.text, fontSize: 12.5, outline: 'none',
   fontFamily: 'inherit', width: '100%',
 }
 export const derivedStyle: React.CSSProperties = {
-  padding: '9px 12px', background: 'rgba(255,255,255,0.02)',
-  border: `1px dashed ${C.border}`, borderRadius: 8, color: C.text,
-  fontSize: 13, fontFamily: 'ui-monospace, monospace', width: '100%',
+  padding: '6px 10px', background: 'rgba(255,255,255,0.02)',
+  border: `1px dashed ${C.border}`, borderRadius: 7, color: C.text,
+  fontSize: 12.5, fontFamily: 'ui-monospace, monospace', width: '100%',
 }
 
 export function money(n: number) {
@@ -913,8 +858,8 @@ export function moneyL(n: number) {
   if (a >= 100000) return `${n < 0 ? '−' : ''}₹${(a / 100000).toFixed(1)}L`
   return money(n)
 }
-export function perUnit(n: number | null, unit: RateUnit = 'm') {
-  return n == null ? '—' : `₹${Math.round(n).toLocaleString('en-IN')}/${unit}`
+export function perUnit(n: number | null) {
+  return n == null ? '—' : `₹${Math.round(n).toLocaleString('en-IN')}/m`
 }
 export function pct(n: number) { return `${n.toFixed(1)}%` }
 
