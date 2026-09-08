@@ -402,7 +402,7 @@ function useProjectHoles(project: string, purchaseOrders: PurchaseOrder[]): Hole
         .forEach(l => keys.add(`${l.rig}|${monthOf(l.date)}`))
     })
 
-    const allCosts = [...keys].flatMap(k => {
+    const allCosts = Array.from(keys).flatMap(k => {
       const [rig, month] = k.split('|')
       const logs = logsFor(state.dailyLogs, rig, project, month)
       const ownership = state.ownership.find(o => o.rig === rig) ?? defaultOwnership(rig)
