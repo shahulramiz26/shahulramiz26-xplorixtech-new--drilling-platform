@@ -94,7 +94,7 @@ export function statusForShifts(shifts: ShiftLog[]): DayStatus {
 
 // ── RIG OWNERSHIP (Set rates → Rig cost) ──────────────────────────────────
 
-export type AllocationBasis = 'operatingDay' | 'calendarDay' | 'expectedUnit'
+export type AllocationBasis = 'operatingDay' | 'expectedUnit'
 export type CostBasis = 'cash' | 'accounting'
 
 export interface RigOwnership {
@@ -111,11 +111,11 @@ export interface RigOwnership {
   depreciationRatePct: number
   depPerMonthOverride?: number
 
-  loanPrincipal: number
-  interestRatePct: number
-  tenureMonths: number
-  emiStartMonth: string     // YYYY-MM
-  emiOverride?: number
+  // The EMI is typed, not computed — contractors already know their monthly
+  // figure. `emiEndsMonth` is optional but worth filling: without it a closed
+  // loan keeps charging forever and the rig looks permanently expensive.
+  emiPerMonth: number
+  emiEndsMonth?: string     // YYYY-MM, blank = no expiry
   insurancePerYear: number
   otherFixedPerMonth: number
 
@@ -139,7 +139,6 @@ export interface OperatingRate {
   fuelPricePerLitre: number
   waterPricePerLitre: number
   additivePricePerKg: number
-  consumablesPerUnit: number
 
   // Labour — crew COUNT comes from the log, only rates live here
   wageBasis: 'perHead' | 'perShift'
@@ -272,24 +271,16 @@ export function daysInMonth(ym: string) {
 }
 export function monthOf(date: string) { return date.slice(0, 7) }
 
-export function computeEMI(principal: number, annualRatePct: number, tenureMonths: number) {
-  if (principal <= 0 || tenureMonths <= 0) return 0
-  const r = annualRatePct / 100 / 12
-  if (r === 0) return principal / tenureMonths
-  const f = Math.pow(1 + r, tenureMonths)
-  return (principal * r * f) / (f - 1)
-}
-
-export function emiMonthsElapsed(o: RigOwnership, ym: string) {
-  const [sy, sm] = o.emiStartMonth.split('-').map(Number)
-  const [y, m] = ym.split('-').map(Number)
-  return (y - sy) * 12 + (m - sm)
+export function monthsBetween(from: string, to: string) {
+  const [fy, fm] = from.split('-').map(Number)
+  const [ty, tm] = to.split('-').map(Number)
+  return (ty - fy) * 12 + (tm - fm)
 }
 
 export interface OwnershipBreakdown {
   landedPrice: number
   depPerYear: number; depPerMonth: number
-  emiFull: number; emi: number; emiActive: boolean; emiMonthsLeft: number
+  emi: number; emiActive: boolean; emiMonthsLeft: number   // -1 = no expiry set
   insurancePerMonth: number; otherFixedPerMonth: number
   perMonth: number; perDay: number; perUnit: number
   basisLabel: string
@@ -302,12 +293,11 @@ export function ownershipBreakdown(o: RigOwnership, ym: string): OwnershipBreakd
   const depPerYear = landedPrice * (o.depreciationRatePct / 100)
   const depPerMonth = o.depPerMonthOverride ?? depPerYear / 12
 
-  const emiFull = o.emiOverride ?? computeEMI(o.loanPrincipal, o.interestRatePct, o.tenureMonths)
-  const elapsed = emiMonthsElapsed(o, ym)
-  const active = elapsed >= 0 && elapsed < o.tenureMonths
+  const notExpired = !o.emiEndsMonth || ym <= o.emiEndsMonth
   // Accounting basis drops the EMI: depreciation and loan repayment write off
   // the same capital, so counting both is a cash view, not an accounting one.
-  const emi = o.costBasis === 'accounting' ? 0 : (active ? emiFull : 0)
+  const active = notExpired && o.costBasis !== 'accounting'
+  const emi = active ? o.emiPerMonth : 0
 
   const insurancePerMonth = o.insurancePerYear / 12
   const perMonth = depPerMonth + emi + insurancePerMonth + o.otherFixedPerMonth
@@ -316,12 +306,9 @@ export function ownershipBreakdown(o: RigOwnership, ym: string): OwnershipBreakd
   let basisLabel = ''
   if (o.allocationBasis === 'operatingDay') {
     perDay = o.expectedOperatingDays > 0 ? perMonth / o.expectedOperatingDays : 0
-    basisLabel = `per operating day, ÷ ${o.expectedOperatingDays}`
-  } else if (o.allocationBasis === 'calendarDay') {
-    perDay = perMonth / daysInMonth(ym)
-    basisLabel = `per calendar day, ÷ ${daysInMonth(ym)}`
+    basisLabel = `÷ ${o.expectedOperatingDays} operating days`
   } else {
-    basisLabel = `per expected unit, ÷ ${o.expectedUnitsPerMonth}`
+    basisLabel = `÷ ${o.expectedUnitsPerMonth} expected metres`
   }
   if (o.ownershipPerDayOverride != null && o.allocationBasis !== 'expectedUnit') {
     perDay = o.ownershipPerDayOverride
@@ -329,8 +316,8 @@ export function ownershipBreakdown(o: RigOwnership, ym: string): OwnershipBreakd
 
   return {
     landedPrice, depPerYear, depPerMonth,
-    emiFull, emi, emiActive: active,
-    emiMonthsLeft: Math.max(0, o.tenureMonths - Math.max(0, elapsed)),
+    emi, emiActive: active,
+    emiMonthsLeft: o.emiEndsMonth ? Math.max(0, monthsBetween(ym, o.emiEndsMonth)) : -1,
     insurancePerMonth, otherFixedPerMonth: o.otherFixedPerMonth,
     perMonth, perDay,
     perUnit: o.expectedUnitsPerMonth > 0 ? perMonth / o.expectedUnitsPerMonth : 0,
@@ -380,7 +367,7 @@ export interface DayCost {
   drillingHours: number; downtimeHours: number
   units: number; coreRecovery: number
   fuelLitres: number; waterLitres: number; additivesKg: number
-  fuel: number; water: number; additives: number; consumables: number
+  fuel: number; water: number; additives: number
   labour: LabourBreakdown
   repairs: number; parts: number
   operating: number; ownership: number; total: number
@@ -408,12 +395,11 @@ export function dayCost(
   const fuel = fuelLitres * op.fuelPricePerLitre
   const water = waterLitres * op.waterPricePerLitre
   const additives = additivesKg * op.additivePricePerKg
-  const consumables = units * op.consumablesPerUnit
   const labour = labourForDay(shifts, status, op)
   const repairs = maint.reduce((a, m) => a + m.cost, 0)
   const parts = units * partsPerUnit
 
-  const operating = fuel + water + additives + consumables + labour.total + repairs + parts
+  const operating = fuel + water + additives + labour.total + repairs + parts
   const ownership = own.allocationBasis === 'expectedUnit' ? units * ob.perUnit : ob.perDay
   const total = operating + ownership
 
@@ -434,7 +420,7 @@ export function dayCost(
     drillingHours: sum(s => s.drillingHours), downtimeHours: sum(s => s.downtimeHours),
     units, coreRecovery: sum(s => s.coreRecovery),
     fuelLitres, waterLitres, additivesKg,
-    fuel, water, additives, consumables, labour, repairs, parts,
+    fuel, water, additives, labour, repairs, parts,
     operating, ownership, total,
     cpu: units > 0 ? total / units : null,
     rate, adjustmentPct, revenue,
@@ -475,7 +461,7 @@ export interface Rollup {
   missingDays: number
   units: number; coreRecovery: number; coreRecoveryPct: number
   drillingHours: number; downtimeHours: number; fuelLitres: number
-  fuel: number; water: number; additives: number; consumables: number
+  fuel: number; water: number; additives: number
   labour: number; repairs: number; parts: number
   operating: number; ownership: number; total: number; revenue: number
   cpu: number; operatingCPU: number; ownershipCPU: number
@@ -486,7 +472,7 @@ export function rollup(days: DayCost[]): Rollup {
   const z: Rollup = {
     days: 0, drillingDays: 0, standbyDays: 0, breakdownDays: 0, missingDays: 0,
     units: 0, coreRecovery: 0, coreRecoveryPct: 0, drillingHours: 0, downtimeHours: 0,
-    fuelLitres: 0, fuel: 0, water: 0, additives: 0, consumables: 0,
+    fuelLitres: 0, fuel: 0, water: 0, additives: 0,
     labour: 0, repairs: 0, parts: 0, operating: 0, ownership: 0, total: 0, revenue: 0,
     cpu: 0, operatingCPU: 0, ownershipCPU: 0, revenuePerUnit: 0, margin: 0, marginPct: 0,
   }
@@ -500,7 +486,7 @@ export function rollup(days: DayCost[]): Rollup {
     z.drillingHours += d.drillingHours; z.downtimeHours += d.downtimeHours
     z.fuelLitres += d.fuelLitres
     z.fuel += d.fuel; z.water += d.water; z.additives += d.additives
-    z.consumables += d.consumables; z.labour += d.labour.total
+    z.labour += d.labour.total
     z.repairs += d.repairs; z.parts += d.parts
     z.operating += d.operating; z.ownership += d.ownership; z.total += d.total
     z.revenue += d.revenue
@@ -573,7 +559,7 @@ export const SEED_OWNERSHIP: RigOwnership[] = [
     id: 'own_a1', rig: 'Rig A1', effectiveFrom: '2026-01-01',
     basicPrice: 6000000, gstPercent: 0, transportation: 200000,
     depreciationRatePct: 20,
-    loanPrincipal: 4960000, interestRatePct: 10, tenureMonths: 36, emiStartMonth: '2025-04',
+    emiPerMonth: 160045, emiEndsMonth: '2028-03',
     insurancePerYear: 120000, otherFixedPerMonth: 0,
     costBasis: 'cash', allocationBasis: 'operatingDay',
     expectedOperatingDays: 25, expectedUnitsPerMonth: 125,
@@ -582,7 +568,7 @@ export const SEED_OWNERSHIP: RigOwnership[] = [
     id: 'own_a2', rig: 'Rig A2', effectiveFrom: '2026-01-01',
     basicPrice: 5400000, gstPercent: 0, transportation: 180000,
     depreciationRatePct: 20,
-    loanPrincipal: 4200000, interestRatePct: 10.5, tenureMonths: 36, emiStartMonth: '2024-11',
+    emiPerMonth: 136500, emiEndsMonth: '2027-10',
     insurancePerYear: 108000, otherFixedPerMonth: 0,
     costBasis: 'cash', allocationBasis: 'operatingDay',
     expectedOperatingDays: 25, expectedUnitsPerMonth: 125,
@@ -592,7 +578,6 @@ export const SEED_OWNERSHIP: RigOwnership[] = [
 const opRate = (id: string, rig: string, project: string, from: string, fuel: number): OperatingRate => ({
   id, rig, project, effectiveFrom: from,
   fuelPricePerLitre: fuel, waterPricePerLitre: 4, additivePricePerKg: 190,
-  consumablesPerUnit: 700,
   wageBasis: 'perHead', dayShiftRate: 850, nightShiftRate: 950,
   accommodationBasis: 'perHead', accommodationRate: 180,
   crewTransportPerDay: 1250, supervisionPerDay: 1000,
@@ -868,8 +853,7 @@ export function blankOwnership(rig: string, from: string): RigOwnership {
   return {
     id: uid('own'), rig, effectiveFrom: from,
     basicPrice: 0, gstPercent: 18, transportation: 0, depreciationRatePct: 20,
-    loanPrincipal: 0, interestRatePct: 10, tenureMonths: 36, emiStartMonth: from.slice(0, 7),
-    insurancePerYear: 0, otherFixedPerMonth: 0,
+    emiPerMonth: 0, insurancePerYear: 0, otherFixedPerMonth: 0,
     costBasis: 'cash', allocationBasis: 'operatingDay',
     expectedOperatingDays: 25, expectedUnitsPerMonth: 125,
   }
@@ -877,7 +861,7 @@ export function blankOwnership(rig: string, from: string): RigOwnership {
 export function blankOperating(rig: string, project: string, from: string): OperatingRate {
   return {
     id: uid('op'), rig, project, effectiveFrom: from,
-    fuelPricePerLitre: 0, waterPricePerLitre: 0, additivePricePerKg: 0, consumablesPerUnit: 0,
+    fuelPricePerLitre: 0, waterPricePerLitre: 0, additivePricePerKg: 0,
     wageBasis: 'perHead', dayShiftRate: 0, nightShiftRate: 0,
     accommodationBasis: 'perHead', accommodationRate: 0,
     crewTransportPerDay: 0, supervisionPerDay: 0,
