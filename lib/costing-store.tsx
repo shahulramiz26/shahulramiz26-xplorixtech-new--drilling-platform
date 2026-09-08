@@ -197,20 +197,21 @@ export function rateRowFor(cr: ClientRate | undefined, holeSize: string, formati
 }
 
 // ── HOLE ──────────────────────────────────────────────────────────────────
-/* No depth intervals. One category per project means a hole bills at total
- * metres x the rate in force on the day each metre was drilled. Metres come
- * from the log; this record carries identity and approval state only. */
+/* A hole is not something you create in Finance. It exists because the driller
+ * logged shifts against a hole number, so the list is derived from the log and
+ * can never disagree with it. The only thing stored here is the decision —
+ * closed, approved, invoiced — because that is a judgement, not a measurement. */
 export type HoleStatus = 'drilling' | 'closed' | 'approved' | 'invoiced'
 
+export interface HoleState { status: HoleStatus; invoiceId?: string }
+
 export interface Hole {
-  id: string
   holeNumber: string
   rig: string
   project: string
   startDate: string
   endDate?: string
   status: HoleStatus
-  targetDepth?: number
   invoiceId?: string
 }
 
@@ -222,7 +223,7 @@ export interface Invoice {
   project: string
   client: string
   date: string
-  holeIds: string[]
+  holeNumbers: string[]
   lines: InvoiceLine[]
   subtotal: number
   taxPercent: number
@@ -253,6 +254,11 @@ export function daysInMonth(ym: string) {
   return new Date(y, m, 0).getDate()
 }
 export function monthOf(date: string) { return date.slice(0, 7) }
+export function shiftMonth(ym: string, by: number) {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 1 + by, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
 
 export function monthsBetween(from: string, to: string) {
   const [fy, fm] = from.split('-').map(Number)
@@ -344,7 +350,7 @@ export interface DayCost {
   status: DayStatus
   holeNumber: string | null
   submitted: boolean
-  drillingHours: number; downtimeHours: number
+  drillingHours: number; downtimeHours: number; maintenanceHours: number
   units: number; coreRecovery: number
   fuelLitres: number; waterLitres: number; additivesKg: number
   fuel: number; water: number; additives: number
@@ -378,6 +384,7 @@ export function dayCost(
   const additives = additivesKg * op.additivePricePerKg
   const labour = labourForDay(shifts, units, op)
   const repairs = maint.reduce((a, m) => a + m.cost, 0)
+  const maintenanceHours = maint.reduce((a, m) => a + m.hours, 0)
   const parts = units * partsPerUnit
 
   const operating = fuel + water + additives + labour.total + repairs + parts
@@ -400,7 +407,7 @@ export function dayCost(
 
   return {
     date, rig, project, shifts, status, holeNumber, submitted,
-    drillingHours: sum(s => s.drillingHours), downtimeHours: sum(s => s.downtimeHours),
+    drillingHours: sum(s => s.drillingHours), downtimeHours: sum(s => s.downtimeHours), maintenanceHours,
     units, coreRecovery: sum(s => s.coreRecovery),
     fuelLitres, waterLitres, additivesKg,
     fuel, water, additives, labour, repairs, parts,
@@ -431,7 +438,7 @@ export interface Rollup {
   days: number; drillingDays: number; standbyDays: number; breakdownDays: number
   missingDays: number
   units: number; coreRecovery: number; coreRecoveryPct: number
-  drillingHours: number; downtimeHours: number; fuelLitres: number
+  drillingHours: number; downtimeHours: number; maintenanceHours: number; fuelLitres: number
   fuel: number; water: number; additives: number
   labour: number; repairs: number; parts: number
   operating: number; ownership: number; total: number; revenue: number
@@ -442,7 +449,7 @@ export interface Rollup {
 export function rollup(days: DayCost[]): Rollup {
   const z: Rollup = {
     days: 0, drillingDays: 0, standbyDays: 0, breakdownDays: 0, missingDays: 0,
-    units: 0, coreRecovery: 0, coreRecoveryPct: 0, drillingHours: 0, downtimeHours: 0,
+    units: 0, coreRecovery: 0, coreRecoveryPct: 0, drillingHours: 0, downtimeHours: 0, maintenanceHours: 0,
     fuelLitres: 0, fuel: 0, water: 0, additives: 0,
     labour: 0, repairs: 0, parts: 0, operating: 0, ownership: 0, total: 0, revenue: 0,
     cpu: 0, operatingCPU: 0, ownershipCPU: 0, revenuePerUnit: 0, margin: 0, marginPct: 0,
@@ -455,6 +462,7 @@ export function rollup(days: DayCost[]): Rollup {
     if (!d.submitted) z.missingDays++
     z.units += d.units; z.coreRecovery += d.coreRecovery
     z.drillingHours += d.drillingHours; z.downtimeHours += d.downtimeHours
+    z.maintenanceHours += d.maintenanceHours
     z.fuelLitres += d.fuelLitres
     z.fuel += d.fuel; z.water += d.water; z.additives += d.additives
     z.labour += d.labour.total
@@ -498,6 +506,24 @@ export interface HoleResult {
   unmatchedDays: number     // metres drilled with no matching rate row
 }
 
+/* Every hole number the log mentions becomes a row. Dates come from the first
+ * and last shift logged against it, so a hole appears the moment drilling
+ * starts and closes when someone says so. */
+export function holesFromDays(allDays: DayCost[], statuses: Record<string, HoleState>): Hole[] {
+  const byHole: Record<string, DayCost[]> = {}
+  allDays.forEach(d => { if (d.holeNumber) (byHole[d.holeNumber] ||= []).push(d) })
+  return Object.entries(byHole).map(([holeNumber, ds]) => {
+    const sorted = [...ds].sort((a, b) => a.date.localeCompare(b.date))
+    const st = statuses[holeNumber]?.status ?? 'drilling'
+    return {
+      holeNumber, rig: sorted[0].rig, project: sorted[0].project,
+      startDate: sorted[0].date,
+      endDate: st === 'drilling' ? undefined : sorted[sorted.length - 1].date,
+      status: st, invoiceId: statuses[holeNumber]?.invoiceId,
+    }
+  }).sort((a, b) => a.startDate.localeCompare(b.startDate))
+}
+
 export function holeResult(hole: Hole, allDays: DayCost[]): HoleResult {
   const days = allDays.filter(d => d.holeNumber === hole.holeNumber)
   const roll = rollup(days)
@@ -515,6 +541,21 @@ export function isBillable(h: Hole) { return h.status === 'approved' && !h.invoi
  * SEED DATA
  * ========================================================================== */
 
+/* Projects and rigs are shown by code. Inventory holds full names, so the code
+ * is looked up here and falls back to any leading CODE- pattern in the name,
+ * then to the name itself — nothing breaks if a code is missing. */
+export const PROJECT_CODES: Record<string, string> = {
+  'Site A - North Field': 'PRJ-001',
+  'Site B - South Ridge': 'PRJ-002',
+  'Site C - East Basin': 'PRJ-003',
+}
+export function projectCode(name: string) {
+  return PROJECT_CODES[name] ?? name.match(/^([A-Za-z]+-\d+)/)?.[1] ?? name
+}
+export function rigCode(name: string) {
+  return name.match(/^([A-Za-z]+-\d+)/)?.[1] ?? name
+}
+
 export const PROJECT_CLIENTS: Record<string, string> = {
   'Site A - North Field': 'CMPDI',
   'Site B - South Ridge': 'DGML',
@@ -526,35 +567,37 @@ export const HOLE_SIZES = ['NQ', 'HQ', 'PQ', 'BQ', 'AQ']
 
 export const SEED_OWNERSHIP: RigOwnership[] = [
   {
-    id: 'own_a1', rig: 'Rig A1', effectiveFrom: '2026-01-01',
+    id: 'own_r1', rig: 'RIG-001', effectiveFrom: '2026-01-01',
     basicPrice: 6000000, gstPercent: 0, transportation: 200000,
     depreciationRatePct: 20,
     emiPerMonth: 160045, emiEndsMonth: '2028-03',
     insurancePerYear: 120000, otherFixedPerMonth: 0,
     costBasis: 'cash', allocationBasis: 'operatingDay',
     expectedOperatingDays: 25, expectedUnitsPerMonth: 125,
+    note: 'Opening entry',
   },
   {
-    id: 'own_a2', rig: 'Rig A2', effectiveFrom: '2026-01-01',
+    id: 'own_r2', rig: 'RIG-002', effectiveFrom: '2026-01-01',
     basicPrice: 5400000, gstPercent: 0, transportation: 180000,
     depreciationRatePct: 20,
     emiPerMonth: 136500, emiEndsMonth: '2027-10',
     insurancePerYear: 108000, otherFixedPerMonth: 0,
     costBasis: 'cash', allocationBasis: 'operatingDay',
     expectedOperatingDays: 25, expectedUnitsPerMonth: 125,
+    note: 'Opening entry',
   },
 ]
 
-const opRate = (id: string, rig: string, project: string, from: string, fuel: number): OperatingRate => ({
-  id, rig, project, effectiveFrom: from,
+const opRate = (id: string, rig: string, project: string, from: string, fuel: number, note: string): OperatingRate => ({
+  id, rig, project, effectiveFrom: from, note,
   fuelPricePerLitre: fuel, waterPricePerLitre: 4, additivePricePerKg: 190,
   labourRate: 900, lodgingRate: 180, transportRate: 1250, chargePerMetre: false,
 })
 
 export const SEED_OPERATING: OperatingRate[] = [
-  opRate('op_a1_1', 'Rig A1', 'Site A - North Field', '2026-01-01', 96),
-  opRate('op_a1_2', 'Rig A1', 'Site A - North Field', '2026-08-01', 100),
-  opRate('op_a2_1', 'Rig A2', 'Site A - North Field', '2026-01-01', 100),
+  opRate('op_a1_1', 'RIG-001', 'Site A - North Field', '2026-01-01', 96, 'Opening entry'),
+  opRate('op_a1_2', 'RIG-001', 'Site A - North Field', '2026-08-01', 100, 'Diesel price revision'),
+  opRate('op_a2_1', 'RIG-002', 'Site A - North Field', '2026-01-01', 100, 'Opening entry'),
 ]
 
 export const SEED_CLIENT_RATES: ClientRate[] = [
@@ -594,13 +637,11 @@ export const SEED_CLIENT_RATES: ClientRate[] = [
   },
 ]
 
-export const SEED_HOLES: Hole[] = [
-  { id: 'h1', holeNumber: 'DH-001', rig: 'Rig A1', project: 'Site A - North Field', startDate: '2026-08-01', endDate: '2026-08-08', status: 'approved', targetDepth: 60 },
-  { id: 'h2', holeNumber: 'DH-002', rig: 'Rig A1', project: 'Site A - North Field', startDate: '2026-08-10', endDate: '2026-08-19', status: 'closed', targetDepth: 70 },
-  { id: 'h3', holeNumber: 'DH-003', rig: 'Rig A1', project: 'Site A - North Field', startDate: '2026-08-21', status: 'drilling', targetDepth: 65 },
-  { id: 'h4', holeNumber: 'DH-011', rig: 'Rig A2', project: 'Site A - North Field', startDate: '2026-08-01', endDate: '2026-08-14', status: 'approved', targetDepth: 80 },
-  { id: 'h5', holeNumber: 'DH-012', rig: 'Rig A2', project: 'Site A - North Field', startDate: '2026-08-16', status: 'drilling', targetDepth: 60 },
-]
+export const SEED_HOLE_STATUS: Record<string, HoleState> = {
+  'DH-001': { status: 'approved' },
+  'DH-002': { status: 'closed' },
+  'DH-011': { status: 'approved' },
+}
 
 /* [day, hole, dayMetres, nightMetres, dayDowntime, nightDowntime, reason]
  * Two shifts per day, 12-hour shifts, drilling hours = 12 − downtime. */
@@ -634,7 +675,7 @@ function expand(rig: string, project: string, ym: string, formation: string, siz
 }
 
 export const SEED_SHIFT_LOGS: ShiftLog[] = [
-  ...expand('Rig A1', 'Site A - North Field', '2026-08', 'Very Hard Formation', 'HQ', [
+  ...expand('RIG-001', 'Site A - North Field', '2026-08', 'Very Hard Formation', 'HQ', [
     [1, 'DH-001', 4, 3], [2, 'DH-001', 4, 3], [3, 'DH-001', 3, 3, 3, 0, 'Bit Change'],
     [4, 'DH-001', 4, 4], [5, 'DH-001', 4, 3], [6, 'DH-001', 4, 3],
     [7, 'DH-001', 3, 3, 2, 0, 'Ground Condition Issue'], [8, 'DH-001', 4, 3],
@@ -650,7 +691,7 @@ export const SEED_SHIFT_LOGS: ShiftLog[] = [
     [24, 'DH-003', 4, 4], [25, 'DH-003', 4, 3], [26, 'DH-003', 4, 3],
     [27, 'DH-003', 4, 4], [28, 'DH-003', 3, 3],
   ]),
-  ...expand('Rig A2', 'Site A - North Field', '2026-08', 'Hard Formation', 'HQ', [
+  ...expand('RIG-002', 'Site A - North Field', '2026-08', 'Hard Formation', 'HQ', [
     [1, 'DH-011', 4, 4], [2, 'DH-011', 4, 3], [3, 'DH-011', 4, 4],
     [4, 'DH-011', 3, 3, 2, 0, 'Water Shortage'], [5, 'DH-011', 4, 4],
     [6, 'DH-011', 4, 3], [7, 'DH-011', 4, 4], [8, 'DH-011', 4, 3],
@@ -664,11 +705,11 @@ export const SEED_SHIFT_LOGS: ShiftLog[] = [
 ]
 
 export const SEED_MAINTENANCE: MaintenanceLog[] = [
-  { id: 'm1', rig: 'Rig A1', project: 'Site A - North Field', date: '2026-08-03', maintenanceType: 'Preventive', hours: 3, component: 'Engine', action: 'Inspection', cost: 4500 },
-  { id: 'm2', rig: 'Rig A1', project: 'Site A - North Field', date: '2026-08-13', maintenanceType: 'Breakdown', hours: 22, component: 'Hydraulic System', action: 'Replace', cost: 68000 },
-  { id: 'm3', rig: 'Rig A1', project: 'Site A - North Field', date: '2026-08-14', maintenanceType: 'Breakdown', hours: 4, component: 'Hydraulic System', action: 'Repair', cost: 12000 },
-  { id: 'm4', rig: 'Rig A1', project: 'Site A - North Field', date: '2026-08-23', maintenanceType: 'Scheduled', hours: 3, component: 'Compressor', action: 'Inspection', cost: 9500 },
-  { id: 'm5', rig: 'Rig A2', project: 'Site A - North Field', date: '2026-08-18', maintenanceType: 'Breakdown', hours: 8, component: 'Electrical', action: 'Repair', cost: 41000 },
+  { id: 'm1', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-03', maintenanceType: 'Preventive', hours: 3, component: 'Engine', action: 'Inspection', cost: 4500 },
+  { id: 'm2', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-13', maintenanceType: 'Breakdown', hours: 22, component: 'Hydraulic System', action: 'Replace', cost: 68000 },
+  { id: 'm3', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-14', maintenanceType: 'Breakdown', hours: 4, component: 'Hydraulic System', action: 'Repair', cost: 12000 },
+  { id: 'm4', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-23', maintenanceType: 'Scheduled', hours: 3, component: 'Compressor', action: 'Inspection', cost: 9500 },
+  { id: 'm5', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-08-18', maintenanceType: 'Breakdown', hours: 8, component: 'Electrical', action: 'Repair', cost: 41000 },
 ]
 
 /* ==========================================================================
@@ -681,7 +722,7 @@ interface State {
   ownership: RigOwnership[]
   operating: OperatingRate[]
   clientRates: ClientRate[]
-  holes: Hole[]
+  holeStatus: Record<string, HoleState>
   invoices: Invoice[]
 }
 
@@ -689,7 +730,7 @@ function initial(): State {
   return {
     shiftLogs: SEED_SHIFT_LOGS, maintenance: SEED_MAINTENANCE,
     ownership: SEED_OWNERSHIP, operating: SEED_OPERATING,
-    clientRates: SEED_CLIENT_RATES, holes: SEED_HOLES, invoices: [],
+    clientRates: SEED_CLIENT_RATES, holeStatus: SEED_HOLE_STATUS, invoices: [],
   }
 }
 
@@ -703,9 +744,7 @@ interface CtxValue {
   saveOperating: (o: OperatingRate) => void
   saveClientRate: (c: ClientRate) => void
   deleteVersion: (kind: VersionKind, id: string) => void
-  setHole: (h: Omit<Hole, 'id'> & { id?: string }) => void
-  deleteHole: (id: string) => void
-  setHoleStatus: (id: string, s: HoleStatus) => void
+  setHoleStatus: (holeNumber: string, s: HoleStatus) => void
   addInvoice: (i: Invoice) => void
   deleteInvoice: (id: string) => void
   resetAll: () => void
@@ -740,28 +779,29 @@ export function CostingProvider({ children }: { children: ReactNode }) {
     return { ...s, clientRates: s.clientRates.filter(x => x.id !== id) }
   })
 
-  const setHole: CtxValue['setHole'] = h => setState(s => {
-    if (h.id && s.holes.some(x => x.id === h.id)) return { ...s, holes: s.holes.map(x => x.id === h.id ? ({ ...h, id: h.id } as Hole) : x) }
-    return { ...s, holes: [{ ...h, id: h.id || uid('hole') } as Hole, ...s.holes] }
-  })
-  const deleteHole: CtxValue['deleteHole'] = id => setState(s => ({ ...s, holes: s.holes.filter(h => h.id !== id) }))
-  const setHoleStatus: CtxValue['setHoleStatus'] = (id, status) => setState(s => ({ ...s, holes: s.holes.map(h => h.id === id ? { ...h, status } : h) }))
+  const setHoleStatus: CtxValue['setHoleStatus'] = (holeNumber, status) => setState(s => ({
+    ...s, holeStatus: { ...s.holeStatus, [holeNumber]: { ...s.holeStatus[holeNumber], status } },
+  }))
 
   // Invoicing stamps the holes it consumed, so a hole can never be billed
   // twice. Deleting the invoice releases them back to Ready to bill.
-  const addInvoice: CtxValue['addInvoice'] = inv => setState(s => ({
-    ...s, invoices: [inv, ...s.invoices],
-    holes: s.holes.map(h => inv.holeIds.includes(h.id) ? { ...h, status: 'invoiced' as HoleStatus, invoiceId: inv.id } : h),
-  }))
-  const deleteInvoice: CtxValue['deleteInvoice'] = id => setState(s => ({
-    ...s, invoices: s.invoices.filter(i => i.id !== id),
-    holes: s.holes.map(h => h.invoiceId === id ? { ...h, status: 'approved' as HoleStatus, invoiceId: undefined } : h),
-  }))
+  // Invoicing stamps each hole so it can never be billed twice; deleting the
+  // invoice releases them back to Ready to bill.
+  const addInvoice: CtxValue['addInvoice'] = inv => setState(s => {
+    const hs = { ...s.holeStatus }
+    inv.holeNumbers.forEach(n => { hs[n] = { status: 'invoiced', invoiceId: inv.id } })
+    return { ...s, invoices: [inv, ...s.invoices], holeStatus: hs }
+  })
+  const deleteInvoice: CtxValue['deleteInvoice'] = id => setState(s => {
+    const hs = { ...s.holeStatus }
+    Object.keys(hs).forEach(n => { if (hs[n].invoiceId === id) hs[n] = { status: 'approved' } })
+    return { ...s, invoices: s.invoices.filter(i => i.id !== id), holeStatus: hs }
+  })
 
   return (
     <CostingContext.Provider value={{
       state, saveOwnership, saveOperating, saveClientRate, deleteVersion,
-      setHole, deleteHole, setHoleStatus, addInvoice, deleteInvoice,
+      setHoleStatus, addInvoice, deleteInvoice,
       resetAll: () => setState(initial()),
     }}>{children}</CostingContext.Provider>
   )
