@@ -782,7 +782,7 @@ export function holeBilling(hole: Hole, rate: ClientRate | undefined): HoleBilli
 
   const total = lines.reduce((s, l) => s + l.amount, 0)
   const metres = lines.reduce((s, l) => s + l.metres, 0)
-  return { lines, total, metres, unmatched: [...unmatched], effectiveRate: metres > 0 ? total / metres : 0 }
+  return { lines, total, metres, unmatched: Array.from(unmatched), effectiveRate: metres > 0 ? total / metres : 0 }
 }
 
 export interface HoleCommercial {
@@ -955,10 +955,10 @@ export function logsFor(logs: DailyLog[], rig: string, project: string, month: s
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 export function monthsFor(logs: DailyLog[], rig: string, project: string) {
-  return [...new Set(logs.filter(l => l.rig === rig && l.project === project).map(l => monthOf(l.date)))].sort()
+  return Array.from(new Set(logs.filter(l => l.rig === rig && l.project === project).map(l => monthOf(l.date)))).sort()
 }
 export function rigsFor(logs: DailyLog[], project: string) {
-  return [...new Set(logs.filter(l => l.project === project).map(l => l.rig))].sort()
+  return Array.from(new Set(logs.filter(l => l.project === project).map(l => l.rig))).sort()
 }
 export function monthLabel(ym: string) {
   const [y, m] = ym.split('-').map(Number)
