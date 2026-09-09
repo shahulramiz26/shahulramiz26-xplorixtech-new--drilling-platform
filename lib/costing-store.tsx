@@ -51,6 +51,10 @@ export interface ShiftLog {
   coreRecovery: number      // metres of core recovered
   holeSize: string          // NQ / HQ / PQ — drives the size adjustment
   formationType: string     // lithology; affects COST, not revenue
+  // Set from "Hole Closed This Shift?" in the driller's log. Finance never
+  // decides when a hole is finished — it reads that decision and the hole
+  // appears in Drillholes as Closed, waiting for approval.
+  holeClosedThisShift?: boolean
   fuelLitres: number
   waterLitres: number
   additivesKg: number
@@ -662,11 +666,16 @@ export function holesFromDays(allDays: DayCost[], statuses: Record<string, HoleS
   allDays.forEach(d => { if (d.holeNumber) (byHole[d.holeNumber] ||= []).push(d) })
   return Object.entries(byHole).map(([holeNumber, ds]) => {
     const sorted = [...ds].sort((a, b) => a.date.localeCompare(b.date))
-    const st = statuses[holeNumber]?.status ?? 'drilling'
+    // The shift that closed it, if any. Its date is the hole's end date.
+    const closingDay = sorted.find(d => d.shifts.some(sh => sh.holeClosedThisShift))
+    const stored = statuses[holeNumber]?.status
+    // Once closed in the log a hole can be approved or invoiced here, but it
+    // can never go back to drilling — that would be Finance overruling the log.
+    const st: HoleStatus = stored && stored !== 'drilling' ? stored : (closingDay ? 'closed' : 'drilling')
     return {
       holeNumber, rig: sorted[0].rig, project: sorted[0].project,
       startDate: sorted[0].date,
-      endDate: st === 'drilling' ? undefined : sorted[sorted.length - 1].date,
+      endDate: closingDay?.date,
       status: st, invoiceId: statuses[holeNumber]?.invoiceId,
     }
   }).sort((a, b) => a.startDate.localeCompare(b.startDate))
@@ -808,11 +817,27 @@ export const SEED_CLIENT_RATES: ClientRate[] = [
   },
 ]
 
+/* Only decisions taken in Finance live here. Whether a hole is closed comes
+ * from the driller's log, not from this map. */
 export const SEED_HOLE_STATUS: Record<string, HoleState> = {
   'DH-001': { status: 'approved' },
-  'DH-002': { status: 'closed' },
   'DH-011': { status: 'approved' },
   'DH-101': { status: 'approved' },
+}
+
+/* Marks the last shift of a hole as the one that closed it, mirroring the
+ * driller ticking "Hole Closed This Shift?". */
+function markClosures(logs: ShiftLog[], holeNumbers: string[]): ShiftLog[] {
+  const lastOf: Record<string, string> = {}
+  logs.forEach(l => {
+    if (l.holeNumber && holeNumbers.includes(l.holeNumber) && l.metresDrilled > 0) {
+      const k = `${l.date}|${l.shift}`
+      if (!lastOf[l.holeNumber] || k > lastOf[l.holeNumber]) lastOf[l.holeNumber] = k
+    }
+  })
+  return logs.map(l =>
+    l.holeNumber && lastOf[l.holeNumber] === `${l.date}|${l.shift}`
+      ? { ...l, holeClosedThisShift: true } : l)
 }
 
 /* [day, hole, dayMetres, nightMetres, dayDowntime, nightDowntime, reason]
@@ -904,7 +929,8 @@ export const SEED_SHIFT_LOGS_B: ShiftLog[] = expand('RIG-003', 'Site B - South R
   [12, 'DH-101', 5, 4], [13, 'DH-101', 5, 5], [14, 'DH-101', 4, 4],
 ], [[Infinity, 'Hard Formation']])
 
-export const SEED_SHIFT_LOGS: ShiftLog[] = [...SEED_SHIFT_LOGS_A, ...SEED_SHIFT_LOGS_B]
+export const SEED_SHIFT_LOGS: ShiftLog[] =
+  markClosures([...SEED_SHIFT_LOGS_A, ...SEED_SHIFT_LOGS_B], ['DH-001', 'DH-002', 'DH-011', 'DH-101'])
 
 export const SEED_MAINTENANCE: MaintenanceLog[] = [
   { id: 'm1', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-03', maintenanceType: 'Preventive', hours: 3, component: 'Engine', action: 'Inspection', cost: 4500 },
