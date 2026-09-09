@@ -995,9 +995,18 @@ export function CostingProvider({ children }: { children: ReactNode }) {
     inv.holeNumbers.forEach(n => { hs[n] = { status: 'invoiced', invoiceId: inv.id } })
     return { ...s, invoices: [inv, ...s.invoices], holeStatus: hs }
   })
-  const updateInvoice: CtxValue['updateInvoice'] = inv => setState(s => ({
-    ...s, invoices: s.invoices.map(i => i.id === inv.id ? inv : i),
-  }))
+  /* Delete is gone from the tracker, so Cancelled is the only way back. It
+   * releases the invoice's holes to Approved — otherwise a mistaken invoice
+   * would lock those holes out of billing permanently. */
+  const updateInvoice: CtxValue['updateInvoice'] = inv => setState(s => {
+    const hs = { ...s.holeStatus }
+    inv.holeNumbers.forEach(n => {
+      hs[n] = inv.status === 'cancelled'
+        ? { status: 'approved' }
+        : { status: 'invoiced', invoiceId: inv.id }
+    })
+    return { ...s, invoices: s.invoices.map(i => i.id === inv.id ? inv : i), holeStatus: hs }
+  })
   const deleteInvoice: CtxValue['deleteInvoice'] = id => setState(s => {
     const hs = { ...s.holeStatus }
     Object.keys(hs).forEach(n => { if (hs[n].invoiceId === id) hs[n] = { status: 'approved' } })
