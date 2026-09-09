@@ -1241,6 +1241,7 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
   // Only finished holes. One still drilling has nothing to approve or bill, so
   // it lives on Performance — but it still needs a way to be closed, which is
   // the strip above the table.
+  const isFlat = v.clientRate?.structure !== 'slab'
   const finished = v.holes.filter(h => isFinished(h.hole))
   const drilling = v.holes.filter(h => !isFinished(h.hole))
 
@@ -1278,12 +1279,6 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
       {finished.some(h => h.unmatchedDays > 0) && (
         <Note tone={C.red}>
           A hole has metres with no matching rate line, so those metres bill at zero. Add the missing size and formation in Set rates.
-        </Note>
-      )}
-      {finished.some(h => h.rates.length > 1) && (
-        <Note tone={C.blue}>
-          A hole spans a rate change. Metres bill at the rate in force on the day they were drilled, so the hole splits
-          automatically — no metre is billed at the wrong rate.
         </Note>
       )}
 
@@ -1368,13 +1363,20 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
                               {/* The measurement book: one line per size, formation
                                   and rate, in depth order. This is exactly what
                                   prints on the invoice. */}
+                              {/* The table follows the contract: a slab project
+                                  bills by depth, so the rock it passed through
+                                  is not part of the bill and is left out. */}
                               <table style={tableStyle}>
-                                <thead><tr><th style={th}>Size</th><th style={th}>Formation</th><th style={th}>Depth</th><th style={thR}>Metres</th><th style={th}>Structure</th><th style={thR}>Amount</th></tr></thead>
+                                <thead><tr>
+                                  <th style={th}>Size</th>
+                                  {isFlat && <th style={th}>Formation</th>}
+                                  <th style={th}>Depth</th><th style={thR}>Metres</th><th style={thR}>Rate</th><th style={thR}>Amount</th>
+                                </tr></thead>
                                 <tbody>
                                   {h.billing.map((l, k) => (
                                     <tr key={k} style={{ borderBottom: rowBorder }}>
                                       <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{l.holeSize}</td>
-                                      <td style={{ ...td, color: C.text }}>{l.formation}</td>
+                                      {isFlat && <td style={{ ...td, color: C.text }}>{l.formation}</td>}
                                       <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{l.fromDepth}–{l.toDepth} m</td>
                                       <td style={tdN}>{l.metres}</td>
                                       <td style={{ ...tdN, color: l.matched ? C.orange : C.red }}>{l.matched ? perUnit(l.rate) : 'no rate'}</td>
@@ -1383,7 +1385,7 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
                                   ))}
                                   {h.roll.standbyDays > 0 && (
                                     <tr style={{ borderBottom: rowBorder }}>
-                                      <td style={td} colSpan={2}>Standby</td>
+                                      <td style={td} colSpan={isFlat ? 2 : 1}>Standby</td>
                                       <td style={td} />
                                       <td style={tdN}>{h.roll.standbyDays} d</td>
                                       <td style={tdN} />
@@ -1395,7 +1397,7 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
                                 </tbody>
                                 <tfoot>
                                   <tr style={{ borderTop: `2px solid ${C.border}` }}>
-                                    <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={3}>Revenue</td>
+                                    <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={isFlat ? 3 : 2}>Revenue</td>
                                     <td style={{ ...tdN, fontWeight: 800 }}>{h.roll.units}</td>
                                     <td style={tdN} />
                                     <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }}>{money(h.roll.revenue)}</td>
@@ -1485,8 +1487,8 @@ function Res({ k, v, tone, big }: { k: string; v: string; tone: string; big?: bo
 /* TRACKER — invoices only. Nothing is created here; invoices are raised from
  * Drillholes, where the hole and its numbers are in front of you. This tab
  * answers what is out, what is overdue and what has been paid. */
-function TrackerTab({ invoices, onUpdate, onDelete }: {
-  invoices: Invoice[]; onUpdate: (i: Invoice) => void; onDelete: (id: string) => void
+function TrackerTab({ invoices, onUpdate }: {
+  invoices: Invoice[]; onUpdate: (i: Invoice) => void
 }) {
   const [viewing, setViewing] = useState<Invoice | null>(null)
   const today = new Date().toISOString().slice(0, 10)
@@ -1511,7 +1513,7 @@ function TrackerTab({ invoices, onUpdate, onDelete }: {
         <Stat label="Overdue" value={money(totals.overdue)} color={totals.overdue > 0 ? C.red : C.dim} />
       </div>
 
-      <Card title="Invoices" pad={false} subtitle="Deleting an invoice releases its holes back to Ready to bill">
+      <Card title="Invoices" pad={false} subtitle="Cancelling an invoice releases its holes back to Ready to bill">
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead>
@@ -1538,27 +1540,16 @@ function TrackerTab({ invoices, onUpdate, onDelete }: {
                     <td style={{ ...tdN, color: inv.paidAmount ? C.green : C.dim }}>{inv.paidAmount ? money(inv.paidAmount) : '—'}</td>
                     <td style={{ ...tdN, color: out > 0 ? C.amber : C.dim }}>{out > 0 ? money(out) : '—'}</td>
                     <td style={td}>
-                      {/* Overdue is shown, never chosen — it follows the due date. */}
-                      {over && <div style={{ marginBottom: 5 }}><Tag tone={C.red}>Overdue</Tag></div>}
-                      <select value={inv.status}
-                        onChange={e => {
-                          const st = e.target.value as InvoiceStatus
-                          onUpdate({
-                            ...inv, status: st,
-                            paidDate: st === 'paid' ? today : undefined,
-                            paidAmount: st === 'paid' ? inv.total : undefined,
-                          })
-                        }}
-                        style={{ ...iStyle, width: 116, cursor: 'pointer', fontSize: 11.5, fontWeight: 700,
-                          color: inv.status === 'paid' ? C.green : inv.status === 'pending' ? C.blue : inv.status === 'cancelled' ? C.faint : C.muted }}>
-                        {INVOICE_STATUSES.map(st => <option key={st} value={st}>{INVOICE_STATUS_LABEL[st]}</option>)}
-                      </select>
+                      <StatusPill inv={inv} overdue={over} onChange={st => onUpdate({
+                        ...inv, status: st,
+                        paidDate: st === 'paid' ? today : undefined,
+                        paidAmount: st === 'paid' ? inv.total : undefined,
+                      })} />
                     </td>
                     <td style={{ ...td, textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: 6 }}>
                         <Btn size="sm" onClick={() => setViewing(inv)}>View</Btn>
                         <Btn size="sm" onClick={() => downloadInvoice(inv)}>Download</Btn>
-                        <Btn size="sm" tone="danger" onClick={() => onDelete(inv.id)}>Delete</Btn>
                       </div>
                     </td>
                   </tr>
@@ -1570,6 +1561,59 @@ function TrackerTab({ invoices, onUpdate, onDelete }: {
       </Card>
 
       {viewing && <InvoiceView inv={viewing} onClose={() => setViewing(null)} />}
+    </div>
+  )
+}
+
+/* A status you can read at a glance and change in one click. A dropdown here
+ * looked like a field waiting to be filled in; this reads as a state.
+ * Overdue is derived from the due date and can't be chosen. */
+function StatusPill({ inv, overdue, onChange }: {
+  inv: Invoice; overdue: boolean; onChange: (s: InvoiceStatus) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const tone = overdue ? C.red
+    : inv.status === 'paid' ? C.green
+    : inv.status === 'pending' ? C.blue
+    : inv.status === 'cancelled' ? C.dim : C.faint
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit',
+        padding: '4px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+        textTransform: 'uppercase', letterSpacing: '0.06em',
+        color: tone, background: `${tone}1A`, border: `1px solid ${tone}44`,
+      }}>
+        {overdue ? 'Overdue' : INVOICE_STATUS_LABEL[inv.status]}
+        <span style={{ fontSize: 8, opacity: 0.7 }}>▾</span>
+      </button>
+
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, marginTop: 5, zIndex: 41,
+            background: C.card, border: `1px solid ${C.border}`, borderRadius: 9,
+            padding: 4, minWidth: 132, boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          }}>
+            {INVOICE_STATUSES.map(st => (
+              <button key={st} onClick={() => { onChange(st); setOpen(false) }} style={{
+                display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                padding: '7px 10px', borderRadius: 6, border: 'none', fontSize: 12,
+                fontWeight: inv.status === st ? 700 : 500,
+                background: inv.status === st ? 'rgba(255,255,255,0.05)' : 'transparent',
+                color: st === 'paid' ? C.green : st === 'pending' ? C.blue : st === 'cancelled' ? C.faint : C.muted,
+              }}>{INVOICE_STATUS_LABEL[st]}</button>
+            ))}
+            {overdue && (
+              <div style={{ padding: '7px 10px', fontSize: 10, color: C.dim, borderTop: `1px solid ${C.border}`, marginTop: 4, lineHeight: 1.5 }}>
+                Overdue follows the due date — it isn&apos;t set by hand.
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -1771,7 +1815,7 @@ type Tab = typeof TABS[number]
 
 function CostingScreen() {
   const { state: inv } = useInventory()
-  const { state, setHoleStatus, addInvoice, updateInvoice, deleteInvoice } = useCosting()
+  const { state, setHoleStatus, addInvoice, updateInvoice } = useCosting()
 
   const projects: string[] = inv.projects.map((p: { name: string }) => p.name)
   const [project, setProject] = useState(projects[0] ?? '')
@@ -1855,7 +1899,7 @@ function CostingScreen() {
 
       {tab === 'Performance' && <PerformanceTab v={v} rig={rig} month={month} />}
       {tab === 'Drillholes' && <DrillholesTab v={v} onStatus={setHoleStatus} onInvoice={h => setQuickInvoice(h)} />}
-      {tab === 'Tracker' && <TrackerTab invoices={invoices} onUpdate={updateInvoice} onDelete={deleteInvoice} />}
+      {tab === 'Tracker' && <TrackerTab invoices={invoices} onUpdate={updateInvoice} />}
 
       {showRates && (
         <SetRatesModal projects={projects} initialProject={project} initialRig={rig} month={month}
