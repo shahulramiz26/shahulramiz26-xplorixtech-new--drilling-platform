@@ -704,7 +704,10 @@ export function holeResult(hole: Hole, allDays: DayCost[]): HoleResult {
   return {
     hole, days, roll, depth: roll.units,
     coreRecoveryPct: roll.coreRecoveryPct,
-    rates: Array.from(new Set(days.filter(d => d.units > 0).map(d => Math.round(d.rate)))),
+    // Taken from the priced runs, not the day totals. A day whose ground
+    // changed mid-shift has a blended average that is not a rate anyone ever
+    // agreed to, and listing it would be misleading.
+    rates: Array.from(new Set(days.flatMap(d => d.charges).filter(c => c.metres > 0).map(c => Math.round(c.rate)))).sort((a, b) => a - b),
     unmatchedDays: days.filter(d => d.unmatched).length,
     billing: billingLines(days),
   }
@@ -740,7 +743,7 @@ export const PROJECT_CLIENTS: Record<string, string> = {
   'Site C - East Basin': 'MECL',
 }
 
-export const ROCK_CATEGORIES = ['Soft rock', 'Medium rock', 'Hard rock', 'Very hard rock', 'Coal', 'Lignite']
+export const ROCK_CATEGORIES = ['Soft rock', 'Medium rock', 'Hard rock', 'Very hard rock']
 export const HOLE_SIZES = ['NQ', 'HQ', 'PQ', 'BQ', 'AQ']
 
 export const SEED_OWNERSHIP: RigOwnership[] = [
@@ -791,37 +794,22 @@ export const SEED_OPERATING: OperatingRate[] = [
 
 export const SEED_CLIENT_RATES: ClientRate[] = [
   {
-    // Priced by formation — the government shape. No depth range on any line.
+    // Priced by formation — the government shape. One version only, so every
+    // screen shows the same rate. Adding a second dated version is what
+    // demonstrates mid-hole rate splitting, and is better shown live.
     id: 'cr_a_1', project: 'Site A - North Field', effectiveFrom: '2026-06-01',
-    structure: 'flat',
-    rateRows: [
-      { id: 'r1', holeSize: 'HQ', formation: 'Soft rock', rate: 5500, adjustments: [] },
-      { id: 'r2', holeSize: 'HQ', formation: 'Hard rock', rate: 10000, adjustments: [] },
-      { id: 'r3', holeSize: 'HQ', formation: 'Very hard rock', rate: 12650, adjustments: [] },
-      { id: 'r4', holeSize: 'NQ', formation: 'Very hard rock', rate: 12650,
-        adjustments: [{ id: 'a1', condition: 'above', depth: 400, adjustPct: -20 }] },
-    ],
-    standbyPerDay: 18000, mobilisation: 175000, demobilisation: 140000,
-    note: 'Tender schedule 2.2.1.1c–e',
-  },
-  {
-    // Reclassified part-way through August. A hole spanning the date splits
-    // day by day automatically.
-    id: 'cr_a_2', project: 'Site A - North Field', effectiveFrom: '2026-08-15',
     structure: 'flat',
     rateRows: [
       { id: 'r1', holeSize: 'HQ', formation: 'Soft rock', rate: 6200, adjustments: [] },
       { id: 'r2', holeSize: 'HQ', formation: 'Hard rock', rate: 11200, adjustments: [] },
       { id: 'r3', holeSize: 'HQ', formation: 'Very hard rock', rate: 14100, adjustments: [] },
-      { id: 'r4', holeSize: 'NQ', formation: 'Very hard rock', rate: 14100,
-        adjustments: [{ id: 'a1', condition: 'above', depth: 400, adjustPct: -20 }] },
     ],
     standbyPerDay: 18000, mobilisation: 175000, demobilisation: 140000,
-    note: 'Revised schedule approved by MoC',
+    note: 'Tender schedule 2.2.1.1c\u2013e',
   },
   {
-    // Priced by depth band — the private shape. Formation is ignored, the rate
-    // rises with depth.
+    // Priced by depth band — the private shape. Formation is ignored and the
+    // rate rises with depth.
     id: 'cr_b_1', project: 'Site B - South Ridge', effectiveFrom: '2026-01-01',
     structure: 'slab',
     rateRows: [
@@ -834,8 +822,6 @@ export const SEED_CLIENT_RATES: ClientRate[] = [
   },
 ]
 
-/* Only decisions taken in Finance live here. Whether a hole is closed comes
- * from the driller's log, not from this map. */
 export const SEED_HOLE_STATUS: Record<string, HoleState> = {
   'DH-001': { status: 'approved' },
   'DH-011': { status: 'approved' },
