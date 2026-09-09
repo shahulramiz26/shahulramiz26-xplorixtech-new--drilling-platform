@@ -10,7 +10,7 @@ import {
   projectCode, rigCode, holesFromDays,
   rigsFor, monthsFor, versionOn, newestFirst, uid,
   ownershipBreakdown, dayCost, rollup, withCumulative, holeResult,
-  partsPerUnitFor, isFinished, ANY_FORMATION, structureLabel,
+  unissuedPartsValue, isFinished, ANY_FORMATION, structureLabel,
   INVOICE_STATUSES, INVOICE_STATUS_LABEL, isOverdue, outstanding,
   blankOwnership, blankOperating, blankClientRate,
   PROJECT_CLIENTS, ROCK_CATEGORIES, HOLE_SIZES, DAY_STATUS_LABEL,
@@ -298,6 +298,7 @@ interface RigMonthView {
   days: DayCostMTD[]
   roll: Rollup
   holes: HoleResult[]
+  unissuedParts: number
   unallocated: number
   unallocatedDays: number
   budgetOwnershipCPU: number
@@ -323,7 +324,7 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
     if (logs.length === 0) {
       return {
         hasLogs: false, ob: EMPTY_OB, days: [], roll: rollup([]),
-        holes: [], unallocated: 0, unallocatedDays: 0,
+        holes: [], unissuedParts: 0, unallocated: 0, unallocatedDays: 0,
         budgetOwnershipCPU: 0, productionVariancePct: 0, loggedFormation: '',
       }
     }
@@ -341,9 +342,6 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
     const operating = versionOn(opVersions, monthEnd)
     const clientRate = versionOn(crVersions, monthEnd)
 
-    const totalUnits = logs.reduce((s, l) => s + l.metresDrilled, 0)
-    const partsPerU = partsPerUnitFor(rig, project, totalUnits, inv.purchaseOrders)
-
     const raw: DayCost[] = []
     const depthByHole: Record<string, number> = {}
 
@@ -359,7 +357,8 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
       const hole = shifts.find(s => s.holeNumber)?.holeNumber ?? null
       const depthSoFar = hole ? (depthByHole[hole] ?? 0) : 0
 
-      const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, partsPerU, depthSoFar)
+      const issued = state.parts.filter(x => x.rig === rig && x.project === project && x.date === date)
+      const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, issued, depthSoFar)
       if (hole) depthByHole[hole] = depthSoFar + d.units
       raw.push(d)
     }
@@ -378,6 +377,7 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
 
     return {
       hasLogs: true, ownership, ob, operating, clientRate, days, roll, holes,
+      unissuedParts: unissuedPartsValue(rig, project, state.parts, inv.purchaseOrders),
       unallocated: orphan.reduce((s, d) => s + d.total, 0),
       unallocatedDays: orphan.length,
       budgetOwnershipCPU: ownership && ownership.expectedUnitsPerMonth > 0 ? ob.perMonth / ownership.expectedUnitsPerMonth : 0,
@@ -997,6 +997,12 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {v.unissuedParts > 0 && (
+        <Note tone={C.amber}>
+          {money(v.unissuedParts)} of parts has been received into inventory for this rig but never issued against a day,
+          so it sits in no hole&apos;s cost. Issue it in Inventory or it stays invisible here.
+        </Note>
+      )}
       <Card title="Performance" subtitle={`${rigCode(rig)} · ${monthLabel(month)} · click a day for the full breakdown`} pad={false}>
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
@@ -1062,6 +1068,7 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                               ['Additives', money(d.additives)],
                               ['Service', money(d.repairs)],
                               ['Parts & tooling', money(d.parts)],
+                              ...d.partsIssued.map(x => [`  ${x.item}`, `${x.quantity} × ${money(x.cost / x.quantity)}`]),
                             ]} />
                             <Detail title="Crew" tone={C.teal} rows={d.labour.perMetre
                               ? [['Charged', 'per metre'], ['Labour', money(d.labour.labour)], ['Lodging', money(d.labour.lodging)], ['Transport', money(d.labour.transport)], ['Crew cost', money(d.labour.total)]]
