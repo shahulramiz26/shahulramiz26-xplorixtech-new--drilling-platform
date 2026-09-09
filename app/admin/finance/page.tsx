@@ -1571,15 +1571,26 @@ function TrackerTab({ invoices, onUpdate }: {
 function StatusPill({ inv, overdue, onChange }: {
   inv: Invoice; overdue: boolean; onChange: (s: InvoiceStatus) => void
 }) {
-  const [open, setOpen] = useState(false)
+  // The menu is positioned against the viewport rather than the button, because
+  // the row sits inside a scrolling table inside a card with hidden overflow —
+  // an absolutely positioned menu gets clipped by both. It also flips upward
+  // when the row is near the bottom of the screen.
+  const [anchor, setAnchor] = useState<{ left: number; top: number; up: boolean } | null>(null)
+  const openMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (anchor) { setAnchor(null); return }
+    const r = e.currentTarget.getBoundingClientRect()
+    const menuHeight = INVOICE_STATUSES.length * 32 + 12
+    const up = r.bottom + menuHeight > window.innerHeight - 12
+    setAnchor({ left: r.left, top: up ? r.top - menuHeight - 5 : r.bottom + 5, up })
+  }
   const tone = overdue ? C.red
     : inv.status === 'paid' ? C.green
     : inv.status === 'pending' ? C.blue
     : inv.status === 'cancelled' ? C.dim : C.faint
 
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
-      <button onClick={() => setOpen(o => !o)} style={{
+    <div style={{ display: 'inline-block' }}>
+      <button onClick={openMenu} style={{
         display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit',
         padding: '4px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
         textTransform: 'uppercase', letterSpacing: '0.06em',
@@ -1589,18 +1600,18 @@ function StatusPill({ inv, overdue, onChange }: {
         <span style={{ fontSize: 8, opacity: 0.7 }}>▾</span>
       </button>
 
-      {open && (
+      {anchor && (
         <>
-          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+          <div onClick={() => setAnchor(null)} style={{ position: 'fixed', inset: 0, zIndex: 1200 }} />
           <div style={{
-            position: 'absolute', top: '100%', left: 0, marginTop: 5, zIndex: 41,
+            position: 'fixed', left: anchor.left, top: anchor.top, zIndex: 1201,
             background: C.card, border: `1px solid ${C.border}`, borderRadius: 9,
-            padding: 4, minWidth: 132, boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            padding: 4, minWidth: 140, boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
           }}>
             {INVOICE_STATUSES.map(st => (
-              <button key={st} onClick={() => { onChange(st); setOpen(false) }} style={{
+              <button key={st} onClick={() => { onChange(st); setAnchor(null) }} style={{
                 display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
-                padding: '7px 10px', borderRadius: 6, border: 'none', fontSize: 12,
+                padding: '7px 10px', borderRadius: 6, border: 'none', fontSize: 12, height: 32,
                 fontWeight: inv.status === st ? 700 : 500,
                 background: inv.status === st ? 'rgba(255,255,255,0.05)' : 'transparent',
                 color: st === 'paid' ? C.green : st === 'pending' ? C.blue : st === 'cancelled' ? C.faint : C.muted,
@@ -1671,10 +1682,15 @@ function ReviewModal({ project, clientRate, holes, nextNumber, onClose, onCreate
   // depth order, exactly as shown on the hole. A formation-priced contract
   // reads by rock type; a band-priced one reads by depth. Both come out of the
   // same structure, so the invoice can never disagree with the screen.
+  // A slab contract bills by depth, so the rock is not part of the line. A flat
+  // contract bills by formation, so it is. The label follows the contract.
+  const isFlat = clientRate?.structure !== 'slab'
   const lines: InvoiceLine[] = []
   holes.forEach(h => {
     h.billing.forEach(l => lines.push({
-      label: `${h.hole.holeNumber} · ${l.holeSize} · ${l.formation === ANY_FORMATION ? `${l.fromDepth}–${l.toDepth} m` : l.formation}`,
+      label: isFlat
+        ? `${h.hole.holeNumber} · ${l.holeSize} · ${l.formation}`
+        : `${h.hole.holeNumber} · ${l.holeSize} · ${l.fromDepth}–${l.toDepth} m`,
       qty: `${l.metres} m`,
       rate: perUnit(l.rate),
       amount: l.amount,
@@ -1792,7 +1808,7 @@ td{padding:10px 12px;border-bottom:1px solid #eee;font-size:13px}
 .f{margin-top:34px;padding-top:14px;border-top:1px solid #eee;font-size:11px;color:#999}
 </style></head><body>
 <div class="head"><div><div class="t">INVOICE</div><div class="s">${inv.number}<br>${inv.date}</div></div>
-<div class="s" style="text-align:right">Bill to<br><strong style="font-size:14px;color:#111">${inv.client || inv.project}</strong><br>${inv.project}${inv.dueDate ? `<br>Payment due ${inv.dueDate}` : ''}</div></div>
+<div class="s" style="text-align:right">${inv.client ? `Bill to<br><strong style="font-size:14px;color:#111">${inv.client}</strong><br>` : 'Project<br>'}<strong style="font-size:14px;color:#111">${projectCode(inv.project)}</strong><br>${inv.project}${inv.dueDate ? `<br>Payment due ${inv.dueDate}` : ''}</div></div>
 <table><thead><tr><th>Description</th><th>Depth</th><th class="r">Quantity</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead>
 <tbody>${rows}</tbody><tfoot>
 <tr><td colspan="4" class="r">Subtotal</td><td class="r">${money(inv.subtotal)}</td></tr>
