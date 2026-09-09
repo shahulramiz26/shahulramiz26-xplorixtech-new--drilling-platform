@@ -1238,15 +1238,19 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
   const [open, setOpen] = useState<string | null>(null)
   const unit = 'm'
 
-  // Only finished holes. One still drilling has nothing to approve or bill, so
-  // it lives on Performance — but it still needs a way to be closed, which is
-  // the strip above the table.
+  // Only holes the driller has closed. A hole still being drilled has nothing
+  // to approve or bill and lives on Performance until the log says it's done.
   const isFlat = v.clientRate?.structure !== 'slab'
   const finished = v.holes.filter(h => isFinished(h.hole))
-  const drilling = v.holes.filter(h => !isFinished(h.hole))
+  const stillDrilling = v.holes.length - finished.length
 
-  if (finished.length === 0 && drilling.length === 0) {
-    return <Card><Empty>No holes logged for this rig this month.</Empty></Card>
+  if (finished.length === 0) {
+    return (
+      <Card><Empty>
+        No closed holes for this rig this month.
+        {stillDrilling > 0 && <><br />{stillDrilling} {stillDrilling === 1 ? 'hole is' : 'holes are'} still being drilled — they appear here once the driller ticks &quot;Hole Closed This Shift&quot; in the log.</>}
+      </Empty></Card>
+    )
   }
 
   const t = finished.reduce((a, h) => ({
@@ -1255,34 +1259,13 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {drilling.length > 0 && (
-        <Card title="Still drilling" subtitle="Not billable yet — close a hole to bring it into the list below" pad={false}>
-          <table style={tableStyle}>
-            <tbody>
-              {drilling.map(h => (
-                <tr key={h.hole.holeNumber} style={{ borderBottom: rowBorder }}>
-                  <td style={{ ...td, color: C.text, fontWeight: 700 }}>{h.hole.holeNumber}</td>
-                  <td style={td}>started {dayLabel(h.hole.startDate)}</td>
-                  <td style={tdN}>{h.roll.units} m</td>
-                  <td style={{ ...tdN, color: LAYER.full }}>{money(h.roll.total)}</td>
-                  <td style={{ ...tdN, color: LAYER.full }}>{perUnit(h.roll.cpu)}</td>
-                  <td style={{ ...td, textAlign: 'right' }}>
-                    <Btn size="sm" tone="primary" onClick={() => onStatus(h.hole.holeNumber, 'closed')}>Close hole</Btn>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
-
       {finished.some(h => h.unmatchedDays > 0) && (
         <Note tone={C.red}>
           A hole has metres with no matching rate line, so those metres bill at zero. Add the missing size and formation in Set rates.
         </Note>
       )}
 
-      <Card title="Drillholes" subtitle="Metres and cost from the driller's log, revenue at the rate in force each day" pad={false}>
+      <Card title="Drillholes" subtitle="Closed in the driller's log. Metres and cost from the log, revenue at the rate in force each day" pad={false}>
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead>
@@ -1428,10 +1411,8 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
                           )}
 
                           <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                            {hole.status === 'closed' && <>
-                              <Btn size="sm" tone="primary" onClick={() => onStatus(hole.holeNumber, 'approved')}>Approve for billing</Btn>
-                              <Btn size="sm" onClick={() => onStatus(hole.holeNumber, 'drilling')}>Reopen</Btn>
-                            </>}
+                            {hole.status === 'closed' &&
+                              <Btn size="sm" tone="primary" onClick={() => onStatus(hole.holeNumber, 'approved')}>Approve for billing</Btn>}
                             {hole.status === 'approved' && <>
                               <Btn size="sm" onClick={() => onStatus(hole.holeNumber, 'closed')}>Withdraw approval</Btn>
                               <Btn size="sm" tone="primary" onClick={() => onInvoice(h)}>Create invoice</Btn>
