@@ -187,11 +187,21 @@ export interface RateRow {
   adjustments: RateAdjustment[]
 }
 
+/* Two shapes, chosen per project because a client contract is one or the other:
+ *
+ *   flat   priced by formation — soft, hard, very hard — at any depth
+ *   slab   priced by depth band — 0–50, 50–100, 100+ — whatever the rock
+ *
+ * The rows carry both sets of fields; the structure decides which are used and
+ * which the editor shows, so switching never destroys what was typed. */
+export type RateStructure = 'flat' | 'slab'
+
 export interface ClientRate {
   id: string
   project: string
   effectiveFrom: string
   note?: string
+  structure: RateStructure
   rateRows: RateRow[]
   standbyPerDay: number
   mobilisation: number
@@ -206,11 +216,23 @@ export function normFormation(v: string) {
 
 export function rateRowFor(cr: ClientRate | undefined, holeSize: string, formation: string, depth: number): RateRow | undefined {
   if (!cr) return undefined
-  return cr.rateRows.find(r =>
-    r.holeSize === holeSize &&
-    (r.formation === ANY_FORMATION || normFormation(r.formation) === normFormation(formation)) &&
+  if (cr.structure === 'flat') {
+    // Formation decides the rate; depth is irrelevant.
+    return cr.rateRows.find(r => r.holeSize === holeSize &&
+      (r.formation === ANY_FORMATION || normFormation(r.formation) === normFormation(formation)))
+  }
+  // Depth decides the rate; the rock it happens to be passing through is not
+  // part of the contract.
+  return cr.rateRows.find(r => r.holeSize === holeSize &&
     (r.fromDepth == null || depth >= r.fromDepth) &&
     (r.toDepth == null || depth < r.toDepth))
+}
+
+export function structureLabel(cr: ClientRate | undefined) {
+  if (!cr) return '—'
+  return cr.structure === 'flat'
+    ? `Flat · ${cr.rateRows.length} formation${cr.rateRows.length === 1 ? '' : 's'}`
+    : `Slab · ${cr.rateRows.length} band${cr.rateRows.length === 1 ? '' : 's'}`
 }
 
 /* One priced run of metres: a stretch of hole at one size, one formation and
@@ -295,17 +317,19 @@ export interface Invoice {
   paidAmount?: number
 }
 
-export type InvoiceStatus = 'draft' | 'issued' | 'paid'
+export type InvoiceStatus = 'draft' | 'pending' | 'paid' | 'cancelled'
+export const INVOICE_STATUSES: InvoiceStatus[] = ['draft', 'pending', 'paid', 'cancelled']
 export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
-  draft: 'Draft', issued: 'Issued', paid: 'Paid',
+  draft: 'Draft', pending: 'Pending', paid: 'Paid', cancelled: 'Cancelled',
 }
-/* Overdue is derived from the due date, never set by hand, so it can't go
- * stale. Part payments are recorded as an amount, not a separate status. */
+/* Overdue is derived from the due date, never set by hand, so it cannot go
+ * stale. An invoice forty days past due showing "Pending" is the one thing a
+ * tracker should shout about. */
 export function isOverdue(i: Invoice, today: string) {
-  return i.status === 'issued' && !!i.dueDate && i.dueDate < today
+  return i.status === 'pending' && !!i.dueDate && i.dueDate < today
 }
 export function outstanding(i: Invoice) {
-  return Math.max(0, i.total - (i.paidAmount ?? 0))
+  return i.status === 'cancelled' ? 0 : Math.max(0, i.total - (i.paidAmount ?? 0))
 }
 
 /* ==========================================================================
@@ -661,6 +685,9 @@ export function holeResult(hole: Hole, allDays: DayCost[]): HoleResult {
 }
 
 export function isBillable(h: Hole) { return h.status === 'approved' && !h.invoiceId }
+/* Drillholes lists holes that are finished. One still drilling has nothing to
+ * approve or bill, so it belongs on Performance, not here. */
+export function isFinished(h: Hole) { return h.status !== 'drilling' }
 
 /* ==========================================================================
  * SEED DATA
@@ -740,6 +767,7 @@ export const SEED_CLIENT_RATES: ClientRate[] = [
   {
     // Priced by formation — the government shape. No depth range on any line.
     id: 'cr_a_1', project: 'Site A - North Field', effectiveFrom: '2026-06-01',
+    structure: 'flat',
     rateRows: [
       { id: 'r1', holeSize: 'HQ', formation: 'Soft rock', rate: 5500, adjustments: [] },
       { id: 'r2', holeSize: 'HQ', formation: 'Hard rock', rate: 10000, adjustments: [] },
@@ -754,6 +782,7 @@ export const SEED_CLIENT_RATES: ClientRate[] = [
     // Reclassified part-way through August. A hole spanning the date splits
     // day by day automatically.
     id: 'cr_a_2', project: 'Site A - North Field', effectiveFrom: '2026-08-15',
+    structure: 'flat',
     rateRows: [
       { id: 'r1', holeSize: 'HQ', formation: 'Soft rock', rate: 6200, adjustments: [] },
       { id: 'r2', holeSize: 'HQ', formation: 'Hard rock', rate: 11200, adjustments: [] },
@@ -768,6 +797,7 @@ export const SEED_CLIENT_RATES: ClientRate[] = [
     // Priced by depth band — the private shape. Formation is ignored, the rate
     // rises with depth.
     id: 'cr_b_1', project: 'Site B - South Ridge', effectiveFrom: '2026-01-01',
+    structure: 'slab',
     rateRows: [
       { id: 'b1', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 0, toDepth: 50, rate: 7800, adjustments: [] },
       { id: 'b2', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 50, toDepth: 100, rate: 8900, adjustments: [] },
@@ -1034,7 +1064,7 @@ export function blankOperating(rig: string, project: string, from: string): Oper
 }
 export function blankClientRate(project: string, from: string): ClientRate {
   return {
-    id: uid('cr'), project, effectiveFrom: from,
+    id: uid('cr'), project, effectiveFrom: from, structure: 'flat',
     rateRows: [{ id: uid('r'), holeSize: 'HQ', formation: 'Hard rock', rate: 0, adjustments: [] }],
     standbyPerDay: 0, mobilisation: 0, demobilisation: 0,
   }
