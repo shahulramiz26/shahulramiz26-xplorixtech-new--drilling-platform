@@ -60,6 +60,20 @@ export interface ShiftLog {
   additivesKg: number
 }
 
+/* Parts and tooling issued from inventory, on the day they were issued. This
+ * replaces spreading a monthly purchase-order total evenly across metres: a
+ * bit is fitted on a particular day, on a particular hole, and a hole that ate
+ * three bits should cost more than one that ate none. */
+export interface PartsIssue {
+  id: string
+  rig: string
+  project: string
+  date: string
+  item: string
+  quantity: number
+  cost: number              // total for the issue, from inventory
+}
+
 export interface MaintenanceLog {
   id: string
   rig: string
@@ -461,7 +475,7 @@ export interface DayCost {
   fuelLitres: number; waterLitres: number; additivesKg: number
   fuel: number; water: number; additives: number
   labour: LabourBreakdown
-  repairs: number; parts: number
+  repairs: number; parts: number; partsIssued: PartsIssue[]
   operating: number; ownership: number; total: number
   cpu: number | null        // null, never 0, on a day with no metres
   rate: number              // rate in force on this day, after adjustment
@@ -475,7 +489,7 @@ export function dayCost(
   date: string, rig: string, project: string,
   shifts: ShiftLog[], maint: MaintenanceLog[],
   op: OperatingRate, own: RigOwnership, ob: OwnershipBreakdown,
-  cr: ClientRate | undefined, partsPerUnit: number, depthSoFar: number,
+  cr: ClientRate | undefined, partsIssued: PartsIssue[], depthSoFar: number,
 ): DayCost {
   const submitted = shifts.length > 0
   const status = submitted ? statusForShifts(shifts) : 'standby'
@@ -492,7 +506,7 @@ export function dayCost(
   const labour = labourForDay(shifts, units, op)
   const repairs = maint.reduce((a, m) => a + m.cost, 0)
   const maintenanceHours = maint.reduce((a, m) => a + m.hours, 0)
-  const parts = units * partsPerUnit
+  const parts = partsIssued.reduce((a, x) => a + x.cost, 0)
 
   const operating = fuel + water + additives + labour.total + repairs + parts
   const ownership = own.allocationBasis === 'expectedUnit' ? units * ob.perUnit : ob.perDay
@@ -526,7 +540,7 @@ export function dayCost(
     drillingHours: sum(s => s.drillingHours), downtimeHours: sum(s => s.downtimeHours), maintenanceHours,
     units, coreRecovery: sum(s => s.coreRecovery),
     fuelLitres, waterLitres, additivesKg,
-    fuel, water, additives, labour, repairs, parts,
+    fuel, water, additives, labour, repairs, parts, partsIssued,
     operating, ownership, total,
     cpu: units > 0 ? total / units : null,
     rate, adjustmentPct, revenue, unmatched, charges,
@@ -541,9 +555,12 @@ export function adjustmentFor(row: RateRow, depth: number): number {
     pct + ((a.condition === 'above' ? depth < a.depth : depth >= a.depth) ? a.adjustPct : 0), 0)
 }
 
-export function partsPerUnitFor(rig: string, project: string, totalUnits: number, pos: PurchaseOrder[]) {
-  const total = pos.filter(po => po.rig === rig && po.project === project).reduce((s, po) => s + poReceivedValue(po), 0)
-  return totalUnits > 0 ? total / totalUnits : 0
+/* Purchase orders that inventory has received but which aren't itemised as
+ * daily issues. Reported so nothing is silently lost, not spread across days. */
+export function unissuedPartsValue(rig: string, project: string, issues: PartsIssue[], pos: PurchaseOrder[]) {
+  const ordered = pos.filter(po => po.rig === rig && po.project === project).reduce((s, po) => s + poReceivedValue(po), 0)
+  const issued = issues.filter(i => i.rig === rig && i.project === project).reduce((s, i) => s + i.cost, 0)
+  return Math.max(0, ordered - issued)
 }
 
 /* ==========================================================================
@@ -932,6 +949,27 @@ export const SEED_SHIFT_LOGS_B: ShiftLog[] = expand('RIG-003', 'Site B - South R
 export const SEED_SHIFT_LOGS: ShiftLog[] =
   markClosures([...SEED_SHIFT_LOGS_A, ...SEED_SHIFT_LOGS_B], ['DH-001', 'DH-002', 'DH-011', 'DH-101'])
 
+export const SEED_PARTS: PartsIssue[] = [
+  // An impregnated core bit runs 150–300 m depending on ground, so one carries
+  // most of a month. Ancillaries turn over faster. Costing charges each on the
+  // day inventory issued it, which is why DH-002 — the hole that took the bit
+  // change and the inner tube — costs more per metre than the two either side.
+  { id: 'p1', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-01', item: 'HQ impregnated core bit', quantity: 1, cost: 68000 },
+  { id: 'p2', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-03', item: 'Core lifter case', quantity: 2, cost: 4400 },
+  { id: 'p3', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-13', item: 'Inner tube assembly', quantity: 1, cost: 32000 },
+  { id: 'p4', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-16', item: 'HQ reaming shell', quantity: 1, cost: 21500 },
+  { id: 'p5', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-24', item: 'Core lifter case', quantity: 3, cost: 6600 },
+
+  { id: 'p6', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-08-01', item: 'HQ impregnated core bit', quantity: 1, cost: 68000 },
+  { id: 'p7', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-08-07', item: 'Core lifter case', quantity: 2, cost: 4400 },
+  { id: 'p8', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-08-17', item: 'HQ reaming shell', quantity: 1, cost: 21500 },
+
+  // Softer ground on Site B, so one bit lasts the hole and tooling wear is low.
+  { id: 'p9', rig: 'RIG-003', project: 'Site B - South Ridge', date: '2026-08-01', item: 'HQ impregnated core bit', quantity: 1, cost: 64000 },
+  { id: 'p10', rig: 'RIG-003', project: 'Site B - South Ridge', date: '2026-08-05', item: 'Core lifter case', quantity: 2, cost: 4400 },
+  { id: 'p11', rig: 'RIG-003', project: 'Site B - South Ridge', date: '2026-08-12', item: 'Drill rods, 3 m', quantity: 2, cost: 23000 },
+]
+
 export const SEED_MAINTENANCE: MaintenanceLog[] = [
   { id: 'm1', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-03', maintenanceType: 'Preventive', hours: 3, component: 'Engine', action: 'Inspection', cost: 4500 },
   { id: 'm2', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-13', maintenanceType: 'Breakdown', hours: 22, component: 'Hydraulic System', action: 'Replace', cost: 68000 },
@@ -947,6 +985,7 @@ export const SEED_MAINTENANCE: MaintenanceLog[] = [
 interface State {
   shiftLogs: ShiftLog[]
   maintenance: MaintenanceLog[]
+  parts: PartsIssue[]
   ownership: RigOwnership[]
   operating: OperatingRate[]
   clientRates: ClientRate[]
@@ -956,7 +995,7 @@ interface State {
 
 function initial(): State {
   return {
-    shiftLogs: SEED_SHIFT_LOGS, maintenance: SEED_MAINTENANCE,
+    shiftLogs: SEED_SHIFT_LOGS, maintenance: SEED_MAINTENANCE, parts: SEED_PARTS,
     ownership: SEED_OWNERSHIP, operating: SEED_OPERATING,
     clientRates: SEED_CLIENT_RATES, holeStatus: SEED_HOLE_STATUS, invoices: [],
   }
