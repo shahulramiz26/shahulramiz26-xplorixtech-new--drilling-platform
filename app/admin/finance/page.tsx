@@ -10,12 +10,14 @@ import {
   projectCode, rigCode, holesFromDays,
   rigsFor, monthsFor, versionOn, newestFirst, uid,
   ownershipBreakdown, dayCost, rollup, withCumulative, holeResult,
-  partsPerUnitFor, isBillable, ANY_FORMATION, INVOICE_STATUS_LABEL, isOverdue, outstanding,
+  partsPerUnitFor, isFinished, ANY_FORMATION, structureLabel,
+  INVOICE_STATUSES, INVOICE_STATUS_LABEL, isOverdue, outstanding,
   blankOwnership, blankOperating, blankClientRate,
   PROJECT_CLIENTS, ROCK_CATEGORIES, HOLE_SIZES, DAY_STATUS_LABEL,
   type DayCost, type DayCostMTD, type Rollup, type OwnershipBreakdown,
   type RigOwnership, type OperatingRate, type ClientRate, type HoleStatus,
   type HoleResult, type Invoice, type InvoiceLine, type RateRow, type RateAdjustment,
+  type InvoiceStatus, type RateStructure,
 
 } from '../../../lib/costing-store'
 
@@ -180,6 +182,24 @@ function Switch({ on, onChange, label, hint }: {
         <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{label}</div>
         {hint && <div style={{ fontSize: 11, color: C.faint, marginTop: 3, lineHeight: 1.5 }}>{hint}</div>}
       </div>
+    </div>
+  )
+}
+
+/* Segmented control. Used where two named alternatives both need naming — a
+ * switch is better only when the choice is genuinely on/off. */
+function Toggle<T extends string>({ options, value, onChange, labels }: {
+  options: readonly T[]; value: T; onChange: (v: T) => void; labels?: Record<string, string>
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: 4 }}>
+      {options.map(o => (
+        <button key={o} onClick={() => onChange(o)} style={{
+          flex: 1, padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          border: 'none', whiteSpace: 'nowrap', fontFamily: 'inherit',
+          background: value === o ? C.orange : 'transparent', color: value === o ? '#fff' : C.faint,
+        }}>{labels?.[o] ?? o}</button>
+      ))}
     </div>
   )
 }
@@ -366,52 +386,6 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
       loggedFormation,
     }
   }, [state, inv.purchaseOrders, project, rig, month])
-}
-
-/* Billing works across the whole project: a hole is billed when approved,
- * whichever rig drilled it and whatever month it closed in. */
-function useProjectHoles(project: string): HoleResult[] {
-  const { state } = useCosting()
-  const { state: inv } = useInventory()
-
-  return useMemo(() => {
-    const crVersions = state.clientRates.filter(c => c.project === project)
-    const keys = new Set<string>()
-    state.shiftLogs
-      .filter(l => l.project === project && l.holeNumber)
-      .forEach(l => keys.add(`${l.rig}|${monthOf(l.date)}`))
-
-    const allDays: DayCost[] = []
-    Array.from(keys).forEach(k => {
-      const [rig, month] = k.split('|')
-      const logs = state.shiftLogs.filter(l => l.rig === rig && l.project === project && monthOf(l.date) === month)
-      if (!logs.length) return
-      const ownV = state.ownership.filter(o => o.rig === rig)
-      const opV = state.operating.filter(o => o.rig === rig && o.project === project)
-      const lastDay = Number(logs.map(l => l.date).sort()[logs.length - 1].slice(8))
-      const totalUnits = logs.reduce((s, l) => s + l.metresDrilled, 0)
-      const ppu = partsPerUnitFor(rig, project, totalUnits, inv.purchaseOrders)
-      const depthByHole: Record<string, number> = {}
-      for (let n = 1; n <= lastDay; n++) {
-        const date = `${month}-${String(n).padStart(2, '0')}`
-        const shifts = logs.filter(l => l.date === date)
-        const maint = state.maintenance.filter(m => m.rig === rig && m.project === project && m.date === date)
-        const op = versionOn(opV, date) ?? blankOperating(rig, project, date)
-        const own = versionOn(ownV, date) ?? blankOwnership(rig, date)
-        const ob = versionOn(ownV, date) ? ownershipBreakdown(own, month) : EMPTY_OB
-        const cr = versionOn(crVersions, date)
-        const hole = shifts.find(s => s.holeNumber)?.holeNumber ?? null
-        const depthSoFar = hole ? (depthByHole[hole] ?? 0) : 0
-        const d = dayCost(date, rig, project, shifts, maint, op, own, ob, cr, ppu, depthSoFar)
-        if (hole) depthByHole[hole] = depthSoFar + d.units
-        allDays.push(d)
-      }
-    })
-
-    return holesFromDays(allDays, state.holeStatus)
-      .map(h => holeResult(h, allDays))
-      .sort((a, b) => (b.hole.endDate || '9999').localeCompare(a.hole.endDate || '9999'))
-  }, [state, inv.purchaseOrders, project])
 }
 
 /* ==========================================================================
@@ -768,51 +742,67 @@ function ClientPanel({ project, versions, onSave }: {
   const updAdj = (i: number, j: number, p: Partial<RateAdjustment>) =>
     updRow(i, { adjustments: f.rateRows[i].adjustments.map((a, k) => k === j ? { ...a, ...p } : a) })
 
-  const inForce = latest && latest.rateRows.length
-    ? `${latest.rateRows.length} rate lines since ${fullDate(latest.effectiveFrom)}`
-    : 'nothing set yet'
+  const inForce = latest ? `${structureLabel(latest)} since ${fullDate(latest.effectiveFrom)}` : 'nothing set yet'
 
   return (
     <div>
       <InForce text={inForce} />
 
       <div style={{ marginTop: 18 }}>
-        <Section title="Rates" note="One line per size, formation and depth range. Leave formation as Any to price purely by depth band; leave the depth range blank to price purely by formation. The driller's log records size and formation, so XPLORIX picks the matching line for every stretch of hole.">
+        <Field label="Rate structure" hint={f.structure === 'flat'
+          ? 'Priced by formation. Soft, hard and very hard each have a rate, and depth makes no difference.'
+          : 'Priced by depth band. The rate rises as the hole gets deeper, whatever rock it passes through.'}>
+          <Toggle options={['flat', 'slab'] as const} value={f.structure}
+            onChange={(v: RateStructure) => u({ structure: v })}
+            labels={{ flat: 'Flat rate', slab: 'Depth slab rate' }} />
+        </Field>
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <Section title="Rates" note={f.structure === 'flat'
+          ? "One line per size and formation, straight off the tender schedule. The driller's log records both, so XPLORIX prices every stretch of hole at the line that matches."
+          : "One line per size and depth band. Each band runs from its depth up to the next; leave the last one open-ended."}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {f.rateRows.map((r, i) => (
               <div key={r.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '12px 14px' }}>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                  <div style={{ width: 92 }}>
+                  <div style={{ width: 88 }}>
                     <Field label="Size">
                       <select value={r.holeSize} onChange={e => updRow(i, { holeSize: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}>
                         {HOLE_SIZES.map(h => <option key={h} value={h}>{h}</option>)}
                       </select>
                     </Field>
                   </div>
-                  <div style={{ width: 150 }}>
-                    <Field label="Formation">
-                      <select value={r.formation} onChange={e => updRow(i, { formation: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}>
-                        <option value={ANY_FORMATION}>{ANY_FORMATION}</option>
-                        {ROCK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        {r.formation && r.formation !== ANY_FORMATION && !ROCK_CATEGORIES.includes(r.formation) && <option value={r.formation}>{r.formation}</option>}
-                      </select>
-                    </Field>
-                  </div>
-                  <div style={{ width: 82 }}>
-                    <Field label="From">
-                      <input type="number" value={r.fromDepth ?? ''} placeholder="0"
-                        onChange={e => updRow(i, { fromDepth: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
-                        style={{ ...iStyle, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }} />
-                    </Field>
-                  </div>
-                  <div style={{ width: 82 }}>
-                    <Field label="To">
-                      <input type="number" value={r.toDepth ?? ''} placeholder="∞"
-                        onChange={e => updRow(i, { toDepth: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
-                        style={{ ...iStyle, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }} />
-                    </Field>
-                  </div>
-                  <div style={{ width: 128 }}>
+
+                  {f.structure === 'flat' ? (
+                    <div style={{ width: 170 }}>
+                      <Field label="Formation">
+                        <select value={r.formation} onChange={e => updRow(i, { formation: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}>
+                          {ROCK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          {r.formation && r.formation !== ANY_FORMATION && !ROCK_CATEGORIES.includes(r.formation) && <option value={r.formation}>{r.formation}</option>}
+                        </select>
+                      </Field>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ width: 96 }}>
+                        <Field label="Depth from">
+                          <input type="number" value={r.fromDepth ?? ''} placeholder="0"
+                            onChange={e => updRow(i, { fromDepth: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                            style={{ ...iStyle, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }} />
+                        </Field>
+                      </div>
+                      <div style={{ width: 96 }}>
+                        <Field label="Depth to">
+                          <input type="number" value={r.toDepth ?? ''} placeholder="no limit"
+                            onChange={e => updRow(i, { toDepth: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                            style={{ ...iStyle, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }} />
+                        </Field>
+                      </div>
+                    </>
+                  )}
+
+                  <div style={{ width: 132 }}>
                     <NumField label="Rate" value={r.rate} onChange={n => updRow(i, { rate: n })} suffix="₹/m" color={C.orange} />
                   </div>
                   <div style={{ flex: 1 }} />
@@ -834,18 +824,19 @@ function ClientPanel({ project, versions, onSave }: {
                     <input type="number" value={a.adjustPct} onChange={e => updAdj(i, j, { adjustPct: parseFloat(e.target.value) || 0 })}
                       style={{ ...iStyle, width: 72, textAlign: 'right', color: a.adjustPct < 0 ? C.red : C.green, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }} />
                     <span style={{ fontSize: 12, color: C.faint }}>%</span>
-                    <span style={{ fontSize: 11, color: C.dim, fontFamily: 'ui-monospace, monospace' }}>
-                      → {perUnit(r.rate * (1 + a.adjustPct / 100))}
-                    </span>
+                    <span style={{ fontSize: 11, color: C.dim, fontFamily: 'ui-monospace, monospace' }}>→ {perUnit(r.rate * (1 + a.adjustPct / 100))}</span>
                     <Btn size="sm" tone="danger" onClick={() => updRow(i, { adjustments: r.adjustments.filter((_, k) => k !== j) })}>Remove</Btn>
                   </div>
                 ))}
               </div>
             ))}
             <div>
-              <Btn size="sm" onClick={() => u({ rateRows: [...f.rateRows, { id: uid('r'), holeSize: 'HQ', formation: 'Hard rock', rate: 0, adjustments: [] }] })}>
-                Add rate
-              </Btn>
+              <Btn size="sm" onClick={() => {
+                const last = f.rateRows[f.rateRows.length - 1]
+                u({ rateRows: [...f.rateRows, f.structure === 'flat'
+                  ? { id: uid('r'), holeSize: 'HQ', formation: 'Hard rock', rate: 0, adjustments: [] }
+                  : { id: uid('r'), holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: last?.toDepth ?? 0, rate: 0, adjustments: [] }] })
+              }}>{f.structure === 'flat' ? 'Add formation' : 'Add band'}</Btn>
             </div>
           </div>
         </Section>
@@ -1090,7 +1081,7 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                                 How this day billed
                               </div>
                               <table style={tableStyle}>
-                                <thead><tr><th style={th}>Shift</th><th style={th}>Size</th><th style={th}>Formation</th><th style={th}>Depth</th><th style={thR}>Metres</th><th style={thR}>Rate</th><th style={thR}>Amount</th></tr></thead>
+                                <thead><tr><th style={th}>Shift</th><th style={th}>Size</th><th style={th}>Formation</th><th style={th}>Depth</th><th style={thR}>Metres</th><th style={th}>Structure</th><th style={thR}>Amount</th></tr></thead>
                                 <tbody>
                                   {d.charges.map((c, k) => (
                                     <tr key={k} style={{ borderBottom: rowBorder }}>
@@ -1247,22 +1238,49 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
   const [open, setOpen] = useState<string | null>(null)
   const unit = 'm'
 
-  if (v.holes.length === 0) {
-    return <Card><Empty>No holes logged for this rig this month.<br />A hole appears here as soon as the driller logs a shift against its number.</Empty></Card>
+  // Only finished holes. One still drilling has nothing to approve or bill, so
+  // it lives on Performance — but it still needs a way to be closed, which is
+  // the strip above the table.
+  const finished = v.holes.filter(h => isFinished(h.hole))
+  const drilling = v.holes.filter(h => !isFinished(h.hole))
+
+  if (finished.length === 0 && drilling.length === 0) {
+    return <Card><Empty>No holes logged for this rig this month.</Empty></Card>
   }
 
-  const t = v.holes.reduce((a, h) => ({
+  const t = finished.reduce((a, h) => ({
     units: a.units + h.roll.units, cost: a.cost + h.roll.total, revenue: a.revenue + h.roll.revenue,
   }), { units: 0, cost: 0, revenue: 0 })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {v.holes.some(h => h.unmatchedDays > 0) && (
+      {drilling.length > 0 && (
+        <Card title="Still drilling" subtitle="Not billable yet — close a hole to bring it into the list below" pad={false}>
+          <table style={tableStyle}>
+            <tbody>
+              {drilling.map(h => (
+                <tr key={h.hole.holeNumber} style={{ borderBottom: rowBorder }}>
+                  <td style={{ ...td, color: C.text, fontWeight: 700 }}>{h.hole.holeNumber}</td>
+                  <td style={td}>started {dayLabel(h.hole.startDate)}</td>
+                  <td style={tdN}>{h.roll.units} m</td>
+                  <td style={{ ...tdN, color: LAYER.full }}>{money(h.roll.total)}</td>
+                  <td style={{ ...tdN, color: LAYER.full }}>{perUnit(h.roll.cpu)}</td>
+                  <td style={{ ...td, textAlign: 'right' }}>
+                    <Btn size="sm" tone="primary" onClick={() => onStatus(h.hole.holeNumber, 'closed')}>Close hole</Btn>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
+      {finished.some(h => h.unmatchedDays > 0) && (
         <Note tone={C.red}>
           A hole has metres with no matching rate line, so those metres bill at zero. Add the missing size and formation in Set rates.
         </Note>
       )}
-      {v.holes.some(h => h.rates.length > 1) && (
+      {finished.some(h => h.rates.length > 1) && (
         <Note tone={C.blue}>
           A hole spans a rate change. Metres bill at the rate in force on the day they were drilled, so the hole splits
           automatically — no metre is billed at the wrong rate.
@@ -1276,12 +1294,12 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
               <tr>
                 <th style={th}>Hole</th><th style={th}>Dates</th><th style={th}>Status</th>
                 <th style={thR}>Days</th><th style={thR}>Metres</th><th style={thR}>Recovery</th>
-                <th style={thR}>Cost</th><th style={thR}>Cost/{unit}</th><th style={thR}>Rate</th>
+                <th style={thR}>Cost</th><th style={thR}>Cost/{unit}</th><th style={th}>Structure</th>
                 <th style={thR}>Revenue</th><th style={thR}>Profit</th><th style={thR}>Margin</th>
               </tr>
             </thead>
             <tbody>
-              {v.holes.map(h => {
+              {finished.map(h => {
                 const hole = h.hole
                 const isOpen = open === hole.holeNumber
                 return (
@@ -1299,7 +1317,7 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
                       <td style={{ ...tdN, color: C.faint }}>{pct(h.coreRecoveryPct)}</td>
                       <td style={{ ...tdN, color: LAYER.full }}>{money(h.roll.total)}</td>
                       <td style={{ ...tdN, color: LAYER.full, fontWeight: 700 }}>{perUnit(h.roll.cpu)}</td>
-                      <td style={{ ...tdN, color: C.faint }}>{h.rates.length > 1 ? `${h.rates.length} rates` : perUnit(h.rates[0] ?? 0)}</td>
+                      <td style={{ ...td, color: C.faint }}>{structureLabel(v.clientRate)}</td>
                       <td style={{ ...tdN, color: LAYER.revenue }}>{money(h.roll.revenue)}</td>
                       <td style={{ ...tdN, color: marginColor(h.roll.margin), fontWeight: 800 }}>{money(h.roll.margin)}</td>
                       <td style={{ ...tdN, color: marginColor(h.roll.margin), fontWeight: 800 }}>{h.roll.revenue > 0 ? pct(h.roll.marginPct) : '—'}</td>
@@ -1351,7 +1369,7 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
                                   and rate, in depth order. This is exactly what
                                   prints on the invoice. */}
                               <table style={tableStyle}>
-                                <thead><tr><th style={th}>Size</th><th style={th}>Formation</th><th style={th}>Depth</th><th style={thR}>Metres</th><th style={thR}>Rate</th><th style={thR}>Amount</th></tr></thead>
+                                <thead><tr><th style={th}>Size</th><th style={th}>Formation</th><th style={th}>Depth</th><th style={thR}>Metres</th><th style={th}>Structure</th><th style={thR}>Amount</th></tr></thead>
                                 <tbody>
                                   {h.billing.map((l, k) => (
                                     <tr key={k} style={{ borderBottom: rowBorder }}>
@@ -1408,7 +1426,6 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
                           )}
 
                           <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                            {hole.status === 'drilling' && <Btn size="sm" tone="primary" onClick={() => onStatus(hole.holeNumber, 'closed')}>Close hole</Btn>}
                             {hole.status === 'closed' && <>
                               <Btn size="sm" tone="primary" onClick={() => onStatus(hole.holeNumber, 'approved')}>Approve for billing</Btn>
                               <Btn size="sm" onClick={() => onStatus(hole.holeNumber, 'drilling')}>Reopen</Btn>
@@ -1428,7 +1445,7 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={4}>{v.holes.length} holes</td>
+                <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={4}>{finished.length} holes</td>
                 <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{t.units}</td>
                 <td style={tdN} />
                 <td style={{ ...tdN, fontWeight: 800, color: LAYER.full }}>{money(t.cost)}</td>
@@ -1465,98 +1482,130 @@ function Res({ k, v, tone, big }: { k: string; v: string; tone: string; big?: bo
 
 /* ── BILLING ──────────────────────────────────────────────────────────── */
 
-function BillingTab({ project, holes, clientRate, invoices, onCreate, onUpdate, onDelete }: {
-  project: string; holes: HoleResult[]; clientRate?: ClientRate
-  invoices: Invoice[]
-  onCreate: (i: Invoice) => void; onUpdate: (i: Invoice) => void; onDelete: (id: string) => void
+/* TRACKER — invoices only. Nothing is created here; invoices are raised from
+ * Drillholes, where the hole and its numbers are in front of you. This tab
+ * answers what is out, what is overdue and what has been paid. */
+function TrackerTab({ invoices, onUpdate, onDelete }: {
+  invoices: Invoice[]; onUpdate: (i: Invoice) => void; onDelete: (id: string) => void
 }) {
-  const [picked, setPicked] = useState<Set<string>>(new Set())
-  const [review, setReview] = useState(false)
+  const [viewing, setViewing] = useState<Invoice | null>(null)
+  const today = new Date().toISOString().slice(0, 10)
 
-  const ready = holes.filter(h => isBillable(h.hole))
-  const waiting = holes.filter(h => h.hole.status === 'closed')
-  const toggle = (id: string) => setPicked(s => { const n = new Set(Array.from(s)); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const chosen = ready.filter(h => picked.has(h.hole.holeNumber))
-  const sel = {
-    revenue: chosen.reduce((s, h) => s + h.roll.revenue, 0),
-    cost: chosen.reduce((s, h) => s + h.roll.total, 0),
+  if (invoices.length === 0) {
+    return <Card><Empty>No invoices yet.<br />Approve a hole in Drillholes and raise one from there.</Empty></Card>
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {waiting.length > 0 && (
-        <Note tone={C.blue}>
-          {waiting.length} {waiting.length === 1 ? 'hole is' : 'holes are'} closed but not approved
-          ({waiting.map(h => h.hole.holeNumber).join(', ')}). Approve them in the Holes tab to bill.
-        </Note>
-      )}
-      {ready.some(h => h.unmatchedDays > 0) && (
-        <Note tone={C.red}>A hole ready to bill has metres with no matching rate line. Those metres will invoice at zero.</Note>
-      )}
+  const live = invoices.filter(i => i.status !== 'cancelled')
+  const totals = live.reduce((a, i) => ({
+    billed: a.billed + i.total,
+    paid: a.paid + (i.paidAmount ?? 0),
+    overdue: a.overdue + (isOverdue(i, today) ? outstanding(i) : 0),
+  }), { billed: 0, paid: 0, overdue: 0 })
 
-      <Card title="Ready to bill" pad={false}
-        subtitle="Approved holes not yet invoiced. Cost sits beside revenue so nothing goes out at a loss unnoticed."
-        right={ready.length > 0 ? (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Btn size="sm" onClick={() => setPicked(picked.size === ready.length ? new Set() : new Set(ready.map(h => h.hole.holeNumber)))}>
-              {picked.size === ready.length ? 'Clear' : 'Select all'}
-            </Btn>
-            <Btn size="sm" tone="primary" disabled={chosen.length === 0} onClick={() => setReview(true)}>
-              Review{chosen.length > 0 ? ` (${chosen.length})` : ''}
-            </Btn>
-          </div>
-        ) : undefined}>
-        {ready.length === 0 ? <Empty>Nothing approved and waiting. Close a hole, approve it, and it appears here.</Empty> : (
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12 }}>
+        <Stat label="Invoiced" value={money(totals.billed)} color={LAYER.revenue} note={`${live.length} live`} />
+        <Stat label="Received" value={money(totals.paid)} color={C.green} />
+        <Stat label="Outstanding" value={money(totals.billed - totals.paid)} color={C.amber} />
+        <Stat label="Overdue" value={money(totals.overdue)} color={totals.overdue > 0 ? C.red : C.dim} />
+      </div>
+
+      <Card title="Invoices" pad={false} subtitle="Deleting an invoice releases its holes back to Ready to bill">
+        <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead>
-              <tr><th style={{ ...th, width: 40 }} /><th style={th}>Hole</th><th style={th}>Rig</th><th style={th}>Closed</th>
-                <th style={thR}>Metres</th><th style={thR}>Recovery</th><th style={thR}>Cost</th>
-                <th style={thR}>Revenue</th><th style={thR}>Profit</th><th style={thR}>Margin</th></tr>
+              <tr><th style={th}>Number</th><th style={th}>Date</th><th style={th}>Due</th><th style={th}>Holes</th>
+                <th style={thR}>Total</th><th style={thR}>Received</th><th style={thR}>Outstanding</th>
+                <th style={th}>Status</th><th style={th} /></tr>
             </thead>
             <tbody>
-              {ready.map(h => {
-                const on = picked.has(h.hole.holeNumber)
+              {invoices.map(inv => {
+                const over = isOverdue(inv, today)
+                const out = outstanding(inv)
+                const cancelled = inv.status === 'cancelled'
                 return (
-                  <tr key={h.hole.holeNumber} onClick={() => toggle(h.hole.holeNumber)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: on ? 'rgba(249,115,22,0.06)' : undefined }}>
-                    <td style={{ ...td, textAlign: 'center' }}>
-                      <span style={{ display: 'inline-block', width: 15, height: 15, borderRadius: 4, border: `1.5px solid ${on ? C.orange : C.border}`, background: on ? C.orange : 'transparent', color: '#fff', fontSize: 10, lineHeight: '13px', textAlign: 'center' }}>{on ? '✓' : ''}</span>
+                  <tr key={inv.id} style={{
+                    borderBottom: rowBorder,
+                    background: over ? 'rgba(239,68,68,0.05)' : undefined,
+                    opacity: cancelled ? 0.5 : 1,
+                  }}>
+                    <td style={{ ...td, color: C.text, fontWeight: 700, textDecoration: cancelled ? 'line-through' : undefined }}>{inv.number}</td>
+                    <td style={td}>{dayLabel(inv.date)}</td>
+                    <td style={{ ...td, color: over ? C.red : C.muted }}>{inv.dueDate ? dayLabel(inv.dueDate) : '—'}</td>
+                    <td style={{ ...td, whiteSpace: 'normal', maxWidth: 170 }}>{inv.holeNumbers.join(', ')}</td>
+                    <td style={{ ...tdN, color: LAYER.revenue, fontWeight: 800 }}>{money(inv.total)}</td>
+                    <td style={{ ...tdN, color: inv.paidAmount ? C.green : C.dim }}>{inv.paidAmount ? money(inv.paidAmount) : '—'}</td>
+                    <td style={{ ...tdN, color: out > 0 ? C.amber : C.dim }}>{out > 0 ? money(out) : '—'}</td>
+                    <td style={td}>
+                      {/* Overdue is shown, never chosen — it follows the due date. */}
+                      {over && <div style={{ marginBottom: 5 }}><Tag tone={C.red}>Overdue</Tag></div>}
+                      <select value={inv.status}
+                        onChange={e => {
+                          const st = e.target.value as InvoiceStatus
+                          onUpdate({
+                            ...inv, status: st,
+                            paidDate: st === 'paid' ? today : undefined,
+                            paidAmount: st === 'paid' ? inv.total : undefined,
+                          })
+                        }}
+                        style={{ ...iStyle, width: 116, cursor: 'pointer', fontSize: 11.5, fontWeight: 700,
+                          color: inv.status === 'paid' ? C.green : inv.status === 'pending' ? C.blue : inv.status === 'cancelled' ? C.faint : C.muted }}>
+                        {INVOICE_STATUSES.map(st => <option key={st} value={st}>{INVOICE_STATUS_LABEL[st]}</option>)}
+                      </select>
                     </td>
-                    <td style={{ ...td, color: C.text, fontWeight: 700 }}>{h.hole.holeNumber}</td>
-                    <td style={td}>{h.hole.rig}</td>
-                    <td style={td}>{h.hole.endDate ? dayLabel(h.hole.endDate) : '—'}</td>
-                    <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{h.roll.units}</td>
-                    <td style={{ ...tdN, color: C.faint }}>{pct(h.coreRecoveryPct)}</td>
-                    <td style={{ ...tdN, color: LAYER.full }}>{money(h.roll.total)}</td>
-                    <td style={{ ...tdN, color: LAYER.revenue, fontWeight: 700 }}>{money(h.roll.revenue)}</td>
-                    <td style={{ ...tdN, color: marginColor(h.roll.margin), fontWeight: 800 }}>{money(h.roll.margin)}</td>
-                    <td style={{ ...tdN, color: marginColor(h.roll.margin), fontWeight: 800 }}>{pct(h.roll.marginPct)}</td>
+                    <td style={{ ...td, textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', gap: 6 }}>
+                        <Btn size="sm" onClick={() => setViewing(inv)}>View</Btn>
+                        <Btn size="sm" onClick={() => downloadInvoice(inv)}>Download</Btn>
+                        <Btn size="sm" tone="danger" onClick={() => onDelete(inv.id)}>Delete</Btn>
+                      </div>
+                    </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
-        )}
+        </div>
       </Card>
 
-      {chosen.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12 }}>
-          <Stat label="Selected" value={`${chosen.length}`} />
-          <Stat label="Revenue" value={money(sel.revenue)} color={LAYER.revenue} />
-          <Stat label="Cost" value={money(sel.cost)} color={LAYER.full} />
-          <Stat label="Profit" value={money(sel.revenue - sel.cost)} color={marginColor(sel.revenue - sel.cost)}
-            note={sel.revenue > 0 ? pct(((sel.revenue - sel.cost) / sel.revenue) * 100) : ''} />
-        </div>
-      )}
-
-      {invoices.length > 0 && <InvoiceTracker invoices={invoices} onUpdate={onUpdate} onDelete={onDelete} />}
-
-      {review && (
-        <ReviewModal project={project} clientRate={clientRate} holes={chosen}
-          nextNumber={`INV-${String(invoices.length + 1).padStart(4, '0')}`}
-          onClose={() => setReview(false)}
-          onCreate={inv => { onCreate(inv); setPicked(new Set()); setReview(false) }} />
-      )}
+      {viewing && <InvoiceView inv={viewing} onClose={() => setViewing(null)} />}
     </div>
+  )
+}
+
+function InvoiceView({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
+  return (
+    <Modal title={inv.number} subtitle={`${inv.project} · ${fullDate(inv.date)}${inv.dueDate ? ` · due ${fullDate(inv.dueDate)}` : ''}`}
+      width={820} onClose={onClose}
+      footer={<><Btn onClick={onClose}>Close</Btn><Btn tone="primary" onClick={() => downloadInvoice(inv)}>Download</Btn></>}>
+      <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+        <table style={tableStyle}>
+          <thead><tr><th style={th}>Description</th><th style={th}>Depth</th><th style={thR}>Quantity</th><th style={thR}>Rate</th><th style={thR}>Amount</th></tr></thead>
+          <tbody>
+            {inv.lines.map((l, i) => (
+              <tr key={i} style={{ borderBottom: rowBorder }}>
+                <td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{l.label}</td>
+                <td style={{ ...td, fontFamily: 'ui-monospace, monospace', color: C.faint }}>{l.depth ?? '—'}</td>
+                <td style={tdN}>{l.qty}</td><td style={tdN}>{l.rate}</td>
+                <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{money(l.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr style={{ borderTop: `2px solid ${C.border}` }}>
+              <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={4}>Subtotal</td>
+              <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{money(inv.subtotal)}</td>
+            </tr>
+            <tr><td style={td} colSpan={4}>Tax at {inv.taxPercent}%</td><td style={tdN}>{money(inv.subtotal * inv.taxPercent / 100)}</td></tr>
+            <tr style={{ background: 'rgba(59,130,246,0.06)' }}>
+              <td style={{ ...td, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }} colSpan={4}>Total</td>
+              <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }}>{money(inv.total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </Modal>
   )
 }
 
@@ -1606,7 +1655,7 @@ function ReviewModal({ project, clientRate, holes, nextNumber, onClose, onCreate
         <Btn tone="primary" onClick={() => onCreate({
           id: uid('inv'), number, project, client: '', date,
           holeNumbers: holes.map(h => h.hole.holeNumber), lines, subtotal, taxPercent, total,
-          status: 'issued', dueDate,
+          status: 'pending', dueDate,
         })}>Create invoice</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <Grid cols={4}>
@@ -1618,7 +1667,7 @@ function ReviewModal({ project, clientRate, holes, nextNumber, onClose, onCreate
 
         <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
           <table style={tableStyle}>
-            <thead><tr><th style={th}>Description</th><th style={th}>Depth</th><th style={thR}>Quantity</th><th style={thR}>Rate</th><th style={thR}>Amount</th></tr></thead>
+            <thead><tr><th style={th}>Description</th><th style={th}>Depth</th><th style={thR}>Quantity</th><th style={th}>Structure</th><th style={thR}>Amount</th></tr></thead>
             <tbody>
               {lines.map((l, i) => (
                 <tr key={i} style={{ borderBottom: rowBorder }}>
@@ -1684,79 +1733,6 @@ function ReviewModal({ project, clientRate, holes, nextNumber, onClose, onCreate
   )
 }
 
-/* The tracker: what is out, what is overdue, what has been paid. Overdue is
- * derived from the due date rather than being a status someone has to
- * remember to set, so it can never go stale. */
-function InvoiceTracker({ invoices, onUpdate, onDelete }: {
-  invoices: Invoice[]; onUpdate: (i: Invoice) => void; onDelete: (id: string) => void
-}) {
-  const today = new Date().toISOString().slice(0, 10)
-  const totals = invoices.reduce((a, i) => ({
-    billed: a.billed + i.total,
-    paid: a.paid + (i.paidAmount ?? 0),
-    overdue: a.overdue + (isOverdue(i, today) ? outstanding(i) : 0),
-  }), { billed: 0, paid: 0, overdue: 0 })
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12 }}>
-        <Stat label="Invoiced" value={money(totals.billed)} color={LAYER.revenue} note={`${invoices.length} invoices`} />
-        <Stat label="Received" value={money(totals.paid)} color={C.green} />
-        <Stat label="Outstanding" value={money(totals.billed - totals.paid)} color={C.amber} />
-        <Stat label="Overdue" value={money(totals.overdue)} color={totals.overdue > 0 ? C.red : C.dim} />
-      </div>
-
-      <Card title="Invoices" pad={false} subtitle="Deleting an invoice releases its holes back to Ready to bill">
-        <table style={tableStyle}>
-          <thead>
-            <tr><th style={th}>Number</th><th style={th}>Date</th><th style={th}>Due</th><th style={th}>Holes</th>
-              <th style={thR}>Total</th><th style={thR}>Received</th><th style={thR}>Outstanding</th>
-              <th style={th}>Status</th><th style={th} /></tr>
-          </thead>
-          <tbody>
-            {invoices.map(inv => {
-              const over = isOverdue(inv, today)
-              const out = outstanding(inv)
-              return (
-                <tr key={inv.id} style={{ borderBottom: rowBorder, background: over ? 'rgba(239,68,68,0.04)' : undefined }}>
-                  <td style={{ ...td, color: C.text, fontWeight: 700 }}>{inv.number}</td>
-                  <td style={td}>{dayLabel(inv.date)}</td>
-                  <td style={{ ...td, color: over ? C.red : C.muted }}>{inv.dueDate ? dayLabel(inv.dueDate) : '—'}</td>
-                  <td style={{ ...td, whiteSpace: 'normal', maxWidth: 180 }}>{inv.holeNumbers.join(', ')}</td>
-                  <td style={{ ...tdN, color: LAYER.revenue, fontWeight: 800 }}>{money(inv.total)}</td>
-                  <td style={{ ...tdN, color: inv.paidAmount ? C.green : C.dim }}>{inv.paidAmount ? money(inv.paidAmount) : '—'}</td>
-                  <td style={{ ...tdN, color: out > 0 ? C.amber : C.dim }}>{out > 0 ? money(out) : '—'}</td>
-                  <td style={td}>
-                    <Tag tone={over ? C.red : inv.status === 'paid' ? C.green : inv.status === 'issued' ? C.blue : C.faint}>
-                      {over ? 'Overdue' : INVOICE_STATUS_LABEL[inv.status]}
-                    </Tag>
-                  </td>
-                  <td style={{ ...td, textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: 6 }}>
-                      {inv.status !== 'paid' && (
-                        <Btn size="sm" onClick={() => onUpdate({ ...inv, status: 'paid', paidDate: today, paidAmount: inv.total })}>
-                          Mark paid
-                        </Btn>
-                      )}
-                      {inv.status === 'paid' && (
-                        <Btn size="sm" onClick={() => onUpdate({ ...inv, status: 'issued', paidDate: undefined, paidAmount: undefined })}>
-                          Unpay
-                        </Btn>
-                      )}
-                      <Btn size="sm" onClick={() => downloadInvoice(inv)}>Download</Btn>
-                      <Btn size="sm" tone="danger" onClick={() => onDelete(inv.id)}>Delete</Btn>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </Card>
-    </div>
-  )
-}
-
 function downloadInvoice(inv: Invoice) {
   const rows = inv.lines.map(l =>
     `<tr><td>${l.label}</td><td>${l.depth ?? ''}</td><td class="r">${l.qty}</td><td class="r">${l.rate}</td><td class="r">${money(l.amount)}</td></tr>`).join('')
@@ -1790,7 +1766,7 @@ td{padding:10px 12px;border-bottom:1px solid #eee;font-size:13px}
  * 7  The screen
  * ========================================================================== */
 
-const TABS = ['Performance', 'Drillholes', 'Invoicing'] as const
+const TABS = ['Performance', 'Drillholes', 'Tracker'] as const
 type Tab = typeof TABS[number]
 
 function CostingScreen() {
@@ -1819,7 +1795,6 @@ function CostingScreen() {
   const [quickInvoice, setQuickInvoice] = useState<HoleResult | null>(null)
 
   const v = useRigMonthView(project, rig, month)
-  const projectHoles = useProjectHoles(project)
   const invoices = state.invoices.filter(i => i.project === project)
 
   if (!project) {
@@ -1880,10 +1855,7 @@ function CostingScreen() {
 
       {tab === 'Performance' && <PerformanceTab v={v} rig={rig} month={month} />}
       {tab === 'Drillholes' && <DrillholesTab v={v} onStatus={setHoleStatus} onInvoice={h => setQuickInvoice(h)} />}
-      {tab === 'Invoicing' && (
-        <BillingTab project={project} holes={projectHoles} clientRate={v.clientRate}
-          invoices={invoices} onCreate={addInvoice} onUpdate={updateInvoice} onDelete={deleteInvoice} />
-      )}
+      {tab === 'Tracker' && <TrackerTab invoices={invoices} onUpdate={updateInvoice} onDelete={deleteInvoice} />}
 
       {showRates && (
         <SetRatesModal projects={projects} initialProject={project} initialRig={rig} month={month}
@@ -1897,7 +1869,7 @@ function CostingScreen() {
         <ReviewModal project={project} clientRate={v.clientRate} holes={[quickInvoice]}
           nextNumber={`INV-${String(invoices.length + 1).padStart(4, '0')}`}
           onClose={() => setQuickInvoice(null)}
-          onCreate={inv => { addInvoice(inv); setQuickInvoice(null); setTab('Invoicing') }} />
+          onCreate={inv => { addInvoice(inv); setQuickInvoice(null); setTab('Tracker') }} />
       )}
       {showHistory && <RatesHistoryModal project={project} rig={rig} onClose={() => setShowHistory(false)} />}
     </div>
