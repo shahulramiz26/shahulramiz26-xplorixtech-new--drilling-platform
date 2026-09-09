@@ -1055,7 +1055,7 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                     {isOpen && (
                       <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
                         <td colSpan={19} style={{ padding: '16px 18px' }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 22 }}>
+                          <div style={{ display: 'flex', gap: 44, flexWrap: 'wrap' }}>
                             <Detail title="From the log" tone={C.blue} rows={[
                               ['Shifts', `${d.shifts.length}`],
                               ['Day crew', `${d.labour.dayCrew}`],
@@ -1088,7 +1088,7 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                                 How this day billed
                               </div>
                               <table style={tableStyle}>
-                                <thead><tr><th style={th}>Shift</th><th style={th}>Size</th><th style={th}>Formation</th><th style={th}>Depth</th><th style={thR}>Metres</th><th style={th}>Structure</th><th style={thR}>Amount</th></tr></thead>
+                                <thead><tr><th style={th}>Shift</th><th style={th}>Size</th><th style={th}>Formation</th><th style={th}>Depth</th><th style={thR}>Metres</th><th style={thR}>Rate</th><th style={thR}>Amount</th></tr></thead>
                                 <tbody>
                                   {d.charges.map((c, k) => (
                                     <tr key={k} style={{ borderBottom: rowBorder }}>
@@ -1148,13 +1148,16 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
   )
 }
 
+/* Each panel is capped so the label and its number stay together. Left to its
+ * own devices in a grid column spanning a 19-column table, space-between threw
+ * them to opposite ends of the screen. */
 function Detail({ title, tone, rows }: { title: string; tone: string; rows: string[][] }) {
   return (
-    <div>
+    <div style={{ minWidth: 210, maxWidth: 270 }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: tone, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>{title}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {rows.map((r, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
             <span style={{ fontSize: 11, color: C.faint }}>{r[0]}</span>
             <span style={{ fontSize: 12, color: C.text, fontFamily: 'ui-monospace, monospace', fontWeight: 600 }}>{r[1]}</span>
           </div>
@@ -1715,7 +1718,7 @@ function ReviewModal({ project, clientRate, holes, nextNumber, onClose, onCreate
 
         <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
           <table style={tableStyle}>
-            <thead><tr><th style={th}>Description</th><th style={th}>Depth</th><th style={thR}>Quantity</th><th style={th}>Structure</th><th style={thR}>Amount</th></tr></thead>
+            <thead><tr><th style={th}>Description</th><th style={th}>Depth</th><th style={thR}>Quantity</th><th style={thR}>Rate</th><th style={thR}>Amount</th></tr></thead>
             <tbody>
               {lines.map((l, i) => (
                 <tr key={i} style={{ borderBottom: rowBorder }}>
