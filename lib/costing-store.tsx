@@ -166,10 +166,23 @@ export interface RateAdjustment {
   adjustPct: number       // negative reduces the rate
 }
 
+/* One line covers a size, a formation and a depth range. Leave formation as
+ * ANY_FORMATION and it matches whatever the log says; leave the depth range
+ * blank and it applies at any depth. That one shape covers both contracts:
+ *
+ *   government   size + formation, no depth range
+ *   private      size + ANY formation + depth bands
+ *
+ * and a contract that prices hard rock differently deep than shallow is just
+ * both at once. */
+export const ANY_FORMATION = 'Any formation'
+
 export interface RateRow {
   id: string
   holeSize: string        // NQ / HQ / PQ / BQ / AQ
-  formation: string       // soft / medium / hard / very hard
+  formation: string       // a rock category, or ANY_FORMATION
+  fromDepth?: number      // blank = from surface
+  toDepth?: number        // blank = no limit
   rate: number            // ₹ per metre
   adjustments: RateAdjustment[]
 }
@@ -191,9 +204,57 @@ export function normFormation(v: string) {
   return v.toLowerCase().replace(/formation|strata|rock/g, '').replace(/\s+/g, ' ').trim()
 }
 
-export function rateRowFor(cr: ClientRate | undefined, holeSize: string, formation: string): RateRow | undefined {
+export function rateRowFor(cr: ClientRate | undefined, holeSize: string, formation: string, depth: number): RateRow | undefined {
   if (!cr) return undefined
-  return cr.rateRows.find(r => r.holeSize === holeSize && normFormation(r.formation) === normFormation(formation))
+  return cr.rateRows.find(r =>
+    r.holeSize === holeSize &&
+    (r.formation === ANY_FORMATION || normFormation(r.formation) === normFormation(formation)) &&
+    (r.fromDepth == null || depth >= r.fromDepth) &&
+    (r.toDepth == null || depth < r.toDepth))
+}
+
+/* One priced run of metres: a stretch of hole at one size, one formation and
+ * one rate. This is the unit a measurement book is written in, and the unit an
+ * invoice line is printed from. */
+export interface Charge {
+  date: string
+  shift: ShiftName
+  holeNumber: string | null
+  holeSize: string
+  formation: string
+  fromDepth: number
+  toDepth: number
+  metres: number
+  rate: number
+  adjustmentPct: number
+  amount: number
+  matched: boolean
+}
+
+/* Price one shift's metres. The shift is split wherever it crosses a rate
+ * line's depth boundary, so a shift running 45 m to 55 m across a band edge at
+ * 50 m produces two runs, not one mispriced one. */
+export function chargeShift(cr: ClientRate | undefined, log: ShiftLog, fromDepth: number): Charge[] {
+  const out: Charge[] = []
+  const to = fromDepth + log.metresDrilled
+  let d = fromDepth
+  let guard = 0
+  while (d < to && guard++ < 50) {
+    const row = rateRowFor(cr, log.holeSize, log.formationType, d)
+    const limit = row?.toDepth ?? to
+    const hi = Math.min(to, limit)
+    if (hi <= d) break
+    const adjustmentPct = row ? adjustmentFor(row, d) : 0
+    const rate = (row?.rate ?? 0) * (1 + adjustmentPct / 100)
+    out.push({
+      date: log.date, shift: log.shift, holeNumber: log.holeNumber,
+      holeSize: log.holeSize, formation: log.formationType,
+      fromDepth: d, toDepth: hi, metres: hi - d,
+      rate, adjustmentPct, amount: (hi - d) * rate, matched: !!row,
+    })
+    d = hi
+  }
+  return out
 }
 
 // ── HOLE ──────────────────────────────────────────────────────────────────
@@ -216,7 +277,7 @@ export interface Hole {
 }
 
 // ── INVOICE ───────────────────────────────────────────────────────────────
-export interface InvoiceLine { label: string; qty: string; rate: string; amount: number }
+export interface InvoiceLine { label: string; qty: string; rate: string; amount: number; depth?: string }
 export interface Invoice {
   id: string
   number: string
@@ -228,6 +289,23 @@ export interface Invoice {
   subtotal: number
   taxPercent: number
   total: number
+  status: InvoiceStatus
+  dueDate?: string
+  paidDate?: string
+  paidAmount?: number
+}
+
+export type InvoiceStatus = 'draft' | 'issued' | 'paid'
+export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
+  draft: 'Draft', issued: 'Issued', paid: 'Paid',
+}
+/* Overdue is derived from the due date, never set by hand, so it can't go
+ * stale. Part payments are recorded as an amount, not a separate status. */
+export function isOverdue(i: Invoice, today: string) {
+  return i.status === 'issued' && !!i.dueDate && i.dueDate < today
+}
+export function outstanding(i: Invoice) {
+  return Math.max(0, i.total - (i.paidAmount ?? 0))
 }
 
 /* ==========================================================================
@@ -361,7 +439,8 @@ export interface DayCost {
   rate: number              // rate in force on this day, after adjustment
   adjustmentPct: number
   revenue: number
-  unmatched: boolean        // metres drilled but no rate row matched
+  unmatched: boolean        // metres drilled with no matching rate line
+  charges: Charge[]         // priced runs, the unit a measurement book uses
 }
 
 export function dayCost(
@@ -391,19 +470,28 @@ export function dayCost(
   const ownership = own.allocationBasis === 'expectedUnit' ? units * ob.perUnit : ob.perDay
   const total = operating + ownership
 
-  // Revenue uses the rate in force ON THIS DAY, which is what makes a rate
-  // change part-way through a hole split correctly with no special case.
+  // Each shift is priced by its own size, formation and depth. A day whose two
+  // shifts pass from soft into hard bills each stretch at its own rate rather
+  // than pricing the whole day off whichever shift happened to be first.
   const holeNumber = shifts.find(s => s.holeNumber)?.holeNumber ?? null
-  const lead = shifts.find(s => s.metresDrilled > 0) ?? shifts[0]
-  const row = lead ? rateRowFor(cr, lead.holeSize, lead.formationType) : undefined
-  const adjustmentPct = row ? adjustmentFor(row, depthSoFar) : 0
-  const rate = (row?.rate ?? 0) * (1 + adjustmentPct / 100)
+  const ordered = [...shifts].sort((a, b) => (a.shift === 'Day' ? -1 : 1) - (b.shift === 'Day' ? -1 : 1))
+  const charges: Charge[] = []
+  let depth = depthSoFar
+  ordered.forEach(sh => {
+    if (sh.metresDrilled <= 0) return
+    chargeShift(cr, sh, depth).forEach(c => charges.push(c))
+    depth += sh.metresDrilled
+  })
+
+  const drillRevenue = charges.reduce((a, c) => a + c.amount, 0)
   // A standby day only bills when someone actually submitted a log saying the
   // client stopped work. A missing submission must never invent revenue.
   const revenue = status === 'standby'
     ? (submitted ? (cr?.standbyPerDay ?? 0) : 0)
-    : units * rate
-  const unmatched = !!lead && lead.metresDrilled > 0 && !row
+    : drillRevenue
+  const rate = units > 0 ? drillRevenue / units : 0
+  const adjustmentPct = charges.find(c => c.adjustmentPct !== 0)?.adjustmentPct ?? 0
+  const unmatched = charges.some(c => !c.matched)
 
   return {
     date, rig, project, shifts, status, holeNumber, submitted,
@@ -413,7 +501,7 @@ export function dayCost(
     fuel, water, additives, labour, repairs, parts,
     operating, ownership, total,
     cpu: units > 0 ? total / units : null,
-    rate, adjustmentPct, revenue, unmatched,
+    rate, adjustmentPct, revenue, unmatched, charges,
   }
 }
 
@@ -503,7 +591,43 @@ export interface HoleResult {
   depth: number
   coreRecoveryPct: number
   rates: number[]           // more than one = the rate moved mid-hole
-  unmatchedDays: number     // metres drilled with no matching rate row
+  unmatchedDays: number     // metres drilled with no matching rate line
+  billing: BillingLine[]    // the measurement book for this hole
+}
+
+/* Grouped runs, in depth order — what goes on the invoice. Runs at the same
+ * size, formation and rate merge, so a hole that passed through hard rock over
+ * four separate days shows as one line. */
+export interface BillingLine {
+  holeSize: string
+  formation: string
+  fromDepth: number
+  toDepth: number
+  metres: number
+  rate: number
+  amount: number
+  matched: boolean
+}
+
+export function billingLines(days: DayCost[]): BillingLine[] {
+  const acc: Record<string, BillingLine> = {}
+  days.forEach(d => d.charges.forEach(c => {
+    const k = `${c.holeSize}|${c.formation}|${Math.round(c.rate)}`
+    const e = acc[k]
+    if (!e) {
+      acc[k] = {
+        holeSize: c.holeSize, formation: c.formation,
+        fromDepth: c.fromDepth, toDepth: c.toDepth,
+        metres: c.metres, rate: c.rate, amount: c.amount, matched: c.matched,
+      }
+    } else {
+      e.fromDepth = Math.min(e.fromDepth, c.fromDepth)
+      e.toDepth = Math.max(e.toDepth, c.toDepth)
+      e.metres += c.metres
+      e.amount += c.amount
+    }
+  }))
+  return Object.values(acc).sort((a, b) => a.fromDepth - b.fromDepth)
 }
 
 /* Every hole number the log mentions becomes a row. Dates come from the first
@@ -532,6 +656,7 @@ export function holeResult(hole: Hole, allDays: DayCost[]): HoleResult {
     coreRecoveryPct: roll.coreRecoveryPct,
     rates: Array.from(new Set(days.filter(d => d.units > 0).map(d => Math.round(d.rate)))),
     unmatchedDays: days.filter(d => d.unmatched).length,
+    billing: billingLines(days),
   }
 }
 
@@ -586,6 +711,16 @@ export const SEED_OWNERSHIP: RigOwnership[] = [
     expectedOperatingDays: 25, expectedUnitsPerMonth: 125,
     note: 'Opening entry',
   },
+  {
+    id: 'own_r3', rig: 'RIG-003', effectiveFrom: '2026-01-01',
+    basicPrice: 4800000, gstPercent: 0, transportation: 160000,
+    depreciationRatePct: 20,
+    emiPerMonth: 118000, emiEndsMonth: '2029-02',
+    insurancePerYear: 96000, otherFixedPerMonth: 0,
+    costBasis: 'cash', allocationBasis: 'operatingDay',
+    expectedOperatingDays: 25, expectedUnitsPerMonth: 130,
+    note: 'Opening entry',
+  },
 ]
 
 const opRate = (id: string, rig: string, project: string, from: string, fuel: number, note: string): OperatingRate => ({
@@ -598,10 +733,12 @@ export const SEED_OPERATING: OperatingRate[] = [
   opRate('op_a1_1', 'RIG-001', 'Site A - North Field', '2026-01-01', 96, 'Opening entry'),
   opRate('op_a1_2', 'RIG-001', 'Site A - North Field', '2026-08-01', 100, 'Diesel price revision'),
   opRate('op_a2_1', 'RIG-002', 'Site A - North Field', '2026-01-01', 100, 'Opening entry'),
+  opRate('op_b1_1', 'RIG-003', 'Site B - South Ridge', '2026-01-01', 100, 'Opening entry'),
 ]
 
 export const SEED_CLIENT_RATES: ClientRate[] = [
   {
+    // Priced by formation — the government shape. No depth range on any line.
     id: 'cr_a_1', project: 'Site A - North Field', effectiveFrom: '2026-06-01',
     rateRows: [
       { id: 'r1', holeSize: 'HQ', formation: 'Soft rock', rate: 5500, adjustments: [] },
@@ -628,12 +765,16 @@ export const SEED_CLIENT_RATES: ClientRate[] = [
     note: 'Revised schedule approved by MoC',
   },
   {
+    // Priced by depth band — the private shape. Formation is ignored, the rate
+    // rises with depth.
     id: 'cr_b_1', project: 'Site B - South Ridge', effectiveFrom: '2026-01-01',
     rateRows: [
-      { id: 'r1', holeSize: 'HQ', formation: 'Soft rock', rate: 4900, adjustments: [] },
-      { id: 'r2', holeSize: 'HQ', formation: 'Hard rock', rate: 8800, adjustments: [] },
+      { id: 'b1', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 0, toDepth: 50, rate: 7800, adjustments: [] },
+      { id: 'b2', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 50, toDepth: 100, rate: 8900, adjustments: [] },
+      { id: 'b3', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 100, rate: 10400, adjustments: [] },
     ],
     standbyPerDay: 14000, mobilisation: 150000, demobilisation: 120000,
+    note: 'Contract rate card, depth bands',
   },
 ]
 
@@ -641,18 +782,36 @@ export const SEED_HOLE_STATUS: Record<string, HoleState> = {
   'DH-001': { status: 'approved' },
   'DH-002': { status: 'closed' },
   'DH-011': { status: 'approved' },
+  'DH-101': { status: 'approved' },
 }
 
 /* [day, hole, dayMetres, nightMetres, dayDowntime, nightDowntime, reason]
- * Two shifts per day, 12-hour shifts, drilling hours = 12 − downtime. */
+ * Two shifts per day, 12-hour shifts, drilling hours = 12 − downtime.
+ *
+ * Formation is not fixed per rig — it follows depth, the way ground actually
+ * behaves: soft near surface, then hard, then very hard. The generator tracks
+ * each hole's depth and labels the shift accordingly, so one hole bills at
+ * three different rates. */
 type DaySpec = [number, string, number, number, number?, number?, string?]
 
-function expand(rig: string, project: string, ym: string, formation: string, size: string, specs: DaySpec[]): ShiftLog[] {
+function formationAt(depth: number, bands: [number, string][]): string {
+  for (const [limit, name] of bands) if (depth < limit) return name
+  return bands[bands.length - 1][1]
+}
+
+const DEPTH_BANDS: [number, string][] = [
+  [18, 'Soft Formation'], [40, 'Hard Formation'], [Infinity, 'Very Hard Formation'],
+]
+
+function expand(rig: string, project: string, ym: string, size: string, specs: DaySpec[], bands = DEPTH_BANDS): ShiftLog[] {
   const out: ShiftLog[] = []
+  const depth: Record<string, number> = {}
   specs.forEach(([day, hole, dm, nm, dd = 0, nd = 0, reason = '']) => {
     const date = `${ym}-${String(day).padStart(2, '0')}`
     const mk = (shift: ShiftName, metres: number, down: number, crew: number): ShiftLog => {
       const drillingHours = Math.max(0, 12 - down)
+      const startDepth = hole ? (depth[hole] ?? 0) : 0
+      if (hole) depth[hole] = startDepth + metres
       return {
         id: `${rig}_${date}_${shift}`.replace(/\s+/g, ''),
         rig, project, date, shift,
@@ -662,7 +821,8 @@ function expand(rig: string, project: string, ym: string, formation: string, siz
         downtimeReason: down > 0 ? reason : '',
         metresDrilled: metres,
         coreRecovery: +(metres * 0.94).toFixed(2),
-        holeSize: size, formationType: formation,
+        holeSize: size,
+        formationType: formationAt(startDepth, bands),
         fuelLitres: drillingHours * 10 + (down > 0 ? 6 : 0),
         waterLitres: metres * 120,
         additivesKg: +(metres * 0.8).toFixed(1),
@@ -674,8 +834,8 @@ function expand(rig: string, project: string, ym: string, formation: string, siz
   return out
 }
 
-export const SEED_SHIFT_LOGS: ShiftLog[] = [
-  ...expand('RIG-001', 'Site A - North Field', '2026-08', 'Very Hard Formation', 'HQ', [
+export const SEED_SHIFT_LOGS_A: ShiftLog[] = [
+  ...expand('RIG-001', 'Site A - North Field', '2026-08', 'HQ', [
     [1, 'DH-001', 4, 3], [2, 'DH-001', 4, 3], [3, 'DH-001', 3, 3, 3, 0, 'Bit Change'],
     [4, 'DH-001', 4, 4], [5, 'DH-001', 4, 3], [6, 'DH-001', 4, 3],
     [7, 'DH-001', 3, 3, 2, 0, 'Ground Condition Issue'], [8, 'DH-001', 4, 3],
@@ -691,7 +851,7 @@ export const SEED_SHIFT_LOGS: ShiftLog[] = [
     [24, 'DH-003', 4, 4], [25, 'DH-003', 4, 3], [26, 'DH-003', 4, 3],
     [27, 'DH-003', 4, 4], [28, 'DH-003', 3, 3],
   ]),
-  ...expand('RIG-002', 'Site A - North Field', '2026-08', 'Hard Formation', 'HQ', [
+  ...expand('RIG-002', 'Site A - North Field', '2026-08', 'HQ', [
     [1, 'DH-011', 4, 4], [2, 'DH-011', 4, 3], [3, 'DH-011', 4, 4],
     [4, 'DH-011', 3, 3, 2, 0, 'Water Shortage'], [5, 'DH-011', 4, 4],
     [6, 'DH-011', 4, 3], [7, 'DH-011', 4, 4], [8, 'DH-011', 4, 3],
@@ -703,6 +863,18 @@ export const SEED_SHIFT_LOGS: ShiftLog[] = [
     [22, 'DH-012', 4, 4], [23, 'DH-012', 4, 3],
   ]),
 ]
+
+/* Site B prices by depth band rather than formation, so its rate lines use
+ * ANY_FORMATION and depth ranges. Same engine, different contract shape. */
+export const SEED_SHIFT_LOGS_B: ShiftLog[] = expand('RIG-003', 'Site B - South Ridge', '2026-08', 'HQ', [
+  [1, 'DH-101', 5, 4], [2, 'DH-101', 5, 5], [3, 'DH-101', 5, 4],
+  [4, 'DH-101', 4, 4, 2, 0, 'Water Shortage'], [5, 'DH-101', 5, 5],
+  [6, 'DH-101', 5, 4], [7, 'DH-101', 5, 5], [8, 'DH-101', 4, 4],
+  [9, 'DH-101', 5, 4], [10, 'DH-101', 5, 5], [11, 'DH-101', 4, 4],
+  [12, 'DH-101', 5, 4], [13, 'DH-101', 5, 5], [14, 'DH-101', 4, 4],
+], [[Infinity, 'Hard Formation']])
+
+export const SEED_SHIFT_LOGS: ShiftLog[] = [...SEED_SHIFT_LOGS_A, ...SEED_SHIFT_LOGS_B]
 
 export const SEED_MAINTENANCE: MaintenanceLog[] = [
   { id: 'm1', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-03', maintenanceType: 'Preventive', hours: 3, component: 'Engine', action: 'Inspection', cost: 4500 },
@@ -746,6 +918,7 @@ interface CtxValue {
   deleteVersion: (kind: VersionKind, id: string) => void
   setHoleStatus: (holeNumber: string, s: HoleStatus) => void
   addInvoice: (i: Invoice) => void
+  updateInvoice: (i: Invoice) => void
   deleteInvoice: (id: string) => void
   resetAll: () => void
 }
@@ -792,6 +965,9 @@ export function CostingProvider({ children }: { children: ReactNode }) {
     inv.holeNumbers.forEach(n => { hs[n] = { status: 'invoiced', invoiceId: inv.id } })
     return { ...s, invoices: [inv, ...s.invoices], holeStatus: hs }
   })
+  const updateInvoice: CtxValue['updateInvoice'] = inv => setState(s => ({
+    ...s, invoices: s.invoices.map(i => i.id === inv.id ? inv : i),
+  }))
   const deleteInvoice: CtxValue['deleteInvoice'] = id => setState(s => {
     const hs = { ...s.holeStatus }
     Object.keys(hs).forEach(n => { if (hs[n].invoiceId === id) hs[n] = { status: 'approved' } })
@@ -801,7 +977,7 @@ export function CostingProvider({ children }: { children: ReactNode }) {
   return (
     <CostingContext.Provider value={{
       state, saveOwnership, saveOperating, saveClientRate, deleteVersion,
-      setHoleStatus, addInvoice, deleteInvoice,
+      setHoleStatus, addInvoice, updateInvoice, deleteInvoice,
       resetAll: () => setState(initial()),
     }}>{children}</CostingContext.Provider>
   )
