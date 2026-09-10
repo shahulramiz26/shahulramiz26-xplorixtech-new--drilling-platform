@@ -1176,6 +1176,7 @@ function Detail({ title, tone, rows }: { title: string; tone: string; rows: stri
  * the points would imply a continuity that isn't there; month to date really
  * is cumulative, so that one is a line. */
 function CPUChart({ days, rate }: { days: DayCostMTD[]; rate: number }) {
+  const [hover, setHover] = useState<number | null>(null)
   const pts = days.filter(d => d.cpu != null)
   if (pts.length < 2) return null
 
@@ -1185,11 +1186,18 @@ function CPUChart({ days, rate }: { days: DayCostMTD[]; rate: number }) {
   const y = (val: number) => PT + (1 - val / maxV) * (H - PT - PB)
   const mtd = days.map((d, i) => d.mtdCPU == null ? null : `${i === 0 || days[i - 1].mtdCPU == null ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.mtdCPU).toFixed(1)}`).filter(Boolean).join(' ')
 
+  // Hit areas are full-height columns rather than the dots themselves — a 4px
+  // circle is far too small a target, and a day with no metres has its point
+  // parked on the axis where nobody would think to aim.
+  const band = (W - PL - PR) / Math.max(1, days.length - 1)
+  const hd = hover != null ? days[hover] : null
+
   return (
     <Card title="Cost per metre through the month"
       subtitle="Points are single days. The line is month to date, which is the figure that actually settles." pad={false}>
-      <div style={{ padding: '18px 20px 8px', overflowX: 'auto' }}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: 620, height: 'auto', display: 'block' }}>
+      <div style={{ padding: '18px 20px 8px', overflowX: 'auto', position: 'relative' }}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: 620, height: 'auto', display: 'block' }}
+          onMouseLeave={() => setHover(null)}>
           {[0, 0.25, 0.5, 0.75, 1].map(fr => {
             const val = maxV * (1 - fr)
             return (
@@ -1205,18 +1213,37 @@ function CPUChart({ days, rate }: { days: DayCostMTD[]; rate: number }) {
               <text x={W - PR} y={y(rate) - 8} textAnchor="end" fill={C.blue} fontSize={11} fontWeight={700}>client rate {Math.round(rate).toLocaleString('en-IN')}</text>
             </g>
           )}
+
+          {hover != null && (
+            <line x1={x(hover)} x2={x(hover)} y1={PT} y2={H - PB} stroke={C.muted} strokeWidth={1} opacity={0.28} />
+          )}
+
           {mtd && <path d={mtd} fill="none" stroke={C.orange} strokeWidth={2.5} strokeLinejoin="round" />}
-          {days.map((d, i) => d.cpu == null ? (
-            <g key={i}>
-              <line x1={x(i)} x2={x(i)} y1={PT} y2={H - PB} stroke={C.red} strokeWidth={1} strokeDasharray="3 4" opacity={0.4} />
-              <circle cx={x(i)} cy={H - PB} r={3} fill={C.red} opacity={0.7} />
-            </g>
-          ) : (
-            <circle key={i} cx={x(i)} cy={y(d.cpu)} r={4} fill={rate ? cpuColor(d.cpu, rate) : C.muted} />
-          ))}
+
+          {days.map((d, i) => {
+            const on = hover === i
+            return d.cpu == null ? (
+              <g key={i}>
+                <line x1={x(i)} x2={x(i)} y1={PT} y2={H - PB} stroke={C.red} strokeWidth={1} strokeDasharray="3 4" opacity={on ? 0.75 : 0.4} />
+                <circle cx={x(i)} cy={H - PB} r={on ? 5 : 3} fill={C.red} opacity={on ? 1 : 0.7} />
+              </g>
+            ) : (
+              <circle key={i} cx={x(i)} cy={y(d.cpu)} r={on ? 6 : 4}
+                fill={rate ? cpuColor(d.cpu, rate) : C.muted}
+                stroke={on ? '#fff' : 'none'} strokeWidth={on ? 1.5 : 0} />
+            )
+          })}
+
           {days.map((d, i) => (i % Math.ceil(days.length / 12) === 0
             ? <text key={i} x={x(i)} y={H - 10} textAnchor="middle" fill={C.dim} fontSize={10}>{d.date.slice(8)}</text> : null))}
+
+          {days.map((_, i) => (
+            <rect key={`h${i}`} x={x(i) - band / 2} y={PT} width={band} height={H - PT - PB}
+              fill="transparent" onMouseEnter={() => setHover(i)} style={{ cursor: 'pointer' }} />
+          ))}
         </svg>
+
+        {hd && <ChartTip d={hd} rate={rate} left={((x(hover!) - PL) / (W - PL - PR)) * 100} />}
       </div>
       <div style={{ display: 'flex', gap: 20, padding: '4px 20px 16px', flexWrap: 'wrap' }}>
         <Legend color={C.orange} label="Month to date" line />
@@ -1226,6 +1253,51 @@ function CPUChart({ days, rate }: { days: DayCostMTD[]; rate: number }) {
         {rate > 0 && <Legend color={C.blue} label="Client rate" line />}
       </div>
     </Card>
+  )
+}
+
+/* A day with no metres has no cost per metre, so the tooltip explains why the
+ * day produced nothing instead of showing a dash — that is the day the chart
+ * most needs to account for. */
+function ChartTip({ d, rate, left }: { d: DayCostMTD; rate: number; left: number }) {
+  const flip = left > 62
+  const rows: [string, string, string?][] = d.cpu == null
+    ? [
+        ['Status', DAY_STATUS_LABEL[d.status]],
+        ['Downtime', `${d.downtimeHours} hrs`],
+        ['Full cost', money(d.total)],
+        ['Billed', d.revenue > 0 ? money(d.revenue) : 'nothing'],
+      ]
+    : [
+        ['Cost per metre', perUnit(d.cpu), rate ? cpuColor(d.cpu, rate) : C.text],
+        ['Metres', `${d.units} m`],
+        ['Full cost', money(d.total)],
+        ['Client rate', d.rate > 0 ? perUnit(d.rate) : '—'],
+        ['Margin', d.rate > 0 ? perUnit(d.rate - d.cpu) : '—', d.rate - d.cpu >= 0 ? C.green : C.red],
+        ['Month to date', d.mtdCPU != null ? perUnit(d.mtdCPU) : '—'],
+      ]
+
+  return (
+    <div style={{
+      position: 'absolute', top: 34, pointerEvents: 'none', zIndex: 5,
+      left: flip ? undefined : `${9.5 + left * 0.88}%`,
+      right: flip ? `${9.5 + (100 - left) * 0.88}%` : undefined,
+      background: C.card, border: `1px solid ${C.border}`, borderRadius: 10,
+      padding: '11px 14px', minWidth: 196, boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 9, paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: C.text }}>{dayLabel(d.date)}</span>
+        <span style={{ fontSize: 11, color: C.faint }}>{d.holeNumber ?? 'no hole'}</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {rows.map(([k, v, tone], i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 18 }}>
+            <span style={{ fontSize: 11, color: C.faint }}>{k}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: tone ?? C.text, fontFamily: 'ui-monospace, monospace' }}>{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
