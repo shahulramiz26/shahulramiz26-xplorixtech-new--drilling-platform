@@ -5,7 +5,7 @@ import { useInventory } from '../../../lib/inventory-store'
 import {
   CostingProvider, useCosting,
   C, LAYER, iStyle, derivedStyle, money, perUnit, pct,
-  cpuColor, marginColor, statusColor, holeStatusColor,
+  cpuColor, marginColor, holeStatusColor,
   monthLabel, dayLabel, fullDate, monthOf, daysInMonth, shiftMonth,
   projectCode, rigCode, holesFromDays,
   rigsFor, monthsFor, versionOn, newestFirst, uid,
@@ -1008,7 +1008,7 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
           <table style={tableStyle}>
             <thead>
               <tr>
-                <th style={th}>Date</th><th style={th}>Hole</th><th style={th}>Status</th>
+                <th style={th}>Date</th><th style={th}>Hole</th>
                 <th style={th}>Size</th><th style={th}>Formation</th><th style={thR}>Crew</th><th style={thR}>Drill hrs</th><th style={thR}>Downtime</th><th style={thR}>Metres</th>
                 <th style={thR}>Maint hrs</th><th style={thR}>Service</th><th style={thR}>Parts</th>
                 <th style={thR}>Fuel</th><th style={thR}>Labour</th>
@@ -1023,14 +1023,19 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                   <Fragment key={d.date}>
                     <tr onClick={() => setOpen(isOpen ? null : d.date)} style={{
                       borderBottom: rowBorder, cursor: 'pointer',
-                      background: isOpen ? 'rgba(249,115,22,0.05)' : !d.submitted ? 'rgba(239,68,68,0.05)' : d.units === 0 ? 'rgba(239,68,68,0.03)' : undefined,
+                      background: isOpen ? 'rgba(249,115,22,0.05)'
+                        : !d.submitted ? 'rgba(239,68,68,0.06)'
+                        : d.status === 'breakdown' ? 'rgba(239,68,68,0.05)'
+                        : d.status === 'standby' ? 'rgba(245,158,11,0.045)'
+                        : undefined,
+                      borderLeft: d.status === 'breakdown' ? `2px solid ${C.red}`
+                        : d.status === 'standby' ? `2px solid ${C.amber}` : '2px solid transparent',
                     }}>
                       <td style={{ ...td, color: C.text, fontWeight: 600 }}>
                         {dayLabel(d.date)}
                         {!d.submitted && <span style={{ marginLeft: 6 }}><Tag tone={C.red}>no log</Tag></span>}
                       </td>
                       <td style={{ ...td, color: d.holeNumber ? C.muted : C.dim }}>{d.holeNumber || '—'}</td>
-                      <td style={td}><Tag tone={statusColor(d.status)}>{DAY_STATUS_LABEL[d.status]}</Tag></td>
                       <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{d.shifts[0]?.holeSize ?? '—'}</td>
                       <td style={{ ...td, color: d.units ? C.muted : C.dim }}>
                         {d.units ? Array.from(new Set(d.charges.map(c => c.formation.replace(/ Formation$/, '')))).join(' → ') : '—'}
@@ -1054,9 +1059,10 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                     </tr>
                     {isOpen && (
                       <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
-                        <td colSpan={19} style={{ padding: '16px 18px' }}>
+                        <td colSpan={18} style={{ padding: '16px 18px' }}>
                           <div style={{ display: 'flex', gap: 44, flexWrap: 'wrap' }}>
                             <Detail title="From the log" tone={C.blue} rows={[
+                              ['Status', DAY_STATUS_LABEL[d.status]],
                               ['Shifts', `${d.shifts.length}`],
                               ['Day crew', `${d.labour.dayCrew}`],
                               ['Night crew', `${d.labour.nightCrew}`],
@@ -1064,11 +1070,10 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                             ]} />
                             <Detail title="Operating" tone={LAYER.operating} rows={[
                               ['Fuel', `${money(d.fuel)} · ${d.fuelLitres} L`],
-                              ['Water', money(d.water)],
-                              ['Additives', money(d.additives)],
+                              ['Water', `${money(d.water)} · ${d.waterLitres} L`],
+                              ['Additives', `${money(d.additives)} · ${d.additivesKg} kg`],
                               ['Service', money(d.repairs)],
                               ['Parts & tooling', money(d.parts)],
-                              ...d.partsIssued.map(x => [`  ${x.item}`, `${x.quantity} × ${money(x.cost / x.quantity)}`]),
                             ]} />
                             <Detail title="Crew" tone={C.teal} rows={d.labour.perMetre
                               ? [['Charged', 'per metre'], ['Labour', money(d.labour.labour)], ['Lodging', money(d.labour.lodging)], ['Transport', money(d.labour.transport)], ['Crew cost', money(d.labour.total)]]
@@ -1122,7 +1127,7 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                <td style={{ ...td, color: C.text, fontWeight: 800 }} colSpan={5}>{r.days} days</td>
+                <td style={{ ...td, color: C.text, fontWeight: 800 }} colSpan={4}>{r.days} days</td>
                 <td style={tdN} />
                 <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{r.drillingHours}</td>
                 <td style={{ ...tdN, fontWeight: 800, color: C.red }}>{r.downtimeHours}</td>
