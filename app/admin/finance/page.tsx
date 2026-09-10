@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, Fragment, ReactNode } from 'react'
-import { useInventory } from '../../../lib/inventory-store'
+import { useInventory, PROJECTS as INV_PROJECTS } from '../../../lib/inventory-store'
 import {
   CostingProvider, useCosting,
   C, LAYER, iStyle, derivedStyle, money, perUnit, pct,
@@ -10,7 +10,7 @@ import {
   projectCode, rigCode, holesFromDays,
   rigsFor, monthsFor, versionOn, newestFirst, uid,
   ownershipBreakdown, dayCost, rollup, withCumulative, holeResult,
-  unissuedPartsValue, isFinished, ANY_FORMATION, structureLabel,
+  isFinished, ANY_FORMATION, structureLabel,
   INVOICE_STATUSES, INVOICE_STATUS_LABEL, isOverdue, outstanding,
   blankOwnership, blankOperating, blankClientRate,
   PROJECT_CLIENTS, ROCK_CATEGORIES, HOLE_SIZES, DAY_STATUS_LABEL,
@@ -298,7 +298,6 @@ interface RigMonthView {
   days: DayCostMTD[]
   roll: Rollup
   holes: HoleResult[]
-  unissuedParts: number
   unallocated: number
   unallocatedDays: number
   budgetOwnershipCPU: number
@@ -324,7 +323,7 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
     if (logs.length === 0) {
       return {
         hasLogs: false, ob: EMPTY_OB, days: [], roll: rollup([]),
-        holes: [], unissuedParts: 0, unallocated: 0, unallocatedDays: 0,
+        holes: [], unallocated: 0, unallocatedDays: 0,
         budgetOwnershipCPU: 0, productionVariancePct: 0, loggedFormation: '',
       }
     }
@@ -357,8 +356,7 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
       const hole = shifts.find(s => s.holeNumber)?.holeNumber ?? null
       const depthSoFar = hole ? (depthByHole[hole] ?? 0) : 0
 
-      const issued = state.parts.filter(x => x.rig === rig && x.project === project && x.date === date)
-      const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, issued, depthSoFar)
+      const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, inv.catalogue, depthSoFar)
       if (hole) depthByHole[hole] = depthSoFar + d.units
       raw.push(d)
     }
@@ -377,7 +375,6 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
 
     return {
       hasLogs: true, ownership, ob, operating, clientRate, days, roll, holes,
-      unissuedParts: unissuedPartsValue(rig, project, state.parts, inv.purchaseOrders),
       unallocated: orphan.reduce((s, d) => s + d.total, 0),
       unallocatedDays: orphan.length,
       budgetOwnershipCPU: ownership && ownership.expectedUnitsPerMonth > 0 ? ob.perMonth / ownership.expectedUnitsPerMonth : 0,
@@ -385,7 +382,7 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
         ? ((roll.units - ownership.expectedUnitsPerMonth) / ownership.expectedUnitsPerMonth) * 100 : 0,
       loggedFormation,
     }
-  }, [state, inv.purchaseOrders, project, rig, month])
+  }, [state, inv.catalogue, project, rig, month])
 }
 
 /* ==========================================================================
@@ -997,12 +994,6 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {v.unissuedParts > 0 && (
-        <Note tone={C.amber}>
-          {money(v.unissuedParts)} of parts has been received into inventory for this rig but never issued against a day,
-          so it sits in no hole&apos;s cost. Issue it in Inventory or it stays invisible here.
-        </Note>
-      )}
       <Card title="Performance" subtitle={`${rigCode(rig)} · ${monthLabel(month)} · click a day for the full breakdown`} pad={false}>
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
@@ -1073,7 +1064,7 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                               ['Water', `${money(d.water)} · ${d.waterLitres} L`],
                               ['Additives', `${money(d.additives)} · ${d.additivesKg} kg`],
                               ['Service', money(d.repairs)],
-                              ['Parts & tooling', money(d.parts)],
+                              ['Tooling', money(d.parts)],
                             ]} />
                             <Detail title="Crew" tone={C.teal} rows={d.labour.perMetre
                               ? [['Charged', 'per metre'], ['Labour', money(d.labour.labour)], ['Lodging', money(d.labour.lodging)], ['Transport', money(d.labour.transport)], ['Crew cost', money(d.labour.total)]]
@@ -1898,17 +1889,12 @@ const TABS = ['Performance', 'Drillholes', 'Tracker'] as const
 type Tab = typeof TABS[number]
 
 function CostingScreen() {
-  const { state: inv } = useInventory()
   const { state, setHoleStatus, addInvoice, updateInvoice } = useCosting()
 
-  const projects: string[] = inv.projects.map((p: { name: string }) => p.name)
+  const projects: string[] = INV_PROJECTS
   const [project, setProject] = useState(projects[0] ?? '')
 
-  const rigs = useMemo(() => {
-    const fromLogs = rigsFor(state.shiftLogs, project)
-    if (fromLogs.length) return fromLogs
-    return (inv.projects.find((p: { name: string }) => p.name === project)?.rigs ?? []) as string[]
-  }, [state.shiftLogs, project, inv.projects])
+  const rigs = useMemo(() => rigsFor(state.shiftLogs, project), [state.shiftLogs, project])
 
   const [rig, setRig] = useState(rigs[0] ?? '')
   const months = useMemo(() => monthsFor(state.shiftLogs, rig, project), [state.shiftLogs, rig, project])
@@ -1987,10 +1973,7 @@ function CostingScreen() {
 
       {showRates && (
         <SetRatesModal projects={projects} initialProject={project} initialRig={rig} month={month}
-          rigsForProject={p => {
-            const fromLogs = rigsFor(state.shiftLogs, p)
-            return fromLogs.length ? fromLogs : ((inv.projects.find((x: { name: string }) => x.name === p)?.rigs ?? []) as string[])
-          }}
+          rigsForProject={p => rigsFor(state.shiftLogs, p)}
           onClose={() => setShowRates(false)} />
       )}
       {quickInvoice && (
