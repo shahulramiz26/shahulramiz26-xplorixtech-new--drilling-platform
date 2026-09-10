@@ -1,466 +1,641 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import Link from 'next/link'
-import { Check, Clock, FileText, Star } from 'lucide-react'
 
-// ── TYPES ──────────────────────────────────────────────────────────────────
-// Project/Rig assignment (creating projects, assigning rigs, closing a
-// project to free its rigs) is managed elsewhere — this module only reads
-// the current project → rig list.
-export interface Project { id: string; name: string; rigs: string[] }
+/* ==========================================================================
+ * XPLORIX INVENTORY
+ *
+ * The idea this module rests on comes from the client's own tooling sheet: a
+ * drilling consumable is not an expense on the day you buy it, it is a cost
+ * spread across the metres it drills.
+ *
+ *     cost per metre = rate / life in metres
+ *     ₹22,000 bit / 100 m = ₹220 per metre
+ *
+ * Their sheet totals ₹548.41 per metre across seventeen items. XPLORIX takes
+ * that model and adds the thing a spreadsheet cannot hold: life varies with
+ * the ground. A bit that runs 220 m through soft rock will not see 60 m in
+ * very hard, so cost per metre follows the formation the driller recorded
+ * rather than one blended figure.
+ *
+ * That gives two numbers worth comparing:
+ *
+ *   expected   catalogue rate / expected life  — what you tender on
+ *   actual     what tooling really cost, per metre really drilled
+ *
+ * When actual runs above expected, something is wearing faster than the tender
+ * assumed and the next quote is already wrong.
+ * ========================================================================== */
 
-// A line item is entered manually every time — no shared catalogue lookup.
-export interface LineItem { partNumber: string; name: string; category: string; manufacturer: string; unit: string; unitCost: number; qty: number }
+// ── FORMATIONS ────────────────────────────────────────────────────────────
+/* Matches the driller's log. Life is held per formation, so what a metre costs
+ * depends on what it was drilled through. */
+export const FORMATIONS = ['Soft', 'Medium', 'Hard', 'Very Hard'] as const
+export type Formation = typeof FORMATIONS[number]
 
-export type POStatus = 'Draft' | 'Ordered' | 'Received'
-export interface POItem extends LineItem { qtyReceived: number }
+/* The log writes "Very Hard Formation"; a catalogue says "Very Hard". Both are
+ * reduced to bare words before matching. */
+export function normFormation(v: string): Formation {
+  const t = (v || '').toLowerCase().replace(/formation|strata|rock/g, '').replace(/\s+/g, ' ').trim()
+  if (t.startsWith('very')) return 'Very Hard'
+  if (t.startsWith('hard')) return 'Hard'
+  if (t.startsWith('med')) return 'Medium'
+  return 'Soft'
+}
 
-// ── ISSUE TRACKING ─────────────────────────────────────────────────────────
-// A PO is a commitment to buy. Receiving puts stock in the store. Neither is
-// a cost. The cost happens when stock is ISSUED to a rig — which is often a
-// different month, and often in more than one go. That's why issues are a
-// list of dated events rather than a flag on the line item.
-export interface IssueLine { itemIndex: number; qty: number }
-export interface IssueRecord {
+// ── CATALOGUE ─────────────────────────────────────────────────────────────
+
+export type ToolCategory = 'Bit' | 'Rod & Casing' | 'Core Barrel' | 'Accessory' | 'Spares'
+export const CATEGORIES: ToolCategory[] = ['Bit', 'Rod & Casing', 'Core Barrel', 'Accessory', 'Spares']
+
+export interface ToolingItem {
   id: string
-  date: string          // YYYY-MM-DD — the date the cost belongs to
-  rig?: string          // the rig the stock actually went to; falls back to the PO's rig
+  name: string
+  category: ToolCategory
+  rate: number                       // ₹ per unit
+  life: Record<Formation, number>    // metres before replacement
+  supplier: string
+  leadTimeDays: number
+  minStock: number                   // below this, reordering is already late
+  active: boolean
+}
+
+/* rate / life. The single calculation the whole module rests on. */
+export function costPerMetre(item: ToolingItem, f: Formation): number {
+  const life = item.life[f]
+  return life > 0 ? item.rate / life : 0
+}
+
+/* What a metre of a given formation costs in tooling, across the catalogue.
+ * This is the client's ₹548.41, recomputed per formation. */
+export function toolingPerMetre(items: ToolingItem[], f: Formation): number {
+  return items.filter(i => i.active).reduce((s, i) => s + costPerMetre(i, f), 0)
+}
+
+// ── SUPPLIERS ─────────────────────────────────────────────────────────────
+
+export interface Supplier {
+  id: string
+  name: string
+  contact: string
+  phone: string
+  /* Their quoted lead time. Measured performance is derived from receipts, not
+   * stored, so it cannot go stale. */
+  quotedLeadDays: number
+}
+
+// ── PURCHASE ORDERS ───────────────────────────────────────────────────────
+
+export type POStatus = 'draft' | 'ordered' | 'partial' | 'received'
+
+export interface POLine { itemId: string; qty: number; rate: number }
+
+/* Receipts are partial and dated, the same way issues are. Stock that arrived
+ * last week carries last week's date, not today's. */
+export interface Receipt {
+  id: string
+  date: string
+  lines: { itemId: string; qty: number }[]
+  note?: string
+}
+
+export interface Issue {
+  id: string
+  date: string
+  rig: string
   issuedBy: string
-  lines: IssueLine[]
+  lines: { itemId: string; qty: number }[]
 }
 
 export interface PurchaseOrder {
-  id: string; poNumber: string; supplierId: string; project: string
-  // Buying happens for a PROJECT. Which rig consumes the stock isn't known
-  // until it's issued, so it's recorded there. `rig` is kept only so POs
-  // created before this change still resolve.
-  rig?: string
-  orderDate: string; status: POStatus; items: POItem[]
-  receivedBy?: string; receivedDate?: string; onTime?: boolean; quality?: 'ok' | 'minor' | 'rejected'
-  issues?: IssueRecord[]   // optional — POs created before this feature still work
+  id: string
+  number: string
+  supplier: string
+  project: string
+  status: POStatus
+  createdDate: string
+  orderedDate?: string
+  /* Promised against actual is the pair that makes lead time measurable
+   * instead of a star rating somebody typed in. */
+  promisedDate?: string
+  lines: POLine[]
+  receipts: Receipt[]
+  issues: Issue[]
+  note?: string
 }
 
-export type SupplierStatus = 'Active' | 'Inactive'
-export interface Supplier { id: string; name: string; category: string; phone: string; status: SupplierStatus }
+export function poValue(po: PurchaseOrder) {
+  return po.lines.reduce((s, l) => s + l.qty * l.rate, 0)
+}
+export function qtyOrdered(po: PurchaseOrder, itemId: string) {
+  return po.lines.filter(l => l.itemId === itemId).reduce((s, l) => s + l.qty, 0)
+}
+export function qtyReceived(po: PurchaseOrder, itemId: string) {
+  return po.receipts.flatMap(r => r.lines).filter(l => l.itemId === itemId).reduce((s, l) => s + l.qty, 0)
+}
+export function qtyIssued(po: PurchaseOrder, itemId: string) {
+  return po.issues.flatMap(i => i.lines).filter(l => l.itemId === itemId).reduce((s, l) => s + l.qty, 0)
+}
+export function qtyAwaitingDelivery(po: PurchaseOrder, itemId: string) {
+  return Math.max(0, qtyOrdered(po, itemId) - qtyReceived(po, itemId))
+}
+/* Received into the store but not yet sent to a rig — money standing still. */
+export function qtyInStore(po: PurchaseOrder, itemId: string) {
+  return Math.max(0, qtyReceived(po, itemId) - qtyIssued(po, itemId))
+}
 
-// ── SAMPLE DATA ──────────────────────────────────────────────────────────
-export const PROJECTS: Project[] = [
-  { id: 'proj1', name: 'Site A - North Field', rigs: ['Rig A1', 'Rig A2'] },
-  { id: 'proj2', name: 'Site B - South Ridge', rigs: ['Rig B1'] },
-  { id: 'proj3', name: 'Site C - East Basin',  rigs: ['Rig C1', 'Rig C2'] },
+export function poReceivedValue(po: PurchaseOrder) {
+  return po.lines.reduce((s, l) => s + qtyReceived(po, l.itemId) * l.rate, 0)
+}
+export function poIssuedValue(po: PurchaseOrder) {
+  return po.lines.reduce((s, l) => s + qtyIssued(po, l.itemId) * l.rate, 0)
+}
+export function poStoreValue(po: PurchaseOrder) {
+  return po.lines.reduce((s, l) => s + qtyInStore(po, l.itemId) * l.rate, 0)
+}
+
+/* Derived, never stored, so it cannot drift from the receipts underneath. */
+export function poStatus(po: PurchaseOrder): POStatus {
+  if (po.status === 'draft') return 'draft'
+  if (po.lines.every(l => qtyReceived(po, l.itemId) >= l.qty)) return 'received'
+  return po.receipts.length > 0 ? 'partial' : 'ordered'
+}
+
+export function daysBetween(from: string, to: string) {
+  return Math.round((new Date(to + 'T00:00:00').getTime() - new Date(from + 'T00:00:00').getTime()) / 86400000)
+}
+
+/* Promised against actual, per receipt. Negative is early. */
+export function receiptDelayDays(po: PurchaseOrder, r: Receipt): number | null {
+  return po.promisedDate ? daysBetween(po.promisedDate, r.date) : null
+}
+
+export interface SupplierPerformance {
+  supplier: string
+  orders: number
+  completed: number
+  value: number
+  quotedLead: number | null
+  actualLead: number | null
+  avgDelay: number | null            // + late, − early
+  onTimePct: number | null
+}
+
+/* Lead time is measured from what happened, not from a rating field. */
+export function supplierPerformance(pos: PurchaseOrder[], suppliers: Supplier[], name: string): SupplierPerformance {
+  const mine = pos.filter(p => p.supplier === name && p.status !== 'draft')
+  const leads: number[] = []
+  const delays: number[] = []
+  mine.forEach(po => po.receipts.forEach(r => {
+    if (po.orderedDate) leads.push(daysBetween(po.orderedDate, r.date))
+    const d = receiptDelayDays(po, r)
+    if (d != null) delays.push(d)
+  }))
+  const avg = (a: number[]) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null
+  return {
+    supplier: name,
+    orders: mine.length,
+    completed: mine.filter(p => poStatus(p) === 'received').length,
+    value: mine.reduce((s, p) => s + poValue(p), 0),
+    quotedLead: suppliers.find(s => s.name === name)?.quotedLeadDays ?? null,
+    actualLead: avg(leads),
+    avgDelay: avg(delays),
+    onTimePct: delays.length ? (delays.filter(d => d <= 0).length / delays.length) * 100 : null,
+  }
+}
+
+// ── STOCK ─────────────────────────────────────────────────────────────────
+
+export interface StockLine {
+  itemId: string
+  qty: number
+  value: number
+  project: string
+  poNumber: string
+  /* Days since the receipt that put it there — what turns a stock list into an
+   * alert. */
+  ageDays: number
+}
+
+export function stockInStore(pos: PurchaseOrder[], today: string): StockLine[] {
+  const out: StockLine[] = []
+  pos.forEach(po => po.lines.forEach(l => {
+    const q = qtyInStore(po, l.itemId)
+    if (q <= 0) return
+    const last = po.receipts.filter(r => r.lines.some(x => x.itemId === l.itemId)).map(r => r.date).sort().pop()
+    out.push({
+      itemId: l.itemId, qty: q, value: q * l.rate, project: po.project,
+      poNumber: po.number, ageDays: last ? daysBetween(last, today) : 0,
+    })
+  }))
+  return out.sort((a, b) => b.value - a.value)
+}
+
+export interface OnOrderLine {
+  itemId: string; qty: number; value: number
+  poNumber: string; supplier: string
+  promisedDate?: string; overdueDays: number | null
+}
+
+export function onOrder(pos: PurchaseOrder[], today: string): OnOrderLine[] {
+  const out: OnOrderLine[] = []
+  pos.filter(p => p.status !== 'draft').forEach(po => po.lines.forEach(l => {
+    const q = qtyAwaitingDelivery(po, l.itemId)
+    if (q <= 0) return
+    out.push({
+      itemId: l.itemId, qty: q, value: q * l.rate, poNumber: po.number, supplier: po.supplier,
+      promisedDate: po.promisedDate,
+      overdueDays: po.promisedDate && po.promisedDate < today ? daysBetween(po.promisedDate, today) : null,
+    })
+  }))
+  return out.sort((a, b) => (b.overdueDays ?? -1) - (a.overdueDays ?? -1))
+}
+
+// ── CONSUMPTION ───────────────────────────────────────────────────────────
+/* What was issued to a rig, on the day it was issued. The actual side of the
+ * comparison; the expected side comes from the catalogue. */
+export interface ConsumptionLine {
+  date: string; rig: string; project: string
+  itemId: string; qty: number; value: number; poNumber: string
+}
+
+export function consumption(pos: PurchaseOrder[], f?: { rig?: string; project?: string; month?: string }): ConsumptionLine[] {
+  const out: ConsumptionLine[] = []
+  pos.forEach(po => po.issues.forEach(i => {
+    if (f?.rig && i.rig !== f.rig) return
+    if (f?.project && po.project !== f.project) return
+    if (f?.month && i.date.slice(0, 7) !== f.month) return
+    i.lines.forEach(l => {
+      const rate = po.lines.find(x => x.itemId === l.itemId)?.rate ?? 0
+      out.push({ date: i.date, rig: i.rig, project: po.project, itemId: l.itemId, qty: l.qty, value: l.qty * rate, poNumber: po.number })
+    })
+  }))
+  return out.sort((a, b) => a.date.localeCompare(b.date))
+}
+
+export function consumptionValue(pos: PurchaseOrder[], f?: { rig?: string; project?: string; month?: string }) {
+  return consumption(pos, f).reduce((s, c) => s + c.value, 0)
+}
+
+// ── ALERTS ────────────────────────────────────────────────────────────────
+
+export type AlertKind = 'idle' | 'stranded' | 'overdue' | 'reorder' | 'lowStock'
+export type AlertLevel = 'info' | 'warn' | 'urgent'
+
+export interface Alert {
+  id: string
+  kind: AlertKind
+  level: AlertLevel
+  title: string
+  detail: string
+  value?: number
+}
+
+export interface AlertSettings {
+  idleDays: number      // in store this long → flagged
+  idleValue: number     // ...or worth at least this much
+  coverDays: number     // days of cover to keep beyond lead time
+}
+export const DEFAULT_ALERTS: AlertSettings = { idleDays: 30, idleValue: 20000, coverDays: 5 }
+
+export interface RigBurn { rig: string; metresPerDay: number; formation: Formation }
+
+/* Three things worth being told: stock standing still, deliveries running
+ * late, and tooling about to run out. The last is the expensive one — a rig
+ * standing for want of a bit costs far more per day than the bit. */
+export function buildAlerts(
+  pos: PurchaseOrder[], items: ToolingItem[], today: string,
+  completedProjects: string[], burn: RigBurn[], s: AlertSettings = DEFAULT_ALERTS,
+): Alert[] {
+  const out: Alert[] = []
+  const nameOf = (id: string) => items.find(i => i.id === id)?.name ?? id
+  const stock = stockInStore(pos, today)
+
+  // 1 — stock against a project that has closed. Stranded rather than merely
+  //      slow, so it is called out separately and never suppressed.
+  stock.filter(l => completedProjects.includes(l.project)).forEach(l => {
+    out.push({
+      id: `stranded_${l.poNumber}_${l.itemId}`, kind: 'stranded', level: 'warn',
+      title: `${nameOf(l.itemId)} stranded on a closed project`,
+      detail: `${l.qty} in store against ${l.project}, which is complete. Move it to a live project or it stays invisible.`,
+      value: l.value,
+    })
+  })
+
+  // 2 — promised date passed with nothing delivered
+  onOrder(pos, today).forEach(l => {
+    if (l.overdueDays == null || l.overdueDays <= 0) return
+    out.push({
+      id: `late_${l.poNumber}_${l.itemId}`, kind: 'overdue',
+      level: l.overdueDays > 14 ? 'urgent' : 'warn',
+      title: `${nameOf(l.itemId)} is ${l.overdueDays} days late`,
+      detail: `${l.qty} on ${l.poNumber} from ${l.supplier}, promised ${l.promisedDate}. Chase it or re-source.`,
+      value: l.value,
+    })
+  })
+
+  // 3 — will run out before a replacement could arrive.
+  //
+  // Only items this operation actually buys are considered: you cannot run out
+  // of something you have never stocked, and warning about all of them would
+  // bury the two or three that matter. Burn is summed across rigs rather than
+  // raising one alert per rig, because the store is shared.
+  const have: Record<string, number> = {}
+  stock.forEach(l => { have[l.itemId] = (have[l.itemId] ?? 0) + l.qty })
+
+  const everOrdered = new Set(pos.flatMap(p => p.lines.map(l => l.itemId)))
+  const totalBurn = burn.reduce((s2, b) => s2 + b.metresPerDay, 0)
+  // Ground is weighted by how much of it each rig is drilling, so a fleet
+  // mostly in hard rock is not costed as if it were in soft.
+  const weighted: Record<Formation, number> = { Soft: 0, Medium: 0, Hard: 0, 'Very Hard': 0 }
+  burn.forEach(b => { weighted[b.formation] += b.metresPerDay })
+
+  items.filter(i => i.active && everOrdered.has(i.id)).forEach(item => {
+    const n = have[item.id] ?? 0
+    if (totalBurn <= 0) return
+
+    // Metres of life in stock, against the mix of ground actually being drilled.
+    const metresOfLife = FORMATIONS.reduce((s2, f) => {
+      const share = weighted[f] / totalBurn
+      return s2 + (item.life[f] > 0 ? n * item.life[f] * share : 0)
+    }, 0)
+    const days = metresOfLife / totalBurn
+    if (days >= item.leadTimeDays + s.coverDays) return
+
+    const onWay = onOrder(pos, today).filter(o => o.itemId === item.id).reduce((a, o) => a + o.qty, 0)
+    out.push({
+      id: `reorder_${item.id}`, kind: 'reorder',
+      level: days < item.leadTimeDays ? 'urgent' : 'warn',
+      title: n === 0
+        ? `${item.name} — none in store`
+        : `${item.name} runs out in ${Math.floor(days)} days`,
+      detail: `${n} in store covers ${Math.round(metresOfLife)} m across the fleet at ${totalBurn.toFixed(1)} m/day. `
+        + `Lead time is ${item.leadTimeDays} days`
+        + (onWay > 0 ? `, and ${onWay} is already on order.` : ` — ${days < item.leadTimeDays ? 'already too late to avoid a gap' : 'order now'}.`),
+      value: Math.max(1, item.minStock - n) * item.rate,
+    })
+  })
+
+  items.filter(i => i.active && everOrdered.has(i.id)).forEach(item => {
+    const n = have[item.id] ?? 0
+    // Only worth saying if it isn't already covered by a reorder warning.
+    if (n < item.minStock && !out.some(a => a.id === `reorder_${item.id}`)) {
+      out.push({
+        id: `low_${item.id}`, kind: 'lowStock', level: 'info',
+        title: `${item.name} below minimum stock`,
+        detail: `${n} in store against a minimum of ${item.minStock}.`,
+        value: (item.minStock - n) * item.rate,
+      })
+    }
+  })
+
+  // 4 — received but never sent to a rig. Aggregated per item rather than per
+  //      purchase order, and skipped entirely for anything already flagged as
+  //      running out: a bit you are about to need is not idle stock.
+  const idleByItem: Record<string, { qty: number; value: number; oldest: number; pos: Set<string> }> = {}
+  stock.filter(l => !completedProjects.includes(l.project)).forEach(l => {
+    const e = idleByItem[l.itemId] ??= { qty: 0, value: 0, oldest: 0, pos: new Set() }
+    e.qty += l.qty; e.value += l.value
+    e.oldest = Math.max(e.oldest, l.ageDays)
+    e.pos.add(l.poNumber)
+  })
+
+  Object.entries(idleByItem).forEach(([itemId, e]) => {
+    if (out.some(a => a.id === `reorder_${itemId}`)) return
+    if (e.oldest < s.idleDays && e.value < s.idleValue) return
+    out.push({
+      id: `idle_${itemId}`, kind: 'idle',
+      level: e.oldest >= s.idleDays * 2 ? 'warn' : 'info',
+      title: `${nameOf(itemId)} sitting in store`,
+      detail: `${e.qty} received up to ${e.oldest} days ago on ${Array.from(e.pos).join(', ')}, not yet issued to any rig.`,
+      value: e.value,
+    })
+  })
+
+  const rank: Record<AlertLevel, number> = { urgent: 0, warn: 1, info: 2 }
+  return out.sort((a, b) => rank[a.level] - rank[b.level] || (b.value ?? 0) - (a.value ?? 0))
+}
+
+/* ==========================================================================
+ * SEED
+ * The catalogue is the client's own tooling sheet, all seventeen items. Their
+ * sheet gives one life per item; XPLORIX splits that by formation, taking
+ * their figure as the hard-rock case and scaling from there. Every figure is
+ * editable — these are starting points, not claims.
+ * ========================================================================== */
+
+const TERRAIN: Record<Formation, number> = { Soft: 2.2, Medium: 1.5, Hard: 1.0, 'Very Hard': 0.6 }
+
+function lives(hardLife: number): Record<Formation, number> {
+  return {
+    Soft: Math.round(hardLife * TERRAIN.Soft),
+    Medium: Math.round(hardLife * TERRAIN.Medium),
+    Hard: hardLife,
+    'Very Hard': Math.round(hardLife * TERRAIN['Very Hard']),
+  }
+}
+
+const T = (id: string, name: string, category: ToolCategory, hardLife: number, rate: number,
+           supplier: string, leadTimeDays: number, minStock: number): ToolingItem =>
+  ({ id, name, category, rate, life: lives(hardLife), supplier, leadTimeDays, minStock, active: true })
+
+export const SEED_CATALOGUE: ToolingItem[] = [
+  T('t01', 'HQ Wire Line Drill Rod 3.0 m', 'Rod & Casing', 5000, 7840, 'Boart Longyear India', 21, 6),
+  T('t02', 'HQ Core Barrel 3.0 m', 'Core Barrel', 2000, 58800, 'Boart Longyear India', 28, 1),
+  T('t03', 'HQ Inner Tube Assembly', 'Core Barrel', 2000, 49000, 'Boart Longyear India', 28, 1),
+  T('t04', 'HQ Diamond Reamer Shell', 'Bit', 500, 17150, 'Sandvik Mining', 18, 2),
+  T('t05', 'HQ Over Shot Assembly', 'Accessory', 2000, 34300, 'Boart Longyear India', 24, 1),
+  T('t06', 'HQ Core Lifter', 'Accessory', 20, 980, 'Drillco Tools', 10, 20),
+  T('t07', 'HQ Core Lifter Case', 'Accessory', 50, 1274, 'Drillco Tools', 10, 12),
+  T('t08', 'HQ Impregnated Bit', 'Bit', 100, 22000, 'Sandvik Mining', 18, 3),
+  T('t09', 'HQ Core Barrel Spares', 'Spares', 500, 37440, 'Boart Longyear India', 28, 1),
+  T('t10', 'Water Swivel NQ/NW Connection', 'Accessory', 5000, 24990, 'Drillco Tools', 14, 1),
+  T('t11', 'Hoisting Plug NQ/NW Connection', 'Accessory', 5000, 29400, 'Drillco Tools', 14, 1),
+  T('t12', 'Adaptors', 'Accessory', 5000, 4900, 'Drillco Tools', 10, 2),
+  T('t13', 'PW Casing 3.0 m', 'Rod & Casing', 10000, 10780, 'Mahalaxmi Steel', 30, 4),
+  T('t14', 'HW Casing 3.0 m', 'Rod & Casing', 10000, 8820, 'Mahalaxmi Steel', 30, 4),
+  T('t15', 'PW Casing TC Bit', 'Bit', 200, 5390, 'Mahalaxmi Steel', 30, 2),
+  T('t16', 'HW Casing TC / Shoe Bit', 'Bit', 200, 3773, 'Mahalaxmi Steel', 30, 2),
+  T('t17', 'Water Swivel Spares, 2 sets', 'Spares', 2000, 25000, 'Drillco Tools', 14, 1),
 ]
 
-// Only used as a starting point for the Supplier "category" dropdown's preset list —
-// admin can always type a custom one via "Other".
-export const CATEGORIES = ['Drill Bits', 'Core Barrel', 'Fluids & Chemicals', 'Filtration', 'Hydraulics', 'Consumables']
-
-export const SUPPLIERS: Supplier[] = [
-  { id: 'sup1', name: 'Apex Drilling Supplies', category: 'Drill Bits',         phone: '+1 555 0110', status: 'Active' },
-  { id: 'sup2', name: 'Northline Equipment',    category: 'Core Barrel',        phone: '+1 555 0122', status: 'Active' },
-  { id: 'sup3', name: 'Summit Fluids Co',       category: 'Fluids & Chemicals', phone: '+1 555 0134', status: 'Active' },
-  { id: 'sup4', name: 'Ironclad Parts Ltd',     category: 'Hydraulics',         phone: '+1 555 0146', status: 'Active' },
-  { id: 'sup5', name: 'Filtermax Inc',          category: 'Filtration',         phone: '+1 555 0158', status: 'Active' },
+export const SEED_SUPPLIERS: Supplier[] = [
+  { id: 's1', name: 'Boart Longyear India', contact: 'R. Menon', phone: '+91 98450 11234', quotedLeadDays: 25 },
+  { id: 's2', name: 'Sandvik Mining', contact: 'A. Deshpande', phone: '+91 99870 44521', quotedLeadDays: 18 },
+  { id: 's3', name: 'Drillco Tools', contact: 'S. Iyer', phone: '+91 90035 77810', quotedLeadDays: 12 },
+  { id: 's4', name: 'Mahalaxmi Steel', contact: 'P. Shah', phone: '+91 98200 33456', quotedLeadDays: 30 },
 ]
 
-// Deliberately includes rigs with history on more than one project — a rig
-// stays locked to a project while it's open, then moves on to the next one
-// once it closes, so its spend history can span several projects over time.
-//
-// Issue records are seeded on some POs to show the three states a received
-// order can be in: fully issued, partly issued, and still sitting in store.
+const rateOf = (id: string) => SEED_CATALOGUE.find(t => t.id === id)!.rate
+
+const PO = (
+  id: string, number: string, supplier: string, project: string,
+  createdDate: string, orderedDate: string, promisedDate: string,
+  lines: [string, number][],
+  receipts: [string, [string, number][]][],
+  issues: [string, string, [string, number][]][],
+): PurchaseOrder => ({
+  id, number, supplier, project, status: 'ordered', createdDate, orderedDate, promisedDate,
+  lines: lines.map(([itemId, qty]) => ({ itemId, qty, rate: rateOf(itemId) })),
+  receipts: receipts.map(([date, ls], k) => ({ id: `${id}_r${k}`, date, lines: ls.map(([itemId, qty]) => ({ itemId, qty })) })),
+  issues: issues.map(([date, rig, ls], k) => ({ id: `${id}_i${k}`, date, rig, issuedBy: 'Store', lines: ls.map(([itemId, qty]) => ({ itemId, qty })) })),
+})
+
 export const SEED_POS: PurchaseOrder[] = [
-  // Partly issued — 3 of 5 bits went out, 2 still in store
-  { id: 'po1', poNumber: 'PO-1001', supplierId: 'sup1', project: 'Site A - North Field', orderDate: '2026-07-15', status: 'Received', receivedBy: 'D. Singh', receivedDate: '2026-07-18', onTime: true, quality: 'ok',
-    items: [{ partNumber: 'NX-DB-01', name: 'NX Drill Bit', category: 'Drill Bits', manufacturer: 'Apex Drilling Supplies', unit: 'Each', unitCost: 12000, qty: 5, qtyReceived: 5 }],
-    issues: [
-      { id: 'iss1', date: '2026-07-21', rig: 'Rig A1', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 2 }] },
-      { id: 'iss1b', date: '2026-07-24', rig: 'Rig A2', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 1 }] },
-    ] },
-  { id: 'po2', poNumber: 'PO-1002', supplierId: 'sup3', project: 'Site B - South Ridge', orderDate: '2026-07-20', status: 'Ordered',
-    items: [{ partNumber: 'FL-MM-01', name: 'Drilling Mud Mix', category: 'Fluids & Chemicals', manufacturer: 'Summit Fluids Co', unit: 'Bucket', unitCost: 8200, qty: 10, qtyReceived: 0 }] },
-  { id: 'po3', poNumber: 'PO-1003', supplierId: 'sup5', project: 'Site C - East Basin', orderDate: '2026-07-22', status: 'Draft',
-    items: [{ partNumber: 'FT-FW-01', name: 'Fuel Water Separator', category: 'Filtration', manufacturer: 'Filtermax Inc', unit: 'Each', unitCost: 1950, qty: 12, qtyReceived: 0 }] },
-  // Fully issued, same month as receipt
-  { id: 'po4', poNumber: 'PO-1004', supplierId: 'sup2', project: 'Site A - North Field', orderDate: '2026-07-10', status: 'Received', receivedBy: 'D. Singh', receivedDate: '2026-07-12', onTime: false, quality: 'ok',
-    items: [{ partNumber: 'CB-RS-01', name: 'Reaming Shell', category: 'Core Barrel', manufacturer: 'Northline Equipment', unit: 'Each', unitCost: 9800, qty: 4, qtyReceived: 4 }],
-    issues: [{ id: 'iss2', date: '2026-07-13', rig: 'Rig A2', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 4 }] }] },
-  // Received in June, issued across June and July — the exact case that makes
-  // "cost = PO value in the month it was raised" wrong
-  { id: 'po5', poNumber: 'PO-1005', supplierId: 'sup1', project: 'Site B - South Ridge', orderDate: '2026-06-28', status: 'Received', receivedBy: 'M. Alvarez', receivedDate: '2026-06-30', onTime: true, quality: 'minor',
-    items: [{ partNumber: 'NX-DB-01', name: 'NX Drill Bit', category: 'Drill Bits', manufacturer: 'Apex Drilling Supplies', unit: 'Each', unitCost: 12000, qty: 3, qtyReceived: 3 }],
-    issues: [
-      { id: 'iss3', date: '2026-06-30', rig: 'Rig B1', issuedBy: 'M. Alvarez', lines: [{ itemIndex: 0, qty: 1 }] },
-      { id: 'iss4', date: '2026-07-08', rig: 'Rig B1', issuedBy: 'M. Alvarez', lines: [{ itemIndex: 0, qty: 2 }] },
-    ] },
-  // Rig A1's earlier project, before it moved to Site A
-  { id: 'po6', poNumber: 'PO-1006', supplierId: 'sup5', project: 'Site B - South Ridge', orderDate: '2026-05-12', status: 'Received', receivedBy: 'M. Alvarez', receivedDate: '2026-05-14', onTime: true, quality: 'ok',
-    items: [{ partNumber: 'FT-AF-01', name: 'Air Filter', category: 'Filtration', manufacturer: 'Filtermax Inc', unit: 'Each', unitCost: 2600, qty: 8, qtyReceived: 8 }],
-    issues: [{ id: 'iss5', date: '2026-05-15', rig: 'Rig A1', issuedBy: 'M. Alvarez', lines: [{ itemIndex: 0, qty: 8 }] }] },
-  // Rig B1's earlier project, before it moved to Site B
-  { id: 'po7', poNumber: 'PO-1007', supplierId: 'sup4', project: 'Site C - East Basin', orderDate: '2026-04-20', status: 'Received', receivedBy: 'R. Alonzo', receivedDate: '2026-04-22', onTime: true, quality: 'ok',
-    items: [{ partNumber: 'HY-HH-01', name: 'Hydraulic Hose 1"', category: 'Hydraulics', manufacturer: 'Ironclad Parts Ltd', unit: 'Each', unitCost: 4200, qty: 5, qtyReceived: 5 }],
-    issues: [{ id: 'iss6', date: '2026-04-23', rig: 'Rig B1', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 5 }] }] },
-  // Rig A2's earlier project — bulk consumable drawn down over three months
-  { id: 'po8', poNumber: 'PO-1008', supplierId: 'sup4', project: 'Site C - East Basin', orderDate: '2026-03-18', status: 'Received', receivedBy: 'R. Alonzo', receivedDate: '2026-03-19', onTime: true, quality: 'ok',
-    items: [{ partNumber: 'CN-GR-01', name: 'Grease Cartridge', category: 'Consumables', manufacturer: 'Ironclad Parts Ltd', unit: 'Each', unitCost: 480, qty: 30, qtyReceived: 30 }],
-    issues: [
-      { id: 'iss7', date: '2026-03-20', rig: 'Rig A2', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 10 }] },
-      { id: 'iss8', date: '2026-04-06', rig: 'Rig A2', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 12 }] },
-      { id: 'iss9', date: '2026-05-04', rig: 'Rig A2', issuedBy: 'R. Alonzo', lines: [{ itemIndex: 0, qty: 8 }] },
-    ] },
-  // Rig C1's earlier project
-  { id: 'po9', poNumber: 'PO-1009', supplierId: 'sup3', project: 'Site A - North Field', orderDate: '2026-02-10', status: 'Received', receivedBy: 'D. Singh', receivedDate: '2026-02-11', onTime: true, quality: 'ok',
-    items: [{ partNumber: 'FL-PA-01', name: 'Polymer Additive', category: 'Fluids & Chemicals', manufacturer: 'Summit Fluids Co', unit: 'Kg', unitCost: 3100, qty: 20, qtyReceived: 20 }],
-    issues: [{ id: 'iss10', date: '2026-02-14', rig: 'Rig C1', issuedBy: 'D. Singh', lines: [{ itemIndex: 0, qty: 20 }] }] },
-  // Received, nothing issued yet — sitting in the store
-  { id: 'po10', poNumber: 'PO-1010', supplierId: 'sup2', project: 'Site C - East Basin', orderDate: '2026-07-25', status: 'Received', receivedBy: 'R. Alonzo', receivedDate: '2026-07-27', onTime: true, quality: 'ok',
-    items: [{ partNumber: 'CB-CL-01', name: 'Core Lifter', category: 'Core Barrel', manufacturer: 'Northline Equipment', unit: 'Each', unitCost: 550, qty: 25, qtyReceived: 25 }] },
+  // Delivered two days early, mostly issued.
+  PO('po1', 'PO-2026-041', 'Sandvik Mining', 'Site A - North Field', '2026-07-02', '2026-07-03', '2026-07-21',
+    [['t08', 3], ['t04', 2]],
+    [['2026-07-19', [['t08', 3], ['t04', 2]]]],
+    [['2026-08-01', 'RIG-001', [['t08', 1]]], ['2026-08-16', 'RIG-001', [['t04', 1]]], ['2026-08-01', 'RIG-002', [['t08', 1]]]]),
+
+  // Part-delivered: casing arrived, rods still outstanding and now overdue.
+  PO('po2', 'PO-2026-047', 'Mahalaxmi Steel', 'Site A - North Field', '2026-07-10', '2026-07-11', '2026-08-10',
+    [['t13', 4], ['t14', 4], ['t16', 2]],
+    [['2026-08-06', [['t14', 4]]]],
+    []),
+
+  // Arrived nine days late.
+  PO('po3', 'PO-2026-052', 'Drillco Tools', 'Site A - North Field', '2026-07-18', '2026-07-19', '2026-07-31',
+    [['t06', 30], ['t07', 20], ['t12', 2]],
+    [['2026-08-09', [['t06', 30], ['t07', 20], ['t12', 2]]]],
+    [['2026-08-03', 'RIG-001', [['t06', 2]]], ['2026-08-24', 'RIG-001', [['t06', 3]]], ['2026-08-07', 'RIG-002', [['t06', 2]]]]),
+
+  // Received in June, barely touched — the idle-stock case.
+  PO('po4', 'PO-2026-033', 'Boart Longyear India', 'Site A - North Field', '2026-06-05', '2026-06-06', '2026-07-01',
+    [['t03', 1], ['t09', 1], ['t05', 1]],
+    [['2026-06-28', [['t03', 1], ['t09', 1], ['t05', 1]]]],
+    [['2026-08-13', 'RIG-001', [['t03', 1]]]]),
+
+  // Site B.
+  PO('po5', 'PO-2026-055', 'Sandvik Mining', 'Site B - South Ridge', '2026-07-20', '2026-07-21', '2026-08-08',
+    [['t08', 2], ['t04', 1]],
+    [['2026-08-05', [['t08', 2], ['t04', 1]]]],
+    [['2026-08-01', 'RIG-003', [['t08', 1]]]]),
+
+  // Bought against a project that has since closed — stranded stock.
+  PO('po6', 'PO-2026-018', 'Drillco Tools', 'Site C - East Basin', '2026-05-02', '2026-05-03', '2026-05-20',
+    [['t10', 1], ['t17', 1]],
+    [['2026-05-18', [['t10', 1], ['t17', 1]]]],
+    []),
+
+  // Never placed.
+  { id: 'po7', number: 'PO-2026-061', supplier: 'Drillco Tools', project: 'Site A - North Field',
+    status: 'draft', createdDate: '2026-09-01',
+    lines: [{ itemId: 't06', qty: 40, rate: rateOf('t06') }, { itemId: 't07', qty: 25, rate: rateOf('t07') }],
+    receipts: [], issues: [], note: 'Awaiting approval' },
 ]
 
-// ── STORE ──────────────────────────────────────────────────────────────────
+export const PROJECTS = ['Site A - North Field', 'Site B - South Ridge', 'Site C - East Basin']
+export const COMPLETED_PROJECTS = ['Site C - East Basin']
+export const RIGS = ['RIG-001', 'RIG-002', 'RIG-003']
+export const PROJECT_CODES: Record<string, string> = {
+  'Site A - North Field': 'PRJ-001',
+  'Site B - South Ridge': 'PRJ-002',
+  'Site C - East Basin': 'PRJ-003',
+}
+export function projectCode(name: string) {
+  return PROJECT_CODES[name] ?? name.match(/^([A-Za-z]+-\d+)/)?.[1] ?? name
+}
+
+/* ==========================================================================
+ * STORE
+ * ========================================================================== */
+
 interface State {
-  projects: Project[]; suppliers: Supplier[]; purchaseOrders: PurchaseOrder[]
+  catalogue: ToolingItem[]
+  suppliers: Supplier[]
+  pos: PurchaseOrder[]
+  alerts: AlertSettings
 }
+
 function initial(): State {
-  return { projects: PROJECTS, suppliers: SUPPLIERS, purchaseOrders: SEED_POS }
+  return { catalogue: SEED_CATALOGUE, suppliers: SEED_SUPPLIERS, pos: SEED_POS, alerts: DEFAULT_ALERTS }
 }
-const uid = (p: string) => `${p}_${Date.now()}_${Math.floor(Math.random() * 9999)}`
-const today = () => new Date().toISOString().split('T')[0]
+
+export const uid = (p: string) => `${p}_${Date.now()}_${Math.floor(Math.random() * 9999)}`
 
 interface Ctx {
   state: State
-  createPO: (po: { supplierId: string; project: string; orderDate: string; items: LineItem[] }, status: 'Draft' | 'Ordered') => void
-  placeOrder: (poId: string) => void
-  receivePO: (poId: string, receivedBy: string, onTime: boolean, quality: 'ok' | 'minor' | 'rejected') => void
-  issueItems: (poId: string, record: Omit<IssueRecord, 'id'>) => void
-  addSupplier: (s: Omit<Supplier, 'id'>) => void
+  saveItem: (i: ToolingItem) => void
+  deleteItem: (id: string) => void
+  saveSupplier: (s: Supplier) => void
+  savePO: (po: PurchaseOrder) => void
+  deletePO: (id: string) => void
+  placeOrder: (id: string, orderedDate: string, promisedDate: string) => void
+  addReceipt: (poId: string, r: Omit<Receipt, 'id'>) => void
+  addIssue: (poId: string, i: Omit<Issue, 'id'>) => void
+  saveAlertSettings: (s: AlertSettings) => void
+  resetAll: () => void
 }
-const InventoryContext = createContext<Ctx | null>(null)
-// Bumped to v8 — the rig lives on the issue, not the PO
-const KEY = 'xplorix_demo_inventory_v8'
+
+const InvCtx = createContext<Ctx | null>(null)
+const KEY = 'xplorix_inventory_v2'
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
   const [loaded, setLoaded] = useState(false)
-  useEffect(() => { try { const raw = localStorage.getItem(KEY); if (raw) setState(JSON.parse(raw)) } catch (e) {} setLoaded(true) }, [])
-  useEffect(() => { if (loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch (e) {} }, [state, loaded])
 
-  const createPO: Ctx['createPO'] = (po, status) => {
-    const poNumber = `PO-${1000 + state.purchaseOrders.length + 1}`
-    setState(s => ({ ...s, purchaseOrders: [{ ...po, id: uid('po'), poNumber, status, items: po.items.map(i => ({ ...i, qtyReceived: 0 })), issues: [] }, ...s.purchaseOrders] }))
-  }
+  // Merged over initial() rather than replacing it, so a saved state from an
+  // earlier build that is missing a key degrades instead of crashing.
+  useEffect(() => {
+    try { const raw = localStorage.getItem(KEY); if (raw) setState(s => ({ ...initial(), ...JSON.parse(raw) })) } catch {}
+    setLoaded(true)
+  }, [])
+  useEffect(() => { if (loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }, [state, loaded])
 
-  const placeOrder: Ctx['placeOrder'] = poId => setState(s => ({ ...s, purchaseOrders: s.purchaseOrders.map(p => p.id === poId && p.status === 'Draft' ? { ...p, status: 'Ordered' } : p) }))
-
-  const receivePO: Ctx['receivePO'] = (poId, receivedBy, onTime, quality) => {
-    setState(s => ({
-      ...s,
-      purchaseOrders: s.purchaseOrders.map(po => po.id === poId
-        ? { ...po, status: 'Received', receivedBy, receivedDate: today(), onTime, quality, items: po.items.map(it => ({ ...it, qtyReceived: it.qty })) }
-        : po),
-    }))
-  }
-
-  // Stock leaving the store for a rig. This — not the PO, not the receipt —
-  // is what Finance treats as a cost, on the date recorded here.
-  const issueItems: Ctx['issueItems'] = (poId, record) => {
-    setState(s => ({
-      ...s,
-      purchaseOrders: s.purchaseOrders.map(po => po.id === poId
-        ? { ...po, issues: [...(po.issues ?? []), { ...record, id: uid('iss') }] }
-        : po),
-    }))
-  }
-
-  const addSupplier: Ctx['addSupplier'] = s => setState(st => ({ ...st, suppliers: [...st.suppliers, { ...s, id: uid('sup') }] }))
-
-  return <InventoryContext.Provider value={{ state, createPO, placeOrder, receivePO, issueItems, addSupplier }}>{children}</InventoryContext.Provider>
-}
-export function useInventory() { const c = useContext(InventoryContext); if (!c) throw new Error('useInventory must be used inside InventoryProvider'); return c }
-
-// ── SELECTORS ────────────────────────────────────────────────────────────
-export function poOrderedValue(po: PurchaseOrder) { return po.items.reduce((s, i) => s + i.qty * i.unitCost, 0) }
-export function poReceivedValue(po: PurchaseOrder) { return po.items.reduce((s, i) => s + i.qtyReceived * i.unitCost, 0) }
-
-// ── ISSUE SELECTORS ──────────────────────────────────────────────────────
-
-/** Safe accessor — POs created before this feature have no issues array. */
-export function poIssues(po: PurchaseOrder): IssueRecord[] { return po.issues ?? [] }
-
-/** How much of one line item has gone out to the rig, across all issue events. */
-export function qtyIssuedForItem(po: PurchaseOrder, itemIndex: number): number {
-  return poIssues(po).reduce((sum, rec) => sum + (rec.lines.find(l => l.itemIndex === itemIndex)?.qty ?? 0), 0)
-}
-
-/** How much of one line item is still sitting in the store. */
-export function qtyRemainingForItem(po: PurchaseOrder, itemIndex: number): number {
-  return Math.max(0, po.items[itemIndex].qty - qtyIssuedForItem(po, itemIndex))
-}
-
-/** Value of everything issued from this PO, ever. */
-export function poIssuedValue(po: PurchaseOrder): number {
-  return po.items.reduce((sum, it, i) => sum + qtyIssuedForItem(po, i) * it.unitCost, 0)
-}
-
-/** Value still in the store from this PO — working capital not yet consumed. */
-export function poUnissuedValue(po: PurchaseOrder): number {
-  return po.items.reduce((sum, it, i) => sum + qtyRemainingForItem(po, i) * it.unitCost, 0)
-}
-
-export function isFullyIssued(po: PurchaseOrder): boolean {
-  return po.items.every((_, i) => qtyRemainingForItem(po, i) === 0)
-}
-
-/** Received, but still has stock waiting to go out. */
-export function isAwaitingIssue(po: PurchaseOrder): boolean {
-  return po.status === 'Received' && !isFullyIssued(po)
-}
-
-/** Value of a single issue event. */
-export function issueRecordValue(po: PurchaseOrder, rec: IssueRecord): number {
-  return rec.lines.reduce((sum, l) => sum + l.qty * (po.items[l.itemIndex]?.unitCost ?? 0), 0)
-}
-
-/**
- * The rig an issue actually went to. Older issues (and any raised before the
- * rig was asked for) fall back to the rig named on the PO.
- */
-export function issueRig(po: PurchaseOrder, rec: IssueRecord): string {
-  return rec.rig || po.rig || ''
-}
-
-/** Value issued from this PO to one specific rig. */
-export function poIssuedValueToRig(po: PurchaseOrder, rig: string): number {
-  return poIssues(po).filter(rec => issueRig(po, rec) === rig)
-    .reduce((s, rec) => s + issueRecordValue(po, rec), 0)
-}
-
-/** Every rig this PO's stock has gone out to — usually one, sometimes more. */
-export function rigsIssuedTo(po: PurchaseOrder): string[] {
-  return Array.from(new Set(poIssues(po).map(rec => issueRig(po, rec))))
-}
-
-/**
- * THE FUNCTION FINANCE CALLS.
- *
- * Consumables actually used by a rig on a project between two dates.
- * Replaces "sum every PO raised for this rig on this project", which both
- * ignored dates and counted stock that never left the store.
- *
- * Matches on the ISSUE's rig, not the PO's — one PO bought for a project can
- * be split across several rigs, and each rig only carries what it received.
- *
- * Dates are plain YYYY-MM-DD strings, so string comparison is correct.
- */
-export function consumablesUsed(
-  purchaseOrders: PurchaseOrder[],
-  rig: string,
-  project: string,
-  fromISO: string,
-  toISO: string
-): number {
-  return purchaseOrders
-    .filter(po => po.project === project)
-    .reduce((sum, po) => sum + poIssues(po)
-      .filter(rec => issueRig(po, rec) === rig && rec.date >= fromISO && rec.date <= toISO)
-      .reduce((s, rec) => s + issueRecordValue(po, rec), 0), 0)
-}
-
-/**
- * Turn a Finance month label into a date range.
- * Handles "March 2026" and "Mar 2026". If operations-store already stores
- * months as "2026-03", build the range from that directly instead.
- */
-export function monthToRange(monthLabel: string): { from: string; to: string } {
-  const [name, yearStr] = monthLabel.trim().split(/\s+/)
-  const year = parseInt(yearStr, 10)
-  const idx = new Date(`${name} 1, ${year}`).getMonth()
-  const lastDay = new Date(year, idx + 1, 0).getDate()
-  const mm = String(idx + 1).padStart(2, '0')
-  return { from: `${year}-${mm}-01`, to: `${year}-${mm}-${String(lastDay).padStart(2, '0')}` }
-}
-
-/** Total value a rig has consumed, all projects, all time. */
-export function rigConsumedSpend(state: State, rig: string): number {
-  return state.purchaseOrders.reduce((s, po) => s + poIssuedValueToRig(po, rig), 0)
-}
-
-/**
- * Value received but not yet issued, for a whole project.
- * This can't be broken down by rig — until stock is issued, nobody knows
- * which rig will get it. That's the point of issuing.
- */
-export function projectStockInStore(state: State, project: string): number {
-  return state.purchaseOrders.filter(po => po.project === project).reduce((s, po) => s + poUnissuedValue(po), 0)
-}
-
-/** Ordered but not yet received, for a whole project. */
-export function projectOutstanding(state: State, project: string): number {
-  return state.purchaseOrders.filter(po => po.project === project)
-    .reduce((s, po) => s + (poOrderedValue(po) - poReceivedValue(po)), 0)
-}
-
-export function supplierPerf(state: State, supplierId: string) {
-  const received = state.purchaseOrders.filter(po => po.supplierId === supplierId && po.status === 'Received')
-  const poCount = state.purchaseOrders.filter(po => po.supplierId === supplierId).length
-  const spend = state.purchaseOrders.filter(po => po.supplierId === supplierId).reduce((s, po) => s + poReceivedValue(po), 0)
-  if (received.length === 0) return { onTimeRate: 0, qualityScore: 100, stars: 0, spend, poCount }
-  const onTimeRate = Math.round((received.filter(p => p.onTime).length / received.length) * 100)
-  const issues = received.filter(p => p.quality && p.quality !== 'ok').length
-  const qualityScore = Math.round(((received.length - issues) / received.length) * 100)
-  const score = onTimeRate * 0.5 + qualityScore * 0.5
-  const stars = score >= 90 ? 5 : score >= 75 ? 4 : score >= 60 ? 3 : score >= 40 ? 2 : 1
-  return { onTimeRate, qualityScore, stars, spend, poCount }
-}
-
-// Rigs are the primary entity on the dashboard. A rig's list comes from
-// whatever project(s) it's currently assigned to (managed elsewhere) — this
-// just collects every rig name that exists, plus any referenced by a PO.
-export function allRigs(state: State): string[] {
-  const set = new Set<string>()
-  state.projects.forEach(p => p.rigs.forEach(r => set.add(r)))
-  state.purchaseOrders.forEach(po => {
-    if (po.rig) set.add(po.rig)                                  // legacy POs
-    poIssues(po).forEach(rec => { const r = issueRig(po, rec); if (r) set.add(r) })
-  })
-  return Array.from(set)
-}
-// What a rig has actually consumed. Same thing as rigConsumedSpend — kept
-// under the old name so existing dashboard code keeps working.
-export function rigTotalSpend(state: State, rig: string) {
-  return rigConsumedSpend(state, rig)
-}
-
-/**
- * DEPRECATED — kept only so existing dashboard code still builds.
- *
- * "Ordered but not yet received" can no longer belong to a rig: a PO is
- * raised for a project, and which rig consumes the stock isn't decided until
- * it's issued. These read from `po.rig`, which only legacy orders carry, so
- * they return 0 for anything created since.
- *
- * Replace the call sites with projectOutstanding / projectStockInStore, or
- * with rigConsumedSpend if the tile is meant to describe the rig.
- */
-export function rigOutstanding(state: State, rig: string) {
-  return state.purchaseOrders.filter(po => po.rig === rig)
-    .reduce((s, po) => s + (poOrderedValue(po) - poReceivedValue(po)), 0)
-}
-
-/** DEPRECATED — see rigOutstanding. Use projectStockInStore instead. */
-export function rigStockInStore(state: State, rig: string) {
-  return state.purchaseOrders.filter(po => po.rig === rig).reduce((s, po) => s + poUnissuedValue(po), 0)
-}
-// A rig can carry history across more than one project over its lifetime
-// (it moves on once a project closes) — this breaks its spend down by
-// every project it's ever been on, not just the one it's on right now.
-export function rigSpendByProject(state: State, rig: string) {
-  const byProject: Record<string, number> = {}
-  state.purchaseOrders.forEach(po => {
-    const spend = poIssuedValueToRig(po, rig)
-    if (spend > 0) byProject[po.project] = (byProject[po.project] || 0) + spend
-  })
-  return Object.entries(byProject).map(([project, spend]) => ({ project, spend })).sort((a, b) => b.spend - a.spend)
-}
-
-// Which parts get ordered most, and what they cost in total. Grouped by
-// part number (falls back to name if part number wasn't entered). Takes a
-// plain list of purchase orders so callers can pass a filtered subset
-// (by project, by rig, by search) rather than always aggregating everything.
-export interface PartOrderStat { key: string; partNumber: string; name: string; category: string; manufacturer: string; unit: string; totalQty: number; totalSpent: number; timesOrdered: number; avgUnitCost: number }
-export function partOrderStats(pos: PurchaseOrder[]): PartOrderStat[] {
-  const map: Record<string, PartOrderStat> = {}
-  pos.forEach(po => po.items.forEach(it => {
-    const key = (it.partNumber || it.name).trim().toLowerCase()
-    if (!key) return
-    if (!map[key]) map[key] = { key, partNumber: it.partNumber, name: it.name, category: it.category, manufacturer: it.manufacturer, unit: it.unit, totalQty: 0, totalSpent: 0, timesOrdered: 0, avgUnitCost: 0 }
-    map[key].totalQty += it.qty
-    map[key].totalSpent += it.qty * it.unitCost
-    map[key].timesOrdered += 1
-  }))
-  return Object.values(map).map(p => ({ ...p, avgUnitCost: p.totalQty > 0 ? p.totalSpent / p.totalQty : 0 })).sort((a, b) => b.totalSpent - a.totalSpent)
-}
-
-// ── SHARED UI ────────────────────────────────────────────────────────────
-export const subNav = [
-  { href: '/admin/inventory', label: 'Dashboard' },
-  { href: '/admin/inventory/purchase-orders', label: 'Purchase Orders' },
-  { href: '/admin/inventory/suppliers', label: 'Suppliers' },
-]
-export function SubNav({ active }: { active: string }) {
-  return (
-    <div style={{ display: 'flex', gap: 4, background: '#080B10', border: '1px solid #1E293B', borderRadius: 12, padding: 4, flexWrap: 'wrap' }}>
-      {subNav.map(n => (
-        <Link key={n.href} href={n.href} style={{ padding: '7px 14px', borderRadius: 9, fontSize: 13, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', background: active === n.label ? '#F97316' : 'transparent', color: active === n.label ? '#fff' : '#94A3B8' }}>{n.label}</Link>
-      ))}
-    </div>
-  )
-}
-export const S = { card: { background: '#0D1117', border: '1px solid #1E293B', borderRadius: 16 } as React.CSSProperties, label: { fontSize: 10, fontWeight: 700, color: '#64748B', letterSpacing: '0.1em', textTransform: 'uppercase' as const } }
-export const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', background: '#080B10', border: '1px solid #1E293B', borderRadius: 8, color: '#F8FAFC', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
-export const selectStyle: React.CSSProperties = { ...inputStyle, cursor: 'pointer', appearance: 'none' as any }
-
-export function StarRating({ stars, size = 14 }: { stars: number; size?: number }) {
-  return <div style={{ display: 'flex', gap: 2 }}>{[1, 2, 3, 4, 5].map(i => <Star key={i} size={size} style={{ color: i <= stars ? '#F59E0B' : '#1E293B', fill: i <= stars ? '#F59E0B' : 'transparent' }} />)}</div>
-}
-export const poStatusColor: Record<POStatus, { color: string; bg: string; border: string; icon: React.ReactNode }> = {
-  'Draft': { color: '#94A3B8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.15)', icon: <FileText size={11} /> },
-  'Ordered': { color: '#60A5FA', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.15)', icon: <Clock size={11} /> },
-  'Received': { color: '#10B981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.15)', icon: <Check size={11} /> },
-}
-export function Badge({ text, c }: { text: string; c: { color: string; bg: string; border: string; icon?: React.ReactNode } }) {
-  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, color: c.color, background: c.bg, border: `1px solid ${c.border}`, whiteSpace: 'nowrap' }}>{c.icon} {text}</span>
-}
-export function money(n: number) { return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}` }
-
-export function PartDetailCard({ item }: { item: LineItem }) {
-  return (
-    <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid #1E293B', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11 }}>
-      <div><span style={{ color: '#64748B' }}>Part No: </span><span style={{ color: '#F8FAFC', fontFamily: 'monospace' }}>{item.partNumber || '—'}</span></div>
-      <div><span style={{ color: '#64748B' }}>Name: </span><span style={{ color: '#F8FAFC' }}>{item.name || '—'}</span></div>
-      <div><span style={{ color: '#64748B' }}>Category: </span><span style={{ color: '#F8FAFC' }}>{item.category || '—'}</span></div>
-      <div><span style={{ color: '#64748B' }}>Manufacturer: </span><span style={{ color: '#F8FAFC' }}>{item.manufacturer || '—'}</span></div>
-      <div><span style={{ color: '#64748B' }}>Unit: </span><span style={{ color: '#F8FAFC' }}>{item.unit || '—'}</span></div>
-      <div><span style={{ color: '#64748B' }}>Unit Cost: </span><span style={{ color: '#10B981', fontWeight: 700 }}>{money(item.unitCost)}</span></div>
-    </div>
-  )
-}
-
-// Manual entry form for a single part line — used by Purchase Orders so
-// there's one place that defines "how a part gets typed in."
-export function ManualPartEntry({ onAdd }: { onAdd: (item: LineItem) => void }) {
-  const [partNumber, setPartNumber] = useState('')
-  const [name, setName] = useState('')
-  const [category, setCategory] = useState('')
-  const [manufacturer, setManufacturer] = useState('')
-  const [unit, setUnit] = useState('Each')
-  const [unitCost, setUnitCost] = useState<number>(0)
-  const [qty, setQty] = useState<number>(1)
-  const [err, setErr] = useState('')
-
-  const add = () => {
-    if (!name.trim()) { setErr('Enter a part name'); return }
-    if (qty < 1) { setErr('Quantity must be at least 1'); return }
-    onAdd({ partNumber: partNumber.trim(), name: name.trim(), category: category.trim(), manufacturer: manufacturer.trim(), unit: unit.trim() || 'Each', unitCost, qty })
-    setPartNumber(''); setName(''); setCategory(''); setManufacturer(''); setUnit('Each'); setUnitCost(0); setQty(1); setErr('')
+  function up<T extends { id: string }>(list: T[], x: T): T[] {
+    return list.some(i => i.id === x.id) ? list.map(i => i.id === x.id ? x : i) : [...list, x]
   }
 
   return (
-    <div style={{ border: '1px solid #1E293B', borderRadius: 10, padding: 14, background: 'rgba(255,255,255,0.02)' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-        <div><div style={{ ...S.label, marginBottom: 4 }}>Part Number</div><input value={partNumber} onChange={e => setPartNumber(e.target.value)} style={inputStyle} placeholder="e.g. NX-DB-01" /></div>
-        <div><div style={{ ...S.label, marginBottom: 4 }}>Part Name *</div><input value={name} onChange={e => setName(e.target.value)} style={inputStyle} placeholder="e.g. NX Drill Bit" /></div>
-        <div><div style={{ ...S.label, marginBottom: 4 }}>Category</div><input value={category} onChange={e => setCategory(e.target.value)} style={inputStyle} placeholder="e.g. Drill Bits" /></div>
-        <div><div style={{ ...S.label, marginBottom: 4 }}>Manufacturer</div><input value={manufacturer} onChange={e => setManufacturer(e.target.value)} style={inputStyle} placeholder="e.g. Apex Drilling Supplies" /></div>
-        <div><div style={{ ...S.label, marginBottom: 4 }}>Unit</div><input value={unit} onChange={e => setUnit(e.target.value)} style={inputStyle} placeholder="Each / Kg / Bucket..." /></div>
-        <div><div style={{ ...S.label, marginBottom: 4 }}>Unit Cost</div><input type="number" min={0} value={unitCost} onChange={e => setUnitCost(parseFloat(e.target.value) || 0)} style={inputStyle} /></div>
-      </div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <div style={{ flex: 1 }}><div style={{ ...S.label, marginBottom: 4 }}>Quantity</div><input type="number" min={1} value={qty} onChange={e => setQty(parseInt(e.target.value) || 1)} style={inputStyle} /></div>
-        <button onClick={add} style={{ marginTop: 18, padding: '9px 20px', borderRadius: 8, background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.25)', color: '#F97316', fontWeight: 700, cursor: 'pointer' }}>+ Add Part</button>
-      </div>
-      {err && <div style={{ fontSize: 11, color: '#EF4444', marginTop: 8 }}>{err}</div>}
-    </div>
+    <InvCtx.Provider value={{
+      state,
+      saveItem: i => setState(s => ({ ...s, catalogue: up(s.catalogue, i) })),
+      deleteItem: id => setState(s => ({ ...s, catalogue: s.catalogue.filter(i => i.id !== id) })),
+      saveSupplier: x => setState(s => ({ ...s, suppliers: up(s.suppliers, x) })),
+      savePO: po => setState(s => ({ ...s, pos: up(s.pos, po) })),
+      deletePO: id => setState(s => ({ ...s, pos: s.pos.filter(p => p.id !== id) })),
+      placeOrder: (id, orderedDate, promisedDate) => setState(s => ({
+        ...s, pos: s.pos.map(p => p.id === id ? { ...p, status: 'ordered' as POStatus, orderedDate, promisedDate } : p),
+      })),
+      addReceipt: (poId, r) => setState(s => ({
+        ...s, pos: s.pos.map(p => p.id === poId ? { ...p, receipts: [...p.receipts, { ...r, id: uid('r') }] } : p),
+      })),
+      addIssue: (poId, i) => setState(s => ({
+        ...s, pos: s.pos.map(p => p.id === poId ? { ...p, issues: [...p.issues, { ...i, id: uid('i') }] } : p),
+      })),
+      saveAlertSettings: a => setState(s => ({ ...s, alerts: a })),
+      resetAll: () => setState(initial()),
+    }}>{children}</InvCtx.Provider>
   )
+}
+
+export function useInventory() {
+  const c = useContext(InvCtx)
+  if (!c) throw new Error('useInventory must be used inside InventoryProvider')
+  return c
+}
+
+/* ── Formatting ─────────────────────────────────────────────────────────── */
+export function money(n: number) {
+  return `${n < 0 ? '−' : ''}₹${Math.abs(Math.round(n)).toLocaleString('en-IN')}`
+}
+export function moneyL(n: number) {
+  const a = Math.abs(n)
+  if (a >= 10000000) return `${n < 0 ? '−' : ''}₹${(a / 10000000).toFixed(2)}Cr`
+  if (a >= 100000) return `${n < 0 ? '−' : ''}₹${(a / 100000).toFixed(1)}L`
+  return money(n)
+}
+export function perMetre(n: number) { return `₹${n.toFixed(2)}/m` }
+export function dayLabel(d: string) {
+  const [, m, day] = d.split('-').map(Number)
+  return `${day} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1]}`
+}
+export function fullDate(d: string) {
+  const [y, m, day] = d.split('-').map(Number)
+  return `${day} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1]} ${y}`
+}
+export function monthLabel(ym: string) {
+  const [y, m] = ym.split('-').map(Number)
+  return `${['January','February','March','April','May','June','July','August','September','October','November','December'][m - 1]} ${y}`
 }
