@@ -737,7 +737,7 @@ export const SEED_OWNERSHIP: RigOwnership[] = [
     emiPerMonth: 160045, emiEndsMonth: '2028-03',
     insurancePerYear: 120000, otherFixedPerMonth: 0,
     costBasis: 'cash', allocationBasis: 'operatingDay',
-    expectedOperatingDays: 25, expectedUnitsPerMonth: 125,
+    expectedOperatingDays: 25, expectedUnitsPerMonth: 300,
     note: 'Opening entry',
   },
   {
@@ -747,7 +747,7 @@ export const SEED_OWNERSHIP: RigOwnership[] = [
     emiPerMonth: 136500, emiEndsMonth: '2027-10',
     insurancePerYear: 108000, otherFixedPerMonth: 0,
     costBasis: 'cash', allocationBasis: 'operatingDay',
-    expectedOperatingDays: 25, expectedUnitsPerMonth: 125,
+    expectedOperatingDays: 25, expectedUnitsPerMonth: 300,
     note: 'Opening entry',
   },
   {
@@ -757,7 +757,7 @@ export const SEED_OWNERSHIP: RigOwnership[] = [
     emiPerMonth: 118000, emiEndsMonth: '2029-02',
     insurancePerYear: 96000, otherFixedPerMonth: 0,
     costBasis: 'cash', allocationBasis: 'operatingDay',
-    expectedOperatingDays: 25, expectedUnitsPerMonth: 130,
+    expectedOperatingDays: 25, expectedUnitsPerMonth: 300,
     note: 'Opening entry',
   },
 ]
@@ -796,9 +796,9 @@ export const SEED_CLIENT_RATES: ClientRate[] = [
     id: 'cr_b_1', project: 'Site B - South Ridge', effectiveFrom: '2026-01-01',
     structure: 'slab',
     rateRows: [
-      { id: 'b1', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 0, toDepth: 50, rate: 7800, adjustments: [] },
-      { id: 'b2', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 50, toDepth: 100, rate: 8900, adjustments: [] },
-      { id: 'b3', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 100, rate: 10400, adjustments: [] },
+      { id: 'b1', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 0, toDepth: 75, rate: 7800, adjustments: [] },
+      { id: 'b2', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 75, toDepth: 150, rate: 8900, adjustments: [] },
+      { id: 'b3', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 150, rate: 10400, adjustments: [] },
     ],
     standbyPerDay: 14000, mobilisation: 150000, demobilisation: 120000,
     note: 'Contract rate card, depth bands',
@@ -841,7 +841,7 @@ function formationAt(depth: number, bands: [number, string][]): string {
 }
 
 const DEPTH_BANDS: [number, string][] = [
-  [18, 'Soft Formation'], [40, 'Hard Formation'], [Infinity, 'Very Hard Formation'],
+  [35, 'Soft Formation'], [75, 'Hard Formation'], [Infinity, 'Very Hard Formation'],
 ]
 
 function expand(rig: string, project: string, ym: string, size: string, specs: DaySpec[], bands = DEPTH_BANDS): ShiftLog[] {
@@ -877,42 +877,42 @@ function expand(rig: string, project: string, ym: string, size: string, specs: D
 
 export const SEED_SHIFT_LOGS_A: ShiftLog[] = [
   ...expand('RIG-001', 'Site A - North Field', '2026-08', 'HQ', [
-    [1, 'DH-001', 4, 3], [2, 'DH-001', 4, 3], [3, 'DH-001', 3, 3, 3, 0, 'Bit Change'],
-    [4, 'DH-001', 4, 4], [5, 'DH-001', 4, 3], [6, 'DH-001', 4, 3],
-    [7, 'DH-001', 3, 3, 2, 0, 'Ground Condition Issue'], [8, 'DH-001', 4, 3],
+    [1, 'DH-001', 7, 5], [2, 'DH-001', 7, 5], [3, 'DH-001', 5, 5, 3, 0, 'Bit Change'],
+    [4, 'DH-001', 7, 7], [5, 'DH-001', 7, 5], [6, 'DH-001', 7, 5],
+    [7, 'DH-001', 5, 5, 2, 0, 'Ground Condition Issue'], [8, 'DH-001', 7, 5],
     // Client stopped work — standby, billable, flat cost
     [9, '', 0, 0, 12, 12, 'Waiting for Instruction'],
-    [10, 'DH-002', 4, 3], [11, 'DH-002', 4, 3], [12, 'DH-002', 4, 3],
+    [10, 'DH-002', 7, 5], [11, 'DH-002', 7, 5], [12, 'DH-002', 7, 5],
     // Breakdown — the contractor's own cost, never billable
     [13, 'DH-002', 0, 0, 12, 12, 'Mechanical Breakdown'],
-    [14, 'DH-002', 3, 3, 2, 0, 'Hydraulic Issue'], [15, 'DH-002', 4, 4],
-    [16, 'DH-002', 4, 3], [17, 'DH-002', 4, 3], [18, 'DH-002', 4, 4],
-    [19, 'DH-002', 3, 3], [20, '', 0, 0, 12, 12, 'Weather Condition'],
-    [21, 'DH-003', 4, 3], [22, 'DH-003', 4, 3], [23, 'DH-003', 3, 3, 3, 0, 'Rod Change'],
-    [24, 'DH-003', 4, 4], [25, 'DH-003', 4, 3], [26, 'DH-003', 4, 3],
-    [27, 'DH-003', 4, 4], [28, 'DH-003', 3, 3],
+    [14, 'DH-002', 5, 5, 2, 0, 'Hydraulic Issue'], [15, 'DH-002', 7, 7],
+    [16, 'DH-002', 7, 5], [17, 'DH-002', 7, 5], [18, 'DH-002', 7, 7],
+    [19, 'DH-002', 5, 5], [20, '', 0, 0, 12, 12, 'Weather Condition'],
+    [21, 'DH-003', 7, 5], [22, 'DH-003', 7, 5], [23, 'DH-003', 5, 5, 3, 0, 'Rod Change'],
+    [24, 'DH-003', 7, 7], [25, 'DH-003', 7, 5], [26, 'DH-003', 7, 5],
+    [27, 'DH-003', 7, 7], [28, 'DH-003', 5, 5],
   ]),
   ...expand('RIG-002', 'Site A - North Field', '2026-08', 'HQ', [
-    [1, 'DH-011', 4, 4], [2, 'DH-011', 4, 3], [3, 'DH-011', 4, 4],
-    [4, 'DH-011', 3, 3, 2, 0, 'Water Shortage'], [5, 'DH-011', 4, 4],
-    [6, 'DH-011', 4, 3], [7, 'DH-011', 4, 4], [8, 'DH-011', 4, 3],
-    [9, 'DH-011', 4, 4], [10, 'DH-011', 3, 3, 3, 0, 'Bit Change'],
-    [11, 'DH-011', 4, 3], [12, 'DH-011', 4, 4], [13, 'DH-011', 4, 3], [14, 'DH-011', 4, 4],
+    [1, 'DH-011', 7, 7], [2, 'DH-011', 7, 5], [3, 'DH-011', 7, 7],
+    [4, 'DH-011', 5, 5, 2, 0, 'Water Shortage'], [5, 'DH-011', 7, 7],
+    [6, 'DH-011', 7, 5], [7, 'DH-011', 7, 7], [8, 'DH-011', 7, 5],
+    [9, 'DH-011', 7, 7], [10, 'DH-011', 5, 5, 3, 0, 'Bit Change'],
+    [11, 'DH-011', 7, 5], [12, 'DH-011', 7, 7], [13, 'DH-011', 7, 5], [14, 'DH-011', 7, 7],
     [15, '', 0, 0, 12, 12, 'Waiting for Instruction'],
-    [16, 'DH-012', 4, 3], [17, 'DH-012', 4, 4], [18, 'DH-012', 3, 3, 4, 0, 'Electrical Fault'],
-    [19, 'DH-012', 4, 3], [20, 'DH-012', 4, 4], [21, 'DH-012', 4, 3],
-    [22, 'DH-012', 4, 4], [23, 'DH-012', 4, 3],
+    [16, 'DH-012', 7, 5], [17, 'DH-012', 7, 7], [18, 'DH-012', 5, 5, 4, 0, 'Electrical Fault'],
+    [19, 'DH-012', 7, 5], [20, 'DH-012', 7, 7], [21, 'DH-012', 7, 5],
+    [22, 'DH-012', 7, 7], [23, 'DH-012', 7, 5],
   ]),
 ]
 
 /* Site B prices by depth band rather than formation, so its rate lines use
  * ANY_FORMATION and depth ranges. Same engine, different contract shape. */
 export const SEED_SHIFT_LOGS_B: ShiftLog[] = expand('RIG-003', 'Site B - South Ridge', '2026-08', 'HQ', [
-  [1, 'DH-101', 5, 4], [2, 'DH-101', 5, 5], [3, 'DH-101', 5, 4],
-  [4, 'DH-101', 4, 4, 2, 0, 'Water Shortage'], [5, 'DH-101', 5, 5],
-  [6, 'DH-101', 5, 4], [7, 'DH-101', 5, 5], [8, 'DH-101', 4, 4],
-  [9, 'DH-101', 5, 4], [10, 'DH-101', 5, 5], [11, 'DH-101', 4, 4],
-  [12, 'DH-101', 5, 4], [13, 'DH-101', 5, 5], [14, 'DH-101', 4, 4],
+  [1, 'DH-101', 8, 7], [2, 'DH-101', 8, 8], [3, 'DH-101', 8, 7],
+  [4, 'DH-101', 7, 7, 2, 0, 'Water Shortage'], [5, 'DH-101', 8, 8],
+  [6, 'DH-101', 8, 7], [7, 'DH-101', 8, 8], [8, 'DH-101', 7, 7],
+  [9, 'DH-101', 8, 7], [10, 'DH-101', 8, 8], [11, 'DH-101', 7, 7],
+  [12, 'DH-101', 8, 7], [13, 'DH-101', 8, 8], [14, 'DH-101', 7, 7],
 ], [[Infinity, 'Hard Formation']])
 
 export const SEED_SHIFT_LOGS: ShiftLog[] =
@@ -1073,7 +1073,7 @@ export function blankOwnership(rig: string, from: string): RigOwnership {
     basicPrice: 0, gstPercent: 18, transportation: 0, depreciationRatePct: 20,
     emiPerMonth: 0, insurancePerYear: 0, otherFixedPerMonth: 0,
     costBasis: 'cash', allocationBasis: 'operatingDay',
-    expectedOperatingDays: 25, expectedUnitsPerMonth: 125,
+    expectedOperatingDays: 25, expectedUnitsPerMonth: 300,
   }
 }
 export function blankOperating(rig: string, project: string, from: string): OperatingRate {
