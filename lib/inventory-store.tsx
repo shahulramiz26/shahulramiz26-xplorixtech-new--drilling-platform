@@ -82,6 +82,11 @@ export interface Supplier {
   /* Their quoted lead time. Measured performance is derived from receipts, not
    * stored, so it cannot go stale. */
   quotedLeadDays: number
+  /* A person's judgement, 1–5. Kept separate from the measured figures rather
+   * than blended into them: a supplier who is always on time but ships damaged
+   * goods should not average out to "fine". */
+  rating?: number
+  ratingNote?: string
 }
 
 // ── PURCHASE ORDERS ───────────────────────────────────────────────────────
@@ -90,12 +95,67 @@ export type POStatus = 'draft' | 'ordered' | 'partial' | 'received'
 
 export interface POLine { itemId: string; qty: number; rate: number }
 
+/* What actually turned up, not just how many. Damaged and rejected units never
+ * enter the store — they cannot be issued to a rig, so counting them as
+ * received would overstate both stock and spend. */
+export interface ReceiptLine {
+  itemId: string
+  accepted: number
+  damaged: number
+  rejected: number      // wrong item, or short-shipped and written off
+}
+
+export const DELAY_REASONS = [
+  'Supplier delay', 'Transport', 'Customs or documentation',
+  'Our order raised late', 'Partial availability', 'Other',
+] as const
+export type DelayReason = typeof DELAY_REASONS[number]
+
 /* Receipts are partial and dated, the same way issues are. Stock that arrived
  * last week carries last week's date, not today's. */
 export interface Receipt {
   id: string
   date: string
-  lines: { itemId: string; qty: number }[]
+  lines: ReceiptLine[]
+  delayReason?: DelayReason      // recorded only when it arrived late
+  note?: string
+  /* Set when this receipt is a replacement for a returned item, so it does not
+   * count again as new spend. */
+  replacesReturn?: string
+}
+
+// ── RETURNS ───────────────────────────────────────────────────────────────
+/* A damaged unit goes back to the supplier and follows its own course. The
+ * replacement arrives as a further receipt against the same order, so the line
+ * eventually reconciles rather than looking short forever. */
+export type ReturnStatus = 'raised' | 'sent' | 'replacementPromised' | 'replaced' | 'credited'
+export const RETURN_STATUS_LABEL: Record<ReturnStatus, string> = {
+  raised: 'Raised', sent: 'Sent back', replacementPromised: 'Replacement promised',
+  replaced: 'Replaced', credited: 'Credited',
+}
+
+export interface ReturnRecord {
+  id: string
+  date: string
+  itemId: string
+  qty: number
+  reason: string
+  status: ReturnStatus
+  promisedDate?: string
+  closedDate?: string
+  note?: string
+}
+
+// ── TRANSFERS ─────────────────────────────────────────────────────────────
+/* Stock bought against a project that has since closed can be moved to a live
+ * one. The order keeps its original project — rewriting that would falsify
+ * what was actually bought for what. */
+export interface Transfer {
+  id: string
+  date: string
+  itemId: string
+  qty: number
+  toProject: string
   note?: string
 }
 
@@ -121,6 +181,8 @@ export interface PurchaseOrder {
   lines: POLine[]
   receipts: Receipt[]
   issues: Issue[]
+  returns: ReturnRecord[]
+  transfers: Transfer[]
   note?: string
 }
 
@@ -130,18 +192,33 @@ export function poValue(po: PurchaseOrder) {
 export function qtyOrdered(po: PurchaseOrder, itemId: string) {
   return po.lines.filter(l => l.itemId === itemId).reduce((s, l) => s + l.qty, 0)
 }
+/* Only accepted units count as received. Damaged and rejected ones arrived but
+ * cannot be used, so they are tracked separately. */
 export function qtyReceived(po: PurchaseOrder, itemId: string) {
-  return po.receipts.flatMap(r => r.lines).filter(l => l.itemId === itemId).reduce((s, l) => s + l.qty, 0)
+  return po.receipts.flatMap(r => r.lines).filter(l => l.itemId === itemId).reduce((s, l) => s + l.accepted, 0)
+}
+export function qtyDamaged(po: PurchaseOrder, itemId: string) {
+  return po.receipts.flatMap(r => r.lines).filter(l => l.itemId === itemId).reduce((s, l) => s + l.damaged, 0)
+}
+export function qtyRejected(po: PurchaseOrder, itemId: string) {
+  return po.receipts.flatMap(r => r.lines).filter(l => l.itemId === itemId).reduce((s, l) => s + l.rejected, 0)
+}
+export function qtyDelivered(po: PurchaseOrder, itemId: string) {
+  return qtyReceived(po, itemId) + qtyDamaged(po, itemId) + qtyRejected(po, itemId)
+}
+export function qtyTransferred(po: PurchaseOrder, itemId: string) {
+  return po.transfers.filter(t => t.itemId === itemId).reduce((s, t) => s + t.qty, 0)
 }
 export function qtyIssued(po: PurchaseOrder, itemId: string) {
   return po.issues.flatMap(i => i.lines).filter(l => l.itemId === itemId).reduce((s, l) => s + l.qty, 0)
 }
+/* Damaged units still count as outstanding — the supplier owes a replacement. */
 export function qtyAwaitingDelivery(po: PurchaseOrder, itemId: string) {
   return Math.max(0, qtyOrdered(po, itemId) - qtyReceived(po, itemId))
 }
-/* Received into the store but not yet sent to a rig — money standing still. */
+/* Received into the store, not yet sent to a rig and not moved elsewhere. */
 export function qtyInStore(po: PurchaseOrder, itemId: string) {
-  return Math.max(0, qtyReceived(po, itemId) - qtyIssued(po, itemId))
+  return Math.max(0, qtyReceived(po, itemId) - qtyIssued(po, itemId) - qtyTransferred(po, itemId))
 }
 
 export function poReceivedValue(po: PurchaseOrder) {
@@ -152,6 +229,12 @@ export function poIssuedValue(po: PurchaseOrder) {
 }
 export function poStoreValue(po: PurchaseOrder) {
   return po.lines.reduce((s, l) => s + qtyInStore(po, l.itemId) * l.rate, 0)
+}
+export function poDamagedValue(po: PurchaseOrder) {
+  return po.lines.reduce((s, l) => s + qtyDamaged(po, l.itemId) * l.rate, 0)
+}
+export function openReturns(po: PurchaseOrder) {
+  return po.returns.filter(r => r.status !== 'replaced' && r.status !== 'credited')
 }
 
 /* Derived, never stored, so it cannot drift from the receipts underneath. */
@@ -179,6 +262,13 @@ export interface SupplierPerformance {
   actualLead: number | null
   avgDelay: number | null            // + late, − early
   onTimePct: number | null
+  /* Quality, kept apart from timeliness. A supplier who is always on time but
+   * ships damaged goods should not look the same as one who is merely slow. */
+  delivered: number
+  damaged: number
+  damagePct: number | null
+  openReturns: number
+  rating?: number
 }
 
 /* Lead time is measured from what happened, not from a rating field. */
@@ -192,15 +282,27 @@ export function supplierPerformance(pos: PurchaseOrder[], suppliers: Supplier[],
     if (d != null) delays.push(d)
   }))
   const avg = (a: number[]) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null
+  const sup = suppliers.find(s => s.name === name)
+
+  let delivered = 0, damaged = 0
+  mine.forEach(po => po.lines.forEach(l => {
+    delivered += qtyDelivered(po, l.itemId)
+    damaged += qtyDamaged(po, l.itemId) + qtyRejected(po, l.itemId)
+  }))
+
   return {
     supplier: name,
     orders: mine.length,
     completed: mine.filter(p => poStatus(p) === 'received').length,
     value: mine.reduce((s, p) => s + poValue(p), 0),
-    quotedLead: suppliers.find(s => s.name === name)?.quotedLeadDays ?? null,
+    quotedLead: sup?.quotedLeadDays ?? null,
     actualLead: avg(leads),
     avgDelay: avg(delays),
     onTimePct: delays.length ? (delays.filter(d => d <= 0).length / delays.length) * 100 : null,
+    delivered, damaged,
+    damagePct: delivered > 0 ? (damaged / delivered) * 100 : null,
+    openReturns: mine.reduce((s, p) => s + openReturns(p).length, 0),
+    rating: sup?.rating,
   }
 }
 
@@ -226,6 +328,14 @@ export function stockInStore(pos: PurchaseOrder[], today: string): StockLine[] {
     out.push({
       itemId: l.itemId, qty: q, value: q * l.rate, project: po.project,
       poNumber: po.number, ageDays: last ? daysBetween(last, today) : 0,
+    })
+  }))
+  // Anything moved off a closed project shows against the project it moved to.
+  pos.forEach(po => po.transfers.forEach(t => {
+    const rate = po.lines.find(l => l.itemId === t.itemId)?.rate ?? 0
+    out.push({
+      itemId: t.itemId, qty: t.qty, value: t.qty * rate, project: t.toProject,
+      poNumber: po.number, ageDays: daysBetween(t.date, today),
     })
   }))
   return out.sort((a, b) => b.value - a.value)
@@ -460,25 +570,36 @@ export const SEED_CATALOGUE: ToolingItem[] = [
 ]
 
 export const SEED_SUPPLIERS: Supplier[] = [
-  { id: 's1', name: 'Boart Longyear India', contact: 'R. Menon', phone: '+91 98450 11234', quotedLeadDays: 25 },
-  { id: 's2', name: 'Sandvik Mining', contact: 'A. Deshpande', phone: '+91 99870 44521', quotedLeadDays: 18 },
-  { id: 's3', name: 'Drillco Tools', contact: 'S. Iyer', phone: '+91 90035 77810', quotedLeadDays: 12 },
-  { id: 's4', name: 'Mahalaxmi Steel', contact: 'P. Shah', phone: '+91 98200 33456', quotedLeadDays: 30 },
+  { id: 's1', name: 'Boart Longyear India', contact: 'R. Menon', phone: '+91 98450 11234', quotedLeadDays: 25, rating: 5, ratingNote: 'Reliable, never had to chase' },
+  { id: 's2', name: 'Sandvik Mining', contact: 'A. Deshpande', phone: '+91 99870 44521', quotedLeadDays: 18, rating: 4 },
+  { id: 's3', name: 'Drillco Tools', contact: 'S. Iyer', phone: '+91 90035 77810', quotedLeadDays: 12, rating: 2, ratingNote: 'Cheap but slow, and packaging is poor' },
+  { id: 's4', name: 'Mahalaxmi Steel', contact: 'P. Shah', phone: '+91 98200 33456', quotedLeadDays: 30, rating: 3 },
 ]
 
 const rateOf = (id: string) => SEED_CATALOGUE.find(t => t.id === id)!.rate
+
+/* [itemId, accepted, damaged, rejected] */
+type RLine = [string, number, number?, number?]
 
 const PO = (
   id: string, number: string, supplier: string, project: string,
   createdDate: string, orderedDate: string, promisedDate: string,
   lines: [string, number][],
-  receipts: [string, [string, number][]][],
+  receipts: [string, RLine[], DelayReason?][],
   issues: [string, string, [string, number][]][],
+  returns: ReturnRecord[] = [],
 ): PurchaseOrder => ({
   id, number, supplier, project, status: 'ordered', createdDate, orderedDate, promisedDate,
   lines: lines.map(([itemId, qty]) => ({ itemId, qty, rate: rateOf(itemId) })),
-  receipts: receipts.map(([date, ls], k) => ({ id: `${id}_r${k}`, date, lines: ls.map(([itemId, qty]) => ({ itemId, qty })) })),
-  issues: issues.map(([date, rig, ls], k) => ({ id: `${id}_i${k}`, date, rig, issuedBy: 'Store', lines: ls.map(([itemId, qty]) => ({ itemId, qty })) })),
+  receipts: receipts.map(([date, ls, delayReason], k) => ({
+    id: `${id}_r${k}`, date, delayReason,
+    lines: ls.map(([itemId, accepted, damaged = 0, rejected = 0]) => ({ itemId, accepted, damaged, rejected })),
+  })),
+  issues: issues.map(([date, rig, ls], k) => ({
+    id: `${id}_i${k}`, date, rig, issuedBy: 'Store',
+    lines: ls.map(([itemId, qty]) => ({ itemId, qty })),
+  })),
+  returns, transfers: [],
 })
 
 export const SEED_POS: PurchaseOrder[] = [
@@ -494,11 +615,14 @@ export const SEED_POS: PurchaseOrder[] = [
     [['2026-08-06', [['t14', 4]]]],
     []),
 
-  // Arrived nine days late.
+  // Arrived nine days late, and one core lifter case came in damaged — so it
+  // never entered the store, and a return is running against the supplier.
   PO('po3', 'PO-2026-052', 'Drillco Tools', 'Site A - North Field', '2026-07-18', '2026-07-19', '2026-07-31',
     [['t06', 30], ['t07', 20], ['t12', 2]],
-    [['2026-08-09', [['t06', 30], ['t07', 20], ['t12', 2]]]],
-    [['2026-08-03', 'RIG-001', [['t06', 2]]], ['2026-08-24', 'RIG-001', [['t06', 3]]], ['2026-08-07', 'RIG-002', [['t06', 2]]]]),
+    [['2026-08-09', [['t06', 30], ['t07', 18, 2], ['t12', 2]], 'Transport']],
+    [['2026-08-03', 'RIG-001', [['t06', 2]]], ['2026-08-24', 'RIG-001', [['t06', 3]]], ['2026-08-07', 'RIG-002', [['t06', 2]]]],
+    [{ id: 'ret1', date: '2026-08-10', itemId: 't07', qty: 2, reason: 'Cases cracked in transit',
+       status: 'replacementPromised', promisedDate: '2026-09-15', note: 'Supplier accepted liability' }]),
 
   // Received in June, barely touched — the idle-stock case.
   PO('po4', 'PO-2026-033', 'Boart Longyear India', 'Site A - North Field', '2026-06-05', '2026-06-06', '2026-07-01',
@@ -518,11 +642,17 @@ export const SEED_POS: PurchaseOrder[] = [
     [['2026-05-18', [['t10', 1], ['t17', 1]]]],
     []),
 
+  // Placed and confirmed, nothing delivered yet — the ordered state.
+  PO('po7', 'PO-2026-058', 'Boart Longyear India', 'Site A - North Field', '2026-08-20', '2026-08-21', '2026-09-18',
+    [['t01', 6], ['t02', 1]],
+    [],
+    []),
+
   // Never placed.
-  { id: 'po7', number: 'PO-2026-061', supplier: 'Drillco Tools', project: 'Site A - North Field',
+  { id: 'po8', number: 'PO-2026-061', supplier: 'Drillco Tools', project: 'Site A - North Field',
     status: 'draft', createdDate: '2026-09-01',
     lines: [{ itemId: 't06', qty: 40, rate: rateOf('t06') }, { itemId: 't07', qty: 25, rate: rateOf('t07') }],
-    receipts: [], issues: [], note: 'Awaiting approval' },
+    receipts: [], issues: [], returns: [], transfers: [], note: 'Awaiting approval' },
 ]
 
 export const PROJECTS = ['Site A - North Field', 'Site B - South Ridge', 'Site C - East Basin']
@@ -557,6 +687,7 @@ export const uid = (p: string) => `${p}_${Date.now()}_${Math.floor(Math.random()
 interface Ctx {
   state: State
   saveItem: (i: ToolingItem) => void
+  importItems: (items: ToolingItem[]) => void
   deleteItem: (id: string) => void
   saveSupplier: (s: Supplier) => void
   savePO: (po: PurchaseOrder) => void
@@ -564,6 +695,9 @@ interface Ctx {
   placeOrder: (id: string, orderedDate: string, promisedDate: string) => void
   addReceipt: (poId: string, r: Omit<Receipt, 'id'>) => void
   addIssue: (poId: string, i: Omit<Issue, 'id'>) => void
+  addReturn: (poId: string, r: Omit<ReturnRecord, 'id'>) => void
+  updateReturn: (poId: string, r: ReturnRecord) => void
+  addTransfer: (poId: string, t: Omit<Transfer, 'id'>) => void
   saveAlertSettings: (s: AlertSettings) => void
   resetAll: () => void
 }
@@ -591,6 +725,16 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
     <InvCtx.Provider value={{
       state,
       saveItem: i => setState(s => ({ ...s, catalogue: up(s.catalogue, i) })),
+      /* Matched on name, so re-importing a corrected sheet updates rather than
+       * duplicating. */
+      importItems: items => setState(s => {
+        let cat = s.catalogue
+        items.forEach(i => {
+          const existing = cat.find(x => x.name.toLowerCase() === i.name.toLowerCase())
+          cat = existing ? cat.map(x => x.id === existing.id ? { ...i, id: existing.id } : x) : [...cat, i]
+        })
+        return { ...s, catalogue: cat }
+      }),
       deleteItem: id => setState(s => ({ ...s, catalogue: s.catalogue.filter(i => i.id !== id) })),
       saveSupplier: x => setState(s => ({ ...s, suppliers: up(s.suppliers, x) })),
       savePO: po => setState(s => ({ ...s, pos: up(s.pos, po) })),
@@ -603,6 +747,15 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       })),
       addIssue: (poId, i) => setState(s => ({
         ...s, pos: s.pos.map(p => p.id === poId ? { ...p, issues: [...p.issues, { ...i, id: uid('i') }] } : p),
+      })),
+      addReturn: (poId, r) => setState(s => ({
+        ...s, pos: s.pos.map(p => p.id === poId ? { ...p, returns: [...p.returns, { ...r, id: uid('ret') }] } : p),
+      })),
+      updateReturn: (poId, r) => setState(s => ({
+        ...s, pos: s.pos.map(p => p.id === poId ? { ...p, returns: p.returns.map(x => x.id === r.id ? r : x) } : p),
+      })),
+      addTransfer: (poId, t) => setState(s => ({
+        ...s, pos: s.pos.map(p => p.id === poId ? { ...p, transfers: [...p.transfers, { ...t, id: uid('tr') }] } : p),
       })),
       saveAlertSettings: a => setState(s => ({ ...s, alerts: a })),
       resetAll: () => setState(initial()),
