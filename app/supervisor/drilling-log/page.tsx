@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Save, Plus, Trash2, Paperclip, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+import { useInventory, money } from '../../../lib/inventory-store'
 
 // Mock data
 const mockData = {
@@ -22,18 +23,13 @@ const downtimeReasonsList = [
   'Site Access Issue', 'Safety Hold', 'Weather Condition',
   'Waiting for Instruction', 'Others'
 ]
-const accessoriesList = [
-  'Adaptor Sub', 'Air Hose', 'Casing', 'Core Barrel', 'Core Lifter',
-  'Core Lifter Case', 'Coupling', 'DTH Hammer', 'Drill Pipe', 'Inner Tube',
-  'Liner', 'O-Rings', 'Outer Tube', 'Reaming Shell', 'Shock Sub', 'Stabilizer', 'Others'
-]
 const incidentTypes = ['Injury', 'Near Miss', 'Equipment Damage', 'Safety Violation', 'Environmental', 'Others']
 const severityTypes = ['Minor', 'Major', 'Critical']
 const shifts = ['Day', 'Night']
 
 interface DowntimeRow { id: string; reason: string; type: 'Internal' | 'Client'; hours: string }
 interface BitRow { id: string; serialNo: string; bitId: string; meterStart: string; meterEnd: string; replaced: boolean; newSerialNo: string; newBitId: string; newMeterStart: string; newMeterEnd: string }
-interface AccessoryRow { id: string; name: string; quantity: string }
+interface AccessoryRow { id: string; itemId: string; quantity: string }
 interface IncidentRow { id: string; type: string; severity: string; description: string }
 
 const inputClass = "w-full px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors"
@@ -45,6 +41,9 @@ const disabledInputClass = "w-full px-4 py-3 bg-[#0D1117]/50 border border-[#1E2
 const disabledSelectClass = "w-full px-4 py-3 bg-[#0D1117]/50 border border-[#1E293B]/50 rounded-xl text-[#4B5563] appearance-none cursor-not-allowed"
 
 export default function DrillingLogPage() {
+  const { state: inv } = useInventory()
+  const catalogue = inv.catalogue.filter(i => i.active)
+
   const [shiftMode, setShiftMode] = useState<10 | 12>(12)
 
   // Standby Mode
@@ -105,7 +104,7 @@ export default function DrillingLogPage() {
 
   // Accessories
   const [accessories, setAccessories] = useState<AccessoryRow[]>([
-    { id: '1', name: '', quantity: '' }
+    { id: '1', itemId: '', quantity: '' }
   ])
 
   // Incidents
@@ -140,7 +139,7 @@ export default function DrillingLogPage() {
     setBitRows(r => r.map(x => x.id === id ? { ...x, [field]: value } : x))
 
   // Accessories handlers
-  const addAccessory = () => setAccessories(r => [...r, { id: Date.now().toString(), name: '', quantity: '' }])
+  const addAccessory = () => setAccessories(r => [...r, { id: Date.now().toString(), itemId: '', quantity: '' }])
   const removeAccessory = (id: string) => setAccessories(r => r.filter(x => x.id !== id))
   const updateAccessory = (id: string, field: keyof AccessoryRow, value: string) =>
     setAccessories(r => r.map(x => x.id === id ? { ...x, [field]: value } : x))
@@ -648,33 +647,76 @@ export default function DrillingLogPage() {
         </div>
 
         <div className="space-y-3">
-          {accessories.map((row, index) => (
-            <div key={row.id} className="flex items-center gap-3 p-3 bg-[#0D1117] rounded-xl border border-[#1E293B]">
-              <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
-              <select
-                className={`flex-1 px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] appearance-none ${isStandby ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} focus:outline-none focus:border-[#3B82F6] transition-colors`}
-                value={row.name}
-                onChange={e => !isStandby && updateAccessory(row.id, 'name', e.target.value)}
-                disabled={isStandby}
-              >
-                <option value="">Select accessory</option>
-                {accessoriesList.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-              <input type="number" min="1"
-                className={`w-24 px-3 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg ${isStandby ? 'text-[#4B5563] cursor-not-allowed opacity-50' : 'text-[#F8FAFC]'} placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors text-center shrink-0`}
-                placeholder="Qty"
-                value={row.quantity}
-                onChange={e => !isStandby && updateAccessory(row.id, 'quantity', e.target.value)}
-                readOnly={isStandby}
-              />
-              {!isStandby && (
-                <button onClick={() => removeAccessory(row.id)}
-                  className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
+          {accessories.map((row, index) => {
+            const item = catalogue.find(i => i.id === row.itemId)
+            const qty = parseFloat(row.quantity) || 0
+            const lineValue = item ? item.rate * qty : 0
+
+            return (
+              <div key={row.id} className="flex items-center gap-3 p-3 bg-[#0D1117] rounded-xl border border-[#1E293B]">
+                <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
+
+                <select
+                  className={`flex-1 px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] appearance-none ${isStandby ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} focus:outline-none focus:border-[#3B82F6] transition-colors`}
+                  value={row.itemId}
+                  onChange={e => !isStandby && updateAccessory(row.id, 'itemId', e.target.value)}
+                  disabled={isStandby}
+                >
+                  <option value="">Select from catalogue</option>
+                  {['Bit', 'Rod & Casing', 'Core Barrel', 'Accessory', 'Spares'].map(cat => {
+                    const items = catalogue.filter(i => i.category === cat)
+                    if (!items.length) return null
+
+                    return (
+                      <optgroup key={cat} label={cat}>
+                        {items.map(i => (
+                          <option key={i.id} value={i.id}>
+                            {i.name} — {money(i.rate)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )
+                  })}
+                </select>
+
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Qty"
+                  className={`w-24 px-3 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] text-right ${isStandby ? 'opacity-50' : ''} focus:outline-none focus:border-[#3B82F6] transition-colors`}
+                  value={row.quantity}
+                  onChange={e => !isStandby && updateAccessory(row.id, 'quantity', e.target.value)}
+                  disabled={isStandby}
+                />
+
+                {/* Value of the parts recorded on this line */}
+                <span className="w-28 text-right text-sm font-semibold text-[#F59E0B] font-mono shrink-0">
+                  {lineValue > 0 ? money(lineValue) : '—'}
+                </span>
+
+                <button
+                  onClick={() => removeAccessory(row.id)}
+                  className="text-[#64748B] hover:text-[#EF4444] transition-colors shrink-0"
+                  disabled={isStandby}
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
-              )}
+              </div>
+            )
+          })}
+
+          {/* Total for the shift */}
+          {accessories.some(r => r.itemId && parseFloat(r.quantity) > 0) && (
+            <div className="flex justify-end gap-3 pt-2 pr-12 text-sm">
+              <span className="text-[#64748B]">Parts used this shift</span>
+              <span className="font-semibold text-[#F59E0B] font-mono">
+                {money(accessories.reduce((s, r) => {
+                  const it = catalogue.find(i => i.id === r.itemId)
+                  return s + (it ? it.rate * (parseFloat(r.quantity) || 0) : 0)
+                }, 0))}
+              </span>
             </div>
-          ))}
+          )}
         </div>
       </div>
 
@@ -766,5 +808,4 @@ export default function DrillingLogPage() {
     </div>
   )
 }
-
 
