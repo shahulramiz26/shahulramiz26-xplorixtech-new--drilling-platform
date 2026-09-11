@@ -11,7 +11,7 @@ import {
   money, moneyL, perMetre, dayLabel, fullDate, monthLabel, uid,
   COMPLETED_PROJECTS, RIGS, PROJECTS,
   type ToolingItem, type PurchaseOrder, type Formation, type Alert,
-  type AlertLevel, type ToolCategory, type ReturnRecord, type ReturnStatus,
+  type AlertLevel, type AlertKind, type ToolCategory, type ReturnRecord, type ReturnStatus,
   type DelayReason, type Supplier, type ReceiptLine, type StockLine, type Transfer,
 } from '../../../lib/inventory-store'
 import { useCosting, monthOf, shiftMonth } from '../../../lib/costing-store'
@@ -161,25 +161,74 @@ const Grid = ({ cols, children }: { cols: number; children: ReactNode }) =>
 
 const LEVEL_TONE: Record<AlertLevel, string> = { urgent: C.red, warn: C.amber, info: C.blue }
 
+/* Eighteen alerts is a wall. They also split into two different jobs — money
+ * standing still, and something about to run out — which belong to different
+ * people, so the panel filters by kind with the count and the value at stake
+ * on each chip. */
+const KIND_LABEL: Record<AlertKind, string> = {
+  reorder: 'Running out',
+  overdue: 'Late delivery',
+  idle: 'Idle stock',
+  stranded: 'Stranded',
+  lowStock: 'Low stock',
+}
+const KIND_ORDER: AlertKind[] = ['reorder', 'overdue', 'idle', 'stranded', 'lowStock']
+const KIND_TONE: Record<AlertKind, string> = {
+  reorder: C.red, overdue: C.red, idle: C.amber, stranded: C.amber, lowStock: C.blue,
+}
+
 function AlertsPanel({ alerts }: { alerts: Alert[] }) {
-  const [open, setOpen] = useState(true)
+  const [kind, setKind] = useState<AlertKind | 'all'>('all')
+
   if (alerts.length === 0) {
     return <Card><Empty>Nothing needs attention. No stock sitting idle, no late deliveries, nothing about to run out.</Empty></Card>
   }
+
+  const kinds = KIND_ORDER
+    .map(k => {
+      const mine = alerts.filter(a => a.kind === k)
+      return { kind: k, count: mine.length, value: mine.reduce((s, a) => s + (a.value ?? 0), 0) }
+    })
+    .filter(x => x.count > 0)
+
+  const shown = kind === 'all' ? alerts : alerts.filter(a => a.kind === kind)
   const urgent = alerts.filter(a => a.level === 'urgent').length
-  const shown = open ? alerts : alerts.slice(0, 4)
+  const shownValue = shown.reduce((s, a) => s + (a.value ?? 0), 0)
+
+  const chip = (label: string, count: number, value: number, on: boolean, tone: string, onClick: () => void) => (
+    <button key={label} onClick={onClick} style={{
+      display: 'flex', alignItems: 'baseline', gap: 7, padding: '5px 11px', borderRadius: 7,
+      cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+      background: on ? `${tone}22` : 'rgba(255,255,255,0.03)',
+      border: `1px solid ${on ? `${tone}66` : C.border}`,
+      color: on ? tone : C.faint,
+    }}>
+      <span style={{ fontSize: 11.5, fontWeight: 700 }}>{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 800, fontFamily: 'ui-monospace, monospace' }}>{count}</span>
+      {value > 0 && <span style={{ fontSize: 10, opacity: 0.7, fontFamily: 'ui-monospace, monospace' }}>{moneyL(value)}</span>}
+    </button>
+  )
 
   return (
     <Card title="Needs attention"
       subtitle={`${alerts.length} item${alerts.length === 1 ? '' : 's'}${urgent ? ` · ${urgent} urgent` : ''}`}
-      pad={false} accent={urgent ? C.red : C.amber}
-      right={alerts.length > 4 ? <Btn size="sm" onClick={() => setOpen(o => !o)}>{open ? 'Show fewer' : `Show all ${alerts.length}`}</Btn> : undefined}>
+      pad={false} accent={urgent ? C.red : C.amber}>
+      <div style={{ display: 'flex', gap: 6, padding: '11px 16px', borderBottom: rowBorder, flexWrap: 'wrap' }}>
+        {chip('All', alerts.length, alerts.reduce((s, a) => s + (a.value ?? 0), 0), kind === 'all', C.orange, () => setKind('all'))}
+        <span style={{ width: 1, background: C.border, margin: '2px 4px' }} />
+        {kinds.map(k => chip(KIND_LABEL[k.kind], k.count, k.value, kind === k.kind, KIND_TONE[k.kind],
+          () => setKind(kind === k.kind ? 'all' : k.kind)))}
+      </div>
+
       <div>
         {shown.map(a => (
           <div key={a.id} style={{ display: 'flex', gap: 12, padding: '11px 16px', borderBottom: rowBorder, alignItems: 'flex-start' }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: LEVEL_TONE[a.level], marginTop: 5, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>{a.title}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>{a.title}</span>
+                {kind === 'all' && <Tag tone={KIND_TONE[a.kind]}>{KIND_LABEL[a.kind]}</Tag>}
+              </div>
               <div style={{ fontSize: 11.5, color: C.faint, marginTop: 3, lineHeight: 1.55 }}>{a.detail}</div>
             </div>
             {a.value != null && (
@@ -188,6 +237,15 @@ function AlertsPanel({ alerts }: { alerts: Alert[] }) {
           </div>
         ))}
       </div>
+
+      {shown.length > 1 && (
+        <div style={{ padding: '9px 16px', display: 'flex', justifyContent: 'space-between', gap: 12, background: 'rgba(255,255,255,0.02)' }}>
+          <span style={{ fontSize: 11, color: C.faint }}>
+            {shown.length} shown{kind !== 'all' ? ` of ${alerts.length}` : ''}
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: C.text, fontFamily: 'ui-monospace, monospace' }}>{money(shownValue)}</span>
+        </div>
+      )}
     </Card>
   )
 }
