@@ -55,6 +55,10 @@ export interface ShiftLog {
   // decides when a hole is finished — it reads that decision and the hole
   // appears in Drillholes as Closed, waiting for approval.
   holeClosedThisShift?: boolean
+  /* Accessories consumed this shift, picked from the tooling catalogue. This
+   * is the only place parts actually used gets recorded — the store knows what
+   * it issued, but only the driller knows what went into the ground. */
+  partsUsed?: { itemId: string; qty: number }[]
   fuelLitres: number
   waterLitres: number
   additivesKg: number
@@ -844,9 +848,49 @@ const DEPTH_BANDS: [number, string][] = [
   [35, 'Soft Formation'], [75, 'Hard Formation'], [Infinity, 'Very Hard Formation'],
 ]
 
+/* Consumption follows wear, and wear follows the metres a tool has done — not
+ * the depth of whichever hole it happens to be in. A bit fitted in DH-001 goes
+ * on working in DH-002, so the counter runs across the rig's whole month.
+ *
+ * Life is taken from the catalogue's hard-rock figures, scaled by ground:
+ * soft wears slowest, very hard fastest. */
+const WEAR: Record<string, number> = { Soft: 2.2, Medium: 1.5, Hard: 1.0, 'Very Hard': 0.6 }
+
+function partsFor(
+  run: Record<string, number>, metres: number, formation: string,
+): { itemId: string; qty: number }[] {
+  const out: { itemId: string; qty: number }[] = []
+  const key = formation.includes('Very') ? 'Very Hard' : formation.includes('Hard') ? 'Hard' : 'Soft'
+  const factor = WEAR[key]
+
+  // [catalogue id, hard-rock life in metres]
+  const wearing: [string, number][] = [
+    ['t06', 20],    // HQ Core Lifter
+    ['t07', 50],    // HQ Core Lifter Case
+    ['t08', 100],   // HQ Impregnated Bit
+    ['t04', 500],   // HQ Diamond Reamer Shell
+    ['t01', 5000],  // HQ Wire Line Drill Rod
+  ]
+
+  wearing.forEach(([id, hardLife]) => {
+    const life = hardLife * factor
+    // Metres are worn off the tool at a rate set by the ground; when a tool has
+    // done its life, one is consumed and the counter starts again.
+    run[id] = (run[id] ?? 0) + metres
+    while (run[id] >= life) {
+      run[id] -= life
+      const existing = out.find(o => o.itemId === id)
+      if (existing) existing.qty += 1
+      else out.push({ itemId: id, qty: 1 })
+    }
+  })
+  return out
+}
+
 function expand(rig: string, project: string, ym: string, size: string, specs: DaySpec[], bands = DEPTH_BANDS): ShiftLog[] {
   const out: ShiftLog[] = []
   const depth: Record<string, number> = {}
+  const wear: Record<string, number> = {}   // metres on each tool, across the rig
   specs.forEach(([day, hole, dm, nm, dd = 0, nd = 0, reason = '']) => {
     const date = `${ym}-${String(day).padStart(2, '0')}`
     const mk = (shift: ShiftName, metres: number, down: number, crew: number): ShiftLog => {
@@ -867,6 +911,7 @@ function expand(rig: string, project: string, ym: string, size: string, specs: D
         fuelLitres: drillingHours * 10 + (down > 0 ? 6 : 0),
         waterLitres: metres * 120,
         additivesKg: +(metres * 0.8).toFixed(1),
+        partsUsed: metres > 0 ? partsFor(wear, metres, formationAt(startDepth, bands)) : [],
       }
     }
     out.push(mk('Day', dm, dd, 4))
