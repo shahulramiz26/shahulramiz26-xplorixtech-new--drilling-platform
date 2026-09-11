@@ -6,7 +6,7 @@ import {
   poValue, poStatus, poReceivedValue, poStoreValue, poIssuedValue, poDamagedValue,
   qtyReceived, qtyIssued, qtyInStore, qtyAwaitingDelivery, qtyDamaged,
   openReturns, RETURN_STATUS_LABEL, DELAY_REASONS,
-  stockInStore, onOrder, consumption, consumptionValue, buildAlerts,
+  stockInStore, onOrder, consumptionValue, buildAlerts,
   supplierPerformance, daysBetween, projectCode,
   money, moneyL, perMetre, dayLabel, fullDate, monthLabel, uid,
   COMPLETED_PROJECTS, RIGS, PROJECTS,
@@ -973,72 +973,117 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
  * CONSUMPTION — expected against actual
  * ========================================================================== */
 
+/* CONSUMPTION — what a month of drilling actually used.
+ *
+ * Three numbers, in the order they answer a question:
+ *
+ *   metres drilled, by ground     what was achieved
+ *   parts used                    what it took, from the driller's log
+ *   cost per metre                what that works out at
+ *
+ * Issued from store sits alongside as a cross-check. Issuing and using are
+ * different events — a bit issued in August may still be drilling in October —
+ * so the two will not match, and the gap is what is sitting on the rig. */
 function ConsumptionTab({ month, onMonth }: { month: string; onMonth: (m: string) => void }) {
   const { state } = useInventory()
   const { state: cost } = useCosting()
   const [openRig, setOpenRig] = useState<string | null>(null)
-  const nameOf = (id: string) => state.catalogue.find(i => i.id === id)?.name ?? id
+  const [project, setProject] = useState(PROJECTS[0])
+  const [rigFilter, setRigFilter] = useState<string | 'all'>('all')
+  const itemOf = (id: string) => state.catalogue.find(i => i.id === id)
+  const nameOf = (id: string) => itemOf(id)?.name ?? id
 
-  /* Expected comes from the catalogue and the metres the driller logged.
-   * Actual comes from what the store issued. The gap is the point. */
-  const byRig = useMemo(() => RIGS.map(rig => {
-    const shifts = cost.shiftLogs.filter(l => l.rig === rig && monthOf(l.date) === month)
+  /* Which rigs worked this project — taken from the driller's log rather than a
+   * fixed list, so a rig moved between projects appears where it actually was. */
+  const projectRigs = useMemo(() => Array.from(new Set(
+    cost.shiftLogs.filter(l => l.project === project).map(l => l.rig))).sort(),
+    [cost.shiftLogs, project])
+
+  const byRig = useMemo(() => projectRigs.map(rig => {
+    const shifts = cost.shiftLogs.filter(l => l.rig === rig && l.project === project && monthOf(l.date) === month)
     const metres = shifts.reduce((s, l) => s + l.metresDrilled, 0)
-    const expected = shifts.reduce((s, l) =>
-      s + l.metresDrilled * toolingPerMetre(state.catalogue, normFormation(l.formationType)), 0)
-    const actual = consumptionValue(state.pos, { rig, month })
-    const byFormation = FORMATIONS.map(f => {
-      const m = shifts.filter(l => normFormation(l.formationType) === f).reduce((s, l) => s + l.metresDrilled, 0)
-      return { formation: f, metres: m, rate: toolingPerMetre(state.catalogue, f), cost: m * toolingPerMetre(state.catalogue, f) }
-    }).filter(x => x.metres > 0)
-    /* The same metres priced item by item, so ₹549.56/m can be traced to the
-     * lines that make it up rather than taken on trust. */
-    const byItem = state.catalogue.filter(i => i.active).map(item => {
-      const c = byFormation.reduce((s, b) => s + b.metres * costPerMetre(item, b.formation), 0)
-      return { item, cost: c, perMetre: metres > 0 ? c / metres : 0 }
-    }).filter(x => x.cost > 0).sort((a, b) => b.cost - a.cost)
-    const issues = consumption(state.pos, { rig, month })
-    return { rig, metres, expected, actual, byFormation, byItem, issues }
-  }).filter(r => r.metres > 0 || r.actual > 0), [state.catalogue, state.pos, cost.shiftLogs, month])
 
-  const totals = byRig.reduce((a, r) => ({
-    metres: a.metres + r.metres, expected: a.expected + r.expected, actual: a.actual + r.actual,
-  }), { metres: 0, expected: 0, actual: 0 })
+    const byFormation = FORMATIONS.map(f => ({
+      formation: f,
+      metres: shifts.filter(l => normFormation(l.formationType) === f).reduce((s, l) => s + l.metresDrilled, 0),
+    })).filter(x => x.metres > 0)
+
+    // Straight from the Accessories section of the driller's log.
+    const usedQty: Record<string, number> = {}
+    shifts.forEach(l => (l.partsUsed ?? []).forEach(p => { usedQty[p.itemId] = (usedQty[p.itemId] ?? 0) + p.qty }))
+    const used = Object.entries(usedQty).map(([itemId, qty]) => {
+      const it = itemOf(itemId)
+      const rate = it?.rate ?? 0
+      return { itemId, qty, rate, cost: qty * rate, perMetre: metres > 0 ? (qty * rate) / metres : 0 }
+    }).sort((a, b) => b.cost - a.cost)
+
+    const usedCost = used.reduce((s, u) => s + u.cost, 0)
+    const issued = consumptionValue(state.pos, { rig, project, month })
+    return { rig, metres, byFormation, used, usedCost, issued, cpm: metres > 0 ? usedCost / metres : 0 }
+  }).filter(r => (r.metres > 0 || r.issued > 0) && (rigFilter === 'all' || r.rig === rigFilter)),
+    [state.catalogue, state.pos, cost.shiftLogs, month, project, projectRigs, rigFilter])
+
+  const t = byRig.reduce((a, r) => ({
+    metres: a.metres + r.metres, used: a.used + r.usedCost, issued: a.issued + r.issued,
+  }), { metres: 0, used: 0, issued: 0 })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <Note tone={C.dim}>
-          <strong style={{ color: C.text }}>Expected</strong> is the catalogue rate divided by expected life, applied to the
-          metres the driller logged — the figure Finance charges and the one you tender on.{' '}
-          <strong style={{ color: C.text }}>Actual</strong> is what the store issued in the same month.
-        </Note>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+      <div style={{
+        background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
+        padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap',
+      }}>
+        <Chain label="Project">
+          {PROJECTS.map(p => (
+            <Chip key={p} on={project === p} label={projectCode(p)}
+              onClick={() => { setProject(p); setRigFilter('all'); setOpenRig(null) }} />
+          ))}
+        </Chain>
+        {projectRigs.length > 0 && (
+          <>
+            <span style={{ width: 1, height: 22, background: C.border }} />
+            <Chain label="Rig">
+              <Chip on={rigFilter === 'all'} label="All" onClick={() => setRigFilter('all')} />
+              {projectRigs.map(r => (
+                <Chip key={r} on={rigFilter === r} label={r} onClick={() => setRigFilter(rigFilter === r ? 'all' : r)} />
+              ))}
+            </Chain>
+          </>
+        )}
+        <div style={{ flex: 1 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <button onClick={() => onMonth(shiftMonth(month, -1))} style={arrowStyle}>◀</button>
           <span style={{ fontSize: 13, fontWeight: 700, color: C.text, minWidth: 128, textAlign: 'center' }}>{monthLabel(month)}</span>
           <button onClick={() => onMonth(shiftMonth(month, 1))} style={arrowStyle}>▶</button>
         </div>
       </div>
 
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <Note tone={C.dim}>
+          <strong style={{ color: C.text }}>Parts used</strong> comes from the Accessories section of the driller&apos;s log —
+          what the supervisor recorded going into the ground.{' '}
+          <strong style={{ color: C.text }}>Issued</strong> is what left the store. They do not match, and should not: a bit
+          issued this month may still be drilling in three months&apos; time.
+        </Note>
+      </div>
+
       <Grid cols={4}>
-        <Stat label="Metres drilled" value={`${totals.metres} m`} note={monthLabel(month)} big />
-        <Stat label="Expected tooling" value={moneyL(totals.expected)}
-          note={totals.metres ? perMetre(totals.expected / totals.metres) : '—'} color={C.blue} big />
-        <Stat label="Actually issued" value={moneyL(totals.actual)}
-          note={totals.metres ? perMetre(totals.actual / totals.metres) : '—'} color={C.amber} big />
-        <Stat label="Difference" value={moneyL(totals.actual - totals.expected)}
-          note={totals.actual > totals.expected ? 'issuing more than the catalogue assumes' : 'issuing less than assumed'}
-          color={totals.actual > totals.expected ? C.red : C.green} big />
+        <Stat label="Metres drilled" value={`${t.metres} m`} note={`${projectCode(project)} · ${monthLabel(month)}`} big />
+        <Stat label="Parts used" value={moneyL(t.used)} note="recorded in the driller's log" color={C.green} big />
+        <Stat label="Cost per metre" value={t.metres ? perMetre(t.used / t.metres) : '—'} note="tooling only" color={C.orange} big />
+        <Stat label="Issued from store" value={moneyL(t.issued)}
+          note={t.issued > t.used ? `${moneyL(t.issued - t.used)} still on the rigs` : 'drawing from earlier stock'}
+          color={C.amber} big />
       </Grid>
 
       {byRig.length === 0 ? (
-        <Card><Empty>Nothing drilled or issued in {monthLabel(month)}.</Empty></Card>
+        <Card><Empty>Nothing drilled or issued on {projectCode(project)} in {monthLabel(month)}.</Empty></Card>
       ) : (
-        <Card title="By rig" pad={false} subtitle="Click a rig for the full working — every formation, every item, and what actually left the store">
+        <Card title="By rig" pad={false} subtitle="Click a rig for the metres, the parts that went into them, and how the cost per metre is reached">
           <table style={tableStyle}>
             <thead>
               <tr><th style={th}>Rig</th><th style={th}>Ground drilled</th><th style={thR}>Metres</th>
-                <th style={thR}>Expected</th><th style={thR}>Per metre</th><th style={thR}>Actually issued</th><th style={thR}>Difference</th></tr>
+                <th style={thR}>Parts used</th><th style={thR}>Cost per metre</th><th style={thR}>Issued from store</th><th style={thR}>On the rig</th></tr>
             </thead>
             <tbody>
               {byRig.map(r => {
@@ -1048,81 +1093,78 @@ function ConsumptionTab({ month, onMonth }: { month: string; onMonth: (m: string
                     <tr onClick={() => setOpenRig(isOpen ? null : r.rig)}
                       style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'rgba(249,115,22,0.05)' : undefined }}>
                       <td style={{ ...td, color: C.text, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{r.rig}</td>
-                      <td style={{ ...td, whiteSpace: 'normal', maxWidth: 320, color: C.faint }}>
+                      <td style={{ ...td, whiteSpace: 'normal', maxWidth: 300, color: C.faint }}>
                         {r.byFormation.map(b => `${b.metres} m ${b.formation.toLowerCase()}`).join(' · ') || '—'}
                       </td>
                       <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{r.metres}</td>
-                      <td style={{ ...tdN, color: C.blue }}>{money(r.expected)}</td>
-                      <td style={{ ...tdN, color: C.blue }}>{r.metres ? perMetre(r.expected / r.metres) : '—'}</td>
-                      <td style={{ ...tdN, color: C.amber }}>{money(r.actual)}</td>
-                      <td style={{ ...tdN, fontWeight: 700, color: r.actual > r.expected ? C.red : C.green }}>{money(r.actual - r.expected)}</td>
+                      <td style={{ ...tdN, color: C.green }}>{money(r.usedCost)}</td>
+                      <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{r.metres ? perMetre(r.cpm) : '—'}</td>
+                      <td style={{ ...tdN, color: C.amber }}>{money(r.issued)}</td>
+                      <td style={{ ...tdN, color: r.issued > r.usedCost ? C.amber : C.dim }}>
+                        {r.issued > r.usedCost ? money(r.issued - r.usedCost) : '—'}
+                      </td>
                     </tr>
 
                     {isOpen && (
                       <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
                         <td colSpan={7} style={{ padding: '18px 20px' }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 26, alignItems: 'start' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 26, alignItems: 'start' }}>
                             <div>
-                              <SubHead tone={C.blue}>Expected — by ground</SubHead>
+                              <SubHead tone={C.blue}>Metres drilled</SubHead>
                               <table style={tableStyle}>
-                                <thead><tr><th style={th}>Formation</th><th style={thR}>Metres</th><th style={thR}>Per metre</th><th style={thR}>Cost</th></tr></thead>
+                                <thead><tr><th style={th}>Ground</th><th style={thR}>Metres</th><th style={thR}>Share</th></tr></thead>
                                 <tbody>
                                   {r.byFormation.map(b => (
                                     <tr key={b.formation} style={{ borderBottom: rowBorder }}>
                                       <td style={{ ...td, color: C.text }}>{b.formation}</td>
                                       <td style={tdN}>{b.metres}</td>
-                                      <td style={{ ...tdN, color: C.faint }}>{b.rate.toFixed(2)}</td>
-                                      <td style={{ ...tdN, color: C.blue, fontWeight: 700 }}>{money(b.cost)}</td>
+                                      <td style={{ ...tdN, color: C.faint }}>{r.metres ? ((b.metres / r.metres) * 100).toFixed(0) + '%' : '—'}</td>
                                     </tr>
                                   ))}
                                 </tbody>
                                 <tfoot>
                                   <tr style={{ borderTop: `2px solid ${C.border}` }}>
                                     <td style={{ ...td, fontWeight: 800, color: C.text }}>Total</td>
-                                    <td style={{ ...tdN, fontWeight: 800 }}>{r.metres}</td>
-                                    <td style={{ ...tdN, fontWeight: 800, color: C.blue }}>{r.metres ? (r.expected / r.metres).toFixed(2) : '—'}</td>
-                                    <td style={{ ...tdN, fontWeight: 900, color: C.blue }}>{money(r.expected)}</td>
+                                    <td style={{ ...tdN, fontWeight: 900, color: C.text }}>{r.metres}</td>
+                                    <td style={tdN} />
                                   </tr>
                                 </tfoot>
                               </table>
 
-                              <div style={{ marginTop: 20 }}>
-                                <SubHead tone={C.blue}>Expected — by item</SubHead>
-                                <table style={tableStyle}>
-                                  <thead><tr><th style={th}>Item</th><th style={thR}>Per metre</th><th style={thR}>Cost</th></tr></thead>
-                                  <tbody>
-                                    {r.byItem.map(x => (
-                                      <tr key={x.item.id} style={{ borderBottom: rowBorder }}>
-                                        <td style={{ ...td, whiteSpace: 'normal' }}>{x.item.name}</td>
-                                        <td style={{ ...tdN, color: C.faint }}>{x.perMetre.toFixed(2)}</td>
-                                        <td style={tdN}>{money(x.cost)}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
+                              <div style={{ marginTop: 20, padding: '14px 16px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: C.orange, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+                                  How the cost per metre is reached
+                                </div>
+                                <pre style={{ margin: 0, fontSize: 12, lineHeight: 1.7, color: C.text, fontFamily: 'ui-monospace, monospace', whiteSpace: 'pre-wrap' }}>
+{`parts used   ${money(r.usedCost)}
+metres       ${r.metres} m
+             ${'─'.repeat(18)}
+per metre    ${r.metres ? perMetre(r.cpm) : '—'}`}
+                                </pre>
                               </div>
                             </div>
 
                             <div>
-                              <SubHead tone={C.amber}>Actually issued</SubHead>
-                              {r.issues.length === 0 ? <Empty>Nothing issued to {r.rig} this month.</Empty> : (
+                              <SubHead tone={C.green}>Parts used — from the driller&apos;s log</SubHead>
+                              {r.used.length === 0 ? <Empty>No accessories recorded for {r.rig} this month.</Empty> : (
                                 <table style={tableStyle}>
-                                  <thead><tr><th style={th}>Date</th><th style={th}>Item</th><th style={th}>Order</th><th style={thR}>Qty</th><th style={thR}>Value</th></tr></thead>
+                                  <thead><tr><th style={th}>Item</th><th style={thR}>Qty</th><th style={thR}>Rate</th><th style={thR}>Cost</th><th style={thR}>Per metre</th></tr></thead>
                                   <tbody>
-                                    {r.issues.map((c, k) => (
-                                      <tr key={k} style={{ borderBottom: rowBorder }}>
-                                        <td style={{ ...td, color: C.text }}>{dayLabel(c.date)}</td>
-                                        <td style={{ ...td, whiteSpace: 'normal' }}>{nameOf(c.itemId)}</td>
-                                        <td style={td}>{c.poNumber}</td>
-                                        <td style={tdN}>{c.qty}</td>
-                                        <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(c.value)}</td>
+                                    {r.used.map(u => (
+                                      <tr key={u.itemId} style={{ borderBottom: rowBorder }}>
+                                        <td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{nameOf(u.itemId)}</td>
+                                        <td style={tdN}>{u.qty}</td>
+                                        <td style={{ ...tdN, color: C.faint }}>{money(u.rate)}</td>
+                                        <td style={{ ...tdN, color: C.green, fontWeight: 700 }}>{money(u.cost)}</td>
+                                        <td style={{ ...tdN, color: C.orange }}>{u.perMetre.toFixed(2)}</td>
                                       </tr>
                                     ))}
                                   </tbody>
                                   <tfoot>
                                     <tr style={{ borderTop: `2px solid ${C.border}` }}>
-                                      <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={4}>Issued</td>
-                                      <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(r.actual)}</td>
+                                      <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={3}>Total</td>
+                                      <td style={{ ...tdN, fontWeight: 900, color: C.green }}>{money(r.usedCost)}</td>
+                                      <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{r.metres ? r.cpm.toFixed(2) : '—'}</td>
                                     </tr>
                                   </tfoot>
                                 </table>
@@ -1130,19 +1172,18 @@ function ConsumptionTab({ month, onMonth }: { month: string; onMonth: (m: string
 
                               <div style={{ marginTop: 18, padding: '14px 16px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10 }}>
                                 <Grid cols={3}>
-                                  <div><div style={{ fontSize: 10, color: C.faint, marginBottom: 4 }}>Expected</div>
-                                    <div style={{ fontSize: 15, fontWeight: 900, color: C.blue, fontFamily: 'ui-monospace, monospace' }}>{money(r.expected)}</div></div>
-                                  <div><div style={{ fontSize: 10, color: C.faint, marginBottom: 4 }}>Issued</div>
-                                    <div style={{ fontSize: 15, fontWeight: 900, color: C.amber, fontFamily: 'ui-monospace, monospace' }}>{money(r.actual)}</div></div>
-                                  <div><div style={{ fontSize: 10, color: C.faint, marginBottom: 4 }}>Difference</div>
-                                    <div style={{ fontSize: 15, fontWeight: 900, color: r.actual > r.expected ? C.red : C.green, fontFamily: 'ui-monospace, monospace' }}>
-                                      {money(r.actual - r.expected)}</div></div>
+                                  <div><div style={{ fontSize: 10, color: C.faint, marginBottom: 4 }}>Used</div>
+                                    <div style={{ fontSize: 15, fontWeight: 900, color: C.green, fontFamily: 'ui-monospace, monospace' }}>{money(r.usedCost)}</div></div>
+                                  <div><div style={{ fontSize: 10, color: C.faint, marginBottom: 4 }}>Issued from store</div>
+                                    <div style={{ fontSize: 15, fontWeight: 900, color: C.amber, fontFamily: 'ui-monospace, monospace' }}>{money(r.issued)}</div></div>
+                                  <div><div style={{ fontSize: 10, color: C.faint, marginBottom: 4 }}>Sitting on the rig</div>
+                                    <div style={{ fontSize: 15, fontWeight: 900, color: r.issued > r.usedCost ? C.amber : C.dim, fontFamily: 'ui-monospace, monospace' }}>
+                                      {r.issued > r.usedCost ? money(r.issued - r.usedCost) : '—'}</div></div>
                                 </Grid>
                                 <div style={{ marginTop: 11, fontSize: 11, color: C.faint, lineHeight: 1.65 }}>
-                                  {r.metres} m at {r.metres ? perMetre(r.expected / r.metres) : '—'} expected against {money(r.actual)} issued.{' '}
-                                  {r.actual > r.expected
-                                    ? 'Tooling is being consumed faster than the catalogue assumes — the life figures are optimistic and the tender is underpriced.'
-                                    : 'Less was drawn than the catalogue assumes, either because stock was issued in an earlier month or the life figures are pessimistic.'}
+                                  {r.issued > r.usedCost
+                                    ? `${money(r.issued - r.usedCost)} was drawn from the store but has not gone into the ground yet — it is on the rig, part-worn or unopened.`
+                                    : 'More was used than drawn this month, so the rig was working through stock issued earlier.'}
                                 </div>
                               </div>
                             </div>
@@ -1154,10 +1195,40 @@ function ConsumptionTab({ month, onMonth }: { month: string; onMonth: (m: string
                 )
               })}
             </tbody>
+            <tfoot>
+              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+                <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={2}>{byRig.length} rig{byRig.length === 1 ? '' : 's'} on {projectCode(project)}</td>
+                <td style={{ ...tdN, fontWeight: 900, color: C.text }}>{t.metres}</td>
+                <td style={{ ...tdN, fontWeight: 900, color: C.green }}>{money(t.used)}</td>
+                <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{t.metres ? perMetre(t.used / t.metres) : '—'}</td>
+                <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(t.issued)}</td>
+                <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{t.issued > t.used ? money(t.issued - t.used) : '—'}</td>
+              </tr>
+            </tfoot>
           </table>
         </Card>
       )}
     </div>
+  )
+}
+
+function Chain({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</span>
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>{children}</div>
+    </div>
+  )
+}
+
+function Chip({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'ui-monospace, monospace',
+      fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+      background: on ? C.orange : 'rgba(255,255,255,0.03)',
+      border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted,
+    }}>{label}</button>
   )
 }
 
