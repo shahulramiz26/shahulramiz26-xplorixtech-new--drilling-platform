@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { InventoryProvider } from '@/lib/inventory-store'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -20,10 +21,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.className} bg-[#0A0F1C] text-white min-h-screen`}>
-        <div className="bg-grid-pattern fixed inset-0 pointer-events-none" />
-        <div className="relative z-10">
-          {children}
-        </div>
+        <InventoryProvider>
+          <div className="bg-grid-pattern fixed inset-0 pointer-events-none" />
+          <div className="relative z-10">
+            {children}
+          </div>
+        </InventoryProvider>
       </body>
     </html>
   )
