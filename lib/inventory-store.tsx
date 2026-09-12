@@ -760,6 +760,33 @@ export const SEED_POS: PurchaseOrder[] = [
     receipts: [], reorders: [], issues: [], transfers: [], note: 'Awaiting approval' },
 ]
 
+export const SEED_OPENING_STOCK: OpeningStockEntry[] = [
+  {
+    id: 'os_seed_1', date: '2026-07-25', addedBy: 'Store',
+    project: 'Site A - North Field', rig: 'RIG-001',
+    lines: [
+      { itemId: 't08', qty: 2, rate: 22000 },  // HQ Impregnated Bit
+      { itemId: 't06', qty: 8, rate: 980  },   // HQ Core Lifter
+      { itemId: 't07', qty: 5, rate: 1274 },   // HQ Core Lifter Case
+    ],
+  },
+  {
+    id: 'os_seed_2', date: '2026-07-25', addedBy: 'Store',
+    project: 'Site A - North Field', rig: 'RIG-002',
+    lines: [
+      { itemId: 't08', qty: 1, rate: 22000 },  // HQ Impregnated Bit
+      { itemId: 't04', qty: 1, rate: 17150 },  // HQ Diamond Reamer Shell
+    ],
+  },
+  {
+    id: 'os_seed_3', date: '2026-07-25', addedBy: 'Store',
+    project: 'Site B - South Ridge', rig: 'RIG-003',
+    lines: [
+      { itemId: 't08', qty: 1, rate: 22000 },  // HQ Impregnated Bit
+    ],
+  },
+]
+
 export const PROJECTS = ['Site A - North Field', 'Site B - South Ridge', 'Site C - East Basin']
 export const COMPLETED_PROJECTS = ['Site C - East Basin']
 export const RIGS = ['RIG-001', 'RIG-002', 'RIG-003']
@@ -787,7 +814,7 @@ interface State {
 }
 
 function initial(): State {
-  return { catalogue: SEED_CATALOGUE, suppliers: SEED_SUPPLIERS, pos: SEED_POS, openingStock: [], openingBalance: [], alerts: DEFAULT_ALERTS }
+  return { catalogue: SEED_CATALOGUE, suppliers: SEED_SUPPLIERS, pos: SEED_POS, openingStock: SEED_OPENING_STOCK, openingBalance: [], alerts: DEFAULT_ALERTS }
 }
 
 let seq = 0
@@ -815,14 +842,28 @@ interface Ctx {
 }
 
 const InvCtx = createContext<Ctx | null>(null)
-const KEY = 'xplorix_inventory_v8'
+const KEY = 'xplorix_inventory_v10'
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    try { const raw = localStorage.getItem(KEY); if (raw) setState(s => ({ ...initial(), ...JSON.parse(raw) })) } catch {}
+    try {
+      const raw = localStorage.getItem(KEY)
+      if (raw) {
+        const saved = JSON.parse(raw)
+        const base  = initial()
+        setState({
+          ...base,
+          ...saved,
+          /* If the saved openingStock is empty but seed has entries, keep seed.
+           * This ensures demo data always shows even after a cache load. */
+          openingStock: saved.openingStock?.length > 0 ? saved.openingStock : base.openingStock,
+          openingBalance: saved.openingBalance ?? base.openingBalance,
+        })
+      }
+    } catch {}
     setLoaded(true)
   }, [])
   useEffect(() => { if (loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }, [state, loaded])
