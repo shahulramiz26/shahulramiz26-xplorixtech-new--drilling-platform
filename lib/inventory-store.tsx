@@ -173,6 +173,15 @@ export interface Issue {
   lines: { itemId: string; qty: number }[]
 }
 
+/* Parts in the store before the system started — not assigned to any rig or
+ * project. They sit on the shelf until issued, exactly like PO receipts. */
+export interface OpeningBalanceEntry {
+  id: string
+  date: string
+  addedBy: string
+  lines: { itemId: string; qty: number; rate: number }[]
+}
+
 /* A part that was already on a rig before the system started. Treated as
  * issued for cost purposes — no PO behind it, just a starting balance. */
 export interface OpeningStockEntry {
@@ -753,11 +762,12 @@ interface State {
   suppliers: Supplier[]
   pos: PurchaseOrder[]
   openingStock: OpeningStockEntry[]
+  openingBalance: OpeningBalanceEntry[]
   alerts: AlertSettings
 }
 
 function initial(): State {
-  return { catalogue: SEED_CATALOGUE, suppliers: SEED_SUPPLIERS, pos: SEED_POS, openingStock: [], alerts: DEFAULT_ALERTS }
+  return { catalogue: SEED_CATALOGUE, suppliers: SEED_SUPPLIERS, pos: SEED_POS, openingStock: [], openingBalance: [], alerts: DEFAULT_ALERTS }
 }
 
 let seq = 0
@@ -778,13 +788,14 @@ interface Ctx {
   receiveReorder: (poId: string, reorderId: string, receipt: ReorderReceipt) => void
   addIssue: (poId: string, i: Omit<Issue, 'id'>) => void
   addTransfer: (poId: string, t: Omit<Transfer, 'id'>) => void
+  addOpeningBalance: (e: Omit<OpeningBalanceEntry, 'id'>) => void
   addOpeningStock: (e: Omit<OpeningStockEntry, 'id'>) => void
   saveAlertSettings: (s: AlertSettings) => void
   resetAll: () => void
 }
 
 const InvCtx = createContext<Ctx | null>(null)
-const KEY = 'xplorix_inventory_v7'
+const KEY = 'xplorix_inventory_v8'
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
@@ -847,6 +858,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       }),
       addIssue: (poId, i) => onPO(poId, p => ({ ...p, issues: [...p.issues, { ...i, id: uid('is') }] })),
       addTransfer: (poId, t) => onPO(poId, p => ({ ...p, transfers: [...p.transfers, { ...t, id: uid('tr') }] })),
+      addOpeningBalance: e => setState(s => ({ ...s, openingBalance: [...s.openingBalance, { ...e, id: uid('ob') }] })),
       addOpeningStock: e => setState(s => ({ ...s, openingStock: [...s.openingStock, { ...e, id: uid('os') }] })),
       saveAlertSettings: a => setState(s => ({ ...s, alerts: a })),
       resetAll: () => setState(initial()),
