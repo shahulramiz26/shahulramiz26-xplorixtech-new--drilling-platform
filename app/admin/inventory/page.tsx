@@ -704,8 +704,8 @@ function RegularStoreTab({ onIssue, onMove }: { onIssue: (project: string, line?
                 {shown.map(l => {
                   const old = l.ageDays >= state.alerts.idleDays
                   const stranded = COMPLETED_PROJECTS.includes(l.project)
+                  const part = state.catalogue.find(p => p.id === l.itemId)
                   return (
-                    {(() => { const part = state.catalogue.find(p => p.id === l.itemId); return (
                     <tr key={l.key} style={{ borderBottom: rowBorder, background: stranded ? 'rgba(239,68,68,0.05)' : old ? 'rgba(245,158,11,0.04)' : undefined }}>
                       <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{part?.partNumber || '—'}</td>
                       <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 200 }}>{nameOf(l.itemId)}</td>
@@ -724,7 +724,6 @@ function RegularStoreTab({ onIssue, onMove }: { onIssue: (project: string, line?
                         </div>
                       </td>
                     </tr>
-                    )})()} 
                   )
                 })}
               </tbody>
