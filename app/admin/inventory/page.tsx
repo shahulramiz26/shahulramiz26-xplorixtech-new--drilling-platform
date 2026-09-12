@@ -716,7 +716,7 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
     RIGS.map(rig => {
       const lines   = startupStore(state.pos, state.catalogue, rig, project, partsUsedByRig[rig] ?? [], state.openingStock)
       const metres  = cost.shiftLogs.filter(l => l.rig === rig && l.project === project).reduce((s, l) => s + l.metresDrilled, 0)
-      return { rig, lines, total: lines.reduce((s, l) => s + l.valueIssued, 0), metres }
+      return { rig, lines, total: lines.reduce((s, l) => s + l.totalValue, 0), metres }
     }).filter(r => r.lines.length > 0),
   [state.pos, state.catalogue, state.openingStock, project, partsUsedByRig, cost.shiftLogs])
 
@@ -821,13 +821,13 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
           </div>
           {rigLines.map(({ rig, lines, total, metres }) => {
             const totalUsed  = lines.reduce((s, l) => s + l.totalUsed, 0)
-            const onRigVal   = lines.reduce((s, l) => s + l.onRig * (l.valueIssued / Math.max(1, l.totalIssued)), 0)
+            const onRigVal   = lines.reduce((s, l) => s + l.onRig * (l.totalValue / Math.max(1, l.totalQty)), 0)
             return (
               <Card key={rig} pad={false} title={rig}
                 subtitle={`${money(total)} issued · ${metres.toLocaleString('en-IN')} m drilled`}
                 accent={C.blue}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, padding: '12px 16px', borderBottom: `1px solid ${C.border}` }}>
-                  <Stat label="Value issued" value={moneyL(total)}        color={C.amber} />
+                  <Stat label="Total value" value={moneyL(total)}          color={C.amber} />
                   <Stat label="Used (log)"   value={`${totalUsed} units`} color={C.green} />
                   <Stat label="Still on rig" value={moneyL(onRigVal)}     color={C.blue}  />
                 </div>
@@ -835,27 +835,36 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
                   <table style={tableStyle}>
                     <thead><tr>
                       <th style={th}>Part number</th><th style={th}>Item</th>
-                      <th style={thR}>Life</th><th style={thR}>Issued</th>
-                      <th style={thR}>Used</th><th style={thR}>On rig</th>
-                      <th style={thR}>Value issued</th><th style={thR}>Cost / m</th>
+                      <th style={thR}>Life</th>
+                      <th style={thR}>Rig stock</th>
+                      <th style={thR}>Issued</th>
+                      <th style={thR}>Used</th>
+                      <th style={thR}>On rig</th>
+                      <th style={thR}>Value</th>
+                      <th style={thR}>Cost / m</th>
                     </tr></thead>
                     <tbody>
                       {lines.map(l => (
                         <tr key={l.itemId} style={{ borderBottom: rowBorder }}>
                           <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{l.partNumber || '—'}</td>
-                          <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 200 }}>{l.name}</td>
+                          <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 180 }}>{l.name}</td>
                           <td style={{ ...tdN, color: C.faint }}>{l.lifeMetres.toLocaleString('en-IN')} m</td>
-                          <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{l.totalIssued}</td>
+                          <td style={{ ...tdN, color: l.openingQty > 0 ? C.purple : C.dim }}>
+                            {l.openingQty > 0 ? l.openingQty : '—'}
+                          </td>
+                          <td style={{ ...tdN, color: l.issuedQty > 0 ? C.text : C.dim, fontWeight: l.issuedQty > 0 ? 700 : 400 }}>
+                            {l.issuedQty > 0 ? l.issuedQty : '—'}
+                          </td>
                           <td style={{ ...tdN, color: C.green }}>{l.totalUsed}</td>
                           <td style={{ ...tdN, color: l.onRig > 0 ? C.blue : C.dim, fontWeight: l.onRig > 0 ? 700 : 400 }}>{l.onRig}</td>
-                          <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(l.valueIssued)}</td>
+                          <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(l.totalValue)}</td>
                           <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(l.costPerMetre)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                        <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={6}>Total</td>
+                        <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>Total</td>
                         <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(total)}</td>
                         <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{metres > 0 ? perMetre(total / metres) : '—'}</td>
                       </tr>
