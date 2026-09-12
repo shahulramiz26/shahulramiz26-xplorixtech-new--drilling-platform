@@ -158,6 +158,9 @@ function Chip({ on, onClick, label }: { on: boolean; onClick: () => void; label:
 
 const arrowStyle: React.CSSProperties = { padding: '5px 9px', borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, color: C.muted }
 
+let _rowSeq = 0
+const rowId = () => `r${Date.now()}_${++_rowSeq}`
+
 /* ==========================================================================
  * ALERTS
  * ========================================================================== */
