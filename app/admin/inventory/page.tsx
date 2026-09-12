@@ -237,7 +237,7 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
     (!q || p.name.toLowerCase().includes(q.toLowerCase()) || p.partNumber.toLowerCase().includes(q.toLowerCase())))
 
   const blank = (): Part => ({
-    id: uid('t'), partNumber: '', name: '', category: 'Bit', formation: 'Any', rate: 0,
+    id: uid('t'), partNumber: '', name: '', category: 'Bit', formation: 'Hard', rate: 0,
     lifeMetres: 0, supplier: state.suppliers[0]?.name ?? '', leadTimeDays: 14, minStock: 1, active: true,
   })
 
@@ -358,7 +358,7 @@ function PartModal({ part, onSave, onClose }: { part: Part; onSave: (p: Part) =>
             </select>
           </Field>
           <Field label="Rate (₹)"><input type="number" value={f.rate} onChange={e => u({ rate: parseFloat(e.target.value) || 0 })} style={{ ...numStyle, color: C.orange }} /></Field>
-          <Field label="Formation"><select value={f.formation ?? 'Any'} onChange={e => u({ formation: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}><option value="Any">Any</option><option value="Soft">Soft</option><option value="Medium">Medium</option><option value="Hard">Hard</option><option value="Very Hard">Very Hard</option></select></Field>
+          <Field label="Formation"><select value={f.formation ?? 'Hard'} onChange={e => u({ formation: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}><option value="Soft">Soft</option><option value="Medium">Medium</option><option value="Hard">Hard</option><option value="Very Hard">Very Hard</option></select></Field>
           </Grid>
         <Grid cols={4}>
           <Field label="Life in metres" hint="Metres before replacement">
@@ -405,7 +405,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
       out.push({
         id: uid('t'), partNumber: at('part_number'), name, serialNumber: at('serial_number') || undefined,
         category: (CATEGORIES as string[]).includes(at('category')) ? at('category') as PartCategory : 'Accessory',
-        formation: at('formation') || 'Any',
+        formation: at('formation') || 'Hard',
         rate: num('rate'), lifeMetres: num('life_metres') || num('life'),
         supplier: at('supplier') || (state.suppliers[0]?.name ?? ''),
         leadTimeDays: num('lead_days', 14), minStock: num('min_stock', 1), active: true,
