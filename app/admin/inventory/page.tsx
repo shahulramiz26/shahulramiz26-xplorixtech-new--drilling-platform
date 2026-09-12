@@ -283,7 +283,7 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
             <thead>
               <tr>
                 <th style={th}>Part number</th><th style={th}>Item</th><th style={th}>Serial no.</th>
-                <th style={th}>Category</th><th style={thR}>Rate</th><th style={thR}>Life</th>
+                <th style={th}>Category</th><th style={th}>Formation</th><th style={thR}>Rate</th><th style={thR}>Life</th>
                 <th style={thR}>Cost / metre</th><th style={th}>Supplier</th><th style={thR}>Lead</th><th style={th} />
               </tr>
             </thead>
@@ -302,6 +302,7 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
                       </td>
                       <td style={{ ...tdMono, color: p.serialNumber ? C.muted : C.dim }}>{p.serialNumber || '—'}</td>
                       <td style={td}><Tag tone={C.dim}>{p.category}</Tag></td>
+                      <td style={{ ...td, color: C.muted }}>{p.formation || '—'}</td>
                       <td style={tdN}>{money(p.rate)}</td>
                       <td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td>
                       <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(costPerMetre(p))}</td>
@@ -333,7 +334,7 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={6}>Total cost per metre (active parts)</td>
+                <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>Total cost per metre (active parts)</td>
                 <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{perMetre(toolingPerMetre(parts))}</td>
                 <td style={td} colSpan={3} />
               </tr>
@@ -374,6 +375,9 @@ function PartModal({ part, onSave, onClose }: { part: Part; onSave: (p: Part) =>
             </select>
           </Field>
           <Field label="Rate (₹)"><input type="number" value={f.rate} onChange={e => u({ rate: parseFloat(e.target.value) || 0 })} style={{ ...numStyle, color: C.orange }} /></Field>
+          <Field label="Formation" hint="e.g. Hard, Soft, Any"><input value={f.formation ?? ''} onChange={e => u({ formation: e.target.value })} style={iStyle} placeholder="Any" /></Field>
+          </Grid>
+        <Grid cols={4}>
           <Field label="Life in metres" hint="Metres before replacement">
             <input type="number" value={f.lifeMetres} onChange={e => u({ lifeMetres: parseFloat(e.target.value) || 0 })} style={numStyle} />
             {f.lifeMetres > 0 && f.rate > 0 && <div style={{ fontSize: 11, color: C.orange, marginTop: 5, textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontWeight: 700 }}>{perMetre(f.rate / f.lifeMetres)}</div>}
