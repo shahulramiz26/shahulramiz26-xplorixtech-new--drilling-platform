@@ -15,6 +15,7 @@ import {
   type Part, type PurchaseOrder, type Alert, type AlertLevel, type AlertKind,
   type PartCategory, type Reorder, type ReorderStatus, type ReorderReceipt,
   type DelayReason, type Supplier, type ReceiptLine, type StockLine,
+  type OpeningStockEntry,
 } from '../../../lib/inventory-store'
 import { useCosting, monthOf, shiftMonth } from '../../../lib/costing-store'
 
@@ -659,67 +660,138 @@ function SupplierTable() {
  * REGULAR STORE
  * ========================================================================== */
 
-function RegularStoreTab({ onIssue, onMove }: { onIssue: (project: string, line?: StockLine) => void; onMove: (l: StockLine) => void }) {
-  const { state } = useInventory()
+function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
+  const { state, addIssue, addOpeningStock } = useInventory()
+  const { state: cost } = useCosting()
   const nameOf = (id: string) => state.catalogue.find(p => p.id === id)?.name ?? id
-  const [project, setProject] = useState<string | 'all'>('all')
-  const stock = stockInStore(state.pos, TODAY)
+
+  const [project, setProject] = useState(PROJECTS.find(isLiveProject) ?? PROJECTS[0])
+  const [issuing, setIssuing] = useState<{ line?: StockLine } | null>(null)
+  const [addingOpeningStock, setAddingOpeningStock] = useState(false)
+
+  const stock = stockInStore(state.pos, TODAY).filter(l => l.project === project)
   const pending = onOrder(state.pos, TODAY)
-  const shown = stock.filter(l => project === 'all' || l.project === project)
   const stockValue = stock.reduce((s, l) => s + l.value, 0)
-  const shownValue = shown.reduce((s, l) => s + l.value, 0)
   const idle = stock.filter(l => l.ageDays >= state.alerts.idleDays)
-  const projects = Array.from(new Set(stock.map(l => l.project)))
+
+  /* ── On the rigs: opening stock + shelf issues, per rig ──────────────── */
+  const partsUsedByRig = useMemo(() => {
+    const out: Record<string, { itemId: string; qty: number }[]> = {}
+    cost.shiftLogs.filter(l => l.project === project).forEach(log => {
+      const key = log.rig
+      if (!out[key]) out[key] = []
+      ;(log.partsUsed ?? []).forEach(u => {
+        const e = out[key].find(x => x.itemId === u.itemId)
+        if (e) e.qty += u.qty ?? 0
+        else out[key].push({ itemId: u.itemId, qty: u.qty ?? 0 })
+      })
+    })
+    return out
+  }, [cost.shiftLogs, project])
+
+  const rigLines = useMemo(() => {
+    return RIGS.map(rig => {
+      const lines = startupStore(state.pos, state.catalogue, rig, project, partsUsedByRig[rig] ?? [], state.openingStock)
+      const total = lines.reduce((s, l) => s + l.valueIssued, 0)
+      const metresDrilled = cost.shiftLogs.filter(l => l.rig === rig && l.project === project).reduce((s, l) => s + l.metresDrilled, 0)
+      return { rig, lines, total, metresDrilled }
+    }).filter(r => r.lines.length > 0)
+  }, [state.pos, state.catalogue, state.openingStock, project, partsUsedByRig, cost.shiftLogs])
+
+  const issueFromStore = (date: string, rig: string, by: string, picks: { poId: string; itemId: string; qty: number }[]) => {
+    const byPO: Record<string, { itemId: string; qty: number }[]> = {}
+    picks.forEach(p => { (byPO[p.poId] ??= []).push({ itemId: p.itemId, qty: p.qty }) })
+    Object.entries(byPO).forEach(([poId, lines]) => addIssue(poId, { date, project, rig, issuedBy: by, lines }))
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* Project selector */}
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px' }}>
+        <Chain label="Project">
+          {PROJECTS.map(p => <Chip key={p} on={project === p} label={projectCode(p)} onClick={() => setProject(p)} />)}
+        </Chain>
+      </div>
+
+      {/* Summary stats */}
       <Grid cols={3}>
         <Stat label="On the shelf" value={moneyL(stockValue)} note={`${stock.length} lines · ${new Set(stock.map(s => s.itemId)).size} parts`} color={C.amber} big />
         <Stat label={`Sitting over ${state.alerts.idleDays} days`} value={moneyL(idle.reduce((s, l) => s + l.value, 0))} note={`${idle.length} lines`} color={idle.length ? C.red : C.dim} big />
         <Stat label="On order" value={moneyL(pending.reduce((s, l) => s + l.value, 0))} note={`${pending.filter(p => (p.overdueDays ?? 0) > 0).length} overdue`} color={C.blue} big />
       </Grid>
 
-      <Note tone={C.dim}>
-        All purchase order receipts land here. Issue parts from here to a rig — once issued they appear in that rig&apos;s startup store and the driller can log them.
-      </Note>
-
-      <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px' }}>
-        <Chain label="Project">
-          <Chip on={project === 'all'} label="All" onClick={() => setProject('all')} />
-          {projects.map(p => <Chip key={p} on={project === p} label={projectCode(p)} onClick={() => setProject(project === p ? 'all' : p)} />)}
-        </Chain>
-        <div style={{ flex: 1 }} />
-        <Btn size="sm" tone="primary" disabled={shown.filter(l => isLiveProject(l.project)).length === 0}
-          onClick={() => onIssue(project === 'all' ? (projects.find(isLiveProject) ?? PROJECTS[0]) : project)}>
-          Issue parts to a rig
-        </Btn>
-      </div>
-
-      <Card title="On the shelf" pad={false} subtitle={`${shown.length} lines · ${money(shownValue)} received and not yet issued`}>
-        {shown.length === 0 ? <Empty>Nothing on the shelf. Everything received has gone to a rig.</Empty> : (
+      {/* ── SECTION 1: Opening stock ── */}
+      <Card title="Opening stock" pad={false}
+        subtitle={`Parts already on a rig before this project was entered into the system · ${projectCode(project)}`}
+        accent={C.purple}
+        right={<Btn size="sm" tone="primary" onClick={() => setAddingOpeningStock(true)}>Add opening stock</Btn>}>
+        {state.openingStock.filter(e => e.project === project).length === 0 ? (
+          <Empty>
+            No opening stock recorded for {projectCode(project)}.<br />
+            Use this when a rig already had parts on it before the system started.
+          </Empty>
+        ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={tableStyle}>
-              <thead><tr><th style={th}>Part number</th><th style={th}>Item</th><th style={th}>Serial no.</th><th style={th}>Category</th><th style={th}>Formation</th><th style={th}>Project</th><th style={th}>From order</th><th style={thR}>Qty</th><th style={thR}>Age</th><th style={thR}>Value</th><th style={th} /></tr></thead>
+              <thead><tr>
+                <th style={th}>Rig</th><th style={th}>Added on</th><th style={th}>Part</th>
+                <th style={thR}>Qty</th><th style={thR}>Rate</th><th style={thR}>Value</th>
+              </tr></thead>
               <tbody>
-                {shown.map(l => {
+                {state.openingStock.filter(e => e.project === project).flatMap(e =>
+                  e.lines.map((l, k) => (
+                    <tr key={`${e.id}_${k}`} style={{ borderBottom: rowBorder }}>
+                      <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{e.rig}</td>
+                      <td style={td}>{dayLabel(e.date)}</td>
+                      <td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{nameOf(l.itemId)}</td>
+                      <td style={tdN}>{l.qty}</td>
+                      <td style={tdN}>{money(l.rate)}</td>
+                      <td style={{ ...tdN, color: C.purple, fontWeight: 700 }}>{money(l.qty * l.rate)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* ── SECTION 2: On the shelf ── */}
+      <Card title="On the shelf" pad={false}
+        subtitle={`${stock.length} lines · ${money(stockValue)} received and not yet issued · ${projectCode(project)}`}>
+        {stock.length === 0 ? (
+          <Empty>Nothing on the shelf for {projectCode(project)}.</Empty>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={tableStyle}>
+              <thead><tr>
+                <th style={th}>Part number</th><th style={th}>Item</th><th style={th}>Serial no.</th>
+                <th style={th}>Category</th><th style={th}>Formation</th>
+                <th style={th}>From order</th><th style={thR}>Qty</th><th style={thR}>Age</th>
+                <th style={thR}>Value</th><th style={th} />
+              </tr></thead>
+              <tbody>
+                {stock.map(l => {
                   const old = l.ageDays >= state.alerts.idleDays
                   const stranded = COMPLETED_PROJECTS.includes(l.project)
                   const part = state.catalogue.find(p => p.id === l.itemId)
                   return (
                     <tr key={l.key} style={{ borderBottom: rowBorder, background: stranded ? 'rgba(239,68,68,0.05)' : old ? 'rgba(245,158,11,0.04)' : undefined }}>
                       <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{part?.partNumber || '—'}</td>
-                      <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 200 }}>{nameOf(l.itemId)}</td>
+                      <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 180 }}>{nameOf(l.itemId)}</td>
                       <td style={{ ...tdMono, color: part?.serialNumber ? C.muted : C.dim }}>{part?.serialNumber || '—'}</td>
                       <td style={td}>{part ? <Tag tone={C.dim}>{part.category}</Tag> : '—'}</td>
                       <td style={{ ...td, color: C.muted }}>{part?.formation || '—'}</td>
-                      <td style={tdMono}>{projectCode(l.project)}{stranded && <span style={{ marginLeft: 7 }}><Tag tone={C.red}>project ended</Tag></span>}{l.movedHere && !stranded && <span style={{ marginLeft: 7 }}><Tag tone={C.blue}>moved</Tag></span>}</td>
                       <td style={td}>{l.poNumber}</td>
                       <td style={tdN}>{l.qty}</td>
                       <td style={{ ...tdN, color: old ? C.amber : C.faint, fontWeight: old ? 700 : 400 }}>{l.ageDays}d</td>
                       <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(l.value)}</td>
                       <td style={{ ...td, textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 6 }}>
-                          {!stranded && <Btn size="sm" tone="primary" onClick={() => onIssue(l.project, l)}>Issue to rig</Btn>}
+                          {!stranded && isLiveProject(l.project) && (
+                            <Btn size="sm" tone="primary" onClick={() => setIssuing({ line: l })}>Issue to rig</Btn>
+                          )}
                           <Btn size="sm" onClick={() => onMove(l)}>Move</Btn>
                         </div>
                       </td>
@@ -729,8 +801,8 @@ function RegularStoreTab({ onIssue, onMove }: { onIssue: (project: string, line?
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                  <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={9}>Total on the shelf</td>
-                  <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(shownValue)}</td>
+                  <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={8}>Total on the shelf</td>
+                  <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(stockValue)}</td>
                   <td style={td} />
                 </tr>
               </tfoot>
@@ -739,144 +811,209 @@ function RegularStoreTab({ onIssue, onMove }: { onIssue: (project: string, line?
         )}
       </Card>
 
-      <Card title="On order" pad={false} subtitle="Placed and not yet received">
-        {pending.length === 0 ? <Empty>Nothing outstanding.</Empty> : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={tableStyle}>
-              <thead><tr><th style={th}>Part</th><th style={th}>Order</th><th style={th}>Supplier</th><th style={th}>Due</th><th style={thR}>Qty</th><th style={thR}>Value</th><th style={thR}>Status</th></tr></thead>
-              <tbody>
-                {pending.map((l, k) => (
-                  <tr key={k} style={{ borderBottom: rowBorder, background: (l.overdueDays ?? 0) > 0 ? 'rgba(239,68,68,0.05)' : undefined }}>
-                    <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal' }}>{state.catalogue.find(p => p.id === l.itemId)?.name ?? l.itemId}</td>
-                    <td style={td}>{l.poNumber}</td><td style={td}>{l.supplier}</td>
-                    <td style={td}>{l.promisedDate ? dayLabel(l.promisedDate) : '—'}</td>
-                    <td style={tdN}>{l.qty}</td><td style={tdN}>{money(l.value)}</td>
-                    <td style={{ ...tdN, color: (l.overdueDays ?? 0) > 0 ? C.red : l.awaitingReplacement ? C.amber : C.blue, fontWeight: 700 }}>
-                      {(l.overdueDays ?? 0) > 0 ? `${l.overdueDays}d late` : l.awaitingReplacement ? 'replacement' : 'awaiting'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-    </div>
-  )
-}
-
-/* ==========================================================================
- * STARTUP STORE
- * ========================================================================== */
-
-function StartupStoreTab() {
-  const { state } = useInventory()
-  const { state: cost } = useCosting()
-
-  const [project, setProject] = useState(PROJECTS[0])
-  const [rig, setRig] = useState(RIGS[0])
-
-  /* All parts used on this rig and project, from the shift logs. */
-  const partsUsed = useMemo(() => {
-    const counts: Record<string, number> = {}
-    cost.shiftLogs
-      .filter(l => l.rig === rig && l.project === project)
-      .forEach(l => (l.partsUsed ?? []).forEach(u => { counts[u.itemId] = (counts[u.itemId] ?? 0) + u.qty }))
-    return Object.entries(counts).map(([itemId, qty]) => ({ itemId, qty }))
-  }, [cost.shiftLogs, rig, project])
-
-  const lines = useMemo(
-    () => startupStore(state.pos, state.catalogue, rig, project, partsUsed),
-    [state.pos, state.catalogue, rig, project, partsUsed])
-
-  const totalIssued = lines.reduce((s, l) => s + l.valueIssued, 0)
-  const totalUsedQty = lines.reduce((s, l) => s + l.totalUsed, 0)
-  const totalOnRig = lines.reduce((s, l) => s + l.onRig * (l.valueIssued / Math.max(1, l.totalIssued)), 0)
-
-  /* Metres drilled by this rig on this project — for context alongside cost. */
-  const metresDrilled = useMemo(() =>
-    cost.shiftLogs.filter(l => l.rig === rig && l.project === project).reduce((s, l) => s + l.metresDrilled, 0),
-    [cost.shiftLogs, rig, project])
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Note tone={C.dim}>
-        Everything the regular store has ever issued to this rig on this project. Each new issue adds to the running total.
-        <strong style={{ color: C.text }}> Total used</strong> comes from the driller&apos;s log.
-      </Note>
-
-      <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px' }}>
-        <Chain label="Project">
-          {PROJECTS.map(p => <Chip key={p} on={project === p} label={projectCode(p)} onClick={() => setProject(p)} />)}
-        </Chain>
-        <span style={{ width: 1, height: 22, background: C.border }} />
-        <Chain label="Rig">
-          {RIGS.map(r => <Chip key={r} on={rig === r} label={r} onClick={() => setRig(r)} />)}
-        </Chain>
+      {/* ── SECTION 3: On the rigs ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+          On the rigs
+          <span style={{ fontSize: 11, color: C.faint, fontWeight: 400, marginLeft: 10 }}>
+            Opening stock + issued from shelf · {projectCode(project)}
+          </span>
+        </div>
+        {rigLines.length === 0 ? (
+          <Card><Empty>Nothing issued to any rig on {projectCode(project)} yet.</Empty></Card>
+        ) : rigLines.map(({ rig, lines, total, metresDrilled }) => {
+          const totalUsed = lines.reduce((s, l) => s + l.totalUsed, 0)
+          const onRigValue = lines.reduce((s, l) => s + l.onRig * (l.valueIssued / Math.max(1, l.totalIssued)), 0)
+          return (
+            <Card key={rig} pad={false}
+              title={rig}
+              subtitle={`${projectCode(project)} · ${money(total)} total issued · ${metresDrilled.toLocaleString('en-IN')} m drilled`}
+              accent={C.blue}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, padding: '12px 16px', borderBottom: `1px solid ${C.border}` }}>
+                <Stat label="Value issued" value={moneyL(total)} color={C.amber} />
+                <Stat label="Used (log)" value={`${totalUsed} units`} color={C.green} />
+                <Stat label="Still on rig" value={moneyL(onRigValue)} color={C.blue} />
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={tableStyle}>
+                  <thead><tr>
+                    <th style={th}>Part number</th><th style={th}>Item</th>
+                    <th style={thR}>Life</th><th style={thR}>Total issued</th>
+                    <th style={thR}>Total used</th><th style={thR}>On the rig</th>
+                    <th style={thR}>Value issued</th><th style={thR}>Cost / metre</th>
+                  </tr></thead>
+                  <tbody>
+                    {lines.map(l => (
+                      <tr key={l.itemId} style={{ borderBottom: rowBorder }}>
+                        <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{l.partNumber || '—'}</td>
+                        <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 200 }}>{l.name}</td>
+                        <td style={{ ...tdN, color: C.faint }}>{l.lifeMetres.toLocaleString('en-IN')} m</td>
+                        <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{l.totalIssued}</td>
+                        <td style={{ ...tdN, color: C.green }}>{l.totalUsed}</td>
+                        <td style={{ ...tdN, color: l.onRig > 0 ? C.blue : C.dim, fontWeight: l.onRig > 0 ? 700 : 400 }}>{l.onRig}</td>
+                        <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(l.valueIssued)}</td>
+                        <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(l.costPerMetre)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+                      <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={6}>Total</td>
+                      <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(total)}</td>
+                      <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>
+                        {metresDrilled > 0 ? perMetre(total / metresDrilled) : '—'}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </Card>
+          )
+        })}
       </div>
 
-      <Grid cols={4}>
-        <Stat label="Total value issued" value={moneyL(totalIssued)} note={`to ${rig} on ${projectCode(project)}`} color={C.amber} big />
-        <Stat label="Total used" value={`${totalUsedQty} units`} note="from the driller's log" color={C.green} big />
-        <Stat label="Still on the rig" value={moneyL(totalOnRig)} note="issued minus used" color={C.blue} big />
-        <Stat label="Metres drilled" value={`${metresDrilled.toLocaleString('en-IN')} m`} note={`by ${rig}`} color={C.text} big />
-      </Grid>
+      {/* Issue modal */}
+      {issuing && (
+        <InlineIssueModal
+          project={project}
+          prefill={issuing.line}
+          onSave={issueFromStore}
+          onClose={() => setIssuing(null)}
+        />
+      )}
 
-      <Card title={`Parts on ${rig} · ${projectCode(project)}`} pad={false}
-        subtitle="Cumulative — every issue ever made to this rig on this project">
-        {lines.length === 0 ? (
-          <Empty>
-            Nothing has been issued to {rig} on {projectCode(project)} yet.<br />
-            Go to Regular store and issue parts to this rig — they will appear here.
-          </Empty>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th style={th}>Part number</th>
-                  <th style={th}>Item</th>
-                  <th style={thR}>Life</th>
-                  <th style={thR}>Total issued</th>
-                  <th style={thR}>Total used</th>
-                  <th style={thR}>On the rig</th>
-                  <th style={thR}>Value issued</th>
-                  <th style={thR}>Cost / metre</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map(l => {
-                  const usedPct = l.totalIssued > 0 ? (l.totalUsed / l.totalIssued) * 100 : 0
-                  return (
-                    <tr key={l.itemId} style={{ borderBottom: rowBorder }}>
-                      <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{l.partNumber || '—'}</td>
-                      <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 230 }}>{l.name}</td>
-                      <td style={{ ...tdN, color: C.faint }}>{l.lifeMetres.toLocaleString('en-IN')} m</td>
-                      <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{l.totalIssued}</td>
-                      <td style={{ ...tdN, color: C.green }}>{l.totalUsed}</td>
-                      <td style={{ ...tdN, color: l.onRig > 0 ? C.blue : C.dim, fontWeight: l.onRig > 0 ? 700 : 400 }}>{l.onRig}</td>
-                      <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(l.valueIssued)}</td>
-                      <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(l.costPerMetre)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-              <tfoot>
-                <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                  <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={6}>Total</td>
-                  <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(totalIssued)}</td>
-                  <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>
-                    {metresDrilled > 0 ? perMetre(totalIssued / metresDrilled) : '—'}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
-      </Card>
+      {/* Opening stock modal */}
+      {addingOpeningStock && (
+        <OpeningStockModal
+          project={project}
+          onSave={e => { addOpeningStock(e); setAddingOpeningStock(false) }}
+          onClose={() => setAddingOpeningStock(false)}
+        />
+      )}
     </div>
   )
 }
+
+/* ── Opening stock modal ────────────────────────────────────────────────── */
+function OpeningStockModal({ project, onSave, onClose }: {
+  project: string
+  onSave: (e: Omit<OpeningStockEntry, 'id'>) => void
+  onClose: () => void
+}) {
+  const { state } = useInventory()
+  const [rig, setRig] = useState(RIGS[0])
+  const [date, setDate] = useState(TODAY)
+  const [by, setBy] = useState('Store')
+  const [rows, setRows] = useState<{ id: string; itemId: string; qty: string; rate: string }[]>([
+    { id: rowId(), itemId: '', qty: '', rate: '' }
+  ])
+  const addRow = () => setRows(r => [...r, { id: rowId(), itemId: '', qty: '', rate: '' }])
+  const removeRow = (id: string) => setRows(r => r.filter(x => x.id !== id))
+  const updateRow = (id: string, patch: Partial<typeof rows[0]>) =>
+    setRows(r => r.map(x => x.id === id ? { ...x, ...patch } : x))
+  const pickItem = (id: string, itemId: string) => {
+    const part = state.catalogue.find(p => p.id === itemId)
+    updateRow(id, { itemId, rate: part ? String(part.rate) : '' })
+  }
+
+  const valid = rows.filter(r => r.itemId && parseFloat(r.qty) > 0)
+  const total = valid.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.rate) || 0), 0)
+
+  return (
+    <Modal title="Add opening stock" subtitle={`Parts already on a rig before ${projectCode(project)} was entered · no PO needed`} width={760} onClose={onClose}
+      footer={<><Btn onClick={onClose}>Cancel</Btn><Btn tone="primary" disabled={valid.length === 0} onClick={() => onSave({ date, project, rig, addedBy: by, lines: valid.map(r => ({ itemId: r.itemId, qty: parseFloat(r.qty), rate: parseFloat(r.rate) || 0 })) })}>Add {valid.length} part{valid.length === 1 ? '' : 's'} to {rig}</Btn></>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Grid cols={3}>
+          <Field label="Rig">
+            <select value={rig} onChange={e => setRig(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}>
+              {RIGS.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </Field>
+          <Field label="Date recorded"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field>
+          <Field label="Recorded by"><input value={by} onChange={e => setBy(e.target.value)} style={iStyle} /></Field>
+        </Grid>
+        <Note tone={C.purple}>These parts are treated as issued to the rig — they appear immediately in the &quot;On the rigs&quot; section. Rate defaults to the catalogue rate but you can edit it.</Note>
+        <table style={tableStyle}>
+          <thead><tr><th style={th}>Part</th><th style={thR}>Qty</th><th style={thR}>Rate (₹)</th><th style={thR}>Value</th><th style={th} /></tr></thead>
+          <tbody>
+            {rows.map((row, idx) => {
+              const part = state.catalogue.find(p => p.id === row.itemId)
+              const val = (parseFloat(row.qty) || 0) * (parseFloat(row.rate) || 0)
+              return (
+                <tr key={row.id} style={{ borderBottom: rowBorder }}>
+                  <td style={{ padding: '5px 8px', minWidth: 260 }}>
+                    <select value={row.itemId} onChange={e => pickItem(row.id, e.target.value)} style={{ ...iStyle, cursor: 'pointer' }}>
+                      <option value="">Select part...</option>
+                      {['Bit', 'Rod & Casing', 'Core Barrel', 'Accessory', 'Spares'].map(cat => {
+                        const items = state.catalogue.filter(p => p.active && p.category === cat)
+                        if (!items.length) return null
+                        return <optgroup key={cat} label={cat}>{items.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>
+                      })}
+                    </select>
+                  </td>
+                  <td style={{ padding: '5px 8px', width: 90 }}><input type="number" min={1} value={row.qty} onChange={e => updateRow(row.id, { qty: e.target.value })} placeholder="0" style={numStyle} /></td>
+                  <td style={{ padding: '5px 8px', width: 120 }}><input type="number" min={0} value={row.rate} onChange={e => updateRow(row.id, { rate: e.target.value })} placeholder={part ? String(part.rate) : '0'} style={{ ...numStyle, color: C.orange }} /></td>
+                  <td style={{ ...tdN, color: val > 0 ? C.text : C.dim, fontWeight: val > 0 ? 700 : 400 }}>{val > 0 ? money(val) : '—'}</td>
+                  <td style={{ ...td, textAlign: 'right' }}>{rows.length > 1 && <Btn size="sm" tone="danger" onClick={() => removeRow(row.id)}>✕</Btn>}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+          <tfoot>
+            <tr style={{ borderTop: `2px solid ${C.border}` }}>
+              <td colSpan={5} style={{ padding: '8px 8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <Btn size="sm" onClick={addRow}>+ Add part</Btn>
+                  <span style={{ marginLeft: 'auto', fontSize: 11, color: C.faint }}>Total opening value</span>
+                  <span style={{ fontSize: 14, fontWeight: 900, color: C.purple, fontFamily: 'ui-monospace, monospace' }}>{money(total)}</span>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </Modal>
+  )
+}
+
+/* ── Inline issue modal (from shelf) ───────────────────────────────────── */
+function InlineIssueModal({ project, prefill, onSave, onClose }: {
+  project: string
+  prefill?: StockLine
+  onSave: (date: string, rig: string, by: string, picks: { poId: string; itemId: string; qty: number }[]) => void
+  onClose: () => void
+}) {
+  const { state } = useInventory()
+  const nameOf = (id: string) => state.catalogue.find(p => p.id === id)?.name ?? id
+  const stock = stockInStore(state.pos, TODAY).filter(l => l.project === project)
+  const [rig, setRig] = useState(RIGS[0])
+  const [date, setDate] = useState(TODAY)
+  const [by, setBy] = useState('Store')
+  const [qty, setQty] = useState<Record<string, number>>(prefill ? { [prefill.key]: prefill.qty } : {})
+  const picks = stock.map(l => ({ line: l, qty: Math.min(l.qty, qty[l.key] ?? 0) })).filter(x => x.qty > 0)
+  const value = picks.reduce((s, p) => s + p.qty * p.line.rate, 0)
+  return (
+    <Modal title="Issue parts to a rig" subtitle={`From the shelf · ${projectCode(project)}`} width={760} onClose={onClose}
+      footer={<><Btn onClick={onClose}>Cancel</Btn><Btn tone="primary" disabled={picks.length === 0} onClick={() => { onSave(date, rig, by, picks.map(p => ({ poId: p.line.poId, itemId: p.line.itemId, qty: p.qty }))); onClose() }}>Issue {picks.reduce((s, p) => s + p.qty, 0)} parts to {rig}</Btn></>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Grid cols={3}>
+          <Field label="Rig"><select value={rig} onChange={e => setRig(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}>{RIGS.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
+          <Field label="Issued on"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field>
+          <Field label="Issued by"><input value={by} onChange={e => setBy(e.target.value)} style={iStyle} /></Field>
+        </Grid>
+        {stock.length === 0 ? <Empty>Nothing on the shelf for {projectCode(project)}.</Empty> : (
+          <table style={tableStyle}>
+            <thead><tr><th style={th}>Part</th><th style={th}>From order</th><th style={thR}>On shelf</th><th style={thR}>Issuing</th><th style={thR}>Value</th></tr></thead>
+            <tbody>{stock.map(l => { const n = qty[l.key] ?? 0; return (<tr key={l.key} style={{ borderBottom: rowBorder, background: n > 0 ? 'rgba(249,115,22,0.06)' : undefined }}><td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{nameOf(l.itemId)}</td><td style={td}>{l.poNumber}</td><td style={{ ...tdN, color: C.amber }}>{l.qty}</td><td style={{ padding: '5px 10px', width: 110 }}><input type="number" min={0} max={l.qty} value={n} onChange={e => setQty(s => ({ ...s, [l.key]: Math.min(l.qty, Math.max(0, parseFloat(e.target.value) || 0)) }))} style={{ ...numStyle, color: n > 0 ? C.orange : C.muted }} /></td><td style={{ ...tdN, color: n > 0 ? C.text : C.dim }}>{n > 0 ? money(n * l.rate) : '—'}</td></tr>) })}</tbody>
+            <tfoot><tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}><td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={4}>Leaving the shelf</td><td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{money(value)}</td></tr></tfoot>
+          </table>
+        )}
+        <Note tone={C.blue}>Once issued, these parts appear immediately in the &quot;On the rigs&quot; section below.</Note>
+      </div>
+    </Modal>
+  )
+}
+
 
 /* ==========================================================================
  * MODALS (receive, reorder, issue, move)
@@ -1103,11 +1240,11 @@ function MoveModal({ line, onSave, onClose }: { line: StockLine; onSave: (poId: 
  * SCREEN
  * ========================================================================== */
 
-const TABS = ['Catalogue', 'Orders', 'Store', 'Startup store'] as const
+const TABS = ['Catalogue', 'Orders', 'Store'] as const
 type Tab = typeof TABS[number]
 
 export default function InventoryPage() {
-  const { state, savePart, savePO, placeOrder, addReceipt, addIssue, addReorder, receiveReorder, addTransfer } = useInventory()
+  const { state, savePart, savePO, placeOrder, addReceipt, addReorder, receiveReorder, addTransfer } = useInventory()
   const { state: cost } = useCosting()
   const [tab, setTab] = useState<Tab>('Catalogue')
   const [editPart, setEditPart] = useState<Part | null>(null)
@@ -1116,7 +1253,6 @@ export default function InventoryPage() {
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null)
   const [raising, setRaising] = useState<PurchaseOrder | null>(null)
   const [replacing, setReplacing] = useState<{ po: PurchaseOrder; reorder: Reorder } | null>(null)
-  const [issuing, setIssuing] = useState<{ project: string; line?: StockLine } | null>(null)
   const [moving, setMoving] = useState<StockLine | null>(null)
 
   const blankPO = (): PurchaseOrder => ({
@@ -1125,11 +1261,6 @@ export default function InventoryPage() {
     status: 'draft', createdDate: TODAY, lines: [], receipts: [], reorders: [], issues: [], transfers: [],
   })
 
-  const issueFromStore = (date: string, project: string, rig: string, by: string, picks: { poId: string; itemId: string; qty: number }[]) => {
-    const byPO: Record<string, { itemId: string; qty: number }[]> = {}
-    picks.forEach(p => { (byPO[p.poId] ??= []).push({ itemId: p.itemId, qty: p.qty }) })
-    Object.entries(byPO).forEach(([poId, lines]) => addIssue(poId, { date, project, rig, issuedBy: by, lines }))
-  }
 
   const burnMonth = useMemo(() => {
     const months = cost.shiftLogs.filter(l => l.metresDrilled > 0).map(l => monthOf(l.date)).sort()
@@ -1182,8 +1313,8 @@ export default function InventoryPage() {
 
       {tab === 'Catalogue' && <CatalogueTab onEdit={setEditPart} onImport={() => setImporting(true)} />}
       {tab === 'Orders' && <OrdersTab onReceive={setReceiving} onCreate={() => setEditPO(blankPO())} onEdit={setEditPO} onRaiseReorder={setRaising} onReceiveReorder={(po, reorder) => setReplacing({ po, reorder })} />}
-      {tab === 'Store' && <RegularStoreTab onIssue={(project, line) => setIssuing({ project, line })} onMove={setMoving} />}
-      {tab === 'Startup store' && <StartupStoreTab />}
+      {tab === 'Store' && <StoreTab onMove={setMoving} />}
+      
 
       {editPart && <PartModal part={editPart} onSave={savePart} onClose={() => setEditPart(null)} />}
       {importing && <ImportModal onClose={() => setImporting(false)} />}
@@ -1191,7 +1322,6 @@ export default function InventoryPage() {
       {receiving && <ReceiveModal po={receiving} onClose={() => setReceiving(null)} onSave={(date, lines, delayReason, note) => addReceipt(receiving.id, { date, lines, delayReason, note })} />}
       {raising && <RaiseReorderModal po={raising} onClose={() => setRaising(null)} onSave={rs => rs.forEach(r => addReorder(raising.id, r))} />}
       {replacing && <ReceiveReorderModal po={replacing.po} reorder={replacing.reorder} onClose={() => setReplacing(null)} onSave={receipt => receiveReorder(replacing.po.id, replacing.reorder.id, receipt)} />}
-      {issuing && <IssueModal project={issuing.project} prefill={issuing.line} onSave={issueFromStore} onClose={() => setIssuing(null)} />}
       {moving && <MoveModal line={moving} onSave={addTransfer} onClose={() => setMoving(null)} />}
     </div>
   )
