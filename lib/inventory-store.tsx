@@ -50,6 +50,7 @@ export interface Part {
   serialNumber?: string
   category: PartCategory
   rate: number           // ₹ per unit
+  formation: string      // e.g. Hard, Soft, Any
   lifeMetres: number     // metres before replacement
   supplier: string
   leadTimeDays: number
@@ -602,7 +603,7 @@ const P = (
   id: string, partNumber: string, name: string, category: PartCategory,
   lifeMetres: number, rate: number,
   supplier: string, leadTimeDays: number, minStock: number,
-): Part => ({ id, partNumber, name, category, rate, lifeMetres, supplier, leadTimeDays, minStock, active: true })
+formation = 'Any', ): Part => ({ id, partNumber, name, category, formation, rate, lifeMetres, supplier, leadTimeDays, minStock, active: true })
 
 export const SEED_CATALOGUE: Part[] = [
   P('t01', 'HQ-ROD-30',  'HQ Wire Line Drill Rod 3.0 m',      'Rod & Casing', 5000,  7840,  'Boart Longyear India', 21, 6),
