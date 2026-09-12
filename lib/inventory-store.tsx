@@ -607,23 +607,23 @@ const P = (
 ): Part => ({ id, partNumber, name, category, formation, rate, lifeMetres, supplier, leadTimeDays, minStock, active: true })
 
 export const SEED_CATALOGUE: Part[] = [
-  P('t01', 'HQ-ROD-30',  'HQ Wire Line Drill Rod 3.0 m',      'Rod & Casing', 5000,  7840,  'Boart Longyear India', 21, 6,  'Any'),
-  P('t02', 'HQ-CB-30',   'HQ Core Barrel 3.0 m',              'Core Barrel',  2000,  58800, 'Boart Longyear India', 28, 1,  'Any'),
-  P('t03', 'HQ-ITA-01',  'HQ Inner Tube Assembly',            'Core Barrel',  2000,  49000, 'Boart Longyear India', 28, 1,  'Any'),
+  P('t01', 'HQ-ROD-30',  'HQ Wire Line Drill Rod 3.0 m',      'Rod & Casing', 5000,  7840,  'Boart Longyear India', 21, 6,  'Hard'),
+  P('t02', 'HQ-CB-30',   'HQ Core Barrel 3.0 m',              'Core Barrel',  2000,  58800, 'Boart Longyear India', 28, 1,  'Hard'),
+  P('t03', 'HQ-ITA-01',  'HQ Inner Tube Assembly',            'Core Barrel',  2000,  49000, 'Boart Longyear India', 28, 1,  'Hard'),
   P('t04', 'HQ-RS-01',   'HQ Diamond Reamer Shell',           'Bit',          500,   17150, 'Sandvik Mining',       18, 2,  'Hard'),
-  P('t05', 'HQ-OS-01',   'HQ Over Shot Assembly',             'Accessory',    2000,  34300, 'Boart Longyear India', 24, 1,  'Any'),
+  P('t05', 'HQ-OS-01',   'HQ Over Shot Assembly',             'Accessory',    2000,  34300, 'Boart Longyear India', 24, 1,  'Hard'),
   P('t06', 'HQ-CL-01',   'HQ Core Lifter',                    'Accessory',    20,    980,   'Drillco Tools',        10, 20, 'Hard'),
   P('t07', 'HQ-CLC-01',  'HQ Core Lifter Case',               'Accessory',    50,    1274,  'Drillco Tools',        10, 12, 'Hard'),
   P('t08', 'HQ-BIT-IMP', 'HQ Impregnated Bit',                'Bit',          100,   22000, 'Sandvik Mining',       18, 3,  'Hard'),
-  P('t09', 'HQ-CB-SPR',  'HQ Core Barrel Spares',             'Spares',       500,   37440, 'Boart Longyear India', 28, 1,  'Any'),
-  P('t10', 'WS-NQNW-01', 'Water Swivel NQ/NW Connection',     'Accessory',    5000,  24990, 'Drillco Tools',        14, 1,  'Any'),
-  P('t11', 'HP-NQNW-01', 'Hoisting Plug NQ/NW Connection',    'Accessory',    5000,  29400, 'Drillco Tools',        14, 1,  'Any'),
-  P('t12', 'ADP-01',     'Adaptors',                          'Accessory',    5000,  4900,  'Drillco Tools',        10, 2,  'Any'),
+  P('t09', 'HQ-CB-SPR',  'HQ Core Barrel Spares',             'Spares',       500,   37440, 'Boart Longyear India', 28, 1,  'Hard'),
+  P('t10', 'WS-NQNW-01', 'Water Swivel NQ/NW Connection',     'Accessory',    5000,  24990, 'Drillco Tools',        14, 1,  'Medium'),
+  P('t11', 'HP-NQNW-01', 'Hoisting Plug NQ/NW Connection',    'Accessory',    5000,  29400, 'Drillco Tools',        14, 1,  'Medium'),
+  P('t12', 'ADP-01',     'Adaptors',                          'Accessory',    5000,  4900,  'Drillco Tools',        10, 2,  'Medium'),
   P('t13', 'PW-CSG-30',  'PW Casing 3.0 m',                   'Rod & Casing', 10000, 10780, 'Mahalaxmi Steel',      30, 4,  'Soft'),
   P('t14', 'HW-CSG-30',  'HW Casing 3.0 m',                   'Rod & Casing', 10000, 8820,  'Mahalaxmi Steel',      30, 4,  'Soft'),
   P('t15', 'PW-TC-BIT',  'PW Casing TC Bit',                  'Bit',          200,   5390,  'Mahalaxmi Steel',      30, 2,  'Soft'),
   P('t16', 'HW-TC-BIT',  'HW Casing TC / Shoe Bit',           'Bit',          200,   3773,  'Mahalaxmi Steel',      30, 2,  'Soft'),
-  P('t17', 'WS-SPR-02',  'Water Swivel Spares, 2 sets',       'Spares',       5000,  25000, 'Drillco Tools',        14, 1,  'Any'),
+  P('t17', 'WS-SPR-02',  'Water Swivel Spares, 2 sets',       'Spares',       5000,  25000, 'Drillco Tools',        14, 1,  'Medium'),
 ]
 
 export const SEED_SUPPLIERS: Supplier[] = [
@@ -760,7 +760,7 @@ interface Ctx {
 }
 
 const InvCtx = createContext<Ctx | null>(null)
-const KEY = 'xplorix_inventory_v5'
+const KEY = 'xplorix_inventory_v6'
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
