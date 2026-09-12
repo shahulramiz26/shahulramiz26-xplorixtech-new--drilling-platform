@@ -827,9 +827,9 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
                 subtitle={`${money(total)} issued · ${metres.toLocaleString('en-IN')} m drilled`}
                 accent={C.blue}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, padding: '12px 16px', borderBottom: `1px solid ${C.border}` }}>
-                  <Stat label="Total value" value={moneyL(total)}          color={C.amber} />
-                  <Stat label="Used (log)"   value={`${totalUsed} units`} color={C.green} />
-                  <Stat label="Still on rig" value={moneyL(onRigVal)}     color={C.blue}  />
+                  <Stat label="Rig stock"   value={moneyL(lines.reduce((s,l)=>s+l.openingValue,0))} color={C.purple} />
+                  <Stat label="Issued"       value={moneyL(lines.reduce((s,l)=>s+l.issuedValue,0))}  color={C.amber} />
+                  <Stat label="Total value"  value={moneyL(total)}                                    color={C.text} />
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={tableStyle}>
@@ -838,8 +838,6 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
                       <th style={thR}>Life</th>
                       <th style={thR}>Rig stock</th>
                       <th style={thR}>Issued</th>
-                      <th style={thR}>Used</th>
-                      <th style={thR}>On rig</th>
                       <th style={thR}>Value</th>
                       <th style={thR}>Cost / m</th>
                     </tr></thead>
@@ -847,16 +845,14 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
                       {lines.map(l => (
                         <tr key={l.itemId} style={{ borderBottom: rowBorder }}>
                           <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{l.partNumber || '—'}</td>
-                          <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 180 }}>{l.name}</td>
+                          <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 200 }}>{l.name}</td>
                           <td style={{ ...tdN, color: C.faint }}>{l.lifeMetres.toLocaleString('en-IN')} m</td>
                           <td style={{ ...tdN, color: l.openingQty > 0 ? C.purple : C.dim }}>
                             {l.openingQty > 0 ? l.openingQty : '—'}
                           </td>
-                          <td style={{ ...tdN, color: l.issuedQty > 0 ? C.text : C.dim, fontWeight: l.issuedQty > 0 ? 700 : 400 }}>
+                          <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>
                             {l.issuedQty > 0 ? l.issuedQty : '—'}
                           </td>
-                          <td style={{ ...tdN, color: C.green }}>{l.totalUsed}</td>
-                          <td style={{ ...tdN, color: l.onRig > 0 ? C.blue : C.dim, fontWeight: l.onRig > 0 ? 700 : 400 }}>{l.onRig}</td>
                           <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(l.totalValue)}</td>
                           <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(l.costPerMetre)}</td>
                         </tr>
@@ -864,7 +860,7 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
                     </tbody>
                     <tfoot>
                       <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                        <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>Total</td>
+                        <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={5}>Total</td>
                         <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(total)}</td>
                         <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{metres > 0 ? perMetre(total / metres) : '—'}</td>
                       </tr>
