@@ -918,7 +918,11 @@ function initial(): State {
   return { catalogue: SEED_CATALOGUE, suppliers: SEED_SUPPLIERS, pos: SEED_POS, alerts: DEFAULT_ALERTS }
 }
 
-export const uid = (p: string) => `${p}_${Date.now()}_${Math.floor(Math.random() * 9999)}`
+/* A counter, not just a timestamp: raising four reorders at once happens inside
+ * the same millisecond, and two rows sharing an id would make one of them
+ * unaddressable. */
+let seq = 0
+export const uid = (p: string) => `${p}_${Date.now()}_${++seq}_${Math.floor(Math.random() * 9999)}`
 
 interface Ctx {
   state: State
