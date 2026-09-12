@@ -1,35 +1,52 @@
 'use client'
 
-import { useState } from 'react'
-import { Save, Plus, Trash2, Paperclip, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
-import { useInventory, money } from '../../../lib/inventory-store'
+import { useState, useMemo } from 'react'
+import { Save, Plus, Trash2, Paperclip, AlertTriangle, ChevronDown } from 'lucide-react'
+import {
+  useInventory, money, perMetre, projectCode, normFormation,
+  WEAR_BASIS_LABEL, costPerMetre, costPerDay,
+  PROJECTS, RIGS,
+  type Part, type Formation,
+} from '../../../lib/inventory-store'
+import { useCostingOptional } from '../../../lib/costing-store'
 
-// Mock data
+/* ==========================================================================
+ * DAILY DRILLING LOG
+ *
+ * One shift, one form. Everything measurable is recorded here and nowhere
+ * else — costing and inventory read it, they never ask for it again.
+ *
+ * Parts used works off what the store actually issued to this rig. The driller
+ * cannot log a part the store never sent out, because the two records would
+ * then disagree and there would be no way to tell which one was wrong. If a
+ * part is missing from the list, the storeman issues it and it appears.
+ *
+ * Wear is carried as a fraction of a life rather than as raw metres, so seven
+ * metres of very hard ground uses up more of a bit than seven metres of soft,
+ * and the two still add up correctly across a month.
+ * ========================================================================== */
+
 const mockData = {
-  projects: ['PRJ-001 - Gold Mine Project A', 'PRJ-002 - Copper Exploration Site', 'PRJ-003 - Diamond Drilling'],
-  rigs: ['RIG-001 - Drill Rig Alpha', 'RIG-002 - Drill Rig Beta', 'RIG-003 - Drill Rig Gamma'],
   drillers: ['Mike Johnson', 'David Chen', 'Robert Williams', 'James Brown'],
   supervisors: ['John Smith', 'Sarah Davis', 'Michael Wilson'],
-  bits: ['BIT-001 - NQ Core Bit', 'BIT-002 - HQ Core Bit', 'BIT-003 - PQ Core Bit', 'BIT-004 - 6" Tricone'],
 }
 
 const holeSizes = ['NQ', 'HQ', 'PQ', 'BQ', 'AQ', '4.5"', '5"', '5.5"', '6"', '6.5"', '8"']
-const formationTypes = ['Soft Formation', 'Medium Formation', 'Hard Formation', 'Mixed']
+const formationTypes = ['Soft Formation', 'Medium Formation', 'Hard Formation', 'Very Hard Formation']
 const lithologyTypes = ['Sandstone', 'Limestone', 'Granite', 'Basalt', 'Shale', 'Quartzite', 'Dolerite', 'Others']
 const downtimeReasonsList = [
   'Mechanical Breakdown', 'Hydraulic Issue', 'Electrical Fault', 'Bit Change',
   'Rod Change', 'Casing Installation', 'Water Shortage', 'Fuel Shortage',
   'Operator Delay', 'Shift Change Delay', 'Ground Condition Issue',
   'Site Access Issue', 'Safety Hold', 'Weather Condition',
-  'Waiting for Instruction', 'Others'
+  'Waiting for Instruction', 'Others',
 ]
 const incidentTypes = ['Injury', 'Near Miss', 'Equipment Damage', 'Safety Violation', 'Environmental', 'Others']
 const severityTypes = ['Minor', 'Major', 'Critical']
 const shifts = ['Day', 'Night']
 
 interface DowntimeRow { id: string; reason: string; type: 'Internal' | 'Client'; hours: string }
-interface BitRow { id: string; serialNo: string; bitId: string; meterStart: string; meterEnd: string; replaced: boolean; newSerialNo: string; newBitId: string; newMeterStart: string; newMeterEnd: string }
-interface AccessoryRow { id: string; itemId: string; quantity: string }
+interface PartRow { id: string; itemId: string; amount: string; qty: string; qtyTouched: boolean }
 interface IncidentRow { id: string; type: string; severity: string; description: string }
 
 const inputClass = "w-full px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors"
@@ -38,21 +55,34 @@ const labelClass = "block text-sm text-[#94A3B8] mb-2"
 const sectionClass = "p-6 rounded-2xl bg-[#111827] border border-[#1E293B]"
 const sectionTitleClass = "text-lg font-bold text-[#F8FAFC]"
 const disabledInputClass = "w-full px-4 py-3 bg-[#0D1117]/50 border border-[#1E293B]/50 rounded-xl text-[#4B5563] placeholder-[#2D3748] cursor-not-allowed"
-const disabledSelectClass = "w-full px-4 py-3 bg-[#0D1117]/50 border border-[#1E293B]/50 rounded-xl text-[#4B5563] appearance-none cursor-not-allowed"
+
+let rowSeq = 0
+const rowId = () => `r${Date.now()}_${++rowSeq}`
+
+/* The life of one unit, in whatever the part is measured in. Terrain parts are
+ * read against the ground this shift is drilling, which is what makes the same
+ * bit worth more metres in soft rock than in very hard. */
+function lifeOf(part: Part, formation: Formation): { value: number; unit: 'm' | 'days' } {
+  if (part.wearBasis === 'days') return { value: part.lifeDays, unit: 'days' }
+  if (part.wearBasis === 'metres') return { value: part.lifeMetres, unit: 'm' }
+  return { value: part.life[formation], unit: 'm' }
+}
 
 export default function DrillingLogPage() {
   const { state: inv } = useInventory()
+  /* Optional on purpose: the log still works without the costing provider
+   * mounted, it just cannot show how worn a part already was. */
+  const costing = useCostingOptional()
   const catalogue = inv.catalogue.filter(i => i.active)
+  const partById = (id: string) => catalogue.find(i => i.id === id)
 
   const [shiftMode, setShiftMode] = useState<10 | 12>(12)
-
-  // Standby Mode
   const [isStandby, setIsStandby] = useState(false)
 
-  // Basic Shift Details
+  // Basic shift details
   const [project, setProject] = useState('')
   const [rig, setRig] = useState('')
-  const [shiftDate, setShiftDate] = useState(new Date().toLocaleDateString('en-GB').replace(/\//g, '-'))
+  const [shiftDate, setShiftDate] = useState(new Date().toISOString().slice(0, 10))
   const [shift, setShift] = useState('')
   const [supervisor, setSupervisor] = useState('')
   const [driller, setDriller] = useState('')
@@ -69,7 +99,7 @@ export default function DrillingLogPage() {
   const [newHoleFormation, setNewHoleFormation] = useState('')
   const [newHoleLithology, setNewHoleLithology] = useState('')
 
-  // Operation Details
+  // Operation details
   const [drillingHours, setDrillingHours] = useState('')
   const [downtimeHours, setDowntimeHours] = useState('')
   const [meterStart, setMeterStart] = useState('')
@@ -81,76 +111,148 @@ export default function DrillingLogPage() {
   const [engineHmr, setEngineHmr] = useState('')
   const [engineHours, setEngineHours] = useState('')
 
-  // Computed
   const metersDrilled = meterStart && meterEnd
-    ? Math.max(0, parseFloat(meterEnd) - parseFloat(meterStart)).toFixed(2)
-    : ''
+    ? Math.max(0, parseFloat(meterEnd) - parseFloat(meterStart)) : 0
   const newHoleMetersDrilled = newHoleMeterStart && newHoleMeterEnd
-    ? Math.max(0, parseFloat(newHoleMeterEnd) - parseFloat(newHoleMeterStart)).toFixed(2)
-    : ''
+    ? Math.max(0, parseFloat(newHoleMeterEnd) - parseFloat(newHoleMeterStart)) : 0
+  const shiftMetres = metersDrilled + (holeClosed && newHoleDrilled ? newHoleMetersDrilled : 0)
 
-  // Dynamic sections
+  // The ground this shift is drilling, used to read the life of terrain parts.
+  const formation: Formation = normFormation(formationType || 'Hard')
+
   const [downtimeRows, setDowntimeRows] = useState<DowntimeRow[]>([
-    { id: '1', reason: '', type: 'Internal', hours: '' }
+    { id: rowId(), reason: '', type: 'Internal', hours: '' },
   ])
-  const [bitRows, setBitRows] = useState<BitRow[]>([
-    { id: '1', serialNo: '', bitId: '', meterStart: '', meterEnd: '', replaced: false, newSerialNo: '', newBitId: '', newMeterStart: '', newMeterEnd: '' }
-  ])
-
-  // Consumables
   const [fuel, setFuel] = useState('')
   const [water, setWater] = useState('')
   const [additives, setAdditives] = useState('')
-
-  // Accessories
-  const [accessories, setAccessories] = useState<AccessoryRow[]>([
-    { id: '1', itemId: '', quantity: '' }
-  ])
-
-  // Incidents
+  const [partRows, setPartRows] = useState<PartRow[]>([{ id: rowId(), itemId: '', amount: '', qty: '', qtyTouched: false }])
   const [incidents, setIncidents] = useState<IncidentRow[]>([
-    { id: '1', type: '', severity: '', description: '' }
+    { id: rowId(), type: '', severity: '', description: '' },
   ])
-
-  // Attachments
   const [attachments, setAttachments] = useState<File[]>([])
 
-  // Standby toggle handler
-  const handleStandbyToggle = (val: boolean) => {
-    setIsStandby(val)
-    if (val) {
-      // Pre-set downtime to Client when standby is on
-      setDowntimeRows([{ id: '1', reason: '', type: 'Client', hours: '' }])
-    } else {
-      setDowntimeRows([{ id: '1', reason: '', type: 'Internal', hours: '' }])
+  /* ── WHAT IS ON THIS RIG ────────────────────────────────────────────────
+   * Issued to it by the store, less what previous shifts have already used
+   * up. Wear carries across shifts as a fraction of a life, so a bit that is
+   * 62% gone stays 62% gone when the next shift picks it up. */
+  const onRig = useMemo(() => {
+    const out: Record<string, { issued: number; consumed: number; lifeUsed: number }> = {}
+    if (!rig || !project) return out
+
+    inv.pos.forEach(po => po.issues
+      .filter(i => i.rig === rig && i.project === project)
+      .forEach(i => i.lines.forEach(l => {
+        const e = out[l.itemId] ??= { issued: 0, consumed: 0, lifeUsed: 0 }
+        e.issued += l.qty
+      })))
+
+    ;(costing?.state.shiftLogs ?? [])
+      .filter(l => l.rig === rig && l.project === project)
+      .forEach(l => {
+        const f = normFormation(l.formationType)
+        ;(l.partsUsed ?? []).forEach(u => {
+          const part = partById(u.itemId)
+          if (!part) return
+          const e = out[u.itemId] ??= { issued: 0, consumed: 0, lifeUsed: 0 }
+          e.consumed += u.qty ?? 0
+          const life = lifeOf(part, f).value
+          const amount = part.wearBasis === 'days' ? (u.days ?? 0) : (u.metres ?? 0)
+          // A log written before wear was recorded only says how many units
+          // went, so one unit counts as one whole life.
+          e.lifeUsed += amount > 0 && life > 0 ? amount / life : (u.qty ?? 0)
+        })
+      })
+
+    return out
+  }, [inv.pos, inv.catalogue, costing?.state.shiftLogs, rig, project])
+
+  /* What the driller can choose from: still on the rig, and not already on
+   * another row of this form. */
+  const available = (currentRow: string) => catalogue.filter(p => {
+    const e = onRig[p.id]
+    if (!e || e.issued - e.consumed <= 0) return false
+    return !partRows.some(r => r.id !== currentRow && r.itemId === p.id)
+  })
+  const anythingOnRig = Object.values(onRig).some(e => e.issued - e.consumed > 0)
+
+  /* Everything one row needs to know, in one place. */
+  const readRow = (row: PartRow) => {
+    const part = partById(row.itemId)
+    if (!part) return null
+    const e = onRig[row.itemId] ?? { issued: 0, consumed: 0, lifeUsed: 0 }
+    const left = Math.max(0, e.issued - e.consumed)
+    const { value: life, unit } = lifeOf(part, formation)
+
+    // How far into the current unit the rig already was. Negative would mean a
+    // unit was scrapped before it wore out, which leaves a fresh one.
+    const priorFraction = Math.max(0, Math.min(1, e.lifeUsed - e.consumed))
+    const amount = parseFloat(row.amount) || 0
+    const thisShift = life > 0 ? amount / life : 0
+    const suggestedQty = Math.min(left, Math.floor(priorFraction + thisShift))
+    const qty = row.qtyTouched ? Math.min(left, parseFloat(row.qty) || 0) : suggestedQty
+
+    // Where the current unit sits after this shift, once whole units are gone.
+    const after = priorFraction + thisShift - qty
+    const worn = Math.max(0, Math.min(1, after))
+    const rate = part.wearBasis === 'days' ? costPerDay(part) : costPerMetre(part, formation)
+
+    return {
+      part, left, life, unit, priorFraction, amount, qty, suggestedQty, worn,
+      remaining: Math.max(0, life * (1 - worn)),
+      wearCost: amount * rate,
+      unitCost: qty * part.rate,
     }
   }
 
-  // Downtime rows handlers
-  const addDowntime = () => setDowntimeRows(r => [...r, { id: Date.now().toString(), reason: '', type: isStandby ? 'Client' : 'Internal', hours: '' }])
+  const partsTotal = partRows.reduce((s, r) => s + (readRow(r)?.unitCost ?? 0), 0)
+
+  const handleStandbyToggle = (val: boolean) => {
+    setIsStandby(val)
+    setDowntimeRows([{ id: rowId(), reason: '', type: val ? 'Client' : 'Internal', hours: '' }])
+    if (val) setPartRows([{ id: rowId(), itemId: '', amount: '', qty: '', qtyTouched: false }])
+  }
+
+  const addDowntime = () => setDowntimeRows(r => [...r, { id: rowId(), reason: '', type: isStandby ? 'Client' : 'Internal', hours: '' }])
   const removeDowntime = (id: string) => setDowntimeRows(r => r.filter(x => x.id !== id))
   const updateDowntime = (id: string, field: keyof DowntimeRow, value: string) =>
     setDowntimeRows(r => r.map(x => x.id === id ? { ...x, [field]: value } : x))
 
-  // Bit rows handlers
-  const addBit = () => setBitRows(r => [...r, { id: Date.now().toString(), serialNo: '', bitId: '', meterStart: '', meterEnd: '', replaced: false, newSerialNo: '', newBitId: '', newMeterStart: '', newMeterEnd: '' }])
-  const removeBit = (id: string) => setBitRows(r => r.filter(x => x.id !== id))
-  const updateBit = (id: string, field: keyof BitRow, value: string | boolean) =>
-    setBitRows(r => r.map(x => x.id === id ? { ...x, [field]: value } : x))
+  const addPart = () => setPartRows(r => [...r, { id: rowId(), itemId: '', amount: '', qty: '', qtyTouched: false }])
+  const removePart = (id: string) => setPartRows(r => r.filter(x => x.id !== id))
+  const updatePart = (id: string, patch: Partial<PartRow>) =>
+    setPartRows(r => r.map(x => x.id === id ? { ...x, ...patch } : x))
 
-  // Accessories handlers
-  const addAccessory = () => setAccessories(r => [...r, { id: Date.now().toString(), itemId: '', quantity: '' }])
-  const removeAccessory = (id: string) => setAccessories(r => r.filter(x => x.id !== id))
-  const updateAccessory = (id: string, field: keyof AccessoryRow, value: string) =>
-    setAccessories(r => r.map(x => x.id === id ? { ...x, [field]: value } : x))
+  /* Picking a part pre-fills the metres, because a part in the hole runs every
+   * metre the shift drills. The driller only touches it when something went in
+   * or came out part way through. */
+  const pickPart = (id: string, itemId: string) => {
+    const part = partById(itemId)
+    updatePart(id, {
+      itemId,
+      amount: !part ? '' : part.wearBasis === 'days' ? '1' : (shiftMetres > 0 ? String(shiftMetres) : ''),
+      qty: '', qtyTouched: false,
+    })
+  }
 
-  // Incident handlers
-  const addIncident = () => setIncidents(r => [...r, { id: Date.now().toString(), type: '', severity: '', description: '' }])
+  const addIncident = () => setIncidents(r => [...r, { id: rowId(), type: '', severity: '', description: '' }])
   const removeIncident = (id: string) => setIncidents(r => r.filter(x => x.id !== id))
   const updateIncident = (id: string, field: keyof IncidentRow, value: string) =>
     setIncidents(r => r.map(x => x.id === id ? { ...x, [field]: value } : x))
 
   const handleSubmit = () => {
+    // The shape costing reads. Nothing is persisted yet — wire this to the
+    // costing store when the log is ready to write.
+    const partsUsed = partRows.map(r => {
+      const read = readRow(r)
+      if (!read || read.amount <= 0) return null
+      return {
+        itemId: r.itemId,
+        ...(read.part.wearBasis === 'days' ? { days: read.amount } : { metres: read.amount }),
+        qty: read.qty,
+      }
+    }).filter(Boolean)
+    console.log('drilling log', { project, rig, shiftDate, shift, partsUsed })
     alert('Drilling log submitted successfully!')
   }
 
@@ -163,38 +265,34 @@ export default function DrillingLogPage() {
           <h1 className="text-2xl font-bold text-[#F8FAFC]">Daily Drilling Log</h1>
           <p className="text-[#94A3B8] mt-1 text-sm">Record shift details, performance metrics and resource consumption</p>
         </div>
-        <button
-          onClick={handleSubmit}
-          className="flex items-center gap-2 px-6 py-3 bg-[#3B82F6] text-white rounded-xl hover:bg-[#2563EB] transition-colors font-medium"
-        >
+        <button onClick={handleSubmit}
+          className="flex items-center gap-2 px-6 py-3 bg-[#3B82F6] text-white rounded-xl hover:bg-[#2563EB] transition-colors font-medium">
           <Save className="w-4 h-4" />
           Submit Log
         </button>
       </div>
 
-      {/* ── STANDBY MODE BANNER ── */}
+      {/* ── STANDBY MODE ── */}
       <div className={`rounded-2xl border p-4 transition-all ${isStandby ? 'bg-amber-500/10 border-amber-500/40' : 'bg-[#111827] border-[#1E293B]'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <AlertTriangle className={`w-5 h-5 ${isStandby ? 'text-amber-400' : 'text-[#64748B]'}`} />
             <div>
               <p className={`font-semibold text-sm ${isStandby ? 'text-amber-300' : 'text-[#F8FAFC]'}`}>Standby Mode</p>
-              <p className="text-xs text-[#64748B] mt-0.5">Enable if operations are on hold — drilling fields will be hidden and downtime set to Client</p>
+              <p className="text-xs text-[#64748B] mt-0.5">Enable if operations are on hold — drilling and parts are hidden and downtime is set to Client</p>
             </div>
           </div>
-          {/* Toggle switch */}
-          <button
-            onClick={() => handleStandbyToggle(!isStandby)}
-            className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${isStandby ? 'bg-amber-500' : 'bg-[#1E293B]'}`}
-          >
+          <button onClick={() => handleStandbyToggle(!isStandby)}
+            className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${isStandby ? 'bg-amber-500' : 'bg-[#1E293B]'}`}>
             <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${isStandby ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
         </div>
-
-        {/* Standby reason + hours — only shown when standby is ON */}
         {isStandby && (
           <div className="mt-3 pt-3 border-t border-amber-500/20">
-            <p className="text-xs text-amber-300/70">Downtime section below is pre-set to <span className="font-semibold text-amber-300">Client</span> — add your standby reason and hours there.</p>
+            <p className="text-xs text-amber-300/70">
+              Nothing wears on a standby day, so Parts used is hidden. Downtime is pre-set to{' '}
+              <span className="font-semibold text-amber-300">Client</span> — add the standby reason and hours there.
+            </p>
           </div>
         )}
       </div>
@@ -203,38 +301,37 @@ export default function DrillingLogPage() {
       <div className={sectionClass}>
         <div className="flex items-center justify-between mb-6">
           <h2 className={sectionTitleClass}>Basic Shift Details</h2>
-          {/* 10h / 12h toggle */}
           <div className="flex items-center gap-1 bg-[#1A2234] rounded-lg p-1">
-            <button
-              onClick={() => setShiftMode(10)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${shiftMode === 10 ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}
-            >10h</button>
-            <button
-              onClick={() => setShiftMode(12)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${shiftMode === 12 ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}
-            >12h</button>
+            {[10, 12].map(h => (
+              <button key={h} onClick={() => setShiftMode(h as 10 | 12)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${shiftMode === h ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}>
+                {h}h
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Row 1: Project, Rig, Shift Date, Shift */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
             <label className={labelClass}>Project *</label>
-            <select className={selectClass} value={project} onChange={e => setProject(e.target.value)}>
+            <select className={selectClass} value={project}
+              onChange={e => { setProject(e.target.value); setPartRows([{ id: rowId(), itemId: '', amount: '', qty: '', qtyTouched: false }]) }}>
               <option value="">Select project...</option>
-              {mockData.projects.map(p => <option key={p} value={p}>{p}</option>)}
+              {PROJECTS.map(p => <option key={p} value={p}>{projectCode(p)} — {p}</option>)}
             </select>
           </div>
           <div>
             <label className={labelClass}>Rig *</label>
-            <select className={selectClass} value={rig} onChange={e => setRig(e.target.value)} disabled={!project}>
+            <select className={selectClass} value={rig} disabled={!project}
+              onChange={e => { setRig(e.target.value); setPartRows([{ id: rowId(), itemId: '', amount: '', qty: '', qtyTouched: false }]) }}>
               <option value="">{project ? 'Select rig...' : 'Select a project first'}</option>
-              {mockData.rigs.map(r => <option key={r} value={r}>{r}</option>)}
+              {RIGS.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
           <div>
             <label className={labelClass}>Shift Date *</label>
-            <input type="text" className={inputClass} value={shiftDate} onChange={e => setShiftDate(e.target.value)} />
+            <input type="date" className={inputClass} style={{ colorScheme: 'dark' }}
+              value={shiftDate} onChange={e => setShiftDate(e.target.value)} />
           </div>
           <div>
             <label className={labelClass}>Shift *</label>
@@ -245,7 +342,6 @@ export default function DrillingLogPage() {
           </div>
         </div>
 
-        {/* Row 2: Supervisor, Driller, Hole Number, Crew Count */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className={labelClass}>Supervisor *</label>
@@ -266,14 +362,10 @@ export default function DrillingLogPage() {
             <select className={selectClass} value={holeNumber} onChange={e => setHoleNumber(e.target.value)}>
               <option value="">Select hole number...</option>
               <optgroup label="Open Holes">
-                {['H1', 'H2', 'H3', 'BH-001', 'BH-002'].map(h => (
-                  <option key={h} value={h}>{h} — OPEN</option>
-                ))}
+                {['H1', 'H2', 'H3', 'BH-001', 'BH-002'].map(h => <option key={h} value={h}>{h} — OPEN</option>)}
               </optgroup>
               <optgroup label="Closed Holes">
-                {['H0'].map(h => (
-                  <option key={h} value={h}>{h} — CLOSED</option>
-                ))}
+                {['H0'].map(h => <option key={h} value={h}>{h} — CLOSED</option>)}
               </optgroup>
             </select>
             <p className="text-xs text-[#4B5563] mt-1">Holes are managed in Admin → Projects → Manage Resources</p>
@@ -286,7 +378,7 @@ export default function DrillingLogPage() {
         </div>
       </div>
 
-      {/* ── 2. OPERATION DETAILS ── (hidden in standby) */}
+      {/* ── 2. OPERATION DETAILS ── */}
       {!isStandby && (
         <div className={sectionClass}>
           <h2 className={`${sectionTitleClass} mb-6`}>Operation Details</h2>
@@ -318,7 +410,7 @@ export default function DrillingLogPage() {
             <div>
               <label className={labelClass}>Meters Drilled (m) *</label>
               <input type="number" className={`${inputClass} opacity-70 cursor-not-allowed`} placeholder="0"
-                value={metersDrilled} readOnly />
+                value={metersDrilled ? metersDrilled.toFixed(2) : ''} readOnly />
               <p className="text-xs text-[#4B5563] mt-1">Calculated from start/end</p>
             </div>
             <div>
@@ -342,6 +434,7 @@ export default function DrillingLogPage() {
                 <option value="">Select formation...</option>
                 {formationTypes.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
+              <p className="text-xs text-[#4B5563] mt-1">Sets how fast parts wear this shift</p>
             </div>
             <div>
               <label className={labelClass}>Lithology Types</label>
@@ -365,17 +458,15 @@ export default function DrillingLogPage() {
             </div>
           </div>
 
-          {/* ── HOLE CLOSED TOGGLE ── */}
-          <div className={`mt-6 pt-6 border-t border-[#1E293B]`}>
+          {/* ── HOLE CLOSED ── */}
+          <div className="mt-6 pt-6 border-t border-[#1E293B]">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-[#F8FAFC]">Hole Closed This Shift?</p>
                 <p className="text-xs text-[#64748B] mt-0.5">Enable if this hole was completed and a new hole was started in the same shift</p>
               </div>
-              <button
-                onClick={() => setHoleClosed(!holeClosed)}
-                className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${holeClosed ? 'bg-[#3B82F6]' : 'bg-[#1E293B]'}`}
-              >
+              <button onClick={() => setHoleClosed(!holeClosed)}
+                className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${holeClosed ? 'bg-[#3B82F6]' : 'bg-[#1E293B]'}`}>
                 <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${holeClosed ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
             </div>
@@ -400,16 +491,13 @@ export default function DrillingLogPage() {
                   </div>
                 </div>
 
-                {/* Started drilling toggle */}
                 <div className="flex items-center justify-between py-3 px-4 bg-[#111827] rounded-xl border border-[#1E293B] mb-4">
                   <div>
                     <p className="text-sm font-medium text-[#F8FAFC]">Started drilling in new hole?</p>
                     <p className="text-xs text-[#64748B] mt-0.5">Turn off if new hole was opened but no meters drilled yet</p>
                   </div>
-                  <button
-                    onClick={() => setNewHoleDrilled(!newHoleDrilled)}
-                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${newHoleDrilled ? 'bg-[#3B82F6]' : 'bg-[#1E293B]'}`}
-                  >
+                  <button onClick={() => setNewHoleDrilled(!newHoleDrilled)}
+                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${newHoleDrilled ? 'bg-[#3B82F6]' : 'bg-[#1E293B]'}`}>
                     <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${newHoleDrilled ? 'translate-x-5' : 'translate-x-0'}`} />
                   </button>
                 </div>
@@ -430,7 +518,7 @@ export default function DrillingLogPage() {
                       <div>
                         <label className={labelClass}>Meters Drilled (m)</label>
                         <input type="number" className={`${inputClass} opacity-70 cursor-not-allowed`} placeholder="0"
-                          value={newHoleMetersDrilled} readOnly />
+                          value={newHoleMetersDrilled ? newHoleMetersDrilled.toFixed(2) : ''} readOnly />
                         <p className="text-xs text-[#4B5563] mt-1">Calculated from start/end</p>
                       </div>
                       <div>
@@ -475,30 +563,23 @@ export default function DrillingLogPage() {
               <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
               <select
                 className="flex-1 px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
-                value={row.reason}
-                onChange={e => updateDowntime(row.id, 'reason', e.target.value)}
-              >
+                value={row.reason} onChange={e => updateDowntime(row.id, 'reason', e.target.value)}>
                 <option value="">Select reason</option>
                 {downtimeReasonsList.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
-              {/* Internal / Client toggle */}
               <div className="flex items-center bg-[#1A2234] rounded-lg p-1 shrink-0">
-                <button
-                  onClick={() => !isStandby && updateDowntime(row.id, 'type', 'Internal')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${row.type === 'Internal' ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'} ${isStandby ? 'opacity-40 cursor-not-allowed' : ''}`}
-                >Internal</button>
-                <button
-                  onClick={() => !isStandby && updateDowntime(row.id, 'type', 'Client')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${row.type === 'Client' ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}
-                >Client</button>
+                <button onClick={() => !isStandby && updateDowntime(row.id, 'type', 'Internal')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${row.type === 'Internal' ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'} ${isStandby ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                  Internal
+                </button>
+                <button onClick={() => !isStandby && updateDowntime(row.id, 'type', 'Client')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${row.type === 'Client' ? 'bg-[#3B82F6] text-white' : 'text-[#94A3B8] hover:text-white'}`}>
+                  Client
+                </button>
               </div>
-              <input
-                type="number" step="0.5"
+              <input type="number" step="0.5" placeholder="Hours"
                 className="w-28 px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors shrink-0"
-                placeholder="Hours"
-                value={row.hours}
-                onChange={e => updateDowntime(row.id, 'hours', e.target.value)}
-              />
+                value={row.hours} onChange={e => updateDowntime(row.id, 'hours', e.target.value)} />
               <button onClick={() => removeDowntime(row.id)}
                 className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
                 <Trash2 className="w-4 h-4" />
@@ -508,111 +589,7 @@ export default function DrillingLogPage() {
         </div>
       </div>
 
-      {/* ── 4. BIT USAGE ── (hidden in standby) */}
-      {!isStandby && (
-        <div className={sectionClass}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className={sectionTitleClass}>Bit Usage</h2>
-            <button onClick={addBit}
-              className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium flex items-center gap-1 transition-colors">
-              <Plus className="w-4 h-4" /> Add
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {bitRows.map((row, index) => (
-              <div key={row.id} className="p-4 rounded-xl bg-[#0D1117] border border-[#1E293B] space-y-3">
-
-                {/* ── BIT ROW HEADER ── */}
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-semibold text-[#64748B]">Bit {index + 1}</span>
-                  <button onClick={() => removeBit(row.id)}
-                    className="ml-auto p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* ── BIT FIELDS ── */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div>
-                    <label className={labelClass}>Serial No.</label>
-                    <input type="text"
-                      className={inputClass} placeholder="e.g. SN-001"
-                      value={row.serialNo}
-                      onChange={e => updateBit(row.id, 'serialNo', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Bit Type</label>
-                    <select className={selectClass} value={row.bitId} onChange={e => updateBit(row.id, 'bitId', e.target.value)}>
-                      <option value="">Select bit</option>
-                      {mockData.bits.map(b => <option key={b} value={b}>{b}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelClass}>Meter Start (m)</label>
-                    <input type="number" step="0.1" className={inputClass} placeholder="0"
-                      value={row.meterStart} onChange={e => updateBit(row.id, 'meterStart', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Meter End (m)</label>
-                    <input type="number" step="0.1" className={inputClass} placeholder="0"
-                      value={row.meterEnd} onChange={e => updateBit(row.id, 'meterEnd', e.target.value)} />
-                  </div>
-                </div>
-
-                {/* ── BIT REPLACED TOGGLE ── */}
-                <div className="flex items-center justify-between pt-2 border-t border-[#1E293B]">
-                  <div>
-                    <p className="text-sm font-medium text-[#F8FAFC]">Bit replaced this shift?</p>
-                    <p className="text-xs text-[#64748B] mt-0.5">Turn on if this bit was replaced and a new one was installed</p>
-                  </div>
-                  <button
-                    onClick={() => updateBit(row.id, 'replaced', !row.replaced)}
-                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${row.replaced ? 'bg-[#3B82F6]' : 'bg-[#1E293B]'}`}
-                  >
-                    <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${row.replaced ? 'translate-x-5' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-
-                {/* ── NEW BIT FIELDS (shown when replaced) ── */}
-                {row.replaced && (
-                  <div className="p-3 rounded-xl bg-[#111827] border border-[#3B82F6]/30 space-y-3">
-                    <p className="text-xs font-semibold text-[#3B82F6]">↳ New bit installed</p>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                      <div>
-                        <label className={labelClass}>Serial No.</label>
-                        <input type="text" className={inputClass} placeholder="e.g. SN-002"
-                          value={row.newSerialNo} onChange={e => updateBit(row.id, 'newSerialNo', e.target.value)} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Bit Type</label>
-                        <select className={selectClass} value={row.newBitId} onChange={e => updateBit(row.id, 'newBitId', e.target.value)}>
-                          <option value="">Select bit</option>
-                          {mockData.bits.map(b => <option key={b} value={b}>{b}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className={labelClass}>Meter Start (m)</label>
-                        <input type="number" step="0.1" className={inputClass} placeholder="0"
-                          value={row.newMeterStart} onChange={e => updateBit(row.id, 'newMeterStart', e.target.value)} />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Meter End (m)</label>
-                        <input type="number" step="0.1" className={inputClass} placeholder="0"
-                          value={row.newMeterEnd} onChange={e => updateBit(row.id, 'newMeterEnd', e.target.value)} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── 5. CONSUMABLES ── */}
+      {/* ── 4. CONSUMABLES ── */}
       <div className={sectionClass}>
         <h2 className={`${sectionTitleClass} mb-6`}>Consumables</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -634,93 +611,178 @@ export default function DrillingLogPage() {
         </div>
       </div>
 
-      {/* ── 6. ACCESSORIES ── */}
-      <div className={sectionClass}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className={sectionTitleClass}>Accessories</h2>
-          {!isStandby && (
-            <button onClick={addAccessory}
-              className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium flex items-center gap-1 transition-colors">
-              <Plus className="w-4 h-4" /> Add
-            </button>
-          )}
-        </div>
+      {/* ── 5. PARTS USED ── */}
+      {!isStandby && (
+        <div className={sectionClass}>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h2 className={sectionTitleClass}>Parts used</h2>
+              <p className="text-xs text-[#64748B] mt-1">
+                Only what the store has issued to {rig ? <span className="font-mono text-[#94A3B8]">{rig}</span> : 'this rig'}.
+                Ask the store to issue anything missing, then log it here.
+              </p>
+            </div>
+            {rig && project && anythingOnRig && (
+              <button onClick={addPart}
+                className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium flex items-center gap-1 transition-colors">
+                <Plus className="w-4 h-4" /> Add
+              </button>
+            )}
+          </div>
 
-        <div className="space-y-3">
-          {accessories.map((row, index) => {
-            const item = catalogue.find(i => i.id === row.itemId)
-            const qty = parseFloat(row.quantity) || 0
-            const lineValue = item ? item.rate * qty : 0
+          {!project || !rig ? (
+            <div className="mt-4 p-6 rounded-xl bg-[#0D1117] border border-[#1E293B] text-center">
+              <p className="text-sm text-[#64748B]">Choose a project and a rig to see what is on it.</p>
+            </div>
+          ) : !anythingOnRig ? (
+            <div className="mt-4 p-6 rounded-xl bg-[#0D1117] border border-[#1E293B] text-center">
+              <p className="text-sm text-[#94A3B8]">Nothing is currently issued to {rig} on {projectCode(project)}.</p>
+              <p className="text-xs text-[#64748B] mt-1">
+                The store issues parts from Inventory → Store. Once they do, the parts appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3 mt-4">
+              {partRows.map((row, index) => {
+                const read = readRow(row)
+                const options = available(row.id)
 
-            return (
-              <div key={row.id} className="flex items-center gap-3 p-3 bg-[#0D1117] rounded-xl border border-[#1E293B]">
-                <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
+                return (
+                  <div key={row.id} className="p-4 rounded-xl bg-[#0D1117] border border-[#1E293B]">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
+                      <select
+                        className="flex-1 px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
+                        value={row.itemId} onChange={e => pickPart(row.id, e.target.value)}>
+                        <option value="">Select a part on this rig</option>
+                        {['Bit', 'Rod & Casing', 'Core Barrel', 'Accessory', 'Spares'].map(cat => {
+                          const items = options.filter(i => i.category === cat)
+                          if (!items.length) return null
+                          return (
+                            <optgroup key={cat} label={cat}>
+                              {items.map(i => {
+                                const e = onRig[i.id]
+                                return (
+                                  <option key={i.id} value={i.id}>
+                                    {i.name} · {i.partNumber} · {e.issued - e.consumed} on the rig
+                                  </option>
+                                )
+                              })}
+                            </optgroup>
+                          )
+                        })}
+                      </select>
+                      <button onClick={() => removePart(row.id)}
+                        className="p-2 text-[#64748B] hover:text-[#EF4444] hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
 
-                <select
-                  className={`flex-1 px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] appearance-none ${isStandby ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} focus:outline-none focus:border-[#3B82F6] transition-colors`}
-                  value={row.itemId}
-                  onChange={e => !isStandby && updateAccessory(row.id, 'itemId', e.target.value)}
-                  disabled={isStandby}
-                >
-                  <option value="">Select from catalogue</option>
-                  {['Bit', 'Rod & Casing', 'Core Barrel', 'Accessory', 'Spares'].map(cat => {
-                    const items = catalogue.filter(i => i.category === cat)
-                    if (!items.length) return null
+                    {read && (
+                      <div className="mt-4 pt-4 border-t border-[#1E293B]">
+                        <div className="flex items-center gap-3 mb-4 flex-wrap">
+                          <span className="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[#3B82F6]/10 border border-[#3B82F6]/30 text-[#3B82F6]">
+                            {WEAR_BASIS_LABEL[read.part.wearBasis]}
+                          </span>
+                          <span className="text-xs text-[#64748B]">
+                            One unit lasts <span className="text-[#94A3B8] font-mono">{read.life.toLocaleString('en-IN')} {read.unit}</span>
+                            {read.part.wearBasis === 'terrain' && formationType && ` in ${formationType.toLowerCase()}`}
+                            {' · '}
+                            <span className="text-[#94A3B8] font-mono">
+                              {read.part.wearBasis === 'days'
+                                ? `${money(costPerDay(read.part))}/day`
+                                : perMetre(costPerMetre(read.part, formation))}
+                            </span>
+                          </span>
+                        </div>
 
-                    return (
-                      <optgroup key={cat} label={cat}>
-                        {items.map(i => (
-                          <option key={i.id} value={i.id}>
-                            {i.name} — {money(i.rate)}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )
-                  })}
-                </select>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div>
+                            <label className={labelClass}>
+                              {read.part.wearBasis === 'days' ? 'Days used' : 'Metres run'}
+                            </label>
+                            <input type="number" step="0.1" min="0" className={inputClass} placeholder="0"
+                              value={row.amount}
+                              onChange={e => updatePart(row.id, { amount: e.target.value })} />
+                            {read.part.wearBasis !== 'days' && shiftMetres > 0 && (
+                              <p className="text-xs text-[#4B5563] mt-1">Shift drilled {shiftMetres.toFixed(2)} m</p>
+                            )}
+                          </div>
 
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="Qty"
-                  className={`w-24 px-3 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] text-right ${isStandby ? 'opacity-50' : ''} focus:outline-none focus:border-[#3B82F6] transition-colors`}
-                  value={row.quantity}
-                  onChange={e => !isStandby && updateAccessory(row.id, 'quantity', e.target.value)}
-                  disabled={isStandby}
-                />
+                          <div>
+                            <label className={labelClass}>Units used up</label>
+                            <input type="number" min="0" max={read.left} className={inputClass} placeholder="0"
+                              value={row.qtyTouched ? row.qty : String(read.suggestedQty)}
+                              onChange={e => updatePart(row.id, { qty: e.target.value, qtyTouched: true })} />
+                            <p className="text-xs text-[#4B5563] mt-1">
+                              {row.qtyTouched
+                                ? <button onClick={() => updatePart(row.id, { qty: '', qtyTouched: false })}
+                                    className="text-[#3B82F6] hover:underline">back to suggested {read.suggestedQty}</button>
+                                : `Suggested from wear · ${read.left} on the rig`}
+                            </p>
+                          </div>
 
-                {/* Value of the parts recorded on this line */}
-                <span className="w-28 text-right text-sm font-semibold text-[#F59E0B] font-mono shrink-0">
-                  {lineValue > 0 ? money(lineValue) : '—'}
-                </span>
+                          <div>
+                            <label className={labelClass}>Scrapped value</label>
+                            <div className="px-4 py-3 bg-[#111827] border border-dashed border-[#1E293B] rounded-xl font-mono text-[#F59E0B] font-semibold">
+                              {read.unitCost > 0 ? money(read.unitCost) : '—'}
+                            </div>
+                            <p className="text-xs text-[#4B5563] mt-1">Units gone × rate</p>
+                          </div>
 
-                <button
-                  onClick={() => removeAccessory(row.id)}
-                  className="text-[#64748B] hover:text-[#EF4444] transition-colors shrink-0"
-                  disabled={isStandby}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            )
-          })}
+                          <div>
+                            <label className={labelClass}>Wear this shift</label>
+                            <div className="px-4 py-3 bg-[#111827] border border-dashed border-[#1E293B] rounded-xl font-mono text-[#94A3B8]">
+                              {read.wearCost > 0 ? money(read.wearCost) : '—'}
+                            </div>
+                            <p className="text-xs text-[#4B5563] mt-1">What the ground took out of it</p>
+                          </div>
+                        </div>
 
-          {/* Total for the shift */}
-          {accessories.some(r => r.itemId && parseFloat(r.quantity) > 0) && (
-            <div className="flex justify-end gap-3 pt-2 pr-12 text-sm">
-              <span className="text-[#64748B]">Parts used this shift</span>
-              <span className="font-semibold text-[#F59E0B] font-mono">
-                {money(accessories.reduce((s, r) => {
-                  const it = catalogue.find(i => i.id === r.itemId)
-                  return s + (it ? it.rate * (parseFloat(r.quantity) || 0) : 0)
-                }, 0))}
-              </span>
+                        {/* How far through the current unit the rig is */}
+                        <div className="mt-4">
+                          <div className="flex items-center justify-between text-xs mb-1.5">
+                            <span className="text-[#64748B]">
+                              Current unit after this shift
+                              {read.priorFraction > 0 && (
+                                <span className="text-[#4B5563]"> · started at {Math.round(read.priorFraction * 100)}%</span>
+                              )}
+                            </span>
+                            <span className="font-mono text-[#94A3B8]">
+                              {Math.round(read.worn * 100)}% worn · {read.remaining.toFixed(read.unit === 'days' ? 0 : 1)} {read.unit} left
+                            </span>
+                          </div>
+                          <div className="h-2 rounded-full bg-[#1E293B] overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-200"
+                              style={{
+                                width: `${Math.round(read.worn * 100)}%`,
+                                background: read.worn > 0.85 ? '#EF4444' : read.worn > 0.6 ? '#F59E0B' : '#10B981',
+                              }} />
+                          </div>
+                          {read.qty > 0 && (
+                            <p className="text-xs text-[#F59E0B] mt-2">
+                              {read.qty} unit{read.qty === 1 ? '' : 's'} used up this shift — {read.left - read.qty} left on the rig.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {partsTotal > 0 && (
+                <div className="flex justify-end gap-3 pt-2 pr-12 text-sm">
+                  <span className="text-[#64748B]">Parts used up this shift</span>
+                  <span className="font-semibold text-[#F59E0B] font-mono">{money(partsTotal)}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
-      </div>
+      )}
 
-      {/* ── 7. INCIDENTS ── */}
+      {/* ── 6. INCIDENTS ── */}
       <div className={sectionClass}>
         <div className="flex items-center justify-between mb-4">
           <h2 className={sectionTitleClass}>Incidents</h2>
@@ -736,26 +798,19 @@ export default function DrillingLogPage() {
               <span className="text-[#64748B] text-sm w-5 shrink-0">{index + 1}.</span>
               <select
                 className="flex-1 px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
-                value={row.type}
-                onChange={e => updateIncident(row.id, 'type', e.target.value)}
-              >
+                value={row.type} onChange={e => updateIncident(row.id, 'type', e.target.value)}>
                 <option value="">Incident type</option>
                 {incidentTypes.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
               <select
                 className="flex-1 px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] appearance-none cursor-pointer focus:outline-none focus:border-[#3B82F6] transition-colors"
-                value={row.severity}
-                onChange={e => updateIncident(row.id, 'severity', e.target.value)}
-              >
+                value={row.severity} onChange={e => updateIncident(row.id, 'severity', e.target.value)}>
                 <option value="">Severity (optional)</option>
                 {severityTypes.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <input type="text"
+              <input type="text" placeholder="Description"
                 className="flex-[2] px-4 py-2.5 bg-[#111827] border border-[#1E293B] rounded-lg text-[#F8FAFC] placeholder-[#4B5563] focus:outline-none focus:border-[#3B82F6] transition-colors"
-                placeholder="Description"
-                value={row.description}
-                onChange={e => updateIncident(row.id, 'description', e.target.value)}
-              />
+                value={row.description} onChange={e => updateIncident(row.id, 'description', e.target.value)} />
               <button onClick={() => removeIncident(row.id)}
                 className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0">
                 <Trash2 className="w-4 h-4" />
@@ -796,7 +851,6 @@ export default function DrillingLogPage() {
         </div>
       </div>
 
-      {/* Submit */}
       <div className="flex justify-end">
         <button onClick={handleSubmit}
           className="flex items-center gap-2 px-8 py-4 bg-[#3B82F6] text-white rounded-xl hover:bg-[#2563EB] transition-colors text-base font-semibold">
@@ -808,4 +862,3 @@ export default function DrillingLogPage() {
     </div>
   )
 }
-
