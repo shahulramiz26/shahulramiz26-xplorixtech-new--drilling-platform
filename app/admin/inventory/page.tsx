@@ -422,6 +422,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
       out.push({
         id: uid('t'), partNumber: at('part_number'), name, serialNumber: at('serial_number') || undefined,
         category: (CATEGORIES as string[]).includes(at('category')) ? at('category') as PartCategory : 'Accessory',
+        formation: at('formation') || 'Any',
         rate: num('rate'), lifeMetres: num('life_metres') || num('life'),
         supplier: at('supplier') || (state.suppliers[0]?.name ?? ''),
         leadTimeDays: num('lead_days', 14), minStock: num('min_stock', 1), active: true,
