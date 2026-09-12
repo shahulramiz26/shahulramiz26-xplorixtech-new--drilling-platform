@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { toolingPerMetre, toolingPerDay, normFormation as normTerrain } from './inventory-store'
+import { toolingPerMetre, normFormation as normTerrain } from './inventory-store'
 import type { ToolingItem } from './inventory-store'
 
 /* ==========================================================================
@@ -467,7 +467,7 @@ export interface DayCost {
   fuel: number; water: number; additives: number
   labour: LabourBreakdown
   repairs: number; parts: number
-  partsByMetre: number; partsByDay: number
+  partsByMetre: number
   operating: number; ownership: number; total: number
   cpu: number | null
   rate: number
@@ -507,8 +507,7 @@ export function dayCost(
    * day wears nothing and carries nothing. */
   const partsByMetre = shifts.reduce((a, sh) =>
     a + sh.metresDrilled * toolingPerMetre(catalogue, normTerrain(sh.formationType)), 0)
-  const partsByDay = status === 'drilling' ? toolingPerDay(catalogue) : 0
-  const parts = partsByMetre + partsByDay
+  const parts = partsByMetre
 
   const operating = fuel + water + additives + labour.total + repairs + parts
   const ownership = own.allocationBasis === 'expectedUnit' ? units * ob.perUnit : ob.perDay
@@ -537,7 +536,7 @@ export function dayCost(
     drillingHours: sum(s => s.drillingHours), downtimeHours: sum(s => s.downtimeHours), maintenanceHours,
     units, coreRecovery: sum(s => s.coreRecovery),
     fuelLitres, waterLitres, additivesKg,
-    fuel, water, additives, labour, repairs, parts, partsByMetre, partsByDay,
+    fuel, water, additives, labour, repairs, parts, partsByMetre,
     operating, ownership, total,
     cpu: units > 0 ? total / units : null,
     rate, adjustmentPct, revenue, unmatched, charges,
