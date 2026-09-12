@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { toolingPerMetre, normFormation as normTerrain } from './inventory-store'
+import { toolingPerMetre, toolingPerDay, normFormation as normTerrain } from './inventory-store'
 import type { ToolingItem } from './inventory-store'
 
 /* ==========================================================================
@@ -34,6 +34,26 @@ import type { ToolingItem } from './inventory-store'
 
 export type ShiftName = 'Day' | 'Night'
 
+/* What a shift took out of a part.
+ *
+ *   metres / days   how far the part ran — wear, which carries across shifts
+ *   qty             how many whole units were finished off and scrapped
+ *
+ * The two are different facts. Seven metres of very hard ground wears a bit
+ * far more than seven metres of soft, and a bit that shatters at 40 m is
+ * scrapped whole even though it had barely worn. Only the driller knows that
+ * happened, so qty is suggested from the wear and then left editable.
+ *
+ * metres and days are optional: a log written before wear was recorded still
+ * reads, with each unit counting as one whole life. */
+export interface PartUsage {
+  itemId: string
+  qty: number
+  metres?: number
+  days?: number
+  note?: string
+}
+
 /* One row per shift, matching the driller's log form. Two shifts make a day. */
 export interface ShiftLog {
   id: string
@@ -55,10 +75,10 @@ export interface ShiftLog {
   // decides when a hole is finished — it reads that decision and the hole
   // appears in Drillholes as Closed, waiting for approval.
   holeClosedThisShift?: boolean
-  /* Accessories consumed this shift, picked from the tooling catalogue. This
-   * is the only place parts actually used gets recorded — the store knows what
-   * it issued, but only the driller knows what went into the ground. */
-  partsUsed?: { itemId: string; qty: number }[]
+  /* Parts consumed this shift, picked from the parts catalogue. This is the
+   * only place parts actually used gets recorded — the store knows what it
+   * issued, but only the driller knows what went into the ground. */
+  partsUsed?: PartUsage[]
   fuelLitres: number
   waterLitres: number
   additivesKg: number
@@ -225,12 +245,9 @@ export function normFormation(v: string) {
 export function rateRowFor(cr: ClientRate | undefined, holeSize: string, formation: string, depth: number): RateRow | undefined {
   if (!cr) return undefined
   if (cr.structure === 'flat') {
-    // Formation decides the rate; depth is irrelevant.
     return cr.rateRows.find(r => r.holeSize === holeSize &&
       (r.formation === ANY_FORMATION || normFormation(r.formation) === normFormation(formation)))
   }
-  // Depth decides the rate; the rock it happens to be passing through is not
-  // part of the contract.
   return cr.rateRows.find(r => r.holeSize === holeSize &&
     (r.fromDepth == null || depth >= r.fromDepth) &&
     (r.toDepth == null || depth < r.toDepth))
@@ -243,9 +260,6 @@ export function structureLabel(cr: ClientRate | undefined) {
     : `Slab · ${cr.rateRows.length} band${cr.rateRows.length === 1 ? '' : 's'}`
 }
 
-/* One priced run of metres: a stretch of hole at one size, one formation and
- * one rate. This is the unit a measurement book is written in, and the unit an
- * invoice line is printed from. */
 export interface Charge {
   date: string
   shift: ShiftName
@@ -261,9 +275,6 @@ export interface Charge {
   matched: boolean
 }
 
-/* Price one shift's metres. The shift is split wherever it crosses a rate
- * line's depth boundary, so a shift running 45 m to 55 m across a band edge at
- * 50 m produces two runs, not one mispriced one. */
 export function chargeShift(cr: ClientRate | undefined, log: ShiftLog, fromDepth: number): Charge[] {
   const out: Charge[] = []
   const to = fromDepth + log.metresDrilled
@@ -288,10 +299,7 @@ export function chargeShift(cr: ClientRate | undefined, log: ShiftLog, fromDepth
 }
 
 // ── HOLE ──────────────────────────────────────────────────────────────────
-/* A hole is not something you create in Finance. It exists because the driller
- * logged shifts against a hole number, so the list is derived from the log and
- * can never disagree with it. The only thing stored here is the decision —
- * closed, approved, invoiced — because that is a judgement, not a measurement. */
+
 export type HoleStatus = 'drilling' | 'closed' | 'approved' | 'invoiced'
 
 export interface HoleState { status: HoleStatus; invoiceId?: string }
@@ -330,9 +338,6 @@ export const INVOICE_STATUSES: InvoiceStatus[] = ['draft', 'pending', 'paid', 'c
 export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
   draft: 'Draft', pending: 'Pending', paid: 'Paid', cancelled: 'Cancelled',
 }
-/* Overdue is derived from the due date, never set by hand, so it cannot go
- * stale. An invoice forty days past due showing "Pending" is the one thing a
- * tracker should shout about. */
 export function isOverdue(i: Invoice, today: string) {
   return i.status === 'pending' && !!i.dueDate && i.dueDate < today
 }
@@ -379,7 +384,7 @@ export function monthsBetween(from: string, to: string) {
 export interface OwnershipBreakdown {
   landedPrice: number
   depPerYear: number; depPerMonth: number
-  emi: number; emiActive: boolean; emiMonthsLeft: number   // -1 = no expiry set
+  emi: number; emiActive: boolean; emiMonthsLeft: number
   insurancePerMonth: number; otherFixedPerMonth: number
   perMonth: number; perDay: number; perUnit: number
   basisLabel: string
@@ -393,8 +398,6 @@ export function ownershipBreakdown(o: RigOwnership, ym: string): OwnershipBreakd
   const depPerMonth = o.depPerMonthOverride ?? depPerYear / 12
 
   const notExpired = !o.emiEndsMonth || ym <= o.emiEndsMonth
-  // Accounting basis drops the EMI: depreciation and loan repayment write off
-  // the same capital, so counting both is a cash view, not an accounting one.
   const active = notExpired && o.costBasis !== 'accounting'
   const emi = active ? o.emiPerMonth : 0
 
@@ -446,8 +449,6 @@ export function labourForDay(shifts: ShiftLog[], units: number, r: OperatingRate
     return { labour, lodging, transport, heads, dayCrew, nightCrew, perMetre: true, total: labour + lodging + transport }
   }
 
-  // Crew is on site and paid whether or not a metre gets drilled, so a standby
-  // day carries the same labour as a drilling day.
   const labour = heads * r.labourRate
   const lodging = heads * r.lodgingRate
   const transport = heads > 0 ? r.transportRate : 0
@@ -466,13 +467,14 @@ export interface DayCost {
   fuel: number; water: number; additives: number
   labour: LabourBreakdown
   repairs: number; parts: number
+  partsByMetre: number; partsByDay: number
   operating: number; ownership: number; total: number
-  cpu: number | null        // null, never 0, on a day with no metres
-  rate: number              // rate in force on this day, after adjustment
+  cpu: number | null
+  rate: number
   adjustmentPct: number
   revenue: number
-  unmatched: boolean        // metres drilled with no matching rate line
-  charges: Charge[]         // priced runs, the unit a measurement book uses
+  unmatched: boolean
+  charges: Charge[]
 }
 
 export function dayCost(
@@ -496,20 +498,22 @@ export function dayCost(
   const labour = labourForDay(shifts, units, op)
   const repairs = maint.reduce((a, m) => a + m.cost, 0)
   const maintenanceHours = maint.reduce((a, m) => a + m.hours, 0)
-  /* Tooling is amortised, not charged on the day it was bought. A ₹22,000 bit
-   * with 100 m of life in hard rock costs ₹220 for every metre it drills, so
-   * the charge follows the ground the driller recorded rather than landing as
-   * a spike on whichever hole happened to be running when it was issued. */
-  const parts = shifts.reduce((a, sh) =>
+
+  /* Parts are amortised, not charged on the day they were bought, and each one
+   * is charged the way it actually wears out. A ₹22,000 bit with 100 m of life
+   * in hard rock costs ₹220 for every metre it drills, so that charge follows
+   * the ground the driller recorded. A water swivel wears with time on the rig,
+   * so it is charged once for each day the rig turned — a standby or breakdown
+   * day wears nothing and carries nothing. */
+  const partsByMetre = shifts.reduce((a, sh) =>
     a + sh.metresDrilled * toolingPerMetre(catalogue, normTerrain(sh.formationType)), 0)
+  const partsByDay = status === 'drilling' ? toolingPerDay(catalogue) : 0
+  const parts = partsByMetre + partsByDay
 
   const operating = fuel + water + additives + labour.total + repairs + parts
   const ownership = own.allocationBasis === 'expectedUnit' ? units * ob.perUnit : ob.perDay
   const total = operating + ownership
 
-  // Each shift is priced by its own size, formation and depth. A day whose two
-  // shifts pass from soft into hard bills each stretch at its own rate rather
-  // than pricing the whole day off whichever shift happened to be first.
   const holeNumber = shifts.find(s => s.holeNumber)?.holeNumber ?? null
   const ordered = [...shifts].sort((a, b) => (a.shift === 'Day' ? -1 : 1) - (b.shift === 'Day' ? -1 : 1))
   const charges: Charge[] = []
@@ -521,8 +525,6 @@ export function dayCost(
   })
 
   const drillRevenue = charges.reduce((a, c) => a + c.amount, 0)
-  // A standby day only bills when someone actually submitted a log saying the
-  // client stopped work. A missing submission must never invent revenue.
   const revenue = status === 'standby'
     ? (submitted ? (cr?.standbyPerDay ?? 0) : 0)
     : drillRevenue
@@ -535,16 +537,13 @@ export function dayCost(
     drillingHours: sum(s => s.drillingHours), downtimeHours: sum(s => s.downtimeHours), maintenanceHours,
     units, coreRecovery: sum(s => s.coreRecovery),
     fuelLitres, waterLitres, additivesKg,
-    fuel, water, additives, labour, repairs, parts,
+    fuel, water, additives, labour, repairs, parts, partsByMetre, partsByDay,
     operating, ownership, total,
     cpu: units > 0 ? total / units : null,
     rate, adjustmentPct, revenue, unmatched, charges,
   }
 }
 
-/* Adjustments are matched against how deep the hole already was when the day
- * started. "NQ used above 400 m" means shallower than 400 m — above in the
- * hole, not above the number. Several can stack. */
 export function adjustmentFor(row: RateRow, depth: number): number {
   return row.adjustments.reduce((pct, a) =>
     pct + ((a.condition === 'above' ? depth < a.depth : depth >= a.depth) ? a.adjustPct : 0), 0)
@@ -602,10 +601,6 @@ export function rollup(days: DayCost[]): Rollup {
   return z
 }
 
-/* Running total alongside each day. A single day's cost per unit can mislead —
- * one metre against a full day of cost reads as an enormous rate that is
- * arithmetically right and operationally meaningless — so month-to-date is
- * always shown beside it. */
 export function withCumulative(days: DayCost[]) {
   let u = 0, t = 0
   return days.map(d => {
@@ -622,14 +617,11 @@ export interface HoleResult {
   roll: Rollup
   depth: number
   coreRecoveryPct: number
-  rates: number[]           // more than one = the rate moved mid-hole
-  unmatchedDays: number     // metres drilled with no matching rate line
-  billing: BillingLine[]    // the measurement book for this hole
+  rates: number[]
+  unmatchedDays: number
+  billing: BillingLine[]
 }
 
-/* Grouped runs, in depth order — what goes on the invoice. Runs at the same
- * size, formation and rate merge, so a hole that passed through hard rock over
- * four separate days shows as one line. */
 export interface BillingLine {
   holeSize: string
   formation: string
@@ -662,19 +654,13 @@ export function billingLines(days: DayCost[]): BillingLine[] {
   return Object.values(acc).sort((a, b) => a.fromDepth - b.fromDepth)
 }
 
-/* Every hole number the log mentions becomes a row. Dates come from the first
- * and last shift logged against it, so a hole appears the moment drilling
- * starts and closes when someone says so. */
 export function holesFromDays(allDays: DayCost[], statuses: Record<string, HoleState>): Hole[] {
   const byHole: Record<string, DayCost[]> = {}
   allDays.forEach(d => { if (d.holeNumber) (byHole[d.holeNumber] ||= []).push(d) })
   return Object.entries(byHole).map(([holeNumber, ds]) => {
     const sorted = [...ds].sort((a, b) => a.date.localeCompare(b.date))
-    // The shift that closed it, if any. Its date is the hole's end date.
     const closingDay = sorted.find(d => d.shifts.some(sh => sh.holeClosedThisShift))
     const stored = statuses[holeNumber]?.status
-    // Once closed in the log a hole can be approved or invoiced here, but it
-    // can never go back to drilling — that would be Finance overruling the log.
     const st: HoleStatus = stored && stored !== 'drilling' ? stored : (closingDay ? 'closed' : 'drilling')
     return {
       holeNumber, rig: sorted[0].rig, project: sorted[0].project,
@@ -691,9 +677,6 @@ export function holeResult(hole: Hole, allDays: DayCost[]): HoleResult {
   return {
     hole, days, roll, depth: roll.units,
     coreRecoveryPct: roll.coreRecoveryPct,
-    // Taken from the priced runs, not the day totals. A day whose ground
-    // changed mid-shift has a blended average that is not a rate anyone ever
-    // agreed to, and listing it would be misleading.
     rates: Array.from(new Set(days.flatMap(d => d.charges).filter(c => c.metres > 0).map(c => Math.round(c.rate)))).sort((a, b) => a - b),
     unmatchedDays: days.filter(d => d.unmatched).length,
     billing: billingLines(days),
@@ -701,17 +684,12 @@ export function holeResult(hole: Hole, allDays: DayCost[]): HoleResult {
 }
 
 export function isBillable(h: Hole) { return h.status === 'approved' && !h.invoiceId }
-/* Drillholes lists holes that are finished. One still drilling has nothing to
- * approve or bill, so it belongs on Performance, not here. */
 export function isFinished(h: Hole) { return h.status !== 'drilling' }
 
 /* ==========================================================================
  * SEED DATA
  * ========================================================================== */
 
-/* Projects and rigs are shown by code. Inventory holds full names, so the code
- * is looked up here and falls back to any leading CODE- pattern in the name,
- * then to the name itself — nothing breaks if a code is missing. */
 export const PROJECT_CODES: Record<string, string> = {
   'Site A - North Field': 'PRJ-001',
   'Site B - South Ridge': 'PRJ-002',
@@ -781,9 +759,6 @@ export const SEED_OPERATING: OperatingRate[] = [
 
 export const SEED_CLIENT_RATES: ClientRate[] = [
   {
-    // Priced by formation — the government shape. One version only, so every
-    // screen shows the same rate. Adding a second dated version is what
-    // demonstrates mid-hole rate splitting, and is better shown live.
     id: 'cr_a_1', project: 'Site A - North Field', effectiveFrom: '2026-06-01',
     structure: 'flat',
     rateRows: [
@@ -795,8 +770,6 @@ export const SEED_CLIENT_RATES: ClientRate[] = [
     note: 'Tender schedule 2.2.1.1c\u2013e',
   },
   {
-    // Priced by depth band — the private shape. Formation is ignored and the
-    // rate rises with depth.
     id: 'cr_b_1', project: 'Site B - South Ridge', effectiveFrom: '2026-01-01',
     structure: 'slab',
     rateRows: [
@@ -815,8 +788,6 @@ export const SEED_HOLE_STATUS: Record<string, HoleState> = {
   'DH-101': { status: 'approved' },
 }
 
-/* Marks the last shift of a hole as the one that closed it, mirroring the
- * driller ticking "Hole Closed This Shift?". */
 function markClosures(logs: ShiftLog[], holeNumbers: string[]): ShiftLog[] {
   const lastOf: Record<string, string> = {}
   logs.forEach(l => {
@@ -830,13 +801,6 @@ function markClosures(logs: ShiftLog[], holeNumbers: string[]): ShiftLog[] {
       ? { ...l, holeClosedThisShift: true } : l)
 }
 
-/* [day, hole, dayMetres, nightMetres, dayDowntime, nightDowntime, reason]
- * Two shifts per day, 12-hour shifts, drilling hours = 12 − downtime.
- *
- * Formation is not fixed per rig — it follows depth, the way ground actually
- * behaves: soft near surface, then hard, then very hard. The generator tracks
- * each hole's depth and labels the shift accordingly, so one hole bills at
- * three different rates. */
 type DaySpec = [number, string, number, number, number?, number?, string?]
 
 function formationAt(depth: number, bands: [number, string][]): string {
@@ -848,40 +812,32 @@ const DEPTH_BANDS: [number, string][] = [
   [35, 'Soft Formation'], [75, 'Hard Formation'], [Infinity, 'Very Hard Formation'],
 ]
 
-/* Consumption follows wear, and wear follows the metres a tool has done — not
- * the depth of whichever hole it happens to be in. A bit fitted in DH-001 goes
- * on working in DH-002, so the counter runs across the rig's whole month.
- *
- * Life is taken from the catalogue's hard-rock figures, scaled by ground:
- * soft wears slowest, very hard fastest. */
 const WEAR: Record<string, number> = { Soft: 2.2, Medium: 1.5, Hard: 1.0, 'Very Hard': 0.6 }
 
 function partsFor(
   run: Record<string, number>, metres: number, formation: string,
-): { itemId: string; qty: number }[] {
-  const out: { itemId: string; qty: number }[] = []
+): PartUsage[] {
+  const out: PartUsage[] = []
   const key = formation.includes('Very') ? 'Very Hard' : formation.includes('Hard') ? 'Hard' : 'Soft'
   const factor = WEAR[key]
 
-  // [catalogue id, hard-rock life in metres]
-  const wearing: [string, number][] = [
-    ['t06', 20],    // HQ Core Lifter
-    ['t07', 50],    // HQ Core Lifter Case
-    ['t08', 100],   // HQ Impregnated Bit
-    ['t04', 500],   // HQ Diamond Reamer Shell
-    ['t01', 5000],  // HQ Wire Line Drill Rod
+  // [catalogue id, life in metres, wears faster in harder ground]
+  const wearing: [string, number, boolean][] = [
+    ['t06', 20, true],     // HQ Core Lifter
+    ['t07', 50, true],     // HQ Core Lifter Case
+    ['t08', 100, true],    // HQ Impregnated Bit
+    ['t04', 500, true],    // HQ Diamond Reamer Shell
+    ['t01', 5000, false],  // HQ Wire Line Drill Rod — metres, any ground
   ]
 
-  wearing.forEach(([id, hardLife]) => {
-    const life = hardLife * factor
-    // Metres are worn off the tool at a rate set by the ground; when a tool has
-    // done its life, one is consumed and the counter starts again.
+  wearing.forEach(([id, baseLife, byTerrain]) => {
+    const life = byTerrain ? baseLife * factor : baseLife
     run[id] = (run[id] ?? 0) + metres
     while (run[id] >= life) {
       run[id] -= life
       const existing = out.find(o => o.itemId === id)
       if (existing) existing.qty += 1
-      else out.push({ itemId: id, qty: 1 })
+      else out.push({ itemId: id, qty: 1, metres })
     }
   })
   return out
@@ -890,7 +846,7 @@ function partsFor(
 function expand(rig: string, project: string, ym: string, size: string, specs: DaySpec[], bands = DEPTH_BANDS): ShiftLog[] {
   const out: ShiftLog[] = []
   const depth: Record<string, number> = {}
-  const wear: Record<string, number> = {}   // metres on each tool, across the rig
+  const wear: Record<string, number> = {}
   specs.forEach(([day, hole, dm, nm, dd = 0, nd = 0, reason = '']) => {
     const date = `${ym}-${String(day).padStart(2, '0')}`
     const mk = (shift: ShiftName, metres: number, down: number, crew: number): ShiftLog => {
@@ -925,10 +881,8 @@ export const SEED_SHIFT_LOGS_A: ShiftLog[] = [
     [1, 'DH-001', 7, 5], [2, 'DH-001', 7, 5], [3, 'DH-001', 5, 5, 3, 0, 'Bit Change'],
     [4, 'DH-001', 7, 7], [5, 'DH-001', 7, 5], [6, 'DH-001', 7, 5],
     [7, 'DH-001', 5, 5, 2, 0, 'Ground Condition Issue'], [8, 'DH-001', 7, 5],
-    // Client stopped work — standby, billable, flat cost
     [9, '', 0, 0, 12, 12, 'Waiting for Instruction'],
     [10, 'DH-002', 7, 5], [11, 'DH-002', 7, 5], [12, 'DH-002', 7, 5],
-    // Breakdown — the contractor's own cost, never billable
     [13, 'DH-002', 0, 0, 12, 12, 'Mechanical Breakdown'],
     [14, 'DH-002', 5, 5, 2, 0, 'Hydraulic Issue'], [15, 'DH-002', 7, 7],
     [16, 'DH-002', 7, 5], [17, 'DH-002', 7, 5], [18, 'DH-002', 7, 7],
@@ -950,8 +904,6 @@ export const SEED_SHIFT_LOGS_A: ShiftLog[] = [
   ]),
 ]
 
-/* Site B prices by depth band rather than formation, so its rate lines use
- * ANY_FORMATION and depth ranges. Same engine, different contract shape. */
 export const SEED_SHIFT_LOGS_B: ShiftLog[] = expand('RIG-003', 'Site B - South Ridge', '2026-08', 'HQ', [
   [1, 'DH-101', 8, 7], [2, 'DH-101', 8, 8], [3, 'DH-101', 8, 7],
   [4, 'DH-101', 7, 7, 2, 0, 'Water Shortage'], [5, 'DH-101', 8, 8],
@@ -1017,8 +969,6 @@ export function CostingProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
   const [loaded, setLoaded] = useState(false)
 
-  // Merge over initial() rather than replacing it, so a saved state from an
-  // older build that is missing a key doesn't crash on first render.
   useEffect(() => {
     try { const raw = localStorage.getItem(KEY); if (raw) setState(s => ({ ...initial(), ...JSON.parse(raw) })) } catch {}
     setLoaded(true)
@@ -1043,18 +993,11 @@ export function CostingProvider({ children }: { children: ReactNode }) {
     ...s, holeStatus: { ...s.holeStatus, [holeNumber]: { ...s.holeStatus[holeNumber], status } },
   }))
 
-  // Invoicing stamps the holes it consumed, so a hole can never be billed
-  // twice. Deleting the invoice releases them back to Ready to bill.
-  // Invoicing stamps each hole so it can never be billed twice; deleting the
-  // invoice releases them back to Ready to bill.
   const addInvoice: CtxValue['addInvoice'] = inv => setState(s => {
     const hs = { ...s.holeStatus }
     inv.holeNumbers.forEach(n => { hs[n] = { status: 'invoiced', invoiceId: inv.id } })
     return { ...s, invoices: [inv, ...s.invoices], holeStatus: hs }
   })
-  /* Delete is gone from the tracker, so Cancelled is the only way back. It
-   * releases the invoice's holes to Approved — otherwise a mistaken invoice
-   * would lock those holes out of billing permanently. */
   const updateInvoice: CtxValue['updateInvoice'] = inv => setState(s => {
     const hs = { ...s.holeStatus }
     inv.holeNumbers.forEach(n => {
@@ -1085,6 +1028,13 @@ export function useCosting() {
   return c
 }
 
+/* Same context, but null instead of a throw when the provider is absent. A
+ * screen that only wants the log history to enrich what it shows should
+ * degrade rather than break the page. */
+export function useCostingOptional() {
+  return useContext(CostingContext)
+}
+
 /* ── Selectors ──────────────────────────────────────────────────────────── */
 
 export function rigsFor(logs: ShiftLog[], project: string) {
@@ -1110,8 +1060,6 @@ export function fullDate(date: string) {
   return `${d} ${MON[m - 1]} ${y}`
 }
 
-/* Blank versions used when nothing is configured yet: costing reads zero
- * rather than throwing, and the UI prompts to set rates. */
 export function blankOwnership(rig: string, from: string): RigOwnership {
   return {
     id: uid('own'), rig, effectiveFrom: from,
@@ -1146,8 +1094,6 @@ export const C = {
   text: '#F8FAFC', muted: '#94A3B8', faint: '#64748B', dim: '#334155',
 }
 
-// Each cost layer has one fixed colour used everywhere, so a number's layer is
-// readable before you read its label.
 export const LAYER = { operating: C.amber, ownership: C.purple, full: C.orange, revenue: C.blue }
 
 export const iStyle: React.CSSProperties = {
@@ -1175,8 +1121,6 @@ export function perUnit(n: number | null) {
 }
 export function pct(n: number) { return `${n.toFixed(1)}%` }
 
-// Cost per unit only means something against what the client pays for that
-// unit, so it is coloured by margin, never by an absolute threshold.
 export function cpuColor(cpu: number, rate: number) {
   if (!rate) return C.muted
   const m = (rate - cpu) / rate
