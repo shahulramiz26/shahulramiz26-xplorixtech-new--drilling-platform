@@ -425,11 +425,15 @@ export interface StartupLine {
   partNumber: string
   name: string
   lifeMetres: number
-  totalIssued: number      // cumulative quantity issued to this rig
+  openingQty: number       // from "Assign rig stock" (no PO)
+  issuedQty: number        // from store shelf issues (PO-backed)
+  totalQty: number         // openingQty + issuedQty
   totalUsed: number        // from the driller's log
-  onRig: number            // totalIssued − totalUsed
-  valueIssued: number      // based on the PO rate of each issue
-  costPerMetre: number     // catalogue rate ÷ life
+  onRig: number            // totalQty − totalUsed
+  openingValue: number     // value of opening rig stock
+  issuedValue: number      // value of shelf issues
+  totalValue: number       // openingValue + issuedValue
+  costPerMetre: number     // totalValue ÷ (totalQty × lifeMetres)
 }
 
 /* partsUsed is the shift log array — passed in from the costing store. */
@@ -441,44 +445,60 @@ export function startupStore(
   partsUsed: { itemId: string; qty: number }[],
   openingStock: OpeningStockEntry[] = [],
 ): StartupLine[] {
-  const issued: Record<string, { qty: number; value: number }> = {}
+  /* Track opening rig stock and shelf issues separately so the table can
+   * show them as distinct columns. */
+  const opening: Record<string, { qty: number; value: number }> = {}
+  const shelf:   Record<string, { qty: number; value: number }> = {}
 
-  /* Opening stock — parts already on the rig before the system started */
+  /* Opening rig stock — assigned directly to this rig, no PO */
   openingStock
     .filter(e => e.rig === rig && e.project === project)
     .forEach(e => e.lines.forEach(l => {
-      const entry = issued[l.itemId] ??= { qty: 0, value: 0 }
-      entry.qty += l.qty
+      const entry = opening[l.itemId] ??= { qty: 0, value: 0 }
+      entry.qty   += l.qty
       entry.value += l.qty * l.rate
     }))
 
-  /* Regular store issues */
+  /* Shelf issues — PO receipts issued from the store to this rig */
   pos.forEach(po => po.issues
     .filter(i => i.rig === rig && (i.project ?? po.project) === project)
     .forEach(i => i.lines.forEach(l => {
-      const e = issued[l.itemId] ??= { qty: 0, value: 0 }
-      e.qty += l.qty
+      const e = shelf[l.itemId] ??= { qty: 0, value: 0 }
+      e.qty   += l.qty
       e.value += l.qty * rateOfLine(po, l.itemId)
     })))
 
   const used: Record<string, number> = {}
   partsUsed.forEach(u => { used[u.itemId] = (used[u.itemId] ?? 0) + u.qty })
 
-  return Object.entries(issued)
-    .map(([itemId, e]) => {
+  const allItems = new Set([...Object.keys(opening), ...Object.keys(shelf)])
+  return Array.from(allItems)
+    .map(itemId => {
       const part = parts.find(p => p.id === itemId)
       if (!part) return null
-      const totalUsed = used[itemId] ?? 0
+      const o          = opening[itemId] ?? { qty: 0, value: 0 }
+      const sh         = shelf[itemId]   ?? { qty: 0, value: 0 }
+      const totalQty   = o.qty + sh.qty
+      const totalValue = o.value + sh.value
+      const totalUsed  = used[itemId] ?? 0
       return {
         itemId,
-        partNumber: part.partNumber,
-        name: part.name,
-        lifeMetres: part.lifeMetres,
-        totalIssued: e.qty,
+        partNumber:   part.partNumber,
+        name:         part.name,
+        lifeMetres:   part.lifeMetres,
+        openingQty:   o.qty,
+        issuedQty:    sh.qty,
+        totalQty,
         totalUsed,
-        onRig: Math.max(0, e.qty - totalUsed),
-        valueIssued: e.value,
-        costPerMetre: costPerMetre(part),
+        onRig:        Math.max(0, totalQty - totalUsed),
+        openingValue: o.value,
+        issuedValue:  sh.value,
+        totalValue,
+        /* Cost per metre = total value spent ÷ total metres of life those
+         * units represent. This updates every time more parts are issued. */
+        costPerMetre: totalQty > 0 && part.lifeMetres > 0
+          ? totalValue / (totalQty * part.lifeMetres)
+          : costPerMetre(part),
       }
     })
     .filter(Boolean) as StartupLine[]
