@@ -1457,15 +1457,23 @@ function ReceiveModal({ po, onSave, onClose }: {
   const [rows, setRows] = useState<Record<string, { accepted: number; damaged: number; rejected: number }>>(
     Object.fromEntries(po.lines.map(l => [l.itemId, { accepted: outstanding(l.itemId), damaged: 0, rejected: 0 }])))
 
-  /* Nothing can be received twice: the three boxes together are capped at what
-   * is still owed on this line, and the box being typed in gives way. */
+  /* Nothing can be received twice, so the three boxes together are capped at
+   * what is still owed. The box being typed in wins and the others give way,
+   * accepted first — otherwise a row that pre-fills as all accepted refuses
+   * every damaged unit you try to enter until you zero it out by hand. */
   const set = (itemId: string, k: 'accepted' | 'damaged' | 'rejected', v: number) =>
     setRows(r => {
-      const row = r[itemId]
-      const others = (['accepted', 'damaged', 'rejected'] as const)
-        .filter(x => x !== k).reduce((s, x) => s + row[x], 0)
-      const capped = Math.max(0, Math.min(v, Math.max(0, outstanding(itemId) - others)))
-      return { ...r, [itemId]: { ...row, [k]: capped } }
+      const out = outstanding(itemId)
+      const row = { ...r[itemId], [k]: Math.max(0, Math.min(v, out)) }
+      const others = (['accepted', 'rejected', 'damaged'] as const).filter(x => x !== k)
+      let over = others.reduce((s, x) => s + row[x], 0) + row[k] - out
+      others.forEach(x => {
+        if (over <= 0) return
+        const take = Math.min(row[x], over)
+        row[x] -= take
+        over -= take
+      })
+      return { ...r, [itemId]: row }
     })
 
   const lines: ReceiptLine[] = po.lines
@@ -1662,13 +1670,26 @@ function ReceiveReorderModal({ po, reorder, onSave, onClose }: {
   const { state } = useInventory()
   const name = state.catalogue.find(p => p.id === reorder.itemId)?.name ?? reorder.itemId
   const [date, setDate] = useState(TODAY)
-  const [accepted, setAccepted] = useState(reorder.qty)
-  const [damaged, setDamaged] = useState(0)
-  const [rejected, setRejected] = useState(0)
   const [note, setNote] = useState('')
+  const [row, setRow] = useState({ accepted: reorder.qty, damaged: 0, rejected: 0 })
 
+  /* Same rule as receiving an order: the box being typed in wins, the others
+   * give way, and the three together never exceed what was sent back. */
+  const set = (k: 'accepted' | 'damaged' | 'rejected', v: number) => setRow(r => {
+    const next = { ...r, [k]: Math.max(0, Math.min(v, reorder.qty)) }
+    const others = (['accepted', 'rejected', 'damaged'] as const).filter(x => x !== k)
+    let over = others.reduce((s, x) => s + next[x], 0) + next[k] - reorder.qty
+    others.forEach(x => {
+      if (over <= 0) return
+      const take = Math.min(next[x], over)
+      next[x] -= take
+      over -= take
+    })
+    return next
+  })
+
+  const { accepted, damaged, rejected } = row
   const total = accepted + damaged + rejected
-  const cap = (v: number, others: number) => Math.max(0, Math.min(v, reorder.qty - others))
   const faulty = damaged + rejected
   const rate = rateOfLine(po, reorder.itemId)
 
@@ -1699,17 +1720,17 @@ function ReceiveReorderModal({ po, reorder, onSave, onClose }: {
         <Grid cols={3}>
           <Field label="Accepted" hint="goes onto the shelf">
             <input type="number" min={0} max={reorder.qty} value={accepted}
-              onChange={e => setAccepted(cap(parseFloat(e.target.value) || 0, damaged + rejected))}
+              onChange={e => set('accepted', parseFloat(e.target.value) || 0)}
               style={{ ...numStyle, color: C.green }} />
           </Field>
           <Field label="Damaged" hint="faulty all over again">
             <input type="number" min={0} max={reorder.qty} value={damaged}
-              onChange={e => setDamaged(cap(parseFloat(e.target.value) || 0, accepted + rejected))}
+              onChange={e => set('damaged', parseFloat(e.target.value) || 0)}
               style={{ ...numStyle, color: C.red }} />
           </Field>
           <Field label="Wrong or short" hint="not what was sent back for">
             <input type="number" min={0} max={reorder.qty} value={rejected}
-              onChange={e => setRejected(cap(parseFloat(e.target.value) || 0, accepted + damaged))}
+              onChange={e => set('rejected', parseFloat(e.target.value) || 0)}
               style={{ ...numStyle, color: C.amber }} />
           </Field>
         </Grid>
