@@ -603,7 +603,7 @@ const P = (
   id: string, partNumber: string, name: string, category: PartCategory,
   lifeMetres: number, rate: number,
   supplier: string, leadTimeDays: number, minStock: number,
-  formation = 'Any',
+  formation = 'Hard',
 ): Part => ({ id, partNumber, name, category, formation, rate, lifeMetres, supplier, leadTimeDays, minStock, active: true })
 
 export const SEED_CATALOGUE: Part[] = [
