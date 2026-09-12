@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { toolingPerMetre, normFormation as normTerrain } from './inventory-store'
+import { toolingPerMetre } from './inventory-store'
 import type { ToolingItem } from './inventory-store'
 
 /* ==========================================================================
@@ -506,7 +506,7 @@ export function dayCost(
    * so it is charged once for each day the rig turned — a standby or breakdown
    * day wears nothing and carries nothing. */
   const partsByMetre = shifts.reduce((a, sh) =>
-    a + sh.metresDrilled * toolingPerMetre(catalogue, normTerrain(sh.formationType)), 0)
+    a + sh.metresDrilled * toolingPerMetre(catalogue), 0)
   const parts = partsByMetre
 
   const operating = fuel + water + additives + labour.total + repairs + parts
