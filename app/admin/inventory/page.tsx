@@ -230,8 +230,6 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
   const [cat, setCat] = useState<PartCategory | 'All'>('All')
   const [sup, setSup] = useState('All')
   const [showRetired, setShowRetired] = useState(false)
-  const [open, setOpen] = useState<string | null>(null)
-
   const parts = state.catalogue.filter(p =>
     (showRetired || p.active) &&
     (cat === 'All' || p.category === cat) &&
@@ -284,7 +282,7 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
               <tr>
                 <th style={th}>Part number</th><th style={th}>Item</th><th style={th}>Serial no.</th>
                 <th style={th}>Category</th><th style={th}>Formation</th><th style={thR}>Rate</th><th style={thR}>Life</th>
-                <th style={thR}>Cost / metre</th><th style={th}>Supplier</th><th style={thR}>Lead</th><th style={th} />
+                <th style={thR}>Cost / metre</th><th style={th}>Supplier</th><th style={thR}>Lead</th><th style={thR}>Min stock</th><th style={th} />
               </tr>
             </thead>
             <tbody>
@@ -292,49 +290,34 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
                 <tr><td colSpan={10}><Empty>{state.catalogue.length === 0 ? 'No parts yet. Add one or import a CSV.' : 'Nothing matches those filters.'}</Empty></td></tr>
               )}
               {parts.map(p => {
-                const isOpen = open === p.id
                 return (
-                  <Fragment key={p.id}>
-                    <tr onClick={() => setOpen(isOpen ? null : p.id)} style={{ borderBottom: rowBorder, cursor: 'pointer', opacity: p.active ? 1 : 0.45, background: isOpen ? 'rgba(249,115,22,0.05)' : undefined }}>
-                      <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber || '—'}</td>
-                      <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 230 }}>
-                        {p.name}{!p.active && <span style={{ marginLeft: 7 }}><Tag tone={C.dim}>retired</Tag></span>}
-                      </td>
-                      <td style={{ ...tdMono, color: p.serialNumber ? C.muted : C.dim }}>{p.serialNumber || '—'}</td>
-                      <td style={td}><Tag tone={C.dim}>{p.category}</Tag></td>
-                      <td style={{ ...td, color: C.muted }}>{p.formation || '—'}</td>
-                      <td style={tdN}>{money(p.rate)}</td>
-                      <td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td>
-                      <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(costPerMetre(p))}</td>
-                      <td style={td}>{p.supplier}</td>
-                      <td style={tdN}>{p.leadTimeDays}d</td>
-                      <td style={{ ...td, textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: 6 }}>
-                          <Btn size="sm" onClick={() => onEdit(p)}>Edit</Btn>
-                          <Btn size="sm" tone="danger" onClick={() => deletePart(p.id)}>Delete</Btn>
-                        </div>
-                      </td>
-                    </tr>
-                    {isOpen && (
-                      <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
-                        <td colSpan={10} style={{ padding: '14px 18px' }}>
-                          <div style={{ display: 'flex', gap: 32 }}>
-                            <KVBlock k="Life" v={`${p.lifeMetres.toLocaleString('en-IN')} m before replacement`} />
-                            <KVBlock k="Cost per metre" v={perMetre(costPerMetre(p))} />
-                            <KVBlock k="Supplier" v={p.supplier} />
-                            <KVBlock k="Lead time" v={`${p.leadTimeDays} days`} />
-                            <KVBlock k="Minimum stock" v={`${p.minStock} units`} />
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
+                  <tr key={p.id} style={{ borderBottom: rowBorder, opacity: p.active ? 1 : 0.45 }}>
+                    <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber || '—'}</td>
+                    <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 230 }}>
+                      {p.name}{!p.active && <span style={{ marginLeft: 7 }}><Tag tone={C.dim}>retired</Tag></span>}
+                    </td>
+                    <td style={{ ...tdMono, color: p.serialNumber ? C.muted : C.dim }}>{p.serialNumber || '—'}</td>
+                    <td style={td}><Tag tone={C.dim}>{p.category}</Tag></td>
+                    <td style={{ ...td, color: C.muted }}>{p.formation || '—'}</td>
+                    <td style={tdN}>{money(p.rate)}</td>
+                    <td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td>
+                    <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(costPerMetre(p))}</td>
+                    <td style={td}>{p.supplier}</td>
+                    <td style={tdN}>{p.leadTimeDays}d</td>
+                    <td style={{ ...tdN, color: C.faint }}>{p.minStock}</td>
+                    <td style={{ ...td, textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', gap: 6 }}>
+                        <Btn size="sm" onClick={() => onEdit(p)}>Edit</Btn>
+                        <Btn size="sm" tone="danger" onClick={() => deletePart(p.id)}>Delete</Btn>
+                      </div>
+                    </td>
+                  </tr>
                 )
               })}
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>Total cost per metre (active parts)</td>
+                <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={8}>Total cost per metre (active parts)</td>
                 <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{perMetre(toolingPerMetre(parts))}</td>
                 <td style={td} colSpan={3} />
               </tr>
@@ -375,7 +358,7 @@ function PartModal({ part, onSave, onClose }: { part: Part; onSave: (p: Part) =>
             </select>
           </Field>
           <Field label="Rate (₹)"><input type="number" value={f.rate} onChange={e => u({ rate: parseFloat(e.target.value) || 0 })} style={{ ...numStyle, color: C.orange }} /></Field>
-          <Field label="Formation" hint="e.g. Hard, Soft, Any"><input value={f.formation ?? ''} onChange={e => u({ formation: e.target.value })} style={iStyle} placeholder="Any" /></Field>
+          <Field label="Formation"><select value={f.formation ?? 'Any'} onChange={e => u({ formation: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}><option value="Any">Any</option><option value="Soft">Soft</option><option value="Medium">Medium</option><option value="Hard">Hard</option><option value="Very Hard">Very Hard</option></select></Field>
           </Grid>
         <Grid cols={4}>
           <Field label="Life in metres" hint="Metres before replacement">
