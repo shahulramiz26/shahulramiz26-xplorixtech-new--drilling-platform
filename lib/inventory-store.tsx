@@ -760,7 +760,7 @@ interface Ctx {
 }
 
 const InvCtx = createContext<Ctx | null>(null)
-const KEY = 'xplorix_inventory_v4'
+const KEY = 'xplorix_inventory_v5'
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
