@@ -1,695 +1,715 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { toolingPerMetre, toolingPerDay, normFormation as normTerrain } from './inventory-store'
-import type { ToolingItem } from './inventory-store'
 
 /* ==========================================================================
- * XPLORIX COSTING
+ * XPLORIX PARTS & INVENTORY
  *
- * Two rules run through this whole file.
+ * Every drilling consumable is a cost spread across the metres it drills.
  *
- * 1. Quantities come from the logs. Rates come from Set rates.
- *    Metres, hours, crew counts, fuel, water and additives are recorded in the
- *    driller's log; repair cost comes from the maintenance log; parts from
- *    inventory. Nothing measurable is ever typed on a costing screen.
+ *     cost per metre = rate / life in metres
+ *     ₹22,000 bit / 100 m = ₹220 per metre
  *
- * 2. Rates are dated, and costing looks up the rate in force on the day.
- *    A hole closed in March keeps its March rate forever. Reclassify in month
- *    four and month four onward changes; nothing before it moves. An invoice
- *    already sent can never silently stop matching the screen.
+ * Every part carries one life figure in metres. No terrain split, no days
+ * basis — one number, one cost per metre, clean.
  *
- * Cost is built in layers and the UI keeps them apart:
+ * The flow of a part through the yard is one-way:
  *
- *   operating   fuel + water + additives + crew + repairs + parts
- *   ownership   depreciation + EMI + insurance, allocated per day
- *   full        operating + ownership          <- cost per unit divides this
+ *   PO → Regular store → issued to rig → Startup store (cumulative view)
  *
- * Mobilisation and demobilisation sit outside that stack: dated lump sums,
- * billed on their own line. Spreading a one-off move across a month's metres
- * makes every hole that month read wrong.
+ * The startup store is not a separate physical location. It is a running
+ * total of everything the regular store has ever sent to a rig on a project,
+ * alongside what the driller's log says was used.
  * ========================================================================== */
 
-// ── LOGS (read-only sources) ──────────────────────────────────────────────
+export const TODAY = '2026-09-09'
 
-export type ShiftName = 'Day' | 'Night'
+// ── FORMATIONS ────────────────────────────────────────────────────────────
 
-/* What a shift took out of a part.
- *
- *   metres / days   how far the part ran — wear, which carries across shifts
- *   qty             how many whole units were finished off and scrapped
- *
- * The two are different facts. Seven metres of very hard ground wears a bit
- * far more than seven metres of soft, and a bit that shatters at 40 m is
- * scrapped whole even though it had barely worn. Only the driller knows that
- * happened, so qty is suggested from the wear and then left editable.
- *
- * metres and days are optional: a log written before wear was recorded still
- * reads, with each unit counting as one whole life. */
-export interface PartUsage {
+export const FORMATIONS = ['Soft', 'Medium', 'Hard', 'Very Hard'] as const
+export type Formation = typeof FORMATIONS[number]
+
+export function normFormation(v: string): Formation {
+  const t = (v || '').toLowerCase().replace(/formation|strata|rock/g, '').replace(/\s+/g, ' ').trim()
+  if (t.startsWith('very')) return 'Very Hard'
+  if (t.startsWith('hard')) return 'Hard'
+  if (t.startsWith('med')) return 'Medium'
+  return 'Soft'
+}
+
+// ── PARTS CATALOGUE ───────────────────────────────────────────────────────
+
+export type PartCategory = 'Bit' | 'Rod & Casing' | 'Core Barrel' | 'Accessory' | 'Spares'
+export const CATEGORIES: PartCategory[] = ['Bit', 'Rod & Casing', 'Core Barrel', 'Accessory', 'Spares']
+
+/* Every part wears in metres. One life figure, one cost per metre. */
+export interface Part {
+  id: string
+  partNumber: string
+  name: string
+  serialNumber?: string
+  category: PartCategory
+  rate: number           // ₹ per unit
+  lifeMetres: number     // metres before replacement
+  supplier: string
+  leadTimeDays: number
+  minStock: number
+  active: boolean
+}
+
+/* Kept as an alias so the finance module needs no change to its imports. */
+export type ToolingItem = Part
+export type ToolCategory = PartCategory
+
+export function costPerMetre(p: Part): number {
+  return p.lifeMetres > 0 ? p.rate / p.lifeMetres : 0
+}
+
+export function toolingPerMetre(parts: Part[]): number {
+  return parts.filter(p => p.active).reduce((s, p) => s + costPerMetre(p), 0
+  )
+}
+
+/* The formation argument is accepted but ignored — kept so the finance
+ * module's call sites still compile without changes. */
+export function toolingPerMetreForFormation(parts: Part[], _f: Formation): number {
+  return toolingPerMetre(parts)
+}
+
+// ── SUPPLIERS ─────────────────────────────────────────────────────────────
+
+export interface Supplier {
+  id: string
+  name: string
+  contact: string
+  phone: string
+  quotedLeadDays: number
+  rating?: number
+  ratingNote?: string
+}
+
+// ── PURCHASE ORDERS ───────────────────────────────────────────────────────
+
+export type POStatus = 'draft' | 'ordered' | 'partial' | 'received'
+export interface POLine { itemId: string; qty: number; rate: number }
+
+export interface ReceiptLine {
+  itemId: string
+  accepted: number
+  damaged: number
+  rejected: number
+}
+
+export const DELAY_REASONS = [
+  'Supplier delay', 'Transport', 'Customs or documentation',
+  'Our order raised late', 'Partial availability', 'Other',
+] as const
+export type DelayReason = typeof DELAY_REASONS[number]
+
+export interface Receipt {
+  id: string
+  date: string
+  lines: ReceiptLine[]
+  delayReason?: DelayReason
+  note?: string
+}
+
+// ── REORDERS ──────────────────────────────────────────────────────────────
+
+export type ReorderStatus = 'raised' | 'sent' | 'promised' | 'closed' | 'credited'
+export const REORDER_STATUS_LABEL: Record<ReorderStatus, string> = {
+  raised: 'Raised', sent: 'Sent back', promised: 'Replacement promised',
+  closed: 'Replaced', credited: 'Credited',
+}
+export const REORDER_OPEN_STATUSES: ReorderStatus[] = ['raised', 'sent', 'promised']
+
+export interface ReorderReceipt {
+  date: string
+  accepted: number
+  damaged: number
+  rejected: number
+  note?: string
+}
+
+export interface Reorder {
+  id: string
   itemId: string
   qty: number
-  metres?: number
-  days?: number
-  note?: string
+  reason: string
+  raisedDate: string
+  round: number
+  parentId?: string
+  status: ReorderStatus
+  promisedDate?: string
+  receipt?: ReorderReceipt
 }
 
-/* One row per shift, matching the driller's log form. Two shifts make a day. */
-export interface ShiftLog {
-  id: string
-  rig: string
-  project: string
-  date: string              // YYYY-MM-DD
-  shift: ShiftName
-  holeNumber: string | null
-  crewCount: number
-  shiftHours: number
-  drillingHours: number
-  downtimeHours: number
-  downtimeReason: string
-  metresDrilled: number
-  coreRecovery: number      // metres of core recovered
-  holeSize: string          // NQ / HQ / PQ — drives the size adjustment
-  formationType: string     // lithology; affects COST, not revenue
-  // Set from "Hole Closed This Shift?" in the driller's log. Finance never
-  // decides when a hole is finished — it reads that decision and the hole
-  // appears in Drillholes as Closed, waiting for approval.
-  holeClosedThisShift?: boolean
-  /* Parts consumed this shift, picked from the parts catalogue. This is the
-   * only place parts actually used gets recorded — the store knows what it
-   * issued, but only the driller knows what went into the ground. */
-  partsUsed?: PartUsage[]
-  fuelLitres: number
-  waterLitres: number
-  additivesKg: number
+export function isOpenReorder(r: Reorder) {
+  return !r.receipt && r.status !== 'credited'
+}
+export function openReorders(po: PurchaseOrder) {
+  return po.reorders.filter(isOpenReorder)
 }
 
-export interface MaintenanceLog {
+// ── TRANSFERS ─────────────────────────────────────────────────────────────
+
+export interface Transfer {
   id: string
-  rig: string
-  project: string
   date: string
-  maintenanceType: 'Preventive' | 'Breakdown' | 'Scheduled' | 'Component Replacement'
-  hours: number
-  component: string
-  action: string
-  cost: number              // already in rupees, straight from the log
-}
-
-/* A rig is drilling, broken, or standing by. There is no "idle": a day with no
- * drilling is standby — the client stopped work — and standby has its own
- * rate. Breakdown stays separate because it is the contractor's own fault and
- * can never be billed to the client. */
-export type DayStatus = 'drilling' | 'standby' | 'breakdown'
-
-export const DAY_STATUS_LABEL: Record<DayStatus, string> = {
-  drilling: 'Drilling', standby: 'Standby', breakdown: 'Breakdown',
-}
-
-/* Downtime reasons that are the contractor's own problem. Everything else —
- * waiting for instruction, weather, safety hold, site access — is the client
- * stopping work, which is standby and is billable. */
-export const BREAKDOWN_REASONS = [
-  'Mechanical Breakdown', 'Hydraulic Issue', 'Electrical Fault',
-  'Bit Change', 'Rod Change', 'Fuel Shortage', 'Operator Delay',
-]
-
-export function statusForShifts(shifts: ShiftLog[]): DayStatus {
-  if (shifts.some(s => s.drillingHours > 0)) return 'drilling'
-  if (shifts.some(s => BREAKDOWN_REASONS.includes(s.downtimeReason))) return 'breakdown'
-  return 'standby'
-}
-
-// ── RIG OWNERSHIP (Set rates → Rig cost) ──────────────────────────────────
-
-export type AllocationBasis = 'operatingDay' | 'expectedUnit'
-export type CostBasis = 'cash' | 'accounting'
-
-export interface RigOwnership {
-  id: string
-  rig: string
-  effectiveFrom: string
+  itemId: string
+  qty: number
+  toProject: string
   note?: string
-
-  basicPrice: number
-  gstPercent: number
-  transportation: number
-  landedPriceOverride?: number
-
-  depreciationRatePct: number
-  depPerMonthOverride?: number
-
-  // The EMI is typed, not computed — contractors already know their monthly
-  // figure. `emiEndsMonth` is optional but worth filling: without it a closed
-  // loan keeps charging forever and the rig looks permanently expensive.
-  emiPerMonth: number
-  emiEndsMonth?: string     // YYYY-MM, blank = no expiry
-  insurancePerYear: number
-  otherFixedPerMonth: number
-
-  costBasis: CostBasis
-  allocationBasis: AllocationBasis
-  expectedOperatingDays: number
-  expectedUnitsPerMonth: number
-  ownershipPerDayOverride?: number
 }
 
-// ── OPERATING & LABOUR (Set rates → Operating cost) ───────────────────────
-
-export interface OperatingRate {
+/* Issued from the regular store to a rig on a project. */
+export interface Issue {
   id: string
-  rig: string
-  project: string
-  effectiveFrom: string
-  note?: string
-
-  // Unit prices only — the quantities come from the driller's log
-  fuelPricePerLitre: number
-  waterPricePerLitre: number
-  additivePricePerKg: number
-
-  // Labour. Crew count per shift comes from the log; only the rates are here.
-  labourRate: number      // per head per shift, or per metre
-  lodgingRate: number     // per head per night, or per metre
-  transportRate: number   // per day, or per metre
-  // On, the three rates above are charged against metres drilled instead of
-  // against days and heads. Crew count then stops affecting cost, which is
-  // simpler but throws away what the log knows.
-  chargePerMetre: boolean
-}
-
-// ── CLIENT RATE (Set rates → Client cost) ─────────────────────────────────
-
-/* A rate line, straight off the tender: a size, a formation, and a rate.
- * "Drilling in soft rock, HQ size — ₹5,500 per m" is one row.
- *
- * Adjustments hang off their own row, not the project, because the tender's
- * conditions are written per line: "in case NQ size drilling is done before
- * 400 m depth, the rate shall decrease by 20%". Nothing about that is
- * standard, so the size, depth and percentage are all typed. */
-export interface RateAdjustment {
-  id: string
-  condition: 'above' | 'below'
-  depth: number
-  adjustPct: number       // negative reduces the rate
-}
-
-/* One line covers a size, a formation and a depth range. Leave formation as
- * ANY_FORMATION and it matches whatever the log says; leave the depth range
- * blank and it applies at any depth. That one shape covers both contracts:
- *
- *   government   size + formation, no depth range
- *   private      size + ANY formation + depth bands
- *
- * and a contract that prices hard rock differently deep than shallow is just
- * both at once. */
-export const ANY_FORMATION = 'Any formation'
-
-export interface RateRow {
-  id: string
-  holeSize: string        // NQ / HQ / PQ / BQ / AQ
-  formation: string       // a rock category, or ANY_FORMATION
-  fromDepth?: number      // blank = from surface
-  toDepth?: number        // blank = no limit
-  rate: number            // ₹ per metre
-  adjustments: RateAdjustment[]
-}
-
-/* Two shapes, chosen per project because a client contract is one or the other:
- *
- *   flat   priced by formation — soft, hard, very hard — at any depth
- *   slab   priced by depth band — 0–50, 50–100, 100+ — whatever the rock
- *
- * The rows carry both sets of fields; the structure decides which are used and
- * which the editor shows, so switching never destroys what was typed. */
-export type RateStructure = 'flat' | 'slab'
-
-export interface ClientRate {
-  id: string
-  project: string
-  effectiveFrom: string
-  note?: string
-  structure: RateStructure
-  rateRows: RateRow[]
-  standbyPerDay: number
-  mobilisation: number
-  demobilisation: number
-}
-
-/* The driller's log says "Very Hard Formation"; a tender says "Very hard rock".
- * Same thing, so both are reduced to their bare words before matching. */
-export function normFormation(v: string) {
-  return v.toLowerCase().replace(/formation|strata|rock/g, '').replace(/\s+/g, ' ').trim()
-}
-
-export function rateRowFor(cr: ClientRate | undefined, holeSize: string, formation: string, depth: number): RateRow | undefined {
-  if (!cr) return undefined
-  if (cr.structure === 'flat') {
-    return cr.rateRows.find(r => r.holeSize === holeSize &&
-      (r.formation === ANY_FORMATION || normFormation(r.formation) === normFormation(formation)))
-  }
-  return cr.rateRows.find(r => r.holeSize === holeSize &&
-    (r.fromDepth == null || depth >= r.fromDepth) &&
-    (r.toDepth == null || depth < r.toDepth))
-}
-
-export function structureLabel(cr: ClientRate | undefined) {
-  if (!cr) return '—'
-  return cr.structure === 'flat'
-    ? `Flat · ${cr.rateRows.length} formation${cr.rateRows.length === 1 ? '' : 's'}`
-    : `Slab · ${cr.rateRows.length} band${cr.rateRows.length === 1 ? '' : 's'}`
-}
-
-export interface Charge {
   date: string
-  shift: ShiftName
-  holeNumber: string | null
-  holeSize: string
-  formation: string
-  fromDepth: number
-  toDepth: number
-  metres: number
-  rate: number
-  adjustmentPct: number
-  amount: number
-  matched: boolean
-}
-
-export function chargeShift(cr: ClientRate | undefined, log: ShiftLog, fromDepth: number): Charge[] {
-  const out: Charge[] = []
-  const to = fromDepth + log.metresDrilled
-  let d = fromDepth
-  let guard = 0
-  while (d < to && guard++ < 50) {
-    const row = rateRowFor(cr, log.holeSize, log.formationType, d)
-    const limit = row?.toDepth ?? to
-    const hi = Math.min(to, limit)
-    if (hi <= d) break
-    const adjustmentPct = row ? adjustmentFor(row, d) : 0
-    const rate = (row?.rate ?? 0) * (1 + adjustmentPct / 100)
-    out.push({
-      date: log.date, shift: log.shift, holeNumber: log.holeNumber,
-      holeSize: log.holeSize, formation: log.formationType,
-      fromDepth: d, toDepth: hi, metres: hi - d,
-      rate, adjustmentPct, amount: (hi - d) * rate, matched: !!row,
-    })
-    d = hi
-  }
-  return out
-}
-
-// ── HOLE ──────────────────────────────────────────────────────────────────
-
-export type HoleStatus = 'drilling' | 'closed' | 'approved' | 'invoiced'
-
-export interface HoleState { status: HoleStatus; invoiceId?: string }
-
-export interface Hole {
-  holeNumber: string
-  rig: string
   project: string
-  startDate: string
-  endDate?: string
-  status: HoleStatus
-  invoiceId?: string
+  rig: string
+  issuedBy: string
+  lines: { itemId: string; qty: number }[]
 }
 
-// ── INVOICE ───────────────────────────────────────────────────────────────
-export interface InvoiceLine { label: string; qty: string; rate: string; amount: number; depth?: string }
-export interface Invoice {
+export interface PurchaseOrder {
   id: string
   number: string
+  supplier: string
   project: string
-  client: string
-  date: string
-  holeNumbers: string[]
-  lines: InvoiceLine[]
-  subtotal: number
-  taxPercent: number
-  total: number
-  status: InvoiceStatus
-  dueDate?: string
-  paidDate?: string
-  paidAmount?: number
+  status: POStatus
+  createdDate: string
+  orderedDate?: string
+  promisedDate?: string
+  lines: POLine[]
+  receipts: Receipt[]
+  reorders: Reorder[]
+  issues: Issue[]
+  transfers: Transfer[]
+  note?: string
 }
 
-export type InvoiceStatus = 'draft' | 'pending' | 'paid' | 'cancelled'
-export const INVOICE_STATUSES: InvoiceStatus[] = ['draft', 'pending', 'paid', 'cancelled']
-export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
-  draft: 'Draft', pending: 'Pending', paid: 'Paid', cancelled: 'Cancelled',
+// ── QUANTITY HELPERS ───────────────────────────────────────────────────────
+
+export function poValue(po: PurchaseOrder) {
+  return po.lines.reduce((s, l) => s + l.qty * l.rate, 0)
 }
-export function isOverdue(i: Invoice, today: string) {
-  return i.status === 'pending' && !!i.dueDate && i.dueDate < today
+export function rateOfLine(po: PurchaseOrder, itemId: string) {
+  return po.lines.find(l => l.itemId === itemId)?.rate ?? 0
 }
-export function outstanding(i: Invoice) {
-  return i.status === 'cancelled' ? 0 : Math.max(0, i.total - (i.paidAmount ?? 0))
+export function qtyOrdered(po: PurchaseOrder, itemId: string) {
+  return po.lines.filter(l => l.itemId === itemId).reduce((s, l) => s + l.qty, 0)
 }
-
-/* ==========================================================================
- * RATE LOOKUP — the version in force on a given date
- * ========================================================================== */
-
-export interface Dated { effectiveFrom: string }
-
-export function versionOn<T extends Dated>(versions: T[], date: string): T | undefined {
-  return versions
-    .filter(v => v.effectiveFrom <= date)
-    .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]
+export function qtyReceived(po: PurchaseOrder, itemId: string) {
+  const first = po.receipts.flatMap(r => r.lines).filter(l => l.itemId === itemId)
+    .reduce((s, l) => s + l.accepted, 0)
+  const replaced = po.reorders.filter(r => r.itemId === itemId)
+    .reduce((s, r) => s + (r.receipt?.accepted ?? 0), 0)
+  return first + replaced
 }
-export function newestFirst<T extends Dated>(versions: T[]): T[] {
-  return [...versions].sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))
+export function qtyFaulty(po: PurchaseOrder, itemId: string) {
+  const first = po.receipts.flatMap(r => r.lines).filter(l => l.itemId === itemId)
+    .reduce((s, l) => s + l.damaged + l.rejected, 0)
+  const again = po.reorders.filter(r => r.itemId === itemId)
+    .reduce((s, r) => s + (r.receipt?.damaged ?? 0) + (r.receipt?.rejected ?? 0), 0)
+  return first + again
 }
-
-/* ==========================================================================
- * OWNERSHIP
- * ========================================================================== */
-
-export function daysInMonth(ym: string) {
-  const [y, m] = ym.split('-').map(Number)
-  return new Date(y, m, 0).getDate()
+export function qtyReorderedFor(po: PurchaseOrder, itemId: string) {
+  return po.reorders.filter(r => r.itemId === itemId).reduce((s, r) => s + r.qty, 0)
 }
-export function monthOf(date: string) { return date.slice(0, 7) }
-export function shiftMonth(ym: string, by: number) {
-  const [y, m] = ym.split('-').map(Number)
-  const d = new Date(y, m - 1 + by, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+export function qtyToReorder(po: PurchaseOrder, itemId: string) {
+  return Math.max(0, qtyFaulty(po, itemId) - qtyReorderedFor(po, itemId))
 }
-
-export function monthsBetween(from: string, to: string) {
-  const [fy, fm] = from.split('-').map(Number)
-  const [ty, tm] = to.split('-').map(Number)
-  return (ty - fy) * 12 + (tm - fm)
+export function poHasSomethingToReorder(po: PurchaseOrder) {
+  return po.lines.some(l => qtyToReorder(po, l.itemId) > 0)
 }
-
-export interface OwnershipBreakdown {
-  landedPrice: number
-  depPerYear: number; depPerMonth: number
-  emi: number; emiActive: boolean; emiMonthsLeft: number
-  insurancePerMonth: number; otherFixedPerMonth: number
-  perMonth: number; perDay: number; perUnit: number
-  basisLabel: string
+export function qtyTransferred(po: PurchaseOrder, itemId: string) {
+  return po.transfers.filter(t => t.itemId === itemId).reduce((s, t) => s + t.qty, 0)
 }
-
-export function ownershipBreakdown(o: RigOwnership, ym: string): OwnershipBreakdown {
-  const landedPrice = o.landedPriceOverride ??
-    (o.basicPrice + o.basicPrice * (o.gstPercent / 100) + o.transportation)
-
-  const depPerYear = landedPrice * (o.depreciationRatePct / 100)
-  const depPerMonth = o.depPerMonthOverride ?? depPerYear / 12
-
-  const notExpired = !o.emiEndsMonth || ym <= o.emiEndsMonth
-  const active = notExpired && o.costBasis !== 'accounting'
-  const emi = active ? o.emiPerMonth : 0
-
-  const insurancePerMonth = o.insurancePerYear / 12
-  const perMonth = depPerMonth + emi + insurancePerMonth + o.otherFixedPerMonth
-
-  let perDay = 0
-  let basisLabel = ''
-  if (o.allocationBasis === 'operatingDay') {
-    perDay = o.expectedOperatingDays > 0 ? perMonth / o.expectedOperatingDays : 0
-    basisLabel = `÷ ${o.expectedOperatingDays} operating days`
-  } else {
-    basisLabel = `÷ ${o.expectedUnitsPerMonth} expected metres`
-  }
-  if (o.ownershipPerDayOverride != null && o.allocationBasis !== 'expectedUnit') {
-    perDay = o.ownershipPerDayOverride
-  }
-
-  return {
-    landedPrice, depPerYear, depPerMonth,
-    emi, emiActive: active,
-    emiMonthsLeft: o.emiEndsMonth ? Math.max(0, monthsBetween(ym, o.emiEndsMonth)) : -1,
-    insurancePerMonth, otherFixedPerMonth: o.otherFixedPerMonth,
-    perMonth, perDay,
-    perUnit: o.expectedUnitsPerMonth > 0 ? perMonth / o.expectedUnitsPerMonth : 0,
-    basisLabel,
-  }
+export function qtyIssuedTotal(po: PurchaseOrder, itemId: string) {
+  return po.issues.flatMap(i => i.lines).filter(l => l.itemId === itemId).reduce((s, l) => s + l.qty, 0)
+}
+export function qtyIssuedTo(po: PurchaseOrder, itemId: string, project: string) {
+  return po.issues.filter(i => i.project === project)
+    .flatMap(i => i.lines).filter(l => l.itemId === itemId).reduce((s, l) => s + l.qty, 0)
+}
+export function qtyNeverDelivered(po: PurchaseOrder, itemId: string) {
+  const delivered = po.receipts.flatMap(r => r.lines).filter(l => l.itemId === itemId)
+    .reduce((s, l) => s + l.accepted + l.damaged + l.rejected, 0)
+  return Math.max(0, qtyOrdered(po, itemId) - delivered)
+}
+export function poHasSomethingToReceive(po: PurchaseOrder) {
+  return po.status !== 'draft' && po.lines.some(l => qtyNeverDelivered(po, l.itemId) > 0)
+}
+export function qtyInStore(po: PurchaseOrder, itemId: string) {
+  return Math.max(0, qtyReceived(po, itemId) - qtyIssuedTotal(po, itemId))
+}
+export function poReceivedValue(po: PurchaseOrder) {
+  return po.lines.reduce((s, l) => s + qtyReceived(po, l.itemId) * l.rate, 0)
+}
+export function poIssuedValue(po: PurchaseOrder) {
+  return po.lines.reduce((s, l) => s + qtyIssuedTotal(po, l.itemId) * l.rate, 0)
+}
+export function poStoreValue(po: PurchaseOrder) {
+  return po.lines.reduce((s, l) => s + qtyInStore(po, l.itemId) * l.rate, 0)
+}
+export function poFaultyValue(po: PurchaseOrder) {
+  return po.lines.reduce((s, l) => s + qtyFaulty(po, l.itemId) * l.rate, 0)
+}
+export function poOpenReorderValue(po: PurchaseOrder) {
+  return openReorders(po).reduce((s, r) => s + r.qty * rateOfLine(po, r.itemId), 0)
+}
+export function poStatus(po: PurchaseOrder): POStatus {
+  if (po.status === 'draft') return 'draft'
+  if (po.lines.every(l => qtyReceived(po, l.itemId) >= l.qty)) return 'received'
+  return po.receipts.length > 0 ? 'partial' : 'ordered'
 }
 
-/* ==========================================================================
- * DAILY COST — one row per calendar day, built from that day's shifts
- * ========================================================================== */
-
-export interface LabourBreakdown {
-  labour: number; lodging: number; transport: number
-  heads: number; dayCrew: number; nightCrew: number; total: number
-  perMetre: boolean
+export function daysBetween(from: string, to: string) {
+  const [fy, fm, fd] = from.split('-').map(Number)
+  const [ty, tm, td] = to.split('-').map(Number)
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000)
+}
+export function addDays(date: string, n: number) {
+  const [y, m, d] = date.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
+}
+export function receiptDelayDays(po: PurchaseOrder, r: Receipt): number | null {
+  return po.promisedDate ? daysBetween(po.promisedDate, r.date) : null
 }
 
-export function labourForDay(shifts: ShiftLog[], units: number, r: OperatingRate): LabourBreakdown {
-  const dayCrew = shifts.filter(s => s.shift === 'Day').reduce((a, s) => a + s.crewCount, 0)
-  const nightCrew = shifts.filter(s => s.shift === 'Night').reduce((a, s) => a + s.crewCount, 0)
-  const heads = dayCrew + nightCrew
+// ── SUPPLIER PERFORMANCE ──────────────────────────────────────────────────
 
-  if (r.chargePerMetre) {
-    const labour = units * r.labourRate
-    const lodging = units * r.lodgingRate
-    const transport = units * r.transportRate
-    return { labour, lodging, transport, heads, dayCrew, nightCrew, perMetre: true, total: labour + lodging + transport }
-  }
-
-  const labour = heads * r.labourRate
-  const lodging = heads * r.lodgingRate
-  const transport = heads > 0 ? r.transportRate : 0
-  return { labour, lodging, transport, heads, dayCrew, nightCrew, perMetre: false, total: labour + lodging + transport }
+export interface SupplierPerformance {
+  supplier: string; orders: number; completed: number; value: number
+  quotedLead: number | null; actualLead: number | null
+  avgDelay: number | null; onTimePct: number | null
+  delivered: number; faulty: number; faultyPct: number | null
+  openReorders: number; repeatFailures: number; rating?: number
 }
 
-export interface DayCost {
-  date: string; rig: string; project: string
-  shifts: ShiftLog[]
-  status: DayStatus
-  holeNumber: string | null
-  submitted: boolean
-  drillingHours: number; downtimeHours: number; maintenanceHours: number
-  units: number; coreRecovery: number
-  fuelLitres: number; waterLitres: number; additivesKg: number
-  fuel: number; water: number; additives: number
-  labour: LabourBreakdown
-  repairs: number; parts: number
-  partsByMetre: number; partsByDay: number
-  operating: number; ownership: number; total: number
-  cpu: number | null
-  rate: number
-  adjustmentPct: number
-  revenue: number
-  unmatched: boolean
-  charges: Charge[]
-}
-
-export function dayCost(
-  date: string, rig: string, project: string,
-  shifts: ShiftLog[], maint: MaintenanceLog[],
-  op: OperatingRate, own: RigOwnership, ob: OwnershipBreakdown,
-  cr: ClientRate | undefined, catalogue: ToolingItem[], depthSoFar: number,
-): DayCost {
-  const submitted = shifts.length > 0
-  const status = submitted ? statusForShifts(shifts) : 'standby'
-  const sum = (f: (s: ShiftLog) => number) => shifts.reduce((a, s) => a + f(s), 0)
-
-  const units = sum(s => s.metresDrilled)
-  const fuelLitres = sum(s => s.fuelLitres)
-  const waterLitres = sum(s => s.waterLitres)
-  const additivesKg = sum(s => s.additivesKg)
-
-  const fuel = fuelLitres * op.fuelPricePerLitre
-  const water = waterLitres * op.waterPricePerLitre
-  const additives = additivesKg * op.additivePricePerKg
-  const labour = labourForDay(shifts, units, op)
-  const repairs = maint.reduce((a, m) => a + m.cost, 0)
-  const maintenanceHours = maint.reduce((a, m) => a + m.hours, 0)
-
-  /* Parts are amortised, not charged on the day they were bought, and each one
-   * is charged the way it actually wears out. A ₹22,000 bit with 100 m of life
-   * in hard rock costs ₹220 for every metre it drills, so that charge follows
-   * the ground the driller recorded. A water swivel wears with time on the rig,
-   * so it is charged once for each day the rig turned — a standby or breakdown
-   * day wears nothing and carries nothing. */
-  const partsByMetre = shifts.reduce((a, sh) =>
-    a + sh.metresDrilled * toolingPerMetre(catalogue, normTerrain(sh.formationType)), 0)
-  const partsByDay = status === 'drilling' ? toolingPerDay(catalogue) : 0
-  const parts = partsByMetre + partsByDay
-
-  const operating = fuel + water + additives + labour.total + repairs + parts
-  const ownership = own.allocationBasis === 'expectedUnit' ? units * ob.perUnit : ob.perDay
-  const total = operating + ownership
-
-  const holeNumber = shifts.find(s => s.holeNumber)?.holeNumber ?? null
-  const ordered = [...shifts].sort((a, b) => (a.shift === 'Day' ? -1 : 1) - (b.shift === 'Day' ? -1 : 1))
-  const charges: Charge[] = []
-  let depth = depthSoFar
-  ordered.forEach(sh => {
-    if (sh.metresDrilled <= 0) return
-    chargeShift(cr, sh, depth).forEach(c => charges.push(c))
-    depth += sh.metresDrilled
-  })
-
-  const drillRevenue = charges.reduce((a, c) => a + c.amount, 0)
-  const revenue = status === 'standby'
-    ? (submitted ? (cr?.standbyPerDay ?? 0) : 0)
-    : drillRevenue
-  const rate = units > 0 ? drillRevenue / units : 0
-  const adjustmentPct = charges.find(c => c.adjustmentPct !== 0)?.adjustmentPct ?? 0
-  const unmatched = charges.some(c => !c.matched)
-
-  return {
-    date, rig, project, shifts, status, holeNumber, submitted,
-    drillingHours: sum(s => s.drillingHours), downtimeHours: sum(s => s.downtimeHours), maintenanceHours,
-    units, coreRecovery: sum(s => s.coreRecovery),
-    fuelLitres, waterLitres, additivesKg,
-    fuel, water, additives, labour, repairs, parts, partsByMetre, partsByDay,
-    operating, ownership, total,
-    cpu: units > 0 ? total / units : null,
-    rate, adjustmentPct, revenue, unmatched, charges,
-  }
-}
-
-export function adjustmentFor(row: RateRow, depth: number): number {
-  return row.adjustments.reduce((pct, a) =>
-    pct + ((a.condition === 'above' ? depth < a.depth : depth >= a.depth) ? a.adjustPct : 0), 0)
-}
-
-/* ==========================================================================
- * ROLLUP
- * ========================================================================== */
-
-export interface Rollup {
-  days: number; drillingDays: number; standbyDays: number; breakdownDays: number
-  missingDays: number
-  units: number; coreRecovery: number; coreRecoveryPct: number
-  drillingHours: number; downtimeHours: number; maintenanceHours: number; fuelLitres: number
-  fuel: number; water: number; additives: number
-  labour: number; repairs: number; parts: number
-  operating: number; ownership: number; total: number; revenue: number
-  cpu: number; operatingCPU: number; ownershipCPU: number
-  revenuePerUnit: number; margin: number; marginPct: number
-}
-
-export function rollup(days: DayCost[]): Rollup {
-  const z: Rollup = {
-    days: 0, drillingDays: 0, standbyDays: 0, breakdownDays: 0, missingDays: 0,
-    units: 0, coreRecovery: 0, coreRecoveryPct: 0, drillingHours: 0, downtimeHours: 0, maintenanceHours: 0,
-    fuelLitres: 0, fuel: 0, water: 0, additives: 0,
-    labour: 0, repairs: 0, parts: 0, operating: 0, ownership: 0, total: 0, revenue: 0,
-    cpu: 0, operatingCPU: 0, ownershipCPU: 0, revenuePerUnit: 0, margin: 0, marginPct: 0,
-  }
-  days.forEach(d => {
-    z.days++
-    if (d.status === 'drilling') z.drillingDays++
-    if (d.status === 'standby') z.standbyDays++
-    if (d.status === 'breakdown') z.breakdownDays++
-    if (!d.submitted) z.missingDays++
-    z.units += d.units; z.coreRecovery += d.coreRecovery
-    z.drillingHours += d.drillingHours; z.downtimeHours += d.downtimeHours
-    z.maintenanceHours += d.maintenanceHours
-    z.fuelLitres += d.fuelLitres
-    z.fuel += d.fuel; z.water += d.water; z.additives += d.additives
-    z.labour += d.labour.total
-    z.repairs += d.repairs; z.parts += d.parts
-    z.operating += d.operating; z.ownership += d.ownership; z.total += d.total
-    z.revenue += d.revenue
-  })
-  if (z.units > 0) {
-    z.cpu = z.total / z.units
-    z.operatingCPU = z.operating / z.units
-    z.ownershipCPU = z.ownership / z.units
-    z.revenuePerUnit = z.revenue / z.units
-    z.coreRecoveryPct = (z.coreRecovery / z.units) * 100
-  }
-  z.margin = z.revenue - z.total
-  z.marginPct = z.revenue > 0 ? (z.margin / z.revenue) * 100 : 0
-  return z
-}
-
-export function withCumulative(days: DayCost[]) {
-  let u = 0, t = 0
-  return days.map(d => {
-    u += d.units; t += d.total
-    return { ...d, mtdUnits: u, mtdTotal: t, mtdCPU: u > 0 ? t / u : null }
-  })
-}
-export type DayCostMTD = ReturnType<typeof withCumulative>[number]
-
-// ── HOLE ROLLUP ───────────────────────────────────────────────────────────
-export interface HoleResult {
-  hole: Hole
-  days: DayCost[]
-  roll: Rollup
-  depth: number
-  coreRecoveryPct: number
-  rates: number[]
-  unmatchedDays: number
-  billing: BillingLine[]
-}
-
-export interface BillingLine {
-  holeSize: string
-  formation: string
-  fromDepth: number
-  toDepth: number
-  metres: number
-  rate: number
-  amount: number
-  matched: boolean
-}
-
-export function billingLines(days: DayCost[]): BillingLine[] {
-  const acc: Record<string, BillingLine> = {}
-  days.forEach(d => d.charges.forEach(c => {
-    const k = `${c.holeSize}|${c.formation}|${Math.round(c.rate)}`
-    const e = acc[k]
-    if (!e) {
-      acc[k] = {
-        holeSize: c.holeSize, formation: c.formation,
-        fromDepth: c.fromDepth, toDepth: c.toDepth,
-        metres: c.metres, rate: c.rate, amount: c.amount, matched: c.matched,
-      }
-    } else {
-      e.fromDepth = Math.min(e.fromDepth, c.fromDepth)
-      e.toDepth = Math.max(e.toDepth, c.toDepth)
-      e.metres += c.metres
-      e.amount += c.amount
-    }
+export function supplierPerformance(pos: PurchaseOrder[], suppliers: Supplier[], name: string): SupplierPerformance {
+  const mine = pos.filter(p => p.supplier === name && p.status !== 'draft')
+  const leads: number[] = []
+  const delays: number[] = []
+  mine.forEach(po => po.receipts.forEach(r => {
+    if (po.orderedDate) leads.push(daysBetween(po.orderedDate, r.date))
+    if (r.delayReason === 'Our order raised late') return
+    const d = receiptDelayDays(po, r)
+    if (d != null) delays.push(d)
   }))
-  return Object.values(acc).sort((a, b) => a.fromDepth - b.fromDepth)
-}
-
-export function holesFromDays(allDays: DayCost[], statuses: Record<string, HoleState>): Hole[] {
-  const byHole: Record<string, DayCost[]> = {}
-  allDays.forEach(d => { if (d.holeNumber) (byHole[d.holeNumber] ||= []).push(d) })
-  return Object.entries(byHole).map(([holeNumber, ds]) => {
-    const sorted = [...ds].sort((a, b) => a.date.localeCompare(b.date))
-    const closingDay = sorted.find(d => d.shifts.some(sh => sh.holeClosedThisShift))
-    const stored = statuses[holeNumber]?.status
-    const st: HoleStatus = stored && stored !== 'drilling' ? stored : (closingDay ? 'closed' : 'drilling')
-    return {
-      holeNumber, rig: sorted[0].rig, project: sorted[0].project,
-      startDate: sorted[0].date,
-      endDate: closingDay?.date,
-      status: st, invoiceId: statuses[holeNumber]?.invoiceId,
-    }
-  }).sort((a, b) => a.startDate.localeCompare(b.startDate))
-}
-
-export function holeResult(hole: Hole, allDays: DayCost[]): HoleResult {
-  const days = allDays.filter(d => d.holeNumber === hole.holeNumber)
-  const roll = rollup(days)
+  const avg = (a: number[]) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null
+  const sup = suppliers.find(s => s.name === name)
+  let delivered = 0, faulty = 0
+  mine.forEach(po => po.lines.forEach(l => {
+    delivered += qtyReceived(po, l.itemId) + qtyFaulty(po, l.itemId)
+    faulty += qtyFaulty(po, l.itemId)
+  }))
   return {
-    hole, days, roll, depth: roll.units,
-    coreRecoveryPct: roll.coreRecoveryPct,
-    rates: Array.from(new Set(days.flatMap(d => d.charges).filter(c => c.metres > 0).map(c => Math.round(c.rate)))).sort((a, b) => a - b),
-    unmatchedDays: days.filter(d => d.unmatched).length,
-    billing: billingLines(days),
+    supplier: name, orders: mine.length,
+    completed: mine.filter(p => poStatus(p) === 'received').length,
+    value: mine.reduce((s, p) => s + poValue(p), 0),
+    quotedLead: sup?.quotedLeadDays ?? null, actualLead: avg(leads),
+    avgDelay: avg(delays),
+    onTimePct: delays.length ? (delays.filter(d => d <= 0).length / delays.length) * 100 : null,
+    delivered, faulty, faultyPct: delivered > 0 ? (faulty / delivered) * 100 : null,
+    openReorders: mine.reduce((s, p) => s + openReorders(p).length, 0),
+    repeatFailures: mine.reduce((s, p) =>
+      s + p.reorders.filter(r => r.receipt && (r.receipt.damaged + r.receipt.rejected) > 0).length, 0),
+    rating: sup?.rating,
   }
 }
 
-export function isBillable(h: Hole) { return h.status === 'approved' && !h.invoiceId }
-export function isFinished(h: Hole) { return h.status !== 'drilling' }
+// ── REGULAR STORE ─────────────────────────────────────────────────────────
+
+export interface StockLine {
+  key: string; poId: string; poNumber: string; itemId: string
+  project: string; qty: number; rate: number; value: number
+  ageDays: number; movedHere: boolean
+}
+
+export function stockInStore(pos: PurchaseOrder[], today: string): StockLine[] {
+  const out: StockLine[] = []
+  pos.forEach(po => po.lines.forEach(l => {
+    const rate = l.rate
+    const lastReceipt = po.receipts
+      .filter(r => r.lines.some(x => x.itemId === l.itemId && x.accepted > 0))
+      .map(r => r.date).sort().pop()
+    const home = qtyReceived(po, l.itemId)
+      - qtyTransferred(po, l.itemId)
+      - qtyIssuedTo(po, l.itemId, po.project)
+    if (home > 0) {
+      out.push({
+        key: `${po.id}|${l.itemId}|${po.project}`,
+        poId: po.id, poNumber: po.number, itemId: l.itemId, project: po.project,
+        qty: home, rate, value: home * rate,
+        ageDays: lastReceipt ? daysBetween(lastReceipt, today) : 0,
+        movedHere: false,
+      })
+    }
+    const byProject: Record<string, { qty: number; last: string }> = {}
+    po.transfers.filter(t => t.itemId === l.itemId).forEach(t => {
+      const e = byProject[t.toProject] ??= { qty: 0, last: t.date }
+      e.qty += t.qty
+      if (t.date > e.last) e.last = t.date
+    })
+    Object.entries(byProject).forEach(([project, e]) => {
+      const qty = e.qty - qtyIssuedTo(po, l.itemId, project)
+      if (qty <= 0) return
+      out.push({
+        key: `${po.id}|${l.itemId}|${project}`,
+        poId: po.id, poNumber: po.number, itemId: l.itemId, project,
+        qty, rate, value: qty * rate,
+        ageDays: daysBetween(e.last, today), movedHere: true,
+      })
+    })
+  }))
+  return out.sort((a, b) => b.value - a.value)
+}
+
+export interface OnOrderLine {
+  itemId: string; qty: number; value: number
+  poNumber: string; supplier: string
+  promisedDate?: string; overdueDays: number | null
+  awaitingReplacement: boolean
+}
+
+export function onOrder(pos: PurchaseOrder[], today: string): OnOrderLine[] {
+  const out: OnOrderLine[] = []
+  pos.filter(p => p.status !== 'draft').forEach(po => po.lines.forEach(l => {
+    const q = qtyNeverDelivered(po, l.itemId)
+    if (q <= 0) return
+    const open = openReorders(po).filter(r => r.itemId === l.itemId)
+    const due = open.length
+      ? (open.map(r => r.promisedDate).filter(Boolean).sort()[0] ?? undefined)
+      : po.promisedDate
+    out.push({
+      itemId: l.itemId, qty: q, value: q * l.rate,
+      poNumber: po.number, supplier: po.supplier,
+      promisedDate: due,
+      overdueDays: due && due < today ? daysBetween(due, today) : null,
+      awaitingReplacement: open.length > 0,
+    })
+  }))
+  return out.sort((a, b) => (b.overdueDays ?? -1) - (a.overdueDays ?? -1))
+}
+
+// ── STARTUP STORE ─────────────────────────────────────────────────────────
+/* A per-rig, per-project running total of everything ever issued from the
+ * regular store to that rig. Grows every time an issue is made. Total used
+ * comes from the driller's log. */
+
+export interface StartupLine {
+  itemId: string
+  partNumber: string
+  name: string
+  lifeMetres: number
+  totalIssued: number      // cumulative quantity issued to this rig
+  totalUsed: number        // from the driller's log
+  onRig: number            // totalIssued − totalUsed
+  valueIssued: number      // based on the PO rate of each issue
+  costPerMetre: number     // catalogue rate ÷ life
+}
+
+/* partsUsed is the shift log array — passed in from the costing store. */
+export function startupStore(
+  pos: PurchaseOrder[],
+  parts: Part[],
+  rig: string,
+  project: string,
+  partsUsed: { itemId: string; qty: number }[],
+): StartupLine[] {
+  const issued: Record<string, { qty: number; value: number }> = {}
+
+  pos.forEach(po => po.issues
+    .filter(i => i.rig === rig && (i.project ?? po.project) === project)
+    .forEach(i => i.lines.forEach(l => {
+      const e = issued[l.itemId] ??= { qty: 0, value: 0 }
+      e.qty += l.qty
+      e.value += l.qty * rateOfLine(po, l.itemId)
+    })))
+
+  const used: Record<string, number> = {}
+  partsUsed.forEach(u => { used[u.itemId] = (used[u.itemId] ?? 0) + u.qty })
+
+  return Object.entries(issued)
+    .map(([itemId, e]) => {
+      const part = parts.find(p => p.id === itemId)
+      if (!part) return null
+      const totalUsed = used[itemId] ?? 0
+      return {
+        itemId,
+        partNumber: part.partNumber,
+        name: part.name,
+        lifeMetres: part.lifeMetres,
+        totalIssued: e.qty,
+        totalUsed,
+        onRig: Math.max(0, e.qty - totalUsed),
+        valueIssued: e.value,
+        costPerMetre: costPerMetre(part),
+      }
+    })
+    .filter(Boolean) as StartupLine[]
+}
+
+// ── CONSUMPTION ───────────────────────────────────────────────────────────
+
+export interface ConsumptionLine {
+  date: string; rig: string; project: string
+  itemId: string; qty: number; value: number; poNumber: string
+}
+
+export function consumption(pos: PurchaseOrder[], f?: { rig?: string; project?: string; month?: string }): ConsumptionLine[] {
+  const out: ConsumptionLine[] = []
+  pos.forEach(po => po.issues.forEach(i => {
+    if (f?.rig && i.rig !== f.rig) return
+    if (f?.project && (i.project ?? po.project) !== f.project) return
+    if (f?.month && i.date.slice(0, 7) !== f.month) return
+    i.lines.forEach(l => {
+      const rate = rateOfLine(po, l.itemId)
+      out.push({ date: i.date, rig: i.rig, project: i.project ?? po.project, itemId: l.itemId, qty: l.qty, value: l.qty * rate, poNumber: po.number })
+    })
+  }))
+  return out.sort((a, b) => a.date.localeCompare(b.date))
+}
+
+export function consumptionValue(pos: PurchaseOrder[], f?: { rig?: string; project?: string; month?: string }) {
+  return consumption(pos, f).reduce((s, c) => s + c.value, 0)
+}
+
+// ── ALERTS ────────────────────────────────────────────────────────────────
+
+export type AlertKind = 'runningOut' | 'lowStock' | 'overdue' | 'replacement' | 'idle' | 'stranded'
+export type AlertLevel = 'info' | 'warn' | 'urgent'
+
+export interface Alert {
+  id: string; kind: AlertKind; level: AlertLevel; title: string; detail: string; value?: number
+}
+
+export interface AlertSettings {
+  idleDays: number; idleValue: number; coverDays: number
+}
+export const DEFAULT_ALERTS: AlertSettings = { idleDays: 30, idleValue: 20000, coverDays: 5 }
+
+export interface RigBurn { rig: string; metresPerDay: number; formation: Formation }
+
+export function buildAlerts(
+  pos: PurchaseOrder[], parts: Part[], today: string,
+  completedProjects: string[], burn: RigBurn[], s: AlertSettings = DEFAULT_ALERTS,
+): Alert[] {
+  const out: Alert[] = []
+  const nameOf = (id: string) => parts.find(p => p.id === id)?.name ?? id
+  const stock = stockInStore(pos, today)
+
+  stock.filter(l => completedProjects.includes(l.project)).forEach(l => {
+    out.push({
+      id: `stranded_${l.key}`, kind: 'stranded', level: 'warn',
+      title: `${nameOf(l.itemId)} is stranded on a closed project`,
+      detail: `${l.qty} in the regular store against ${l.project}, which is complete. Move it or it stays invisible.`,
+      value: l.value,
+    })
+  })
+
+  onOrder(pos, today).forEach(l => {
+    if (l.overdueDays == null || l.overdueDays <= 0) return
+    out.push({
+      id: `late_${l.poNumber}_${l.itemId}`,
+      kind: l.awaitingReplacement ? 'replacement' : 'overdue',
+      level: l.overdueDays > 14 ? 'urgent' : 'warn',
+      title: l.awaitingReplacement
+        ? `Replacement for ${nameOf(l.itemId)} is ${l.overdueDays} days late`
+        : `${nameOf(l.itemId)} is ${l.overdueDays} days late`,
+      detail: `${l.qty} on ${l.poNumber} from ${l.supplier}, due ${l.promisedDate}. Chase it or re-source.`,
+      value: l.value,
+    })
+  })
+
+  pos.forEach(po => openReorders(po).forEach(r => {
+    if (r.promisedDate) return
+    const age = daysBetween(r.raisedDate, today)
+    if (age < 7) return
+    out.push({
+      id: `reorder_open_${r.id}`, kind: 'replacement', level: age > 21 ? 'urgent' : 'warn',
+      title: `${nameOf(r.itemId)} sent back ${age} days ago with no replacement date`,
+      detail: `${r.qty} on ${po.number} from ${po.supplier} — ${r.reason}.`,
+      value: r.qty * rateOfLine(po, r.itemId),
+    })
+  }))
+
+  const have: Record<string, number> = {}
+  stock.forEach(l => { have[l.itemId] = (have[l.itemId] ?? 0) + l.qty })
+  const everOrdered = new Set(pos.flatMap(p => p.lines.map(l => l.itemId)))
+  const totalBurn = burn.reduce((a, b) => a + b.metresPerDay, 0)
+  const live = parts.filter(p => p.active && everOrdered.has(p.id))
+
+  live.forEach(part => {
+    const n = have[part.id] ?? 0
+    if (totalBurn <= 0) return
+    const metresOfLife = n * part.lifeMetres
+    const days = metresOfLife / totalBurn
+    if (days >= part.leadTimeDays + s.coverDays) return
+    const onWay = onOrder(pos, today).filter(o => o.itemId === part.id).reduce((a, o) => a + o.qty, 0)
+    out.push({
+      id: `running_${part.id}`, kind: 'runningOut',
+      level: days < part.leadTimeDays && onWay === 0 ? 'urgent' : 'warn',
+      title: n === 0 ? `${part.name} — none in the regular store` : `${part.name} runs out in ${Math.floor(days)} days`,
+      detail: `${n} in store covers ${Math.round(metresOfLife).toLocaleString('en-IN')} m at ${totalBurn.toFixed(1)} m/day. Lead time is ${part.leadTimeDays} days`
+        + (onWay > 0 ? `, and ${onWay} is already on order.` : days < part.leadTimeDays ? ' — already too late to avoid a gap.' : ' — order now.'),
+      value: Math.max(1, part.minStock - n) * part.rate,
+    })
+  })
+
+  live.forEach(part => {
+    const n = have[part.id] ?? 0
+    if (n < part.minStock && !out.some(a => a.id === `running_${part.id}`)) {
+      out.push({
+        id: `low_${part.id}`, kind: 'lowStock', level: 'info',
+        title: `${part.name} is below minimum stock`,
+        detail: `${n} in the regular store against a minimum of ${part.minStock}.`,
+        value: (part.minStock - n) * part.rate,
+      })
+    }
+  })
+
+  const idle: Record<string, { qty: number; value: number; oldest: number; pos: Set<string> }> = {}
+  stock.filter(l => !completedProjects.includes(l.project)).forEach(l => {
+    const e = idle[l.itemId] ??= { qty: 0, value: 0, oldest: 0, pos: new Set() }
+    e.qty += l.qty; e.value += l.value
+    e.oldest = Math.max(e.oldest, l.ageDays)
+    e.pos.add(l.poNumber)
+  })
+  Object.entries(idle).forEach(([itemId, e]) => {
+    if (out.some(a => a.id === `running_${itemId}`)) return
+    if (e.oldest < s.idleDays && e.value < s.idleValue) return
+    out.push({
+      id: `idle_${itemId}`, kind: 'idle',
+      level: e.oldest >= s.idleDays * 2 ? 'warn' : 'info',
+      title: `${nameOf(itemId)} is sitting in the regular store`,
+      detail: `${e.qty} received up to ${e.oldest} days ago on ${Array.from(e.pos).join(', ')}, not yet issued to any rig.`,
+      value: e.value,
+    })
+  })
+
+  const rank: Record<AlertLevel, number> = { urgent: 0, warn: 1, info: 2 }
+  return out.sort((a, b) => rank[a.level] - rank[b.level] || (b.value ?? 0) - (a.value ?? 0))
+}
 
 /* ==========================================================================
- * SEED DATA
+ * SEED
  * ========================================================================== */
 
+const P = (
+  id: string, partNumber: string, name: string, category: PartCategory,
+  lifeMetres: number, rate: number,
+  supplier: string, leadTimeDays: number, minStock: number,
+): Part => ({ id, partNumber, name, category, rate, lifeMetres, supplier, leadTimeDays, minStock, active: true })
+
+export const SEED_CATALOGUE: Part[] = [
+  P('t01', 'HQ-ROD-30',  'HQ Wire Line Drill Rod 3.0 m',      'Rod & Casing', 5000,  7840,  'Boart Longyear India', 21, 6),
+  P('t02', 'HQ-CB-30',   'HQ Core Barrel 3.0 m',              'Core Barrel',  2000,  58800, 'Boart Longyear India', 28, 1),
+  P('t03', 'HQ-ITA-01',  'HQ Inner Tube Assembly',            'Core Barrel',  2000,  49000, 'Boart Longyear India', 28, 1),
+  P('t04', 'HQ-RS-01',   'HQ Diamond Reamer Shell',           'Bit',          500,   17150, 'Sandvik Mining',       18, 2),
+  P('t05', 'HQ-OS-01',   'HQ Over Shot Assembly',             'Accessory',    2000,  34300, 'Boart Longyear India', 24, 1),
+  P('t06', 'HQ-CL-01',   'HQ Core Lifter',                    'Accessory',    20,    980,   'Drillco Tools',        10, 20),
+  P('t07', 'HQ-CLC-01',  'HQ Core Lifter Case',               'Accessory',    50,    1274,  'Drillco Tools',        10, 12),
+  P('t08', 'HQ-BIT-IMP', 'HQ Impregnated Bit',                'Bit',          100,   22000, 'Sandvik Mining',       18, 3),
+  P('t09', 'HQ-CB-SPR',  'HQ Core Barrel Spares',             'Spares',       500,   37440, 'Boart Longyear India', 28, 1),
+  P('t10', 'WS-NQNW-01', 'Water Swivel NQ/NW Connection',     'Accessory',    5000,  24990, 'Drillco Tools',        14, 1),
+  P('t11', 'HP-NQNW-01', 'Hoisting Plug NQ/NW Connection',    'Accessory',    5000,  29400, 'Drillco Tools',        14, 1),
+  P('t12', 'ADP-01',     'Adaptors',                          'Accessory',    5000,  4900,  'Drillco Tools',        10, 2),
+  P('t13', 'PW-CSG-30',  'PW Casing 3.0 m',                   'Rod & Casing', 10000, 10780, 'Mahalaxmi Steel',      30, 4),
+  P('t14', 'HW-CSG-30',  'HW Casing 3.0 m',                   'Rod & Casing', 10000, 8820,  'Mahalaxmi Steel',      30, 4),
+  P('t15', 'PW-TC-BIT',  'PW Casing TC Bit',                  'Bit',          200,   5390,  'Mahalaxmi Steel',      30, 2),
+  P('t16', 'HW-TC-BIT',  'HW Casing TC / Shoe Bit',           'Bit',          200,   3773,  'Mahalaxmi Steel',      30, 2),
+  P('t17', 'WS-SPR-02',  'Water Swivel Spares, 2 sets',       'Spares',       5000,  25000, 'Drillco Tools',        14, 1),
+]
+
+export const SEED_SUPPLIERS: Supplier[] = [
+  { id: 's1', name: 'Boart Longyear India', contact: 'R. Menon',     phone: '+91 98450 11234', quotedLeadDays: 25, rating: 5, ratingNote: 'Reliable, never had to chase' },
+  { id: 's2', name: 'Sandvik Mining',       contact: 'A. Deshpande', phone: '+91 99870 44521', quotedLeadDays: 18, rating: 4 },
+  { id: 's3', name: 'Drillco Tools',        contact: 'S. Iyer',      phone: '+91 90035 77810', quotedLeadDays: 12, rating: 2, ratingNote: 'Cheap but slow, and packaging is poor' },
+  { id: 's4', name: 'Mahalaxmi Steel',      contact: 'P. Shah',      phone: '+91 98200 33456', quotedLeadDays: 30, rating: 3 },
+]
+
+const seedRate = (id: string) => SEED_CATALOGUE.find(p => p.id === id)!.rate
+type RLine = [string, number, number?, number?]
+type ISpec = [string, string, [string, number][]]
+
+const PO = (
+  id: string, number: string, supplier: string, project: string,
+  createdDate: string, orderedDate: string, promisedDate: string,
+  lines: [string, number][],
+  receipts: [string, RLine[], DelayReason?][],
+  issues: ISpec[],
+  reorders: Reorder[] = [],
+): PurchaseOrder => ({
+  id, number, supplier, project, status: 'ordered', createdDate, orderedDate, promisedDate,
+  lines: lines.map(([itemId, qty]) => ({ itemId, qty, rate: seedRate(itemId) })),
+  receipts: receipts.map(([date, ls, delayReason], k) => ({
+    id: `${id}_r${k}`, date, delayReason,
+    lines: ls.map(([itemId, accepted, damaged = 0, rejected = 0]) => ({ itemId, accepted, damaged, rejected })),
+  })),
+  issues: issues.map(([date, rig, ls], k) => ({
+    id: `${id}_i${k}`, date, project, rig, issuedBy: 'Store',
+    lines: ls.map(([itemId, qty]) => ({ itemId, qty })),
+  })),
+  reorders, transfers: [],
+})
+
+export const SEED_POS: PurchaseOrder[] = [
+  PO('po1', 'PO-2026-041', 'Sandvik Mining', 'Site A - North Field', '2026-07-02', '2026-07-03', '2026-07-21',
+    [['t08', 3], ['t04', 2]],
+    [['2026-07-19', [['t08', 3], ['t04', 2]]]],
+    [['2026-08-01', 'RIG-001', [['t08', 1]]], ['2026-08-16', 'RIG-001', [['t04', 1]]], ['2026-08-02', 'RIG-002', [['t08', 1]]]]),
+
+  PO('po2', 'PO-2026-047', 'Mahalaxmi Steel', 'Site A - North Field', '2026-07-10', '2026-07-11', '2026-08-10',
+    [['t13', 4], ['t14', 4], ['t16', 2]],
+    [['2026-08-06', [['t14', 4]]]],
+    []),
+
+  PO('po3', 'PO-2026-052', 'Drillco Tools', 'Site A - North Field', '2026-07-18', '2026-07-19', '2026-07-31',
+    [['t06', 30], ['t07', 20], ['t12', 2]],
+    [['2026-08-09', [['t06', 30], ['t07', 18, 2], ['t12', 2]], 'Transport']],
+    [['2026-08-12', 'RIG-001', [['t06', 10], ['t07', 8]]], ['2026-08-14', 'RIG-002', [['t06', 8], ['t07', 5]]]],
+    [{ id: 'ro_1', itemId: 't07', qty: 2, reason: 'Cases cracked in transit', raisedDate: '2026-08-10', round: 1, status: 'promised', promisedDate: '2026-09-15' }]),
+
+  PO('po4', 'PO-2026-033', 'Boart Longyear India', 'Site A - North Field', '2026-06-05', '2026-06-06', '2026-07-01',
+    [['t03', 1], ['t09', 1], ['t05', 1]],
+    [['2026-06-28', [['t03', 1], ['t09', 1], ['t05', 1]]]],
+    [['2026-08-01', 'RIG-001', [['t03', 1], ['t05', 1]]]]),
+
+  PO('po5', 'PO-2026-055', 'Sandvik Mining', 'Site B - South Ridge', '2026-07-20', '2026-07-21', '2026-08-08',
+    [['t08', 2], ['t04', 1]],
+    [['2026-08-05', [['t08', 2], ['t04', 1]]]],
+    [['2026-08-07', 'RIG-003', [['t08', 2], ['t04', 1]]]]),
+
+  PO('po6', 'PO-2026-018', 'Drillco Tools', 'Site C - East Basin', '2026-05-02', '2026-05-03', '2026-05-20',
+    [['t10', 1], ['t17', 1]],
+    [['2026-05-18', [['t10', 1], ['t17', 1]]]],
+    []),
+
+  PO('po7', 'PO-2026-058', 'Boart Longyear India', 'Site A - North Field', '2026-08-20', '2026-08-21', '2026-09-18',
+    [['t01', 6], ['t02', 1]], [], []),
+
+  PO('po9', 'PO-2026-060', 'Boart Longyear India', 'Site A - North Field', '2026-08-02', '2026-08-03', '2026-08-24',
+    [['t03', 2]],
+    [['2026-08-20', [['t03', 1, 1]]]],
+    [],
+    [
+      { id: 'ro_2', itemId: 't03', qty: 1, reason: 'Tube bent, latch would not seat', raisedDate: '2026-08-21', round: 1, status: 'closed', promisedDate: '2026-09-02',
+        receipt: { date: '2026-09-02', accepted: 0, damaged: 1, rejected: 0, note: 'Same fault again' } },
+      { id: 'ro_3', itemId: 't03', qty: 1, reason: 'Replacement arrived with the same fault', raisedDate: '2026-09-02', round: 2, parentId: 'ro_2', status: 'promised', promisedDate: '2026-09-25' },
+    ]),
+
+  { id: 'po8', number: 'PO-2026-061', supplier: 'Drillco Tools', project: 'Site A - North Field',
+    status: 'draft', createdDate: '2026-09-01',
+    lines: [{ itemId: 't06', qty: 40, rate: seedRate('t06') }, { itemId: 't07', qty: 25, rate: seedRate('t07') }],
+    receipts: [], reorders: [], issues: [], transfers: [], note: 'Awaiting approval' },
+]
+
+export const PROJECTS = ['Site A - North Field', 'Site B - South Ridge', 'Site C - East Basin']
+export const COMPLETED_PROJECTS = ['Site C - East Basin']
+export const RIGS = ['RIG-001', 'RIG-002', 'RIG-003']
 export const PROJECT_CODES: Record<string, string> = {
   'Site A - North Field': 'PRJ-001',
   'Site B - South Ridge': 'PRJ-002',
@@ -698,274 +718,49 @@ export const PROJECT_CODES: Record<string, string> = {
 export function projectCode(name: string) {
   return PROJECT_CODES[name] ?? name.match(/^([A-Za-z]+-\d+)/)?.[1] ?? name
 }
-export function rigCode(name: string) {
-  return name.match(/^([A-Za-z]+-\d+)/)?.[1] ?? name
-}
-
-export const PROJECT_CLIENTS: Record<string, string> = {
-  'Site A - North Field': 'CMPDI',
-  'Site B - South Ridge': 'DGML',
-  'Site C - East Basin': 'MECL',
-}
-
-export const ROCK_CATEGORIES = ['Soft rock', 'Medium rock', 'Hard rock', 'Very hard rock']
-export const HOLE_SIZES = ['NQ', 'HQ', 'PQ', 'BQ', 'AQ']
-
-export const SEED_OWNERSHIP: RigOwnership[] = [
-  {
-    id: 'own_r1', rig: 'RIG-001', effectiveFrom: '2026-01-01',
-    basicPrice: 6000000, gstPercent: 0, transportation: 200000,
-    depreciationRatePct: 20,
-    emiPerMonth: 160045, emiEndsMonth: '2028-03',
-    insurancePerYear: 120000, otherFixedPerMonth: 0,
-    costBasis: 'cash', allocationBasis: 'operatingDay',
-    expectedOperatingDays: 25, expectedUnitsPerMonth: 300,
-    note: 'Opening entry',
-  },
-  {
-    id: 'own_r2', rig: 'RIG-002', effectiveFrom: '2026-01-01',
-    basicPrice: 5400000, gstPercent: 0, transportation: 180000,
-    depreciationRatePct: 20,
-    emiPerMonth: 136500, emiEndsMonth: '2027-10',
-    insurancePerYear: 108000, otherFixedPerMonth: 0,
-    costBasis: 'cash', allocationBasis: 'operatingDay',
-    expectedOperatingDays: 25, expectedUnitsPerMonth: 300,
-    note: 'Opening entry',
-  },
-  {
-    id: 'own_r3', rig: 'RIG-003', effectiveFrom: '2026-01-01',
-    basicPrice: 4800000, gstPercent: 0, transportation: 160000,
-    depreciationRatePct: 20,
-    emiPerMonth: 118000, emiEndsMonth: '2029-02',
-    insurancePerYear: 96000, otherFixedPerMonth: 0,
-    costBasis: 'cash', allocationBasis: 'operatingDay',
-    expectedOperatingDays: 25, expectedUnitsPerMonth: 300,
-    note: 'Opening entry',
-  },
-]
-
-const opRate = (id: string, rig: string, project: string, from: string, fuel: number, note: string): OperatingRate => ({
-  id, rig, project, effectiveFrom: from, note,
-  fuelPricePerLitre: fuel, waterPricePerLitre: 4, additivePricePerKg: 190,
-  labourRate: 900, lodgingRate: 180, transportRate: 1250, chargePerMetre: false,
-})
-
-export const SEED_OPERATING: OperatingRate[] = [
-  opRate('op_a1_1', 'RIG-001', 'Site A - North Field', '2026-01-01', 96, 'Opening entry'),
-  opRate('op_a1_2', 'RIG-001', 'Site A - North Field', '2026-08-01', 100, 'Diesel price revision'),
-  opRate('op_a2_1', 'RIG-002', 'Site A - North Field', '2026-01-01', 100, 'Opening entry'),
-  opRate('op_b1_1', 'RIG-003', 'Site B - South Ridge', '2026-01-01', 100, 'Opening entry'),
-]
-
-export const SEED_CLIENT_RATES: ClientRate[] = [
-  {
-    id: 'cr_a_1', project: 'Site A - North Field', effectiveFrom: '2026-06-01',
-    structure: 'flat',
-    rateRows: [
-      { id: 'r1', holeSize: 'HQ', formation: 'Soft rock', rate: 6200, adjustments: [] },
-      { id: 'r2', holeSize: 'HQ', formation: 'Hard rock', rate: 11200, adjustments: [] },
-      { id: 'r3', holeSize: 'HQ', formation: 'Very hard rock', rate: 14100, adjustments: [] },
-    ],
-    standbyPerDay: 18000, mobilisation: 175000, demobilisation: 140000,
-    note: 'Tender schedule 2.2.1.1c\u2013e',
-  },
-  {
-    id: 'cr_b_1', project: 'Site B - South Ridge', effectiveFrom: '2026-01-01',
-    structure: 'slab',
-    rateRows: [
-      { id: 'b1', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 0, toDepth: 75, rate: 7800, adjustments: [] },
-      { id: 'b2', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 75, toDepth: 150, rate: 8900, adjustments: [] },
-      { id: 'b3', holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 150, rate: 10400, adjustments: [] },
-    ],
-    standbyPerDay: 14000, mobilisation: 150000, demobilisation: 120000,
-    note: 'Contract rate card, depth bands',
-  },
-]
-
-export const SEED_HOLE_STATUS: Record<string, HoleState> = {
-  'DH-001': { status: 'approved' },
-  'DH-011': { status: 'approved' },
-  'DH-101': { status: 'approved' },
-}
-
-function markClosures(logs: ShiftLog[], holeNumbers: string[]): ShiftLog[] {
-  const lastOf: Record<string, string> = {}
-  logs.forEach(l => {
-    if (l.holeNumber && holeNumbers.includes(l.holeNumber) && l.metresDrilled > 0) {
-      const k = `${l.date}|${l.shift}`
-      if (!lastOf[l.holeNumber] || k > lastOf[l.holeNumber]) lastOf[l.holeNumber] = k
-    }
-  })
-  return logs.map(l =>
-    l.holeNumber && lastOf[l.holeNumber] === `${l.date}|${l.shift}`
-      ? { ...l, holeClosedThisShift: true } : l)
-}
-
-type DaySpec = [number, string, number, number, number?, number?, string?]
-
-function formationAt(depth: number, bands: [number, string][]): string {
-  for (const [limit, name] of bands) if (depth < limit) return name
-  return bands[bands.length - 1][1]
-}
-
-const DEPTH_BANDS: [number, string][] = [
-  [35, 'Soft Formation'], [75, 'Hard Formation'], [Infinity, 'Very Hard Formation'],
-]
-
-const WEAR: Record<string, number> = { Soft: 2.2, Medium: 1.5, Hard: 1.0, 'Very Hard': 0.6 }
-
-function partsFor(
-  run: Record<string, number>, metres: number, formation: string,
-): PartUsage[] {
-  const out: PartUsage[] = []
-  const key = formation.includes('Very') ? 'Very Hard' : formation.includes('Hard') ? 'Hard' : 'Soft'
-  const factor = WEAR[key]
-
-  // [catalogue id, life in metres, wears faster in harder ground]
-  const wearing: [string, number, boolean][] = [
-    ['t06', 20, true],     // HQ Core Lifter
-    ['t07', 50, true],     // HQ Core Lifter Case
-    ['t08', 100, true],    // HQ Impregnated Bit
-    ['t04', 500, true],    // HQ Diamond Reamer Shell
-    ['t01', 5000, false],  // HQ Wire Line Drill Rod — metres, any ground
-  ]
-
-  wearing.forEach(([id, baseLife, byTerrain]) => {
-    const life = byTerrain ? baseLife * factor : baseLife
-    run[id] = (run[id] ?? 0) + metres
-    while (run[id] >= life) {
-      run[id] -= life
-      const existing = out.find(o => o.itemId === id)
-      if (existing) existing.qty += 1
-      else out.push({ itemId: id, qty: 1, metres })
-    }
-  })
-  return out
-}
-
-function expand(rig: string, project: string, ym: string, size: string, specs: DaySpec[], bands = DEPTH_BANDS): ShiftLog[] {
-  const out: ShiftLog[] = []
-  const depth: Record<string, number> = {}
-  const wear: Record<string, number> = {}
-  specs.forEach(([day, hole, dm, nm, dd = 0, nd = 0, reason = '']) => {
-    const date = `${ym}-${String(day).padStart(2, '0')}`
-    const mk = (shift: ShiftName, metres: number, down: number, crew: number): ShiftLog => {
-      const drillingHours = Math.max(0, 12 - down)
-      const startDepth = hole ? (depth[hole] ?? 0) : 0
-      if (hole) depth[hole] = startDepth + metres
-      return {
-        id: `${rig}_${date}_${shift}`.replace(/\s+/g, ''),
-        rig, project, date, shift,
-        holeNumber: hole || null,
-        crewCount: down >= 12 ? 2 : crew,
-        shiftHours: 12, drillingHours, downtimeHours: down,
-        downtimeReason: down > 0 ? reason : '',
-        metresDrilled: metres,
-        coreRecovery: +(metres * 0.94).toFixed(2),
-        holeSize: size,
-        formationType: formationAt(startDepth, bands),
-        fuelLitres: drillingHours * 10 + (down > 0 ? 6 : 0),
-        waterLitres: metres * 120,
-        additivesKg: +(metres * 0.8).toFixed(1),
-        partsUsed: metres > 0 ? partsFor(wear, metres, formationAt(startDepth, bands)) : [],
-      }
-    }
-    out.push(mk('Day', dm, dd, 4))
-    out.push(mk('Night', nm, nd, 3))
-  })
-  return out
-}
-
-export const SEED_SHIFT_LOGS_A: ShiftLog[] = [
-  ...expand('RIG-001', 'Site A - North Field', '2026-08', 'HQ', [
-    [1, 'DH-001', 7, 5], [2, 'DH-001', 7, 5], [3, 'DH-001', 5, 5, 3, 0, 'Bit Change'],
-    [4, 'DH-001', 7, 7], [5, 'DH-001', 7, 5], [6, 'DH-001', 7, 5],
-    [7, 'DH-001', 5, 5, 2, 0, 'Ground Condition Issue'], [8, 'DH-001', 7, 5],
-    [9, '', 0, 0, 12, 12, 'Waiting for Instruction'],
-    [10, 'DH-002', 7, 5], [11, 'DH-002', 7, 5], [12, 'DH-002', 7, 5],
-    [13, 'DH-002', 0, 0, 12, 12, 'Mechanical Breakdown'],
-    [14, 'DH-002', 5, 5, 2, 0, 'Hydraulic Issue'], [15, 'DH-002', 7, 7],
-    [16, 'DH-002', 7, 5], [17, 'DH-002', 7, 5], [18, 'DH-002', 7, 7],
-    [19, 'DH-002', 5, 5], [20, '', 0, 0, 12, 12, 'Weather Condition'],
-    [21, 'DH-003', 7, 5], [22, 'DH-003', 7, 5], [23, 'DH-003', 5, 5, 3, 0, 'Rod Change'],
-    [24, 'DH-003', 7, 7], [25, 'DH-003', 7, 5], [26, 'DH-003', 7, 5],
-    [27, 'DH-003', 7, 7], [28, 'DH-003', 5, 5],
-  ]),
-  ...expand('RIG-002', 'Site A - North Field', '2026-08', 'HQ', [
-    [1, 'DH-011', 7, 7], [2, 'DH-011', 7, 5], [3, 'DH-011', 7, 7],
-    [4, 'DH-011', 5, 5, 2, 0, 'Water Shortage'], [5, 'DH-011', 7, 7],
-    [6, 'DH-011', 7, 5], [7, 'DH-011', 7, 7], [8, 'DH-011', 7, 5],
-    [9, 'DH-011', 7, 7], [10, 'DH-011', 5, 5, 3, 0, 'Bit Change'],
-    [11, 'DH-011', 7, 5], [12, 'DH-011', 7, 7], [13, 'DH-011', 7, 5], [14, 'DH-011', 7, 7],
-    [15, '', 0, 0, 12, 12, 'Waiting for Instruction'],
-    [16, 'DH-012', 7, 5], [17, 'DH-012', 7, 7], [18, 'DH-012', 5, 5, 4, 0, 'Electrical Fault'],
-    [19, 'DH-012', 7, 5], [20, 'DH-012', 7, 7], [21, 'DH-012', 7, 5],
-    [22, 'DH-012', 7, 7], [23, 'DH-012', 7, 5],
-  ]),
-]
-
-export const SEED_SHIFT_LOGS_B: ShiftLog[] = expand('RIG-003', 'Site B - South Ridge', '2026-08', 'HQ', [
-  [1, 'DH-101', 8, 7], [2, 'DH-101', 8, 8], [3, 'DH-101', 8, 7],
-  [4, 'DH-101', 7, 7, 2, 0, 'Water Shortage'], [5, 'DH-101', 8, 8],
-  [6, 'DH-101', 8, 7], [7, 'DH-101', 8, 8], [8, 'DH-101', 7, 7],
-  [9, 'DH-101', 8, 7], [10, 'DH-101', 8, 8], [11, 'DH-101', 7, 7],
-  [12, 'DH-101', 8, 7], [13, 'DH-101', 8, 8], [14, 'DH-101', 7, 7],
-], [[Infinity, 'Hard Formation']])
-
-export const SEED_SHIFT_LOGS: ShiftLog[] =
-  markClosures([...SEED_SHIFT_LOGS_A, ...SEED_SHIFT_LOGS_B], ['DH-001', 'DH-002', 'DH-011', 'DH-101'])
-
-export const SEED_MAINTENANCE: MaintenanceLog[] = [
-  { id: 'm1', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-03', maintenanceType: 'Preventive', hours: 3, component: 'Engine', action: 'Inspection', cost: 4500 },
-  { id: 'm2', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-13', maintenanceType: 'Breakdown', hours: 22, component: 'Hydraulic System', action: 'Replace', cost: 68000 },
-  { id: 'm3', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-14', maintenanceType: 'Breakdown', hours: 4, component: 'Hydraulic System', action: 'Repair', cost: 12000 },
-  { id: 'm4', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-23', maintenanceType: 'Scheduled', hours: 3, component: 'Compressor', action: 'Inspection', cost: 9500 },
-  { id: 'm5', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-08-18', maintenanceType: 'Breakdown', hours: 8, component: 'Electrical', action: 'Repair', cost: 41000 },
-]
+export function isLiveProject(name: string) { return !COMPLETED_PROJECTS.includes(name) }
 
 /* ==========================================================================
  * STORE
  * ========================================================================== */
 
 interface State {
-  shiftLogs: ShiftLog[]
-  maintenance: MaintenanceLog[]
-  ownership: RigOwnership[]
-  operating: OperatingRate[]
-  clientRates: ClientRate[]
-  holeStatus: Record<string, HoleState>
-  invoices: Invoice[]
+  catalogue: Part[]
+  suppliers: Supplier[]
+  pos: PurchaseOrder[]
+  alerts: AlertSettings
 }
 
 function initial(): State {
-  return {
-    shiftLogs: SEED_SHIFT_LOGS, maintenance: SEED_MAINTENANCE,
-    ownership: SEED_OWNERSHIP, operating: SEED_OPERATING,
-    clientRates: SEED_CLIENT_RATES, holeStatus: SEED_HOLE_STATUS, invoices: [],
-  }
+  return { catalogue: SEED_CATALOGUE, suppliers: SEED_SUPPLIERS, pos: SEED_POS, alerts: DEFAULT_ALERTS }
 }
 
-export const uid = (p: string) => `${p}_${Date.now()}_${Math.floor(Math.random() * 9999)}`
+let seq = 0
+export const uid = (p: string) => `${p}_${Date.now()}_${++seq}_${Math.floor(Math.random() * 9999)}`
 
-export type VersionKind = 'ownership' | 'operating' | 'clientRate'
-
-interface CtxValue {
+interface Ctx {
   state: State
-  saveOwnership: (o: RigOwnership) => void
-  saveOperating: (o: OperatingRate) => void
-  saveClientRate: (c: ClientRate) => void
-  deleteVersion: (kind: VersionKind, id: string) => void
-  setHoleStatus: (holeNumber: string, s: HoleStatus) => void
-  addInvoice: (i: Invoice) => void
-  updateInvoice: (i: Invoice) => void
-  deleteInvoice: (id: string) => void
+  savePart: (p: Part) => void
+  importParts: (parts: Part[]) => void
+  deletePart: (id: string) => void
+  saveSupplier: (s: Supplier) => void
+  savePO: (po: PurchaseOrder) => void
+  deletePO: (id: string) => void
+  placeOrder: (id: string, orderedDate: string, promisedDate: string) => void
+  addReceipt: (poId: string, r: Omit<Receipt, 'id'>) => void
+  addReorder: (poId: string, r: Omit<Reorder, 'id'>) => void
+  updateReorder: (poId: string, r: Reorder) => void
+  receiveReorder: (poId: string, reorderId: string, receipt: ReorderReceipt) => void
+  addIssue: (poId: string, i: Omit<Issue, 'id'>) => void
+  addTransfer: (poId: string, t: Omit<Transfer, 'id'>) => void
+  saveAlertSettings: (s: AlertSettings) => void
   resetAll: () => void
 }
 
-const CostingContext = createContext<CtxValue | null>(null)
-const KEY = 'xplorix_costing_v2'
+const InvCtx = createContext<Ctx | null>(null)
+const KEY = 'xplorix_inventory_v4'
 
-export function CostingProvider({ children }: { children: ReactNode }) {
+export function InventoryProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
   const [loaded, setLoaded] = useState(false)
 
@@ -975,137 +770,73 @@ export function CostingProvider({ children }: { children: ReactNode }) {
   }, [])
   useEffect(() => { if (loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }, [state, loaded])
 
-  function upsert<T extends { id: string }>(list: T[], item: T): T[] {
-    return list.some(x => x.id === item.id) ? list.map(x => x.id === item.id ? item : x) : [...list, item]
+  function up<T extends { id: string }>(list: T[], x: T): T[] {
+    return list.some(i => i.id === x.id) ? list.map(i => i.id === x.id ? x : i) : [...list, x]
   }
-
-  const saveOwnership: CtxValue['saveOwnership'] = o => setState(s => ({ ...s, ownership: upsert(s.ownership, o) }))
-  const saveOperating: CtxValue['saveOperating'] = o => setState(s => ({ ...s, operating: upsert(s.operating, o) }))
-  const saveClientRate: CtxValue['saveClientRate'] = c => setState(s => ({ ...s, clientRates: upsert(s.clientRates, c) }))
-
-  const deleteVersion: CtxValue['deleteVersion'] = (kind, id) => setState(s => {
-    if (kind === 'ownership') return { ...s, ownership: s.ownership.filter(x => x.id !== id) }
-    if (kind === 'operating') return { ...s, operating: s.operating.filter(x => x.id !== id) }
-    return { ...s, clientRates: s.clientRates.filter(x => x.id !== id) }
-  })
-
-  const setHoleStatus: CtxValue['setHoleStatus'] = (holeNumber, status) => setState(s => ({
-    ...s, holeStatus: { ...s.holeStatus, [holeNumber]: { ...s.holeStatus[holeNumber], status } },
-  }))
-
-  const addInvoice: CtxValue['addInvoice'] = inv => setState(s => {
-    const hs = { ...s.holeStatus }
-    inv.holeNumbers.forEach(n => { hs[n] = { status: 'invoiced', invoiceId: inv.id } })
-    return { ...s, invoices: [inv, ...s.invoices], holeStatus: hs }
-  })
-  const updateInvoice: CtxValue['updateInvoice'] = inv => setState(s => {
-    const hs = { ...s.holeStatus }
-    inv.holeNumbers.forEach(n => {
-      hs[n] = inv.status === 'cancelled'
-        ? { status: 'approved' }
-        : { status: 'invoiced', invoiceId: inv.id }
-    })
-    return { ...s, invoices: s.invoices.map(i => i.id === inv.id ? inv : i), holeStatus: hs }
-  })
-  const deleteInvoice: CtxValue['deleteInvoice'] = id => setState(s => {
-    const hs = { ...s.holeStatus }
-    Object.keys(hs).forEach(n => { if (hs[n].invoiceId === id) hs[n] = { status: 'approved' } })
-    return { ...s, invoices: s.invoices.filter(i => i.id !== id), holeStatus: hs }
-  })
+  const onPO = (id: string, f: (po: PurchaseOrder) => PurchaseOrder) =>
+    setState(s => ({ ...s, pos: s.pos.map(p => p.id === id ? f(p) : p) }))
 
   return (
-    <CostingContext.Provider value={{
-      state, saveOwnership, saveOperating, saveClientRate, deleteVersion,
-      setHoleStatus, addInvoice, updateInvoice, deleteInvoice,
+    <InvCtx.Provider value={{
+      state,
+      savePart: p => setState(s => ({ ...s, catalogue: up(s.catalogue, p) })),
+      importParts: parts => setState(s => {
+        let cat = s.catalogue
+        parts.forEach(p => {
+          const existing = cat.find(x =>
+            (p.partNumber && x.partNumber?.toLowerCase() === p.partNumber.toLowerCase()) ||
+            x.name.toLowerCase() === p.name.toLowerCase())
+          cat = existing ? cat.map(x => x.id === existing.id ? { ...p, id: existing.id } : x) : [...cat, p]
+        })
+        return { ...s, catalogue: cat }
+      }),
+      deletePart: id => setState(s => {
+        const used = s.pos.some(p => p.lines.some(l => l.itemId === id))
+        return {
+          ...s,
+          catalogue: used
+            ? s.catalogue.map(p => p.id === id ? { ...p, active: false } : p)
+            : s.catalogue.filter(p => p.id !== id),
+        }
+      }),
+      saveSupplier: x => setState(s => ({ ...s, suppliers: up(s.suppliers, x) })),
+      savePO: po => setState(s => ({ ...s, pos: up(s.pos, po) })),
+      deletePO: id => setState(s => ({ ...s, pos: s.pos.filter(p => p.id !== id) })),
+      placeOrder: (id, orderedDate, promisedDate) =>
+        onPO(id, p => ({ ...p, status: 'ordered', orderedDate, promisedDate })),
+      addReceipt: (poId, r) => onPO(poId, p => ({ ...p, receipts: [...p.receipts, { ...r, id: uid('rc') }] })),
+      addReorder: (poId, r) => onPO(poId, p => ({ ...p, reorders: [...p.reorders, { ...r, id: uid('ro') }] })),
+      updateReorder: (poId, r) => onPO(poId, p => ({ ...p, reorders: p.reorders.map(x => x.id === r.id ? r : x) })),
+      receiveReorder: (poId, reorderId, receipt) => onPO(poId, p => {
+        const target = p.reorders.find(r => r.id === reorderId)
+        if (!target) return p
+        const closed: Reorder = { ...target, receipt, status: 'closed' }
+        const faulty = receipt.damaged + receipt.rejected
+        const next: Reorder[] = faulty > 0 ? [{
+          id: uid('ro'), itemId: target.itemId, qty: faulty,
+          reason: `Round ${target.round} replacement arrived unusable`,
+          raisedDate: receipt.date, round: target.round + 1, parentId: target.id, status: 'raised',
+        }] : []
+        return { ...p, reorders: [...p.reorders.map(r => r.id === reorderId ? closed : r), ...next] }
+      }),
+      addIssue: (poId, i) => onPO(poId, p => ({ ...p, issues: [...p.issues, { ...i, id: uid('is') }] })),
+      addTransfer: (poId, t) => onPO(poId, p => ({ ...p, transfers: [...p.transfers, { ...t, id: uid('tr') }] })),
+      saveAlertSettings: a => setState(s => ({ ...s, alerts: a })),
       resetAll: () => setState(initial()),
-    }}>{children}</CostingContext.Provider>
+    }}>{children}</InvCtx.Provider>
   )
 }
 
-export function useCosting() {
-  const c = useContext(CostingContext)
-  if (!c) throw new Error('useCosting must be used inside CostingProvider')
+export function useInventory() {
+  const c = useContext(InvCtx)
+  if (!c) throw new Error('useInventory must be used inside InventoryProvider')
   return c
 }
 
-/* Same context, but null instead of a throw when the provider is absent. A
- * screen that only wants the log history to enrich what it shows should
- * degrade rather than break the page. */
-export function useCostingOptional() {
-  return useContext(CostingContext)
-}
+/* ── Formatting ─────────────────────────────────────────────────────────── */
 
-/* ── Selectors ──────────────────────────────────────────────────────────── */
-
-export function rigsFor(logs: ShiftLog[], project: string) {
-  return Array.from(new Set(logs.filter(l => l.project === project).map(l => l.rig))).sort()
-}
-export function monthsFor(logs: ShiftLog[], rig: string, project: string) {
-  return Array.from(new Set(logs.filter(l => l.rig === rig && l.project === project).map(l => monthOf(l.date)))).sort()
-}
-
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-
-export function monthLabel(ym: string) {
-  const [y, m] = ym.split('-').map(Number)
-  return `${MONTHS[m - 1]} ${y}`
-}
-export function dayLabel(date: string) {
-  const [, m, d] = date.split('-').map(Number)
-  return `${d} ${MON[m - 1]}`
-}
-export function fullDate(date: string) {
-  const [y, m, d] = date.split('-').map(Number)
-  return `${d} ${MON[m - 1]} ${y}`
-}
-
-export function blankOwnership(rig: string, from: string): RigOwnership {
-  return {
-    id: uid('own'), rig, effectiveFrom: from,
-    basicPrice: 0, gstPercent: 18, transportation: 0, depreciationRatePct: 20,
-    emiPerMonth: 0, insurancePerYear: 0, otherFixedPerMonth: 0,
-    costBasis: 'cash', allocationBasis: 'operatingDay',
-    expectedOperatingDays: 25, expectedUnitsPerMonth: 300,
-  }
-}
-export function blankOperating(rig: string, project: string, from: string): OperatingRate {
-  return {
-    id: uid('op'), rig, project, effectiveFrom: from,
-    fuelPricePerLitre: 0, waterPricePerLitre: 0, additivePricePerKg: 0,
-    labourRate: 0, lodgingRate: 0, transportRate: 0, chargePerMetre: false,
-  }
-}
-export function blankClientRate(project: string, from: string): ClientRate {
-  return {
-    id: uid('cr'), project, effectiveFrom: from, structure: 'flat',
-    rateRows: [{ id: uid('r'), holeSize: 'HQ', formation: 'Hard rock', rate: 0, adjustments: [] }],
-    standbyPerDay: 0, mobilisation: 0, demobilisation: 0,
-  }
-}
-
-/* ── UI tokens ──────────────────────────────────────────────────────────── */
-
-export const C = {
-  bg: '#080B10', card: '#0D1117', border: '#1E293B',
-  orange: '#F97316', orangeD: '#EA580C',
-  green: '#10B981', red: '#EF4444', amber: '#F59E0B',
-  blue: '#3B82F6', purple: '#8B5CF6', teal: '#14B8A6',
-  text: '#F8FAFC', muted: '#94A3B8', faint: '#64748B', dim: '#334155',
-}
-
-export const LAYER = { operating: C.amber, ownership: C.purple, full: C.orange, revenue: C.blue }
-
-export const iStyle: React.CSSProperties = {
-  padding: '6px 10px', background: C.bg, border: `1px solid ${C.border}`,
-  borderRadius: 7, color: C.text, fontSize: 12.5, outline: 'none',
-  fontFamily: 'inherit', width: '100%',
-}
-export const derivedStyle: React.CSSProperties = {
-  padding: '6px 10px', background: 'rgba(255,255,255,0.02)',
-  border: `1px dashed ${C.border}`, borderRadius: 7, color: C.text,
-  fontSize: 12.5, fontFamily: 'ui-monospace, monospace', width: '100%',
-}
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 export function money(n: number) {
   return `${n < 0 ? '−' : ''}₹${Math.abs(Math.round(n)).toLocaleString('en-IN')}`
@@ -1116,20 +847,16 @@ export function moneyL(n: number) {
   if (a >= 100000) return `${n < 0 ? '−' : ''}₹${(a / 100000).toFixed(1)}L`
   return money(n)
 }
-export function perUnit(n: number | null) {
-  return n == null ? '—' : `₹${Math.round(n).toLocaleString('en-IN')}/m`
+export function perMetre(n: number) { return `₹${n.toFixed(2)}/m` }
+export function dayLabel(d: string) {
+  const [, m, day] = d.split('-').map(Number)
+  return `${day} ${MON[m - 1]}`
 }
-export function pct(n: number) { return `${n.toFixed(1)}%` }
-
-export function cpuColor(cpu: number, rate: number) {
-  if (!rate) return C.muted
-  const m = (rate - cpu) / rate
-  return m >= 0.3 ? C.green : m >= 0.12 ? C.amber : C.red
+export function fullDate(d: string) {
+  const [y, m, day] = d.split('-').map(Number)
+  return `${day} ${MON[m - 1]} ${y}`
 }
-export function marginColor(m: number) { return m >= 0 ? C.green : C.red }
-export function statusColor(s: DayStatus) {
-  return s === 'drilling' ? C.green : s === 'standby' ? C.amber : C.red
-}
-export function holeStatusColor(s: HoleStatus) {
-  return s === 'drilling' ? C.blue : s === 'closed' ? C.amber : s === 'approved' ? C.green : C.purple
+export function monthLabel(ym: string) {
+  const [y, m] = ym.split('-').map(Number)
+  return `${MONTHS[m - 1]} ${y}`
 }
