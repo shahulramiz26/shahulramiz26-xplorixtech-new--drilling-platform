@@ -239,7 +239,7 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
     (!q || p.name.toLowerCase().includes(q.toLowerCase()) || p.partNumber.toLowerCase().includes(q.toLowerCase())))
 
   const blank = (): Part => ({
-    id: uid('t'), partNumber: '', name: '', category: 'Bit', rate: 0,
+    id: uid('t'), partNumber: '', name: '', category: 'Bit', formation: 'Any', rate: 0,
     lifeMetres: 0, supplier: state.suppliers[0]?.name ?? '', leadTimeDays: 14, minStock: 1, active: true,
   })
 
