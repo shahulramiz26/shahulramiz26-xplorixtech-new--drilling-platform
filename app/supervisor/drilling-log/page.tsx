@@ -141,7 +141,10 @@ export default function DrillingLogPage() {
     if (!rig || !project) return out
 
     inv.pos.forEach(po => po.issues
-      .filter(i => i.rig === rig && i.project === project)
+      /* Fall back to the PO's project when the issue pre-dates the project
+       * field — so the drilling log works against both the old and new
+       * inventory-store shapes. */
+      .filter(i => i.rig === rig && (i.project ?? po.project) === project)
       .forEach(i => i.lines.forEach(l => {
         const e = out[l.itemId] ??= { issued: 0, consumed: 0, lifeUsed: 0 }
         e.issued += l.qty
@@ -636,10 +639,17 @@ export default function DrillingLogPage() {
             </div>
           ) : !anythingOnRig ? (
             <div className="mt-4 p-6 rounded-xl bg-[#0D1117] border border-[#1E293B] text-center">
-              <p className="text-sm text-[#94A3B8]">Nothing is currently issued to {rig} on {projectCode(project)}.</p>
-              <p className="text-xs text-[#64748B] mt-1">
-                The store issues parts from Inventory → Store. Once they do, the parts appear here.
+              <p className="text-sm text-[#94A3B8] font-semibold">Nothing issued to {rig} on {projectCode(project)} yet.</p>
+              <p className="text-xs text-[#64748B] mt-2 leading-relaxed">
+                Go to <span className="text-[#3B82F6]">Inventory → Store</span>, find the part on the shelf,
+                and click <span className="text-[#F97316] font-medium">Issue</span> — selecting this rig and project.
+                It will then appear here.
               </p>
+              {Object.keys(onRig).length === 0 && (
+                <p className="text-xs text-[#4B5563] mt-3 italic">
+                  Tip: make sure you have selected the same project here as the one the parts were issued against.
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-3 mt-4">
