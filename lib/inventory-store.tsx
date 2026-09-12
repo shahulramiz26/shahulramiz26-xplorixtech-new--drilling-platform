@@ -173,6 +173,17 @@ export interface Issue {
   lines: { itemId: string; qty: number }[]
 }
 
+/* A part that was already on a rig before the system started. Treated as
+ * issued for cost purposes — no PO behind it, just a starting balance. */
+export interface OpeningStockEntry {
+  id: string
+  date: string
+  project: string
+  rig: string
+  addedBy: string
+  lines: { itemId: string; qty: number; rate: number }[]
+}
+
 export interface PurchaseOrder {
   id: string
   number: string
@@ -419,9 +430,20 @@ export function startupStore(
   rig: string,
   project: string,
   partsUsed: { itemId: string; qty: number }[],
+  openingStock: OpeningStockEntry[] = [],
 ): StartupLine[] {
   const issued: Record<string, { qty: number; value: number }> = {}
 
+  /* Opening stock — parts already on the rig before the system started */
+  openingStock
+    .filter(e => e.rig === rig && e.project === project)
+    .forEach(e => e.lines.forEach(l => {
+      const entry = issued[l.itemId] ??= { qty: 0, value: 0 }
+      entry.qty += l.qty
+      entry.value += l.qty * l.rate
+    }))
+
+  /* Regular store issues */
   pos.forEach(po => po.issues
     .filter(i => i.rig === rig && (i.project ?? po.project) === project)
     .forEach(i => i.lines.forEach(l => {
@@ -730,11 +752,12 @@ interface State {
   catalogue: Part[]
   suppliers: Supplier[]
   pos: PurchaseOrder[]
+  openingStock: OpeningStockEntry[]
   alerts: AlertSettings
 }
 
 function initial(): State {
-  return { catalogue: SEED_CATALOGUE, suppliers: SEED_SUPPLIERS, pos: SEED_POS, alerts: DEFAULT_ALERTS }
+  return { catalogue: SEED_CATALOGUE, suppliers: SEED_SUPPLIERS, pos: SEED_POS, openingStock: [], alerts: DEFAULT_ALERTS }
 }
 
 let seq = 0
@@ -755,12 +778,13 @@ interface Ctx {
   receiveReorder: (poId: string, reorderId: string, receipt: ReorderReceipt) => void
   addIssue: (poId: string, i: Omit<Issue, 'id'>) => void
   addTransfer: (poId: string, t: Omit<Transfer, 'id'>) => void
+  addOpeningStock: (e: Omit<OpeningStockEntry, 'id'>) => void
   saveAlertSettings: (s: AlertSettings) => void
   resetAll: () => void
 }
 
 const InvCtx = createContext<Ctx | null>(null)
-const KEY = 'xplorix_inventory_v6'
+const KEY = 'xplorix_inventory_v7'
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
@@ -823,6 +847,7 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       }),
       addIssue: (poId, i) => onPO(poId, p => ({ ...p, issues: [...p.issues, { ...i, id: uid('is') }] })),
       addTransfer: (poId, t) => onPO(poId, p => ({ ...p, transfers: [...p.transfers, { ...t, id: uid('tr') }] })),
+      addOpeningStock: e => setState(s => ({ ...s, openingStock: [...s.openingStock, { ...e, id: uid('os') }] })),
       saveAlertSettings: a => setState(s => ({ ...s, alerts: a })),
       resetAll: () => setState(initial()),
     }}>{children}</InvCtx.Provider>
