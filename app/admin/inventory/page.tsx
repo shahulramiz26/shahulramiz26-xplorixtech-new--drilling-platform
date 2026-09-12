@@ -699,14 +699,19 @@ function RegularStoreTab({ onIssue, onMove }: { onIssue: (project: string, line?
         {shown.length === 0 ? <Empty>Nothing on the shelf. Everything received has gone to a rig.</Empty> : (
           <div style={{ overflowX: 'auto' }}>
             <table style={tableStyle}>
-              <thead><tr><th style={th}>Part</th><th style={th}>Project</th><th style={th}>From order</th><th style={thR}>Qty</th><th style={thR}>Age</th><th style={thR}>Value</th><th style={th} /></tr></thead>
+              <thead><tr><th style={th}>Part number</th><th style={th}>Item</th><th style={th}>Serial no.</th><th style={th}>Category</th><th style={th}>Formation</th><th style={th}>Project</th><th style={th}>From order</th><th style={thR}>Qty</th><th style={thR}>Age</th><th style={thR}>Value</th><th style={th} /></tr></thead>
               <tbody>
                 {shown.map(l => {
                   const old = l.ageDays >= state.alerts.idleDays
                   const stranded = COMPLETED_PROJECTS.includes(l.project)
                   return (
+                    {(() => { const part = state.catalogue.find(p => p.id === l.itemId); return (
                     <tr key={l.key} style={{ borderBottom: rowBorder, background: stranded ? 'rgba(239,68,68,0.05)' : old ? 'rgba(245,158,11,0.04)' : undefined }}>
-                      <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal' }}>{nameOf(l.itemId)}</td>
+                      <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{part?.partNumber || '—'}</td>
+                      <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 200 }}>{nameOf(l.itemId)}</td>
+                      <td style={{ ...tdMono, color: part?.serialNumber ? C.muted : C.dim }}>{part?.serialNumber || '—'}</td>
+                      <td style={td}>{part ? <Tag tone={C.dim}>{part.category}</Tag> : '—'}</td>
+                      <td style={{ ...td, color: C.muted }}>{part?.formation || '—'}</td>
                       <td style={tdMono}>{projectCode(l.project)}{stranded && <span style={{ marginLeft: 7 }}><Tag tone={C.red}>project ended</Tag></span>}{l.movedHere && !stranded && <span style={{ marginLeft: 7 }}><Tag tone={C.blue}>moved</Tag></span>}</td>
                       <td style={td}>{l.poNumber}</td>
                       <td style={tdN}>{l.qty}</td>
@@ -719,12 +724,13 @@ function RegularStoreTab({ onIssue, onMove }: { onIssue: (project: string, line?
                         </div>
                       </td>
                     </tr>
+                    )})()} 
                   )
                 })}
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                  <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={5}>Total on the shelf</td>
+                  <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={9}>Total on the shelf</td>
                   <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(shownValue)}</td>
                   <td style={td} />
                 </tr>
@@ -1098,7 +1104,7 @@ function MoveModal({ line, onSave, onClose }: { line: StockLine; onSave: (poId: 
  * SCREEN
  * ========================================================================== */
 
-const TABS = ['Catalogue', 'Orders', 'Regular store', 'Startup store'] as const
+const TABS = ['Catalogue', 'Orders', 'Store', 'Startup store'] as const
 type Tab = typeof TABS[number]
 
 export default function InventoryPage() {
@@ -1177,7 +1183,7 @@ export default function InventoryPage() {
 
       {tab === 'Catalogue' && <CatalogueTab onEdit={setEditPart} onImport={() => setImporting(true)} />}
       {tab === 'Orders' && <OrdersTab onReceive={setReceiving} onCreate={() => setEditPO(blankPO())} onEdit={setEditPO} onRaiseReorder={setRaising} onReceiveReorder={(po, reorder) => setReplacing({ po, reorder })} />}
-      {tab === 'Regular store' && <RegularStoreTab onIssue={(project, line) => setIssuing({ project, line })} onMove={setMoving} />}
+      {tab === 'Store' && <RegularStoreTab onIssue={(project, line) => setIssuing({ project, line })} onMove={setMoving} />}
       {tab === 'Startup store' && <StartupStoreTab />}
 
       {editPart && <PartModal part={editPart} onSave={savePart} onClose={() => setEditPart(null)} />}
