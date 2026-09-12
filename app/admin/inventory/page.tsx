@@ -1580,77 +1580,105 @@ function ReceiveModal({ po, onSave, onClose }: {
 
 /* ── Raise a reorder ──────────────────────────────────────────────────── */
 
+/* A bad delivery is rarely one part. Everything on the order that arrived
+ * unusable is listed together, and each part gets its own line in the Reorders
+ * table so the rounds can diverge — one part replaced first time, another
+ * failing twice, both true at once. */
 function RaiseReorderModal({ po, onSave, onClose }: {
   po: PurchaseOrder
-  onSave: (r: Omit<Reorder, 'id'>) => void
+  onSave: (rs: Omit<Reorder, 'id'>[]) => void
   onClose: () => void
 }) {
   const { state } = useInventory()
   const nameOf = (id: string) => state.catalogue.find(p => p.id === id)?.name ?? id
   const candidates = po.lines.filter(l => qtyToReorder(po, l.itemId) > 0)
-  const [itemId, setItemId] = useState(candidates[0]?.itemId ?? '')
-  const max = itemId ? qtyToReorder(po, itemId) : 0
-  const [qty, setQty] = useState(max || 1)
-  const [reason, setReason] = useState('Damaged in transit')
+
+  const [rows, setRows] = useState<Record<string, { qty: number; reason: string }>>(
+    Object.fromEntries(candidates.map(l => [l.itemId, { qty: qtyToReorder(po, l.itemId), reason: 'Damaged in transit' }])))
   const [promisedDate, setPromisedDate] = useState('')
 
-  const pick = (id: string) => { setItemId(id); setQty(qtyToReorder(po, id) || 1) }
+  const set = (itemId: string, p: Partial<{ qty: number; reason: string }>) =>
+    setRows(r => ({ ...r, [itemId]: { ...r[itemId], ...p } }))
+
+  const picked = candidates
+    .map(l => ({ itemId: l.itemId, ...rows[l.itemId] }))
+    .filter(r => r.qty > 0)
+  const owed = picked.reduce((s, r) => s + r.qty * rateOfLine(po, r.itemId), 0)
 
   return (
     <Modal title={`Reorder against ${po.number}`} subtitle={`${po.supplier} · faulty units the supplier still owes`}
-      width={640} onClose={onClose}
+      width={780} onClose={onClose}
       footer={<><Btn onClick={onClose}>Cancel</Btn>
-        <Btn tone="primary" disabled={!itemId || qty < 1}
+        <Btn tone="primary" disabled={picked.length === 0}
           onClick={() => {
-            onSave({
-              itemId, qty, reason: reason.trim() || 'Arrived unusable', raisedDate: TODAY,
-              round: 1, status: promisedDate ? 'promised' : 'raised',
+            onSave(picked.map(r => ({
+              itemId: r.itemId, qty: r.qty,
+              reason: r.reason.trim() || 'Arrived unusable',
+              raisedDate: TODAY, round: 1,
+              status: promisedDate ? 'promised' : 'raised',
               promisedDate: promisedDate || undefined,
-            })
+            })))
             onClose()
-          }}>Raise reorder</Btn></>}>
+          }}>
+          Raise {picked.length} reorder{picked.length === 1 ? '' : 's'}
+        </Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {candidates.length === 0 ? (
           <Empty>Nothing on this order is waiting to be reordered.</Empty>
         ) : (
           <>
             <Note tone={C.dim}>
-              The replacement is not a new order. It is chased on its own line in the Reorders table, and when it arrives
-              you receive it there — so the order reconciles without anything being paid for twice.
+              A replacement is not a new order. Each part is chased on its own line in the Reorders table, and you receive
+              it there when it arrives — so the order reconciles without anything being paid for twice. Set a quantity to
+              zero to leave that part out.
             </Note>
 
             <Grid cols={2}>
-              <Field label="Part">
-                <select value={itemId} onChange={e => pick(e.target.value)} style={{ ...iStyle, cursor: 'pointer' }}>
-                  {candidates.map(l => (
-                    <option key={l.itemId} value={l.itemId}>
-                      {nameOf(l.itemId)} — {qtyToReorder(po, l.itemId)} faulty
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Quantity" hint={`${max} waiting to be chased`}>
-                <input type="number" min={1} max={max} value={qty}
-                  onChange={e => setQty(Math.min(max, Math.max(1, parseFloat(e.target.value) || 1)))} style={numStyle} />
-              </Field>
-            </Grid>
-
-            <Grid cols={2}>
-              <Field label="What was wrong">
-                <input value={reason} onChange={e => setReason(e.target.value)}
-                  placeholder="e.g. cases cracked in transit" style={iStyle} />
-              </Field>
-              <Field label="Replacement promised" hint="Optional. Without a date this shows as unchased after a week.">
+              <Field label="Replacement promised" hint="Optional, and applies to every part on this reorder. Without a date they show as unchased after a week.">
                 <input type="date" value={promisedDate} onChange={e => setPromisedDate(e.target.value)}
                   style={{ ...iStyle, colorScheme: 'dark' }} />
               </Field>
             </Grid>
 
+            <div style={{ overflowX: 'auto' }}>
+              <table style={tableStyle}>
+                <thead><tr>
+                  <th style={th}>Part</th><th style={thR}>Faulty</th><th style={thR}>Reordering</th>
+                  <th style={th}>What was wrong</th><th style={thR}>Value</th>
+                </tr></thead>
+                <tbody>
+                  {candidates.map(l => {
+                    const max = qtyToReorder(po, l.itemId)
+                    const r = rows[l.itemId]
+                    const on = r.qty > 0
+                    return (
+                      <tr key={l.itemId} style={{ borderBottom: rowBorder, opacity: on ? 1 : 0.5 }}>
+                        <td style={{ ...td, color: C.text, whiteSpace: 'normal', maxWidth: 220 }}>{nameOf(l.itemId)}</td>
+                        <td style={{ ...tdN, color: C.red }}>{max}</td>
+                        <td style={{ padding: '5px 8px', width: 104 }}>
+                          <input type="number" min={0} max={max} value={r.qty}
+                            onChange={e => set(l.itemId, { qty: Math.min(max, Math.max(0, parseFloat(e.target.value) || 0)) })}
+                            style={{ ...numStyle, color: on ? C.orange : C.muted }} />
+                        </td>
+                        <td style={{ padding: '5px 8px', minWidth: 230 }}>
+                          <input value={r.reason} disabled={!on}
+                            onChange={e => set(l.itemId, { reason: e.target.value })}
+                            placeholder="e.g. cases cracked in transit"
+                            style={{ ...iStyle, opacity: on ? 1 : 0.45 }} />
+                        </td>
+                        <td style={{ ...tdN, color: on ? C.text : C.dim, fontWeight: on ? 700 : 400 }}>
+                          {on ? money(r.qty * rateOfLine(po, l.itemId)) : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: 10 }}>
               <span style={{ fontSize: 11, color: C.faint }}>Value owed by {po.supplier}</span>
-              <span style={{ fontSize: 15, fontWeight: 900, color: C.red, fontFamily: 'ui-monospace, monospace' }}>
-                {money(qty * rateOfLine(po, itemId))}
-              </span>
+              <span style={{ fontSize: 15, fontWeight: 900, color: C.red, fontFamily: 'ui-monospace, monospace' }}>{money(owed)}</span>
             </div>
           </>
         )}
@@ -2472,7 +2500,7 @@ export default function InventoryPage() {
       )}
       {raising && (
         <RaiseReorderModal po={raising} onClose={() => setRaising(null)}
-          onSave={r => addReorder(raising.id, r)} />
+          onSave={rs => rs.forEach(r => addReorder(raising.id, r))} />
       )}
       {replacing && (
         <ReceiveReorderModal po={replacing.po} reorder={replacing.reorder} onClose={() => setReplacing(null)}
