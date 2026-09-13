@@ -6,7 +6,7 @@ import {
   CostingProvider, useCosting,
   C, LAYER, iStyle, derivedStyle, money, perUnit, pct,
   cpuColor, marginColor, holeStatusColor,
-  monthLabel, dayLabel, fullDate, monthOf, daysInMonth, shiftMonth,
+  monthLabel, monthShort, dayLabel, fullDate, monthOf, daysInMonth, shiftMonth,
   projectCode, rigCode, holesFromDays,
   rigsFor, monthsFor, versionOn, newestFirst, uid,
   ownershipBreakdown, dayCost, rollup, withCumulative, holeResult,
@@ -18,13 +18,12 @@ import {
   type RigOwnership, type OperatingRate, type ClientRate, type HoleStatus,
   type HoleResult, type Invoice, type InvoiceLine, type RateRow, type RateAdjustment,
   type InvoiceStatus, type RateStructure,
-
 } from '../../../lib/costing-store'
 
 /* ==========================================================================
  * XPLORIX COSTING — one screen.
  *
- * Project -> rig -> month, then four views of the same costed data. Two
+ * Project -> rig -> month, then three views of the same costed data. Two
  * buttons top right: Set rates (three tabs) and Rates history.
  *
  * Sections below, in order:
@@ -32,9 +31,8 @@ import {
  *   2  The costing view (turns logs + dated rates into days)
  *   3  Set rates      — Rig cost / Operating cost / Client cost
  *   4  Rates history
- *   5  Overview / Daily / Holes / Billing
- *   6  Hole editor
- *   7  The screen
+ *   5  Performance / Drillholes / Tracker
+ *   6  The screen
  * ========================================================================== */
 
 /* ==========================================================================
@@ -284,9 +282,9 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 /* ==========================================================================
  * 2  The costing view
  *
- * One place turns logs plus dated rates into days, so the Daily table, the
- * Holes table, the Overview and the invoice can never disagree. If a number
- * appears in two tabs it came from the same call.
+ * One place turns logs plus dated rates into days, so the Performance table,
+ * the Drillholes table and the invoice can never disagree. If a number appears
+ * in two tabs it came from the same call.
  * ========================================================================== */
 
 interface RigMonthView {
@@ -317,6 +315,8 @@ const EMPTY_OB: OwnershipBreakdown = {
 type CostingState = ReturnType<typeof useCosting>['state']
 type InvState = ReturnType<typeof useInventory>['state']
 
+/* A plain function rather than a hook, because the month strip needs the same
+ * calculation for several months at once and a hook cannot be called in a loop. */
 function computeRigMonth(state: CostingState, inv: InvState, project: string, rig: string, month: string): RigMonthView {
   const logs = state.shiftLogs.filter(l => l.rig === rig && l.project === project && monthOf(l.date) === month)
   if (logs.length === 0) {
@@ -352,8 +352,9 @@ function computeRigMonth(state: CostingState, inv: InvState, project: string, ri
     const obDay = versionOn(ownVersions, date) ? ownershipBreakdown(own, month) : EMPTY_OB
     const cr = versionOn(crVersions, date)
 
-    /* The tooling rate as it stood on this date. Parts issued later do not
-     * reach back and change a day that was already costed. */
+    /* The tooling rate as it stood on this date — the rig's starting kit plus
+     * everything issued up to it. Parts issued later do not reach back and
+     * change a day that was already costed. */
     const tooling = toolingRatesFor(inv.pos, inv.rigKit, inv.catalogue, rig, project, date)
 
     const hole = shifts.find(s => s.holeNumber)?.holeNumber ?? null
@@ -369,6 +370,7 @@ function computeRigMonth(state: CostingState, inv: InvState, project: string, ri
   const holes = holesFromDays(raw, state.holeStatus).map(h => holeResult(h, raw))
   const orphan = raw.filter(d => !d.holeNumber)
 
+  // Most common lithology in the logs, for the category check.
   const counts: Record<string, number> = {}
   logs.forEach(l => { if (l.formationType) counts[l.formationType] = (counts[l.formationType] || 0) + l.metresDrilled })
   const loggedFormation = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
@@ -391,16 +393,20 @@ function useRigMonthView(project: string, rig: string, month: string): RigMonthV
 }
 
 /* Every month this rig has logs for, costed, so the strip above the table can
- * show where the month sits against the ones before it. */
-function useMonthTrend(project: string, rig: string): { month: string; cpu: number; rate: number; units: number }[] {
+ * show where this month sits against the ones before it. */
+interface MonthPoint { month: string; cpu: number; rate: number; units: number }
+
+function useMonthTrend(project: string, rig: string): MonthPoint[] {
   const { state } = useCosting()
   const { state: inv } = useInventory()
   return useMemo(() => {
-    const months = monthsFor(state.shiftLogs, rig, project)
-    return months.map(m => {
-      const v = computeRigMonth(state, inv, project, rig, m)
-      return { month: m, cpu: v.roll.cpu, rate: v.roll.revenuePerUnit, units: v.roll.units }
-    }).filter(x => x.units > 0)
+    if (!rig || !project) return []
+    return monthsFor(state.shiftLogs, rig, project)
+      .map(m => {
+        const v = computeRigMonth(state, inv, project, rig, m)
+        return { month: m, cpu: v.roll.cpu, rate: v.roll.revenuePerUnit, units: v.roll.units }
+      })
+      .filter(x => x.units > 0)
   }, [state, inv, project, rig])
 }
 
@@ -462,7 +468,8 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
           </Field>
           <Note tone={C.dim}>
             Rig cost applies to this rig on every project. Operating cost applies to this rig on this project.
-            Client cost applies to the whole project, whichever rig drills it.
+            Client cost applies to the whole project, whichever rig drills it. Tooling is not set here — it comes from
+            what the rig is carrying, in Parts &amp; inventory.
           </Note>
         </div>
       </Modal>
@@ -699,8 +706,9 @@ function OperatingPanel({ rig, project, versions, onSave }: {
 
       <div style={{ marginTop: 14 }}>
         <Note tone={C.dim}>
-          Fuel, water, additives, metres and crew count come from the driller&apos;s log. Repairs come from the maintenance log,
-          parts and tooling from inventory. Only the rates below are set here.
+          Fuel, water, additives, metres and crew count come from the driller&apos;s log. Repairs come from the maintenance log.
+          Tooling comes from what each rig is carrying — its starting kit plus everything issued since — and is charged
+          against the ground the log recorded. Only the rates below are set here.
         </Note>
       </div>
 
@@ -958,26 +966,34 @@ function RatesHistoryModal({ project, rig, onClose }: { project: string; rig: st
   return (
     <Modal title="Rates history" subtitle={`${rigCode(rig)} · ${projectCode(project)} — what changed, when, and why`} width={960} onClose={onClose}>
       {rows.length === 0 ? <Empty>No rates set yet.</Empty> : (
-        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
-          <table style={tableStyle}>
-            <thead>
-              <tr><th style={th}>Date</th><th style={th}>Rig</th><th style={th}>What</th><th style={th}>What changed</th><th style={th}>Why</th></tr>
-            </thead>
-            <tbody>
-              {rows.map(r => (
-                <tr key={r.id} style={{ borderBottom: rowBorder, verticalAlign: 'top' }}>
-                  <td style={{ ...td, color: C.text, fontWeight: 700 }}>{fullDate(r.from)}</td>
-                  <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{r.rigs}</td>
-                  <td style={td}><Tag tone={r.tone}>{r.what}</Tag></td>
-                  <td style={{ ...td, whiteSpace: 'normal', maxWidth: 300, color: C.muted, lineHeight: 1.7 }}>
-                    {r.changed.map((c, k) => <div key={k}>{c}</div>)}
-                  </td>
-                  <td style={{ ...td, whiteSpace: 'normal', maxWidth: 220, color: C.text, lineHeight: 1.6 }}>{r.why}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <table style={tableStyle}>
+              <thead>
+                <tr><th style={th}>Date</th><th style={th}>Rig</th><th style={th}>What</th><th style={th}>What changed</th><th style={th}>Why</th></tr>
+              </thead>
+              <tbody>
+                {rows.map(r => (
+                  <tr key={r.id} style={{ borderBottom: rowBorder, verticalAlign: 'top' }}>
+                    <td style={{ ...td, color: C.text, fontWeight: 700 }}>{fullDate(r.from)}</td>
+                    <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{r.rigs}</td>
+                    <td style={td}><Tag tone={r.tone}>{r.what}</Tag></td>
+                    <td style={{ ...td, whiteSpace: 'normal', maxWidth: 300, color: C.muted, lineHeight: 1.7 }}>
+                      {r.changed.map((c, k) => <div key={k}>{c}</div>)}
+                    </td>
+                    <td style={{ ...td, whiteSpace: 'normal', maxWidth: 220, color: C.text, lineHeight: 1.6 }}>{r.why}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <Note tone={C.dim}>
+              Tooling is not listed here. It changes every time the store issues a part, and its history lives with the
+              issue that caused it — in Parts &amp; inventory, under the rig.
+            </Note>
+          </div>
+        </>
       )}
     </Modal>
   )
@@ -995,13 +1011,22 @@ function delta(from: number, to: number) {
 
 /* PERFORMANCE — how the month is going, day by day.
  *
- * Two things only: the table and the graph. A zero-metre day shows its cost
- * with CPM as "—", never zero, because the rig still cost money that day.
+ * The table shows the most recent fifteen logged days, because that is the
+ * stretch anyone actually reads; the whole month is one click away and the
+ * footer always totals the month regardless. Above it, where this month sits
+ * against the ones before, and where it stands right now.
  *
- * Every figure left of Service cost comes from a log. Everything right of it
- * is that quantity priced by the rate version in force on that day. */
+ * A zero-metre day shows its cost with CPM as "—", never zero, because the rig
+ * still cost money that day.
+ *
+ * Every figure left of Service comes from a log. Everything right of it is that
+ * quantity priced by the rate version in force on that day. */
 
-function PerformanceTab({ v, rig, project, month }: { v: RigMonthView; rig: string; project: string; month: string }) {
+const WINDOW = 15
+
+function PerformanceTab({ v, rig, project, month }: {
+  v: RigMonthView; rig: string; project: string; month: string
+}) {
   const [open, setOpen] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
   const trend = useMonthTrend(project, rig)
@@ -1013,9 +1038,9 @@ function PerformanceTab({ v, rig, project, month }: { v: RigMonthView; rig: stri
   const rate = v.roll.revenuePerUnit
   const r = v.roll
 
-  /* The latest fifteen days that actually have a log. A day with no log in
-   * the middle of the run still shows, because a missing log is information. */
-  const WINDOW = 15
+  /* The latest fifteen days that actually have a log. Counting back fifteen
+   * calendar days from month end would show empty rows for a rig that stopped
+   * early. A missing log inside the run still shows — that is information. */
   const lastLogged = v.days.reduce((acc, d, i) => (d.submitted ? i : acc), 0)
   const from = showAll ? 0 : Math.max(0, lastLogged - WINDOW + 1)
   const days = showAll ? v.days : v.days.slice(from, lastLogged + 1)
@@ -1046,9 +1071,9 @@ function PerformanceTab({ v, rig, project, month }: { v: RigMonthView; rig: stri
                 border: `1px solid ${on ? `${C.orange}66` : C.border}`,
               }}>
                 <div style={{ fontSize: 10, color: on ? C.orange : C.faint, fontWeight: 700 }}>
-                  {monthLabel(t.month).replace(/ \d{4}$/, '')}
+                  {monthShort(t.month)}
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: rate ? cpuColor(t.cpu, t.rate) : C.text, fontFamily: 'ui-monospace, monospace', marginTop: 2 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: t.rate ? cpuColor(t.cpu, t.rate) : C.text, fontFamily: 'ui-monospace, monospace', marginTop: 2 }}>
                   {perUnit(t.cpu)}
                 </div>
                 {move != null && (
@@ -1071,7 +1096,7 @@ function PerformanceTab({ v, rig, project, month }: { v: RigMonthView; rig: stri
           </div>
           <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>
             {rate > 0
-              ? `against ${perUnit(rate)} billed — ${perUnit(rate - r.cpu)} a metre`
+              ? `against ${perUnit(rate)} billed, ${perUnit(rate - r.cpu)} a metre`
               : 'no client rate set for this project'}
           </div>
         </div>
@@ -1090,7 +1115,7 @@ function PerformanceTab({ v, rig, project, month }: { v: RigMonthView; rig: stri
             <thead>
               <tr>
                 <th style={th}>Date</th><th style={th}>Hole</th>
-                <th style={th}>Size</th><th style={th}>Formation</th><th style={thR}>Crew</th><th style={thR}>Drill hrs</th><th style={thR}>Downtime</th><th style={thR}>Metres</th>
+                <th style={th}>Size</th><th style={th}>Ground</th><th style={thR}>Crew</th><th style={thR}>Drill hrs</th><th style={thR}>Downtime</th><th style={thR}>Metres</th>
                 <th style={thR}>Maint hrs</th><th style={thR}>Service</th><th style={thR}>Tooling</th><th style={thR}>Tooling/m</th>
                 <th style={thR}>Fuel</th><th style={thR}>Labour</th>
                 <th style={thR}>Operating</th><th style={thR}>Ownership</th><th style={thR}>Total</th>
@@ -1119,9 +1144,7 @@ function PerformanceTab({ v, rig, project, month }: { v: RigMonthView; rig: stri
                       <td style={{ ...td, color: d.holeNumber ? C.muted : C.dim }}>{d.holeNumber || '—'}</td>
                       <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{d.shifts[0]?.holeSize ?? '—'}</td>
                       <td style={{ ...td, color: d.units ? C.muted : C.dim }}>
-                        {d.toolingByFormation.length
-                          ? d.toolingByFormation.map(x => x.formation).join(' → ')
-                          : '—'}
+                        {d.toolingByFormation.length ? d.toolingByFormation.map(x => x.formation).join(' → ') : '—'}
                       </td>
                       <td style={tdN}>{d.labour.heads || '—'}</td>
                       <td style={tdN}>{d.drillingHours || '—'}</td>
@@ -1264,11 +1287,16 @@ function PerformanceTab({ v, rig, project, month }: { v: RigMonthView; rig: stri
         </div>
       </Card>
 
+      {/* The chart keeps the whole month. A cost trend with two thirds of its
+          points cut off is worse than no trend. */}
       <CPUChart days={v.days} rate={rate} />
     </div>
   )
 }
 
+/* Each panel is capped so the label and its number stay together. Left to its
+ * own devices in a grid column spanning a 19-column table, space-between threw
+ * them to opposite ends of the screen. */
 function Detail({ title, tone, rows }: { title: string; tone: string; rows: string[][] }) {
   return (
     <div style={{ minWidth: 210, maxWidth: 270 }}>
@@ -1384,6 +1412,7 @@ function ChartTip({ d, rate, left }: { d: DayCostMTD; rate: number; left: number
     : [
         ['Cost per metre', perUnit(d.cpu), rate ? cpuColor(d.cpu, rate) : C.text],
         ['Metres', `${d.units} m`],
+        ['Tooling', perUnit(d.toolingRate)],
         ['Full cost', money(d.total)],
         ['Client rate', d.rate > 0 ? perUnit(d.rate) : '—'],
         ['Margin', d.rate > 0 ? perUnit(d.rate - d.cpu) : '—', d.rate - d.cpu >= 0 ? C.green : C.red],
@@ -1515,7 +1544,7 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
                                     ['Water & additives', money(h.roll.water + h.roll.additives)],
                                     ['Crew', money(h.roll.labour)],
                                     ['Repairs', money(h.roll.repairs)],
-                                    ['Parts & tooling', money(h.roll.parts)],
+                                    ['Tooling', money(h.roll.parts)],
                                   ].map(([k, val]) => <tr key={k}><td style={td}>{k}</td><td style={tdN}>{val}</td></tr>)}
                                   <tr style={{ borderTop: rowBorder }}>
                                     <td style={{ ...td, color: LAYER.operating, fontWeight: 700 }}>Operating</td>
@@ -1536,6 +1565,7 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
                                 <Mini k="Standby" v={`${h.roll.standbyDays}`} />
                                 <Mini k="Breakdown" v={`${h.roll.breakdownDays}`} />
                                 <Mini k="Downtime" v={`${h.roll.downtimeHours} hrs`} />
+                                <Mini k="Tooling / m" v={perUnit(h.roll.toolingPerUnit)} />
                               </div>
                             </div>
 
@@ -1545,10 +1575,9 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
                               </div>
                               {/* The measurement book: one line per size, formation
                                   and rate, in depth order. This is exactly what
-                                  prints on the invoice. */}
-                              {/* The table follows the contract: a slab project
-                                  bills by depth, so the rock it passed through
-                                  is not part of the bill and is left out. */}
+                                  prints on the invoice. A slab project bills by
+                                  depth, so the rock it passed through is not part
+                                  of the bill and is left out. */}
                               <table style={tableStyle}>
                                 <thead><tr>
                                   <th style={th}>Size</th>
@@ -1694,7 +1723,7 @@ function TrackerTab({ invoices, onUpdate }: {
         <Stat label="Overdue" value={money(totals.overdue)} color={totals.overdue > 0 ? C.red : C.dim} />
       </div>
 
-      <Card title="Invoices" pad={false} subtitle="Cancelling an invoice releases its holes back to Ready to bill">
+      <Card title="Invoices" pad={false} subtitle="Cancelling an invoice releases its holes back to approved">
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead>
@@ -1860,11 +1889,10 @@ function ReviewModal({ project, clientRate, holes, nextNumber, onClose, onCreate
   const [extras, setExtras] = useState<{ id: string; label: string; amount: number }[]>([])
 
   // Lines are the measurement book — one per size, formation and rate, in
-  // depth order, exactly as shown on the hole. A formation-priced contract
-  // reads by rock type; a band-priced one reads by depth. Both come out of the
-  // same structure, so the invoice can never disagree with the screen.
-  // A slab contract bills by depth, so the rock is not part of the line. A flat
-  // contract bills by formation, so it is. The label follows the contract.
+  // depth order, exactly as shown on the hole. A slab contract bills by depth,
+  // so the rock is not part of the line. A flat contract bills by formation,
+  // so it is. The label follows the contract, and both come out of the same
+  // structure, so the invoice can never disagree with the screen.
   const isFlat = clientRate?.structure !== 'slab'
   const lines: InvoiceLine[] = []
   holes.forEach(h => {
@@ -2004,7 +2032,7 @@ td{padding:10px 12px;border-bottom:1px solid #eee;font-size:13px}
 }
 
 /* ==========================================================================
- * 7  The screen
+ * 6  The screen
  * ========================================================================== */
 
 const TABS = ['Performance', 'Drillholes', 'Tracker'] as const
@@ -2044,7 +2072,8 @@ function CostingScreen() {
           <h1 style={{ fontSize: 26, fontWeight: 900, color: C.text, margin: 0 }}>Costing</h1>
           <p style={{ fontSize: 13, color: C.faint, marginTop: 5, maxWidth: 660, lineHeight: 1.6 }}>
             What each hole cost, what it can be billed for, and what it made. Metres, hours, crew and fuel come from the
-            driller&apos;s log, repairs from the maintenance log, parts from inventory — the only things set here are rates.
+            driller&apos;s log, repairs from the maintenance log, tooling from what each rig is carrying — the only things
+            set here are rates.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -2076,17 +2105,14 @@ function CostingScreen() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 4 }}>
-          {TABS.map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              padding: '7px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-              border: 'none', fontFamily: 'inherit',
-              background: tab === t ? C.orange : 'transparent', color: tab === t ? '#fff' : C.muted,
-            }}>{t}</button>
-          ))}
-        </div>
-
+      <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 4, alignSelf: 'flex-start' }}>
+        {TABS.map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{
+            padding: '7px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+            border: 'none', fontFamily: 'inherit',
+            background: tab === t ? C.orange : 'transparent', color: tab === t ? '#fff' : C.muted,
+          }}>{t}</button>
+        ))}
       </div>
 
       {tab === 'Performance' && <PerformanceTab v={v} rig={rig} project={project} month={month} />}
