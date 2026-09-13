@@ -838,29 +838,40 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
                       <th style={thR}>Life</th>
                       <th style={thR}>Rig stock</th>
                       <th style={thR}>Issued</th>
+                      <th style={thR}>Total qty</th>
+                      <th style={thR}>Rate</th>
                       <th style={thR}>Value</th>
                       <th style={thR}>Cost / m</th>
                     </tr></thead>
                     <tbody>
-                      {lines.map(l => (
-                        <tr key={l.itemId} style={{ borderBottom: rowBorder }}>
-                          <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{l.partNumber || '—'}</td>
-                          <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 200 }}>{l.name}</td>
-                          <td style={{ ...tdN, color: C.faint }}>{l.lifeMetres.toLocaleString('en-IN')} m</td>
-                          <td style={{ ...tdN, color: l.openingQty > 0 ? C.purple : C.dim }}>
-                            {l.openingQty > 0 ? l.openingQty : '—'}
-                          </td>
-                          <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>
-                            {l.issuedQty > 0 ? l.issuedQty : '—'}
-                          </td>
-                          <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(l.totalValue)}</td>
-                          <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(l.costPerMetre)}</td>
-                        </tr>
-                      ))}
+                      {lines.map(l => {
+                        /* Average rate actually paid — total spent divided by
+                         * how many units came in. Differs from the catalogue
+                         * rate when opening stock was entered at a different
+                         * price or a PO rate has moved. */
+                        const avgRate = l.totalQty > 0 ? l.totalValue / l.totalQty : 0
+                        return (
+                          <tr key={l.itemId} style={{ borderBottom: rowBorder }}>
+                            <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{l.partNumber || '—'}</td>
+                            <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 190 }}>{l.name}</td>
+                            <td style={{ ...tdN, color: C.faint }}>{l.lifeMetres.toLocaleString('en-IN')} m</td>
+                            <td style={{ ...tdN, color: l.openingQty > 0 ? C.purple : C.dim }}>
+                              {l.openingQty > 0 ? l.openingQty : '—'}
+                            </td>
+                            <td style={{ ...tdN, color: l.issuedQty > 0 ? C.text : C.dim, fontWeight: l.issuedQty > 0 ? 700 : 400 }}>
+                              {l.issuedQty > 0 ? l.issuedQty : '—'}
+                            </td>
+                            <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{l.totalQty}</td>
+                            <td style={tdN}>{money(avgRate)}</td>
+                            <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(l.totalValue)}</td>
+                            <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(l.costPerMetre)}</td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                     <tfoot>
                       <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                        <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={5}>Total</td>
+                        <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>Total</td>
                         <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(total)}</td>
                         <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{metres > 0 ? perMetre(total / metres) : '—'}</td>
                       </tr>
