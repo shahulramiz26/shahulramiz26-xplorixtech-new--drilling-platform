@@ -7,19 +7,38 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
  *
  * Every drilling consumable is a cost spread across the metres it drills.
  *
- *     cost per metre = rate / life in metres
+ *     cost per metre = rate paid / life in metres
  *     ₹22,000 bit / 100 m = ₹220 per metre
  *
- * Every part carries one life figure in metres. No terrain split, no days
- * basis — one number, one cost per metre, clean.
+ * Three things happen to a part, and they are different facts:
  *
- * The flow of a part through the yard is one-way:
+ *   Existing stock   what was already on the shelf the day the system
+ *                    started. No project, no rig. Sits until issued.
+ *   Starting kit     what has to go on a rig before it can turn at all.
+ *                    Assigned straight to the rig, no purchase order.
+ *   Issued           replacements handed over once something wears out,
+ *                    drawn off the shelf.
  *
- *   PO → Regular store → issued to rig → Startup store (cumulative view)
+ *   Purchase order → store shelf → issued to a rig
+ *                                      ↑
+ *                    starting kit ─────┘
  *
- * The startup store is not a separate physical location. It is a running
- * total of everything the regular store has ever sent to a rig on a project,
- * alongside what the driller's log says was used.
+ * Starting kit plus everything issued since is what a rig is carrying, and
+ * that is what decides its tooling cost per metre. Adding a second bit does
+ * not make each metre cost twice as much — a bit is ₹220/m whether the rig
+ * holds one or three. Quantity decides how long you can keep drilling; rate
+ * and life decide what each metre costs.
+ *
+ * The rate used is the rate actually paid, blended across the units that
+ * reached the rig, so a replacement bought dearer moves the figure.
+ *
+ * Two rules make the charge honest:
+ *
+ *   1. It is dated. Parts issued on the 14th change the 14th onward and
+ *      nothing before it, the same way every rate in costing behaves.
+ *   2. It follows the ground. A part is tagged with the formations it works
+ *      in, so seven metres of soft and eleven of hard on the same day are
+ *      charged at different rates.
  * ========================================================================== */
 
 export const TODAY = '2026-09-09'
@@ -37,6 +56,47 @@ export function normFormation(v: string): Formation {
   return 'Soft'
 }
 
+/* Which ground a part actually works in.
+ *
+ * A surface casing is consumed in the soft overburden and never at 200 m in
+ * granite. A water swivel turns in whatever the hole is made of. An
+ * impregnated bit runs in hard ground and harder. Tagging the part is what
+ * lets a day charge each stretch of hole at the right rate instead of
+ * smearing one blended figure across ground that cost wildly different
+ * amounts to drill. */
+export type FormationUse = 'soft' | 'hard+' | 'veryHard' | 'all'
+
+export const FORMATION_USE_LABEL: Record<FormationUse, string> = {
+  soft: 'Soft ground only',
+  'hard+': 'Hard and very hard',
+  veryHard: 'Very hard only',
+  all: 'All ground',
+}
+
+export const FORMATION_USES: FormationUse[] = ['all', 'soft', 'hard+', 'veryHard']
+
+/* Reads the free-text tag carried by older records. Anything unrecognised
+ * counts as general purpose, so a part is never silently charged nowhere. */
+export function formationUse(p: Part): FormationUse {
+  const raw = (p.formationUse ?? p.formation ?? '').toString().toLowerCase().trim()
+  if (FORMATION_USES.includes(raw as FormationUse)) return raw as FormationUse
+  if (raw.startsWith('very')) return 'veryHard'
+  if (raw.startsWith('hard')) return 'hard+'
+  if (raw.startsWith('soft')) return 'soft'
+  return 'all'
+}
+
+const USE_COVERS: Record<FormationUse, Formation[]> = {
+  all: ['Soft', 'Medium', 'Hard', 'Very Hard'],
+  soft: ['Soft'],
+  'hard+': ['Medium', 'Hard', 'Very Hard'],
+  veryHard: ['Very Hard'],
+}
+
+export function partWorksIn(p: Part, f: Formation): boolean {
+  return USE_COVERS[formationUse(p)].includes(f)
+}
+
 // ── PARTS CATALOGUE ───────────────────────────────────────────────────────
 
 export type PartCategory = 'Bit' | 'Rod & Casing' | 'Core Barrel' | 'Accessory' | 'Spares'
@@ -49,9 +109,10 @@ export interface Part {
   name: string
   serialNumber?: string
   category: PartCategory
-  rate: number           // ₹ per unit
-  formation: string      // e.g. Hard, Soft, Any
-  lifeMetres: number     // metres before replacement
+  rate: number            // ₹ per unit
+  formation?: string      // legacy tag, read by formationUse()
+  formationUse?: FormationUse
+  lifeMetres: number      // metres before replacement
   supplier: string
   leadTimeDays: number
   minStock: number
@@ -66,15 +127,15 @@ export function costPerMetre(p: Part): number {
   return p.lifeMetres > 0 ? p.rate / p.lifeMetres : 0
 }
 
+/* Catalogue-wide figure. Useful as a reference price for a rig nobody has
+ * kitted out yet, but never the thing a real day is charged at — a day is
+ * charged on what its own rig is carrying. See toolingRatesFor. */
 export function toolingPerMetre(parts: Part[]): number {
-  return parts.filter(p => p.active).reduce((s, p) => s + costPerMetre(p), 0
-  )
+  return parts.filter(p => p.active).reduce((s, p) => s + costPerMetre(p), 0)
 }
 
-/* The formation argument is accepted but ignored — kept so the finance
- * module's call sites still compile without changes. */
-export function toolingPerMetreForFormation(parts: Part[], _f: Formation): number {
-  return toolingPerMetre(parts)
+export function toolingPerMetreForFormation(parts: Part[], f: Formation): number {
+  return parts.filter(p => p.active && partWorksIn(p, f)).reduce((s, p) => s + costPerMetre(p), 0)
 }
 
 // ── SUPPLIERS ─────────────────────────────────────────────────────────────
@@ -152,7 +213,7 @@ export function openReorders(po: PurchaseOrder) {
   return po.reorders.filter(isOpenReorder)
 }
 
-// ── TRANSFERS ─────────────────────────────────────────────────────────────
+// ── MOVEMENTS ─────────────────────────────────────────────────────────────
 
 export interface Transfer {
   id: string
@@ -163,7 +224,7 @@ export interface Transfer {
   note?: string
 }
 
-/* Issued from the regular store to a rig on a project. */
+/* Issued from the store shelf to a rig on a project. */
 export interface Issue {
   id: string
   date: string
@@ -173,18 +234,19 @@ export interface Issue {
   lines: { itemId: string; qty: number }[]
 }
 
-/* Parts in the store before the system started — not assigned to any rig or
- * project. They sit on the shelf until issued, exactly like PO receipts. */
-export interface OpeningBalanceEntry {
+/* Parts already on the shelf before the system started. No project, no rig —
+ * they sit in the store until issued, exactly like a purchase order receipt. */
+export interface StoreStockEntry {
   id: string
   date: string
   addedBy: string
   lines: { itemId: string; qty: number; rate: number }[]
 }
 
-/* A part that was already on a rig before the system started. Treated as
- * issued for cost purposes — no PO behind it, just a starting balance. */
-export interface OpeningStockEntry {
+/* The kit a rig needs before it can turn. Assigned straight to the rig with
+ * no purchase order behind it — a starting balance, counted as issued for
+ * costing. */
+export interface RigKitEntry {
   id: string
   date: string
   project: string
@@ -341,7 +403,7 @@ export function supplierPerformance(pos: PurchaseOrder[], suppliers: Supplier[],
   }
 }
 
-// ── REGULAR STORE ─────────────────────────────────────────────────────────
+// ── STORE SHELF ───────────────────────────────────────────────────────────
 
 export interface StockLine {
   key: string; poId: string; poNumber: string; itemId: string
@@ -415,93 +477,211 @@ export function onOrder(pos: PurchaseOrder[], today: string): OnOrderLine[] {
   return out.sort((a, b) => (b.overdueDays ?? -1) - (a.overdueDays ?? -1))
 }
 
-// ── STARTUP STORE ─────────────────────────────────────────────────────────
-/* A per-rig, per-project running total of everything ever issued from the
- * regular store to that rig. Grows every time an issue is made. Total used
- * comes from the driller's log. */
+/* ==========================================================================
+ * WHAT A RIG IS CARRYING
+ *
+ * Starting kit plus everything issued since. Optionally as at a date, which
+ * is what makes the tooling charge dated: a bit issued on the 14th changes
+ * the 14th onward and leaves the 13th exactly as it was costed.
+ * ========================================================================== */
 
-export interface StartupLine {
+export interface RigUnit {
+  itemId: string
+  kitQty: number; kitValue: number
+  issuedQty: number; issuedValue: number
+  qty: number; value: number
+  firstDate: string
+  lastDate: string
+}
+
+export function rigUnits(
+  pos: PurchaseOrder[],
+  rigKit: RigKitEntry[],
+  rig: string,
+  project: string,
+  onOrBefore?: string,
+): Record<string, RigUnit> {
+  const acc: Record<string, RigUnit> = {}
+  const touch = (itemId: string, date: string): RigUnit => {
+    const e = acc[itemId] ??= {
+      itemId, kitQty: 0, kitValue: 0, issuedQty: 0, issuedValue: 0,
+      qty: 0, value: 0, firstDate: date, lastDate: date,
+    }
+    if (date < e.firstDate) e.firstDate = date
+    if (date > e.lastDate) e.lastDate = date
+    return e
+  }
+
+  rigKit
+    .filter(e => e.rig === rig && e.project === project && (!onOrBefore || e.date <= onOrBefore))
+    .forEach(e => e.lines.forEach(l => {
+      const u = touch(l.itemId, e.date)
+      u.kitQty += l.qty
+      u.kitValue += l.qty * l.rate
+    }))
+
+  pos.forEach(po => po.issues
+    .filter(i => i.rig === rig && (i.project ?? po.project) === project && (!onOrBefore || i.date <= onOrBefore))
+    .forEach(i => i.lines.forEach(l => {
+      const u = touch(l.itemId, i.date)
+      u.issuedQty += l.qty
+      u.issuedValue += l.qty * rateOfLine(po, l.itemId)
+    })))
+
+  Object.values(acc).forEach(u => {
+    u.qty = u.kitQty + u.issuedQty
+    u.value = u.kitValue + u.issuedValue
+  })
+  return acc
+}
+
+/* ── Tooling rate per formation ────────────────────────────────────────────
+ *
+ * For each part the rig is carrying, the rate actually paid blended across
+ * the units that reached it, divided by that part's life. Summed over the
+ * parts that work in a given formation, that is the tooling cost of a metre
+ * of that ground on that rig on that day.
+ *
+ * Ground the rig holds no tagged parts for falls back to the blended rate
+ * across everything, so a metre is never drilled free. That fallback is
+ * reported rather than hidden — it means a part is tagged wrong. */
+
+export interface ToolingRateLine {
   itemId: string
   partNumber: string
   name: string
+  category: PartCategory
+  use: FormationUse
+  qty: number
+  avgRate: number
+  catalogueRate: number
   lifeMetres: number
-  openingQty: number       // from "Assign rig stock" (no PO)
-  issuedQty: number        // from store shelf issues (PO-backed)
-  totalQty: number         // openingQty + issuedQty
-  totalUsed: number        // from the driller's log
-  onRig: number            // totalQty − totalUsed
-  openingValue: number     // value of opening rig stock
-  issuedValue: number      // value of shelf issues
-  totalValue: number       // openingValue + issuedValue
-  costPerMetre: number     // totalValue ÷ (totalQty × lifeMetres)
+  perMetre: number
+  value: number
 }
 
-/* partsUsed is the shift log array — passed in from the costing store. */
-export function startupStore(
+export interface ToolingRates {
+  byFormation: Record<Formation, number>
+  blended: number
+  lines: ToolingRateLine[]
+  fellBack: Formation[]
+  kitted: boolean
+}
+
+export const EMPTY_TOOLING: ToolingRates = {
+  byFormation: { Soft: 0, Medium: 0, Hard: 0, 'Very Hard': 0 },
+  blended: 0, lines: [], fellBack: [], kitted: false,
+}
+
+export function toolingRatesFor(
+  pos: PurchaseOrder[],
+  rigKit: RigKitEntry[],
+  parts: Part[],
+  rig: string,
+  project: string,
+  onOrBefore?: string,
+): ToolingRates {
+  const units = rigUnits(pos, rigKit, rig, project, onOrBefore)
+  const lines: ToolingRateLine[] = []
+
+  Object.values(units).forEach(u => {
+    const part = parts.find(p => p.id === u.itemId)
+    if (!part || u.qty <= 0 || part.lifeMetres <= 0) return
+    const avgRate = u.value / u.qty
+    lines.push({
+      itemId: u.itemId,
+      partNumber: part.partNumber,
+      name: part.name,
+      category: part.category,
+      use: formationUse(part),
+      qty: u.qty,
+      avgRate,
+      catalogueRate: part.rate,
+      lifeMetres: part.lifeMetres,
+      perMetre: avgRate / part.lifeMetres,
+      value: u.value,
+    })
+  })
+
+  const blended = lines.reduce((s, l) => s + l.perMetre, 0)
+  const byFormation = { ...EMPTY_TOOLING.byFormation }
+  const fellBack: Formation[] = []
+
+  FORMATIONS.forEach(f => {
+    const mine = lines.filter(l => USE_COVERS[l.use].includes(f))
+    if (mine.length === 0 && lines.length > 0) {
+      byFormation[f] = blended
+      fellBack.push(f)
+    } else {
+      byFormation[f] = mine.reduce((s, l) => s + l.perMetre, 0)
+    }
+  })
+
+  return {
+    byFormation, blended,
+    lines: lines.sort((a, b) => b.perMetre - a.perMetre),
+    fellBack, kitted: lines.length > 0,
+  }
+}
+
+/* ── What a rig is carrying, for the screen ───────────────────────────── */
+
+export interface RigHoldingLine {
+  itemId: string
+  partNumber: string
+  name: string
+  category: PartCategory
+  use: FormationUse
+  lifeMetres: number
+  kitQty: number           // from "Assign starting kit" — no purchase order
+  issuedQty: number        // handed over from the store shelf
+  totalQty: number
+  totalUsed: number        // scrapped, from the driller's log
+  onRig: number
+  kitValue: number
+  issuedValue: number
+  totalValue: number
+  avgRate: number
+  costPerMetre: number     // blended rate paid ÷ life
+}
+
+export function rigHoldings(
   pos: PurchaseOrder[],
   parts: Part[],
   rig: string,
   project: string,
   partsUsed: { itemId: string; qty: number }[],
-  openingStock: OpeningStockEntry[] = [],
-): StartupLine[] {
-  /* Track opening rig stock and shelf issues separately so the table can
-   * show them as distinct columns. */
-  const opening: Record<string, { qty: number; value: number }> = {}
-  const shelf:   Record<string, { qty: number; value: number }> = {}
-
-  /* Opening rig stock — assigned directly to this rig, no PO */
-  openingStock
-    .filter(e => e.rig === rig && e.project === project)
-    .forEach(e => e.lines.forEach(l => {
-      const entry = opening[l.itemId] ??= { qty: 0, value: 0 }
-      entry.qty   += l.qty
-      entry.value += l.qty * l.rate
-    }))
-
-  /* Shelf issues — PO receipts issued from the store to this rig */
-  pos.forEach(po => po.issues
-    .filter(i => i.rig === rig && (i.project ?? po.project) === project)
-    .forEach(i => i.lines.forEach(l => {
-      const e = shelf[l.itemId] ??= { qty: 0, value: 0 }
-      e.qty   += l.qty
-      e.value += l.qty * rateOfLine(po, l.itemId)
-    })))
-
+  rigKit: RigKitEntry[] = [],
+): RigHoldingLine[] {
+  const units = rigUnits(pos, rigKit, rig, project)
   const used: Record<string, number> = {}
   partsUsed.forEach(u => { used[u.itemId] = (used[u.itemId] ?? 0) + u.qty })
 
-  const allItems = new Set([...Object.keys(opening), ...Object.keys(shelf)])
-  return Array.from(allItems)
-    .map(itemId => {
-      const part = parts.find(p => p.id === itemId)
+  return Object.values(units)
+    .map(u => {
+      const part = parts.find(p => p.id === u.itemId)
       if (!part) return null
-      const o          = opening[itemId] ?? { qty: 0, value: 0 }
-      const sh         = shelf[itemId]   ?? { qty: 0, value: 0 }
-      const totalQty   = o.qty + sh.qty
-      const totalValue = o.value + sh.value
-      const totalUsed  = used[itemId] ?? 0
+      const avgRate = u.qty > 0 ? u.value / u.qty : part.rate
       return {
-        itemId,
-        partNumber:   part.partNumber,
-        name:         part.name,
-        lifeMetres:   part.lifeMetres,
-        openingQty:   o.qty,
-        issuedQty:    sh.qty,
-        totalQty,
-        totalUsed,
-        onRig:        Math.max(0, totalQty - totalUsed),
-        openingValue: o.value,
-        issuedValue:  sh.value,
-        totalValue,
-        /* Cost per metre = total value spent ÷ total metres of life those
-         * units represent. This updates every time more parts are issued. */
-        costPerMetre: totalQty > 0 && part.lifeMetres > 0
-          ? totalValue / (totalQty * part.lifeMetres)
-          : costPerMetre(part),
+        itemId: u.itemId,
+        partNumber: part.partNumber,
+        name: part.name,
+        category: part.category,
+        use: formationUse(part),
+        lifeMetres: part.lifeMetres,
+        kitQty: u.kitQty,
+        issuedQty: u.issuedQty,
+        totalQty: u.qty,
+        totalUsed: used[u.itemId] ?? 0,
+        onRig: Math.max(0, u.qty - (used[u.itemId] ?? 0)),
+        kitValue: u.kitValue,
+        issuedValue: u.issuedValue,
+        totalValue: u.value,
+        avgRate,
+        costPerMetre: part.lifeMetres > 0 ? avgRate / part.lifeMetres : 0,
       }
     })
-    .filter(Boolean) as StartupLine[]
+    .filter(Boolean) as RigHoldingLine[]
 }
 
 // ── CONSUMPTION ───────────────────────────────────────────────────────────
@@ -527,6 +707,198 @@ export function consumption(pos: PurchaseOrder[], f?: { rig?: string; project?: 
 
 export function consumptionValue(pos: PurchaseOrder[], f?: { rig?: string; project?: string; month?: string }) {
   return consumption(pos, f).reduce((s, c) => s + c.value, 0)
+}
+
+/* ==========================================================================
+ * TERRAIN — what the ground is actually doing to the parts
+ *
+ * The catalogue's life figure is a claim: a supplier's number, or whatever
+ * was assumed when the tender was priced. The driller's log is what really
+ * happened — every shift records the ground it was in and the parts that
+ * were scrapped in it.
+ *
+ * Metres in that ground ÷ units scrapped in that ground = the life the part
+ * actually gets. The gap between that and the catalogue is the gap between
+ * what a metre was priced at and what it cost.
+ * ========================================================================== */
+
+export interface ShiftFact {
+  rig: string
+  project: string
+  date: string
+  metres: number
+  formation: Formation
+  used: { itemId: string; qty: number }[]
+}
+
+export interface TerrainCell {
+  formation: Formation
+  metres: number
+  scrapped: number
+  observedLife: number | null
+  catalogueLife: number
+  observedPerMetre: number | null
+  cataloguePerMetre: number
+  lifeDeltaPct: number | null
+  confident: boolean
+}
+
+export interface TerrainRow {
+  itemId: string
+  partNumber: string
+  name: string
+  category: PartCategory
+  use: FormationUse
+  rate: number
+  catalogueLife: number
+  cells: Record<Formation, TerrainCell>
+  totalScrapped: number
+  totalSpend: number
+  worst: TerrainCell | null
+  best: TerrainCell | null
+}
+
+/* Below this many scrapped units a formation figure is one unlucky bit, not
+ * a pattern, so it is shown as evidence rather than as a number to act on. */
+export const TERRAIN_MIN_SAMPLE = 3
+
+export function terrainRows(facts: ShiftFact[], parts: Part[]): TerrainRow[] {
+  const metresBy: Record<Formation, number> = { Soft: 0, Medium: 0, Hard: 0, 'Very Hard': 0 }
+  facts.forEach(f => { metresBy[f.formation] += f.metres })
+
+  const scrapBy: Record<string, Record<Formation, number>> = {}
+  facts.forEach(f => f.used.forEach(u => {
+    const row = scrapBy[u.itemId] ??= { Soft: 0, Medium: 0, Hard: 0, 'Very Hard': 0 }
+    row[f.formation] += u.qty
+  }))
+
+  return Object.entries(scrapBy).map(([itemId, scrap]) => {
+    const part = parts.find(p => p.id === itemId)
+    if (!part) return null
+    const cells = {} as Record<Formation, TerrainCell>
+    FORMATIONS.forEach(f => {
+      const metres = metresBy[f]
+      const scrapped = scrap[f]
+      const observedLife = scrapped > 0 ? metres / scrapped : null
+      const confident = scrapped >= TERRAIN_MIN_SAMPLE
+      cells[f] = {
+        formation: f, metres, scrapped, observedLife,
+        catalogueLife: part.lifeMetres,
+        observedPerMetre: observedLife && observedLife > 0 ? part.rate / observedLife : null,
+        cataloguePerMetre: costPerMetre(part),
+        lifeDeltaPct: observedLife != null && part.lifeMetres > 0
+          ? ((observedLife - part.lifeMetres) / part.lifeMetres) * 100 : null,
+        confident,
+      }
+    })
+    const rated = FORMATIONS.map(f => cells[f]).filter(c => c.confident && c.observedLife != null)
+    const totalScrapped = FORMATIONS.reduce((s, f) => s + cells[f].scrapped, 0)
+    return {
+      itemId, partNumber: part.partNumber, name: part.name,
+      category: part.category, use: formationUse(part), rate: part.rate,
+      catalogueLife: part.lifeMetres, cells, totalScrapped,
+      totalSpend: totalScrapped * part.rate,
+      worst: rated.length ? rated.reduce((a, b) => (a.observedLife! < b.observedLife! ? a : b)) : null,
+      best: rated.length ? rated.reduce((a, b) => (a.observedLife! > b.observedLife! ? a : b)) : null,
+    }
+  }).filter(Boolean).sort((a, b) => b!.totalSpend - a!.totalSpend) as TerrainRow[]
+}
+
+/* Where the ground actually is, and what each band really costs to drill.
+ * Cross that against the rate the client pays for it and you find out which
+ * formation is carrying the project and which is losing money per metre. */
+export interface GroundBand {
+  formation: Formation
+  metres: number
+  sharePct: number
+  toolingPerMetre: number
+  toolingSpend: number
+}
+
+export function groundMix(facts: ShiftFact[], tooling: ToolingRates): GroundBand[] {
+  const metres: Record<Formation, number> = { Soft: 0, Medium: 0, Hard: 0, 'Very Hard': 0 }
+  facts.forEach(f => { metres[f.formation] += f.metres })
+  const total = FORMATIONS.reduce((s, f) => s + metres[f], 0)
+  return FORMATIONS.map(f => ({
+    formation: f,
+    metres: metres[f],
+    sharePct: total > 0 ? (metres[f] / total) * 100 : 0,
+    toolingPerMetre: tooling.byFormation[f],
+    toolingSpend: metres[f] * tooling.byFormation[f],
+  })).filter(b => b.metres > 0)
+}
+
+/* ==========================================================================
+ * SUPPLIERS — the price you actually paid
+ *
+ * A cheap supplier that ships one part in ten broken is not cheap. Faults
+ * have to be re-ordered, and the rig waits. These turn the raw record into
+ * the figure that should decide the next order.
+ * ========================================================================== */
+
+export interface SupplierInsight extends SupplierPerformance {
+  /* Unit price loaded with the proportion that had to be sent back. */
+  effectiveLoadingPct: number
+  /* Every lead time seen, so reliability is visible instead of an average
+   * hiding a range of 8 to 40 days. */
+  leadTimes: number[]
+  leadMin: number | null
+  leadMax: number | null
+  leadSpread: number | null
+  /* Replacements that arrived faulty again — a different problem from a
+   * first-time fault, and worth seeing on its own. */
+  reorderRounds: number
+  survivedPct: number | null
+  /* Value still owed, and the ground that cannot be drilled while it is. */
+  owedValue: number
+  worstLateDays: number
+  /* Faults concentrated in one part, rather than spread across the range. */
+  faultByItem: { itemId: string; delivered: number; faulty: number; pct: number }[]
+}
+
+export function supplierInsight(
+  pos: PurchaseOrder[], suppliers: Supplier[], name: string, today: string,
+): SupplierInsight {
+  const base = supplierPerformance(pos, suppliers, name)
+  const mine = pos.filter(p => p.supplier === name && p.status !== 'draft')
+
+  const leadTimes: number[] = []
+  mine.forEach(po => po.receipts.forEach(r => {
+    if (po.orderedDate) leadTimes.push(daysBetween(po.orderedDate, r.date))
+  }))
+
+  const byItem: Record<string, { delivered: number; faulty: number }> = {}
+  mine.forEach(po => po.lines.forEach(l => {
+    const e = byItem[l.itemId] ??= { delivered: 0, faulty: 0 }
+    e.delivered += qtyReceived(po, l.itemId) + qtyFaulty(po, l.itemId)
+    e.faulty += qtyFaulty(po, l.itemId)
+  }))
+
+  const rounds = mine.flatMap(p => p.reorders)
+  const settled = rounds.filter(r => r.receipt)
+  const survived = settled.filter(r => (r.receipt!.damaged + r.receipt!.rejected) === 0).length
+
+  let worstLateDays = 0
+  onOrder(pos, today).filter(o => o.supplier === name).forEach(o => {
+    if (o.overdueDays && o.overdueDays > worstLateDays) worstLateDays = o.overdueDays
+  })
+
+  return {
+    ...base,
+    effectiveLoadingPct: base.faultyPct ?? 0,
+    leadTimes,
+    leadMin: leadTimes.length ? Math.min(...leadTimes) : null,
+    leadMax: leadTimes.length ? Math.max(...leadTimes) : null,
+    leadSpread: leadTimes.length ? Math.max(...leadTimes) - Math.min(...leadTimes) : null,
+    reorderRounds: rounds.length,
+    survivedPct: settled.length ? (survived / settled.length) * 100 : null,
+    owedValue: mine.reduce((s, p) => s + poOpenReorderValue(p), 0),
+    worstLateDays,
+    faultByItem: Object.entries(byItem)
+      .map(([itemId, e]) => ({ itemId, ...e, pct: e.delivered > 0 ? (e.faulty / e.delivered) * 100 : 0 }))
+      .filter(e => e.faulty > 0)
+      .sort((a, b) => b.pct - a.pct),
+  }
 }
 
 // ── ALERTS ────────────────────────────────────────────────────────────────
@@ -557,7 +929,7 @@ export function buildAlerts(
     out.push({
       id: `stranded_${l.key}`, kind: 'stranded', level: 'warn',
       title: `${nameOf(l.itemId)} is stranded on a closed project`,
-      detail: `${l.qty} in the regular store against ${l.project}, which is complete. Move it or it stays invisible.`,
+      detail: `${l.qty} in the store against ${l.project}, which is complete. Move it or it stays invisible.`,
       value: l.value,
     })
   })
@@ -604,7 +976,7 @@ export function buildAlerts(
     out.push({
       id: `running_${part.id}`, kind: 'runningOut',
       level: days < part.leadTimeDays && onWay === 0 ? 'urgent' : 'warn',
-      title: n === 0 ? `${part.name} — none in the regular store` : `${part.name} runs out in ${Math.floor(days)} days`,
+      title: n === 0 ? `${part.name} — none in the store` : `${part.name} runs out in ${Math.floor(days)} days`,
       detail: `${n} in store covers ${Math.round(metresOfLife).toLocaleString('en-IN')} m at ${totalBurn.toFixed(1)} m/day. Lead time is ${part.leadTimeDays} days`
         + (onWay > 0 ? `, and ${onWay} is already on order.` : days < part.leadTimeDays ? ' — already too late to avoid a gap.' : ' — order now.'),
       value: Math.max(1, part.minStock - n) * part.rate,
@@ -617,7 +989,7 @@ export function buildAlerts(
       out.push({
         id: `low_${part.id}`, kind: 'lowStock', level: 'info',
         title: `${part.name} is below minimum stock`,
-        detail: `${n} in the regular store against a minimum of ${part.minStock}.`,
+        detail: `${n} in the store against a minimum of ${part.minStock}.`,
         value: (part.minStock - n) * part.rate,
       })
     }
@@ -636,7 +1008,7 @@ export function buildAlerts(
     out.push({
       id: `idle_${itemId}`, kind: 'idle',
       level: e.oldest >= s.idleDays * 2 ? 'warn' : 'info',
-      title: `${nameOf(itemId)} is sitting in the regular store`,
+      title: `${nameOf(itemId)} is sitting in the store`,
       detail: `${e.qty} received up to ${e.oldest} days ago on ${Array.from(e.pos).join(', ')}, not yet issued to any rig.`,
       value: e.value,
     })
@@ -654,27 +1026,30 @@ const P = (
   id: string, partNumber: string, name: string, category: PartCategory,
   lifeMetres: number, rate: number,
   supplier: string, leadTimeDays: number, minStock: number,
-  formation = 'Hard',
-): Part => ({ id, partNumber, name, category, formation, rate, lifeMetres, supplier, leadTimeDays, minStock, active: true })
+  use: FormationUse = 'hard+',
+): Part => ({
+  id, partNumber, name, category, formationUse: use, rate, lifeMetres,
+  supplier, leadTimeDays, minStock, active: true,
+})
 
 export const SEED_CATALOGUE: Part[] = [
-  P('t01', 'HQ-ROD-30',  'HQ Wire Line Drill Rod 3.0 m',      'Rod & Casing', 5000,  7840,  'Boart Longyear India', 21, 6,  'Hard'),
-  P('t02', 'HQ-CB-30',   'HQ Core Barrel 3.0 m',              'Core Barrel',  2000,  58800, 'Boart Longyear India', 28, 1,  'Hard'),
-  P('t03', 'HQ-ITA-01',  'HQ Inner Tube Assembly',            'Core Barrel',  2000,  49000, 'Boart Longyear India', 28, 1,  'Hard'),
-  P('t04', 'HQ-RS-01',   'HQ Diamond Reamer Shell',           'Bit',          500,   17150, 'Sandvik Mining',       18, 2,  'Hard'),
-  P('t05', 'HQ-OS-01',   'HQ Over Shot Assembly',             'Accessory',    2000,  34300, 'Boart Longyear India', 24, 1,  'Hard'),
-  P('t06', 'HQ-CL-01',   'HQ Core Lifter',                    'Accessory',    20,    980,   'Drillco Tools',        10, 20, 'Hard'),
-  P('t07', 'HQ-CLC-01',  'HQ Core Lifter Case',               'Accessory',    50,    1274,  'Drillco Tools',        10, 12, 'Hard'),
-  P('t08', 'HQ-BIT-IMP', 'HQ Impregnated Bit',                'Bit',          100,   22000, 'Sandvik Mining',       18, 3,  'Hard'),
-  P('t09', 'HQ-CB-SPR',  'HQ Core Barrel Spares',             'Spares',       500,   37440, 'Boart Longyear India', 28, 1,  'Hard'),
-  P('t10', 'WS-NQNW-01', 'Water Swivel NQ/NW Connection',     'Accessory',    5000,  24990, 'Drillco Tools',        14, 1,  'Medium'),
-  P('t11', 'HP-NQNW-01', 'Hoisting Plug NQ/NW Connection',    'Accessory',    5000,  29400, 'Drillco Tools',        14, 1,  'Medium'),
-  P('t12', 'ADP-01',     'Adaptors',                          'Accessory',    5000,  4900,  'Drillco Tools',        10, 2,  'Medium'),
-  P('t13', 'PW-CSG-30',  'PW Casing 3.0 m',                   'Rod & Casing', 10000, 10780, 'Mahalaxmi Steel',      30, 4,  'Soft'),
-  P('t14', 'HW-CSG-30',  'HW Casing 3.0 m',                   'Rod & Casing', 10000, 8820,  'Mahalaxmi Steel',      30, 4,  'Soft'),
-  P('t15', 'PW-TC-BIT',  'PW Casing TC Bit',                  'Bit',          200,   5390,  'Mahalaxmi Steel',      30, 2,  'Soft'),
-  P('t16', 'HW-TC-BIT',  'HW Casing TC / Shoe Bit',           'Bit',          200,   3773,  'Mahalaxmi Steel',      30, 2,  'Soft'),
-  P('t17', 'WS-SPR-02',  'Water Swivel Spares, 2 sets',       'Spares',       5000,  25000, 'Drillco Tools',        14, 1,  'Medium'),
+  P('t01', 'HQ-ROD-30',  'HQ Wire Line Drill Rod 3.0 m',   'Rod & Casing', 5000,  7840,  'Boart Longyear India', 21, 6,  'all'),
+  P('t02', 'HQ-CB-30',   'HQ Core Barrel 3.0 m',           'Core Barrel',  2000,  58800, 'Boart Longyear India', 28, 1,  'all'),
+  P('t03', 'HQ-ITA-01',  'HQ Inner Tube Assembly',         'Core Barrel',  2000,  49000, 'Boart Longyear India', 28, 1,  'all'),
+  P('t04', 'HQ-RS-01',   'HQ Diamond Reamer Shell',        'Bit',          500,   17150, 'Sandvik Mining',       18, 2,  'hard+'),
+  P('t05', 'HQ-OS-01',   'HQ Over Shot Assembly',          'Accessory',    2000,  34300, 'Boart Longyear India', 24, 1,  'all'),
+  P('t06', 'HQ-CL-01',   'HQ Core Lifter',                 'Accessory',    20,    980,   'Drillco Tools',        10, 20, 'all'),
+  P('t07', 'HQ-CLC-01',  'HQ Core Lifter Case',            'Accessory',    50,    1274,  'Drillco Tools',        10, 12, 'all'),
+  P('t08', 'HQ-BIT-IMP', 'HQ Impregnated Bit',             'Bit',          100,   22000, 'Sandvik Mining',       18, 3,  'hard+'),
+  P('t09', 'HQ-CB-SPR',  'HQ Core Barrel Spares',          'Spares',       500,   37440, 'Boart Longyear India', 28, 1,  'all'),
+  P('t10', 'WS-NQNW-01', 'Water Swivel NQ/NW Connection',  'Accessory',    5000,  24990, 'Drillco Tools',        14, 1,  'all'),
+  P('t11', 'HP-NQNW-01', 'Hoisting Plug NQ/NW Connection', 'Accessory',    5000,  29400, 'Drillco Tools',        14, 1,  'all'),
+  P('t12', 'ADP-01',     'Adaptors',                       'Accessory',    5000,  4900,  'Drillco Tools',        10, 2,  'all'),
+  P('t13', 'PW-CSG-30',  'PW Casing 3.0 m',                'Rod & Casing', 10000, 10780, 'Mahalaxmi Steel',      30, 4,  'soft'),
+  P('t14', 'HW-CSG-30',  'HW Casing 3.0 m',                'Rod & Casing', 10000, 8820,  'Mahalaxmi Steel',      30, 4,  'soft'),
+  P('t15', 'PW-TC-BIT',  'PW Casing TC Bit',               'Bit',          200,   5390,  'Mahalaxmi Steel',      30, 2,  'soft'),
+  P('t16', 'HW-TC-BIT',  'HW Casing TC / Shoe Bit',        'Bit',          200,   3773,  'Mahalaxmi Steel',      30, 2,  'soft'),
+  P('t17', 'WS-SPR-02',  'Water Swivel Spares, 2 sets',    'Spares',       5000,  25000, 'Drillco Tools',        14, 1,  'all'),
 ]
 
 export const SEED_SUPPLIERS: Supplier[] = [
@@ -760,29 +1135,38 @@ export const SEED_POS: PurchaseOrder[] = [
     receipts: [], reorders: [], issues: [], transfers: [], note: 'Awaiting approval' },
 ]
 
-export const SEED_OPENING_STOCK: OpeningStockEntry[] = [
+/* Kits are dated before the first shift of the month, which is what a real
+ * site does — the rig cannot turn until it is kitted. Date one of these
+ * after the first log and the early days of the month read free. */
+export const SEED_RIG_KIT: RigKitEntry[] = [
   {
-    id: 'os_seed_1', date: '2026-07-25', addedBy: 'Store',
+    id: 'rk_seed_1', date: '2026-07-25', addedBy: 'Store',
     project: 'Site A - North Field', rig: 'RIG-001',
     lines: [
-      { itemId: 't08', qty: 2, rate: 22000 },  // HQ Impregnated Bit
-      { itemId: 't06', qty: 8, rate: 980  },   // HQ Core Lifter
-      { itemId: 't07', qty: 5, rate: 1274 },   // HQ Core Lifter Case
+      { itemId: 't08', qty: 2, rate: 22000 },
+      { itemId: 't06', qty: 8, rate: 980 },
+      { itemId: 't07', qty: 5, rate: 1274 },
+      { itemId: 't01', qty: 6, rate: 7840 },
+      { itemId: 't14', qty: 2, rate: 8820 },
+      { itemId: 't16', qty: 1, rate: 3773 },
     ],
   },
   {
-    id: 'os_seed_2', date: '2026-07-25', addedBy: 'Store',
+    id: 'rk_seed_2', date: '2026-07-25', addedBy: 'Store',
     project: 'Site A - North Field', rig: 'RIG-002',
     lines: [
-      { itemId: 't08', qty: 1, rate: 22000 },  // HQ Impregnated Bit
-      { itemId: 't04', qty: 1, rate: 17150 },  // HQ Diamond Reamer Shell
+      { itemId: 't08', qty: 1, rate: 22000 },
+      { itemId: 't04', qty: 1, rate: 17150 },
+      { itemId: 't01', qty: 6, rate: 7840 },
+      { itemId: 't14', qty: 2, rate: 8820 },
     ],
   },
   {
-    id: 'os_seed_3', date: '2026-07-25', addedBy: 'Store',
+    id: 'rk_seed_3', date: '2026-07-25', addedBy: 'Store',
     project: 'Site B - South Ridge', rig: 'RIG-003',
     lines: [
-      { itemId: 't08', qty: 1, rate: 22000 },  // HQ Impregnated Bit
+      { itemId: 't08', qty: 1, rate: 22000 },
+      { itemId: 't01', qty: 6, rate: 7840 },
     ],
   },
 ]
@@ -808,13 +1192,16 @@ interface State {
   catalogue: Part[]
   suppliers: Supplier[]
   pos: PurchaseOrder[]
-  openingStock: OpeningStockEntry[]
-  openingBalance: OpeningBalanceEntry[]
+  rigKit: RigKitEntry[]
+  storeStock: StoreStockEntry[]
   alerts: AlertSettings
 }
 
 function initial(): State {
-  return { catalogue: SEED_CATALOGUE, suppliers: SEED_SUPPLIERS, pos: SEED_POS, openingStock: SEED_OPENING_STOCK, openingBalance: [], alerts: DEFAULT_ALERTS }
+  return {
+    catalogue: SEED_CATALOGUE, suppliers: SEED_SUPPLIERS, pos: SEED_POS,
+    rigKit: SEED_RIG_KIT, storeStock: [], alerts: DEFAULT_ALERTS,
+  }
 }
 
 let seq = 0
@@ -835,14 +1222,15 @@ interface Ctx {
   receiveReorder: (poId: string, reorderId: string, receipt: ReorderReceipt) => void
   addIssue: (poId: string, i: Omit<Issue, 'id'>) => void
   addTransfer: (poId: string, t: Omit<Transfer, 'id'>) => void
-  addOpeningBalance: (e: Omit<OpeningBalanceEntry, 'id'>) => void
-  addOpeningStock: (e: Omit<OpeningStockEntry, 'id'>) => void
+  addStoreStock: (e: Omit<StoreStockEntry, 'id'>) => void
+  addRigKit: (e: Omit<RigKitEntry, 'id'>) => void
   saveAlertSettings: (s: AlertSettings) => void
   resetAll: () => void
 }
 
 const InvCtx = createContext<Ctx | null>(null)
-const KEY = 'xplorix_inventory_v10'
+const KEY = 'xplorix_inventory_v11'
+const LEGACY_KEY = 'xplorix_inventory_v10'
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
@@ -850,17 +1238,19 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(KEY)
+      const base = initial()
+      const raw = localStorage.getItem(KEY) ?? localStorage.getItem(LEGACY_KEY)
       if (raw) {
         const saved = JSON.parse(raw)
-        const base  = initial()
+        /* v10 called these openingStock and openingBalance. Same data, so it
+         * is carried across rather than thrown away. */
+        const rigKit = saved.rigKit ?? saved.openingStock ?? []
+        const storeStock = saved.storeStock ?? saved.openingBalance ?? []
         setState({
           ...base,
           ...saved,
-          /* If the saved openingStock is empty but seed has entries, keep seed.
-           * This ensures demo data always shows even after a cache load. */
-          openingStock: saved.openingStock?.length > 0 ? saved.openingStock : base.openingStock,
-          openingBalance: saved.openingBalance ?? base.openingBalance,
+          rigKit: rigKit.length > 0 ? rigKit : base.rigKit,
+          storeStock,
         })
       }
     } catch {}
@@ -919,8 +1309,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       }),
       addIssue: (poId, i) => onPO(poId, p => ({ ...p, issues: [...p.issues, { ...i, id: uid('is') }] })),
       addTransfer: (poId, t) => onPO(poId, p => ({ ...p, transfers: [...p.transfers, { ...t, id: uid('tr') }] })),
-      addOpeningBalance: e => setState(s => ({ ...s, openingBalance: [...s.openingBalance, { ...e, id: uid('ob') }] })),
-      addOpeningStock: e => setState(s => ({ ...s, openingStock: [...s.openingStock, { ...e, id: uid('os') }] })),
+      addStoreStock: e => setState(s => ({ ...s, storeStock: [...s.storeStock, { ...e, id: uid('ss') }] })),
+      addRigKit: e => setState(s => ({ ...s, rigKit: [...s.rigKit, { ...e, id: uid('rk') }] })),
       saveAlertSettings: a => setState(s => ({ ...s, alerts: a })),
       resetAll: () => setState(initial()),
     }}>{children}</InvCtx.Provider>
@@ -960,3 +1350,11 @@ export function monthLabel(ym: string) {
   const [y, m] = ym.split('-').map(Number)
   return `${MONTHS[m - 1]} ${y}`
 }
+
+/* ── Compatibility ──────────────────────────────────────────────────────────
+ * Old names, kept so nothing outside these files breaks on the rename. Use
+ * the new names in anything you write from here. */
+export const startupStore = rigHoldings
+export type StartupLine = RigHoldingLine
+export type OpeningStockEntry = RigKitEntry
+export type OpeningBalanceEntry = StoreStockEntry
