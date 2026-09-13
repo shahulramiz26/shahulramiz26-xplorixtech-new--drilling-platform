@@ -785,9 +785,13 @@ const opRate = (id: string, rig: string, project: string, from: string, fuel: nu
 })
 
 export const SEED_OPERATING: OperatingRate[] = [
-  opRate('op_a1_1', 'RIG-001', 'Site A - North Field', '2026-01-01', 96, 'Opening entry'),
-  opRate('op_a1_2', 'RIG-001', 'Site A - North Field', '2026-08-01', 100, 'Diesel price revision'),
-  opRate('op_a2_1', 'RIG-002', 'Site A - North Field', '2026-01-01', 100, 'Opening entry'),
+  opRate('op_a1_1', 'RIG-001', 'Site A - North Field', '2026-01-01', 92, 'Opening entry'),
+  opRate('op_a1_2', 'RIG-001', 'Site A - North Field', '2026-07-01', 96, 'Diesel price revision'),
+  opRate('op_a1_3', 'RIG-001', 'Site A - North Field', '2026-08-01', 100, 'Diesel price revision'),
+  opRate('op_a1_4', 'RIG-001', 'Site A - North Field', '2026-09-01', 104, 'Diesel price revision'),
+  opRate('op_a2_1', 'RIG-002', 'Site A - North Field', '2026-01-01', 96, 'Opening entry'),
+  opRate('op_a2_2', 'RIG-002', 'Site A - North Field', '2026-08-01', 100, 'Diesel price revision'),
+  opRate('op_a2_3', 'RIG-002', 'Site A - North Field', '2026-09-01', 104, 'Diesel price revision'),
   opRate('op_b1_1', 'RIG-003', 'Site B - South Ridge', '2026-01-01', 100, 'Opening entry'),
 ]
 
@@ -848,24 +852,47 @@ const DEPTH_BANDS: [number, string][] = [
 
 const WEAR: Record<string, number> = { Soft: 2.2, Medium: 1.5, Hard: 1.0, 'Very Hard': 0.6 }
 
+/* How a part wears.
+ *
+ *   terrain   harder ground eats it faster — bits, lifters, reamers
+ *   flat      metres are metres whatever the rock — rods, swivels, barrels
+ *   soft      only consumed in the overburden — casing and casing shoes,
+ *             which are set near surface and never touched at depth
+ */
+type WearMode = 'terrain' | 'flat' | 'soft'
+
 function partsFor(
   run: Record<string, number>, metres: number, formation: string,
 ): PartUsage[] {
   const out: PartUsage[] = []
   const key = formation.includes('Very') ? 'Very Hard' : formation.includes('Hard') ? 'Hard' : 'Soft'
   const factor = WEAR[key]
+  const inSoft = key === 'Soft'
 
-  // [catalogue id, life in metres, wears faster in harder ground]
-  const wearing: [string, number, boolean][] = [
-    ['t06', 20, true],     // HQ Core Lifter
-    ['t07', 50, true],     // HQ Core Lifter Case
-    ['t08', 100, true],    // HQ Impregnated Bit
-    ['t04', 500, true],    // HQ Diamond Reamer Shell
-    ['t01', 5000, false],  // HQ Wire Line Drill Rod — metres, any ground
+  // [catalogue id, life in metres, how it wears]
+  const wearing: [string, number, WearMode][] = [
+    ['t06', 20, 'terrain'],    // HQ Core Lifter
+    ['t07', 50, 'terrain'],    // HQ Core Lifter Case
+    ['t08', 100, 'terrain'],   // HQ Impregnated Bit
+    ['t15', 200, 'soft'],      // PW Casing TC Bit
+    ['t16', 200, 'soft'],      // HW Casing TC / Shoe Bit
+    ['t04', 500, 'terrain'],   // HQ Diamond Reamer Shell
+    ['t09', 500, 'terrain'],   // HQ Core Barrel Spares
+    ['t02', 2000, 'flat'],     // HQ Core Barrel 3.0 m
+    ['t03', 2000, 'flat'],     // HQ Inner Tube Assembly
+    ['t05', 2000, 'flat'],     // HQ Over Shot Assembly
+    ['t17', 2000, 'flat'],     // Water Swivel Spares
+    ['t01', 5000, 'flat'],     // HQ Wire Line Drill Rod
+    ['t10', 5000, 'flat'],     // Water Swivel
+    ['t11', 5000, 'flat'],     // Hoisting Plug
+    ['t12', 5000, 'flat'],     // Adaptors
+    ['t13', 10000, 'soft'],    // PW Casing 3.0 m
+    ['t14', 10000, 'soft'],    // HW Casing 3.0 m
   ]
 
-  wearing.forEach(([id, baseLife, byTerrain]) => {
-    const life = byTerrain ? baseLife * factor : baseLife
+  wearing.forEach(([id, baseLife, mode]) => {
+    if (mode === 'soft' && !inSoft) return
+    const life = mode === 'terrain' ? baseLife * factor : baseLife
     run[id] = (run[id] ?? 0) + metres
     while (run[id] >= life) {
       run[id] -= life
@@ -946,8 +973,94 @@ export const SEED_SHIFT_LOGS_B: ShiftLog[] = expand('RIG-003', 'Site B - South R
   [12, 'DH-101', 8, 7], [13, 'DH-101', 8, 8], [14, 'DH-101', 7, 7],
 ], [[Infinity, 'Hard Formation']])
 
+/* June and July give the month strip something to compare against, and they
+ * are deliberately different months rather than noise: June carries a bad
+ * breakdown run and two weather stoppages, July is clean. September runs to
+ * the 13th, which is where the system's today sits. */
+export const SEED_SHIFT_LOGS_JUNE: ShiftLog[] = [
+  ...expand('RIG-001', 'Site A - North Field', '2026-06', 'HQ', [
+    [1, 'DH-901', 6, 5], [2, 'DH-901', 6, 5], [3, 'DH-901', 5, 4, 3, 0, 'Bit Change'],
+    [4, 'DH-901', 0, 0, 12, 12, 'Mechanical Breakdown'],
+    [5, 'DH-901', 0, 0, 12, 12, 'Mechanical Breakdown'],
+    [6, 'DH-901', 4, 4, 5, 2, 'Hydraulic Issue'], [7, 'DH-901', 6, 5],
+    [8, 'DH-901', 6, 6], [9, 'DH-901', 5, 5, 2, 0, 'Rod Change'],
+    [10, '', 0, 0, 12, 12, 'Weather Condition'],
+    [11, '', 0, 0, 12, 12, 'Weather Condition'],
+    [12, 'DH-902', 6, 5], [13, 'DH-902', 6, 5], [14, 'DH-902', 6, 6],
+    [15, 'DH-902', 5, 4, 3, 0, 'Electrical Fault'], [16, 'DH-902', 6, 5],
+    [17, 'DH-902', 6, 6], [18, 'DH-902', 6, 5], [19, 'DH-902', 6, 6],
+    [20, 'DH-902', 5, 5], [21, 'DH-902', 6, 5], [22, 'DH-902', 6, 6],
+    [23, 'DH-902', 5, 5, 2, 0, 'Operator Delay'], [24, 'DH-902', 6, 5],
+    [25, 'DH-902', 6, 6], [26, 'DH-902', 6, 5],
+  ]),
+  ...expand('RIG-002', 'Site A - North Field', '2026-06', 'HQ', [
+    [2, 'DH-911', 7, 6], [3, 'DH-911', 7, 6], [4, 'DH-911', 7, 7],
+    [5, 'DH-911', 6, 5, 2, 0, 'Water Shortage'], [6, 'DH-911', 7, 6],
+    [7, 'DH-911', 7, 7], [8, 'DH-911', 7, 6], [9, 'DH-911', 7, 7],
+    [10, '', 0, 0, 12, 12, 'Weather Condition'],
+    [11, 'DH-911', 7, 6], [12, 'DH-911', 7, 7], [13, 'DH-911', 6, 6, 3, 0, 'Bit Change'],
+    [14, 'DH-911', 7, 6], [15, 'DH-911', 7, 7], [16, 'DH-911', 7, 6],
+    [17, 'DH-911', 7, 7], [18, 'DH-911', 6, 6],
+  ]),
+]
+
+export const SEED_SHIFT_LOGS_JULY: ShiftLog[] = [
+  ...expand('RIG-001', 'Site A - North Field', '2026-07', 'HQ', [
+    [1, 'DH-951', 8, 6], [2, 'DH-951', 8, 7], [3, 'DH-951', 8, 6],
+    [4, 'DH-951', 8, 7], [5, 'DH-951', 7, 7], [6, 'DH-951', 8, 6],
+    [7, 'DH-951', 8, 7], [8, 'DH-951', 8, 7], [9, 'DH-951', 7, 6],
+    [10, 'DH-951', 8, 7], [11, 'DH-951', 8, 6],
+    [12, '', 0, 0, 12, 12, 'Waiting for Instruction'],
+    [13, 'DH-952', 8, 7], [14, 'DH-952', 8, 6], [15, 'DH-952', 8, 7],
+    [16, 'DH-952', 7, 7], [17, 'DH-952', 8, 6], [18, 'DH-952', 8, 7],
+    [19, 'DH-952', 8, 6], [20, 'DH-952', 7, 7], [21, 'DH-952', 8, 6],
+    [22, 'DH-952', 8, 7], [23, 'DH-952', 6, 6, 2, 0, 'Bit Change'],
+    [24, 'DH-952', 8, 7], [25, 'DH-952', 8, 6], [26, 'DH-952', 8, 7],
+    [27, 'DH-952', 7, 7], [28, 'DH-952', 8, 6], [29, 'DH-952', 8, 7],
+  ]),
+  ...expand('RIG-002', 'Site A - North Field', '2026-07', 'HQ', [
+    [1, 'DH-961', 7, 7], [2, 'DH-961', 8, 6], [3, 'DH-961', 7, 7],
+    [4, 'DH-961', 8, 7], [5, 'DH-961', 7, 6], [6, 'DH-961', 8, 7],
+    [7, 'DH-961', 7, 7], [8, 'DH-961', 8, 6], [9, 'DH-961', 7, 7],
+    [10, 'DH-961', 6, 6, 3, 0, 'Rod Change'], [11, 'DH-961', 8, 7],
+    [12, 'DH-961', 7, 6], [13, 'DH-961', 8, 7], [14, 'DH-961', 7, 7],
+    [15, 'DH-961', 8, 6], [16, 'DH-961', 7, 7], [17, 'DH-961', 8, 7],
+    [18, 'DH-961', 7, 6], [19, 'DH-961', 8, 7], [20, 'DH-961', 7, 7],
+    [21, 'DH-961', 8, 6], [22, 'DH-961', 7, 7],
+  ]),
+]
+
+export const SEED_SHIFT_LOGS_SEP: ShiftLog[] = [
+  ...expand('RIG-001', 'Site A - North Field', '2026-09', 'HQ', [
+    [1, 'DH-004', 7, 6], [2, 'DH-004', 7, 5], [3, 'DH-004', 7, 6],
+    [4, 'DH-004', 6, 5, 2, 0, 'Bit Change'], [5, 'DH-004', 7, 6],
+    [6, 'DH-004', 7, 7], [7, 'DH-004', 7, 6],
+    [8, '', 0, 0, 12, 12, 'Waiting for Instruction'],
+    [9, 'DH-004', 7, 6], [10, 'DH-004', 7, 7], [11, 'DH-004', 6, 6],
+    [12, 'DH-004', 7, 6], [13, 'DH-004', 7, 7],
+  ]),
+  ...expand('RIG-002', 'Site A - North Field', '2026-09', 'HQ', [
+    [1, 'DH-013', 7, 7], [2, 'DH-013', 7, 6], [3, 'DH-013', 7, 7],
+    [4, 'DH-013', 7, 6], [5, 'DH-013', 6, 6, 3, 0, 'Hydraulic Issue'],
+    [6, 'DH-013', 7, 7], [7, 'DH-013', 7, 6], [8, 'DH-013', 7, 7],
+    [9, 'DH-013', 7, 6], [10, 'DH-013', 7, 7], [11, 'DH-013', 6, 6],
+    [12, 'DH-013', 7, 7], [13, 'DH-013', 7, 6],
+  ]),
+  ...expand('RIG-003', 'Site B - South Ridge', '2026-09', 'HQ', [
+    [1, 'DH-102', 8, 7], [2, 'DH-102', 8, 8], [3, 'DH-102', 8, 7],
+    [4, 'DH-102', 7, 7], [5, 'DH-102', 8, 8], [6, 'DH-102', 8, 7],
+    [7, 'DH-102', 8, 8], [8, 'DH-102', 7, 7], [9, 'DH-102', 8, 7],
+    [10, 'DH-102', 8, 8], [11, 'DH-102', 7, 7], [12, 'DH-102', 8, 7],
+    [13, 'DH-102', 8, 8],
+  ], [[Infinity, 'Hard Formation']]),
+]
+
 export const SEED_SHIFT_LOGS: ShiftLog[] =
-  markClosures([...SEED_SHIFT_LOGS_A, ...SEED_SHIFT_LOGS_B], ['DH-001', 'DH-002', 'DH-011', 'DH-101'])
+  markClosures(
+    [...SEED_SHIFT_LOGS_JUNE, ...SEED_SHIFT_LOGS_JULY, ...SEED_SHIFT_LOGS_A,
+     ...SEED_SHIFT_LOGS_B, ...SEED_SHIFT_LOGS_SEP],
+    ['DH-901', 'DH-902', 'DH-911', 'DH-951', 'DH-952', 'DH-961',
+     'DH-001', 'DH-002', 'DH-011', 'DH-101'])
 
 export const SEED_MAINTENANCE: MaintenanceLog[] = [
   { id: 'm1', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-03', maintenanceType: 'Preventive', hours: 3, component: 'Engine', action: 'Inspection', cost: 4500 },
@@ -955,6 +1068,13 @@ export const SEED_MAINTENANCE: MaintenanceLog[] = [
   { id: 'm3', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-14', maintenanceType: 'Breakdown', hours: 4, component: 'Hydraulic System', action: 'Repair', cost: 12000 },
   { id: 'm4', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-23', maintenanceType: 'Scheduled', hours: 3, component: 'Compressor', action: 'Inspection', cost: 9500 },
   { id: 'm5', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-08-18', maintenanceType: 'Breakdown', hours: 8, component: 'Electrical', action: 'Repair', cost: 41000 },
+  { id: 'm6', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-06-04', maintenanceType: 'Breakdown', hours: 24, component: 'Engine', action: 'Replace', cost: 118000 },
+  { id: 'm7', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-06-05', maintenanceType: 'Breakdown', hours: 20, component: 'Engine', action: 'Repair', cost: 34000 },
+  { id: 'm8', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-06-15', maintenanceType: 'Breakdown', hours: 6, component: 'Electrical', action: 'Repair', cost: 22000 },
+  { id: 'm9', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-07-05', maintenanceType: 'Preventive', hours: 3, component: 'Engine', action: 'Inspection', cost: 4500 },
+  { id: 'm10', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-07-12', maintenanceType: 'Preventive', hours: 2, component: 'Compressor', action: 'Inspection', cost: 3800 },
+  { id: 'm11', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-09-04', maintenanceType: 'Scheduled', hours: 3, component: 'Mud Pump', action: 'Inspection', cost: 7200 },
+  { id: 'm12', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-09-05', maintenanceType: 'Breakdown', hours: 9, component: 'Hydraulic System', action: 'Repair', cost: 28500 },
 ]
 
 /* ==========================================================================
