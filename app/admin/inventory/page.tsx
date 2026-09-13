@@ -7,17 +7,19 @@ import {
   qtyReceived, qtyInStore, qtyNeverDelivered, qtyFaulty, qtyToReorder,
   poHasSomethingToReorder, poHasSomethingToReceive, rateOfLine,
   openReorders, REORDER_STATUS_LABEL, REORDER_OPEN_STATUSES, DELAY_REASONS,
-  stockInStore, onOrder, consumptionValue, buildAlerts, supplierPerformance,
-  startupStore,
+  stockInStore, buildAlerts, supplierPerformance, supplierInsight,
+  rigHoldings, toolingRatesFor, terrainRows, groundMix, TERRAIN_MIN_SAMPLE,
+  formationUse, FORMATION_USES, FORMATION_USE_LABEL,
   daysBetween, addDays, projectCode, isLiveProject, money, moneyL, perMetre,
-  dayLabel, fullDate, monthLabel, uid,
+  dayLabel, fullDate, uid,
   COMPLETED_PROJECTS, RIGS, PROJECTS,
   type Part, type PurchaseOrder, type Alert, type AlertLevel, type AlertKind,
   type PartCategory, type Reorder, type ReorderStatus, type ReorderReceipt,
   type DelayReason, type Supplier, type ReceiptLine, type StockLine,
-  type OpeningStockEntry, type OpeningBalanceEntry,
+  type Formation, type FormationUse,
+  type ShiftFact, type TerrainRow, type ToolingRates,
 } from '../../../lib/inventory-store'
-import { useCosting, monthOf, shiftMonth } from '../../../lib/costing-store'
+import { useCosting, monthOf } from '../../../lib/costing-store'
 
 const C = {
   bg: '#080B10', card: '#0D1117', border: '#1E293B',
@@ -156,10 +158,22 @@ function Chip({ on, onClick, label }: { on: boolean; onClick: () => void; label:
   )
 }
 
-const arrowStyle: React.CSSProperties = { padding: '5px 9px', borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, color: C.muted }
+/* A bar drawn in the row it belongs to, so length and number sit together. */
+function Bar({ value, max, tone, height = 6 }: { value: number; max: number; tone: string; height?: number }) {
+  const w = max > 0 ? Math.max(1.5, (value / max) * 100) : 0
+  return (
+    <div style={{ height, background: 'rgba(255,255,255,0.045)', borderRadius: height / 2, overflow: 'hidden', minWidth: 60 }}>
+      <div style={{ width: `${w}%`, height: '100%', background: tone, borderRadius: height / 2 }} />
+    </div>
+  )
+}
 
 let _rowSeq = 0
 const rowId = () => `r${Date.now()}_${++_rowSeq}`
+
+const FORMATION_TONE: Record<Formation, string> = {
+  Soft: C.green, Medium: C.teal, Hard: C.amber, 'Very Hard': C.red,
+}
 
 /* ==========================================================================
  * ALERTS
@@ -193,7 +207,7 @@ function AlertsPanel({ alerts }: { alerts: Alert[] }) {
   )
 
   return (
-    <Card title="Needs attention" subtitle={`${alerts.length} item${alerts.length === 1 ? '' : 's'}${urgent ? ` · ${urgent} urgent` : ''}`} pad={false} accent={urgent ? C.red : C.amber}>
+    <Card title="Needs attention" subtitle={`${alerts.length} item${alerts.length === 1 ? '' : 's'}${urgent ? `, ${urgent} urgent` : ''}`} pad={false} accent={urgent ? C.red : C.amber}>
       <div style={{ display: 'flex', gap: 6, padding: '11px 16px', borderBottom: rowBorder, flexWrap: 'wrap' }}>
         {chip('All', alerts.length, alerts.reduce((s, a) => s + (a.value ?? 0), 0), active === 'all', C.orange, () => setKind('all'))}
         <span style={{ width: 1, background: C.border, margin: '2px 4px' }} />
@@ -241,14 +255,15 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
     (!q || p.name.toLowerCase().includes(q.toLowerCase()) || p.partNumber.toLowerCase().includes(q.toLowerCase())))
 
   const blank = (): Part => ({
-    id: uid('t'), partNumber: '', name: '', category: 'Bit', formation: 'Hard', rate: 0,
+    id: uid('t'), partNumber: '', name: '', category: 'Bit', formationUse: 'all', rate: 0,
     lifeMetres: 0, supplier: state.suppliers[0]?.name ?? '', leadTimeDays: 14, minStock: 1, active: true,
   })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Note tone={C.dim}>
-        Cost per metre is rate divided by life in metres. The same figure is what finance charges for every metre drilled.
+        Cost per metre is the rate divided by life in metres. Used in decides which ground a part is charged against,
+        so a surface casing is not charged to a metre of granite.
       </Note>
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px' }}>
@@ -274,56 +289,59 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
           <span style={{ fontSize: 12, color: C.muted }}>Show retired</span>
         </label>
         <div style={{ flex: 1 }} />
-        {(q || cat !== 'All' || sup !== 'All') && <Btn size="sm" onClick={() => { setQ(''); setCat('All'); setSup('All') }}>Clear</Btn>}
+        {(q || cat !== 'All' || sup !== 'All') && <Btn size="sm" onClick={() => { setQ(''); setCat('All'); setSup('All') }}>Clear filters</Btn>}
         <Btn size="sm" onClick={onImport}>Import CSV</Btn>
         <Btn size="sm" tone="primary" onClick={() => onEdit(blank())}>Add part</Btn>
       </div>
 
-      <Card title="Parts catalogue" pad={false} subtitle={`${parts.length} of ${state.catalogue.length} parts · ₹${toolingPerMetre(parts).toFixed(2)}/m total across active parts`}>
+      <Card title="Parts catalogue" pad={false} subtitle={`${parts.length} of ${state.catalogue.length} parts`}>
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead>
               <tr>
                 <th style={th}>Part number</th><th style={th}>Item</th><th style={th}>Serial no.</th>
-                <th style={th}>Category</th><th style={th}>Formation</th><th style={thR}>Rate</th><th style={thR}>Life</th>
+                <th style={th}>Category</th><th style={th}>Used in</th><th style={thR}>Rate</th><th style={thR}>Life</th>
                 <th style={thR}>Cost / metre</th><th style={th}>Supplier</th><th style={thR}>Lead</th><th style={thR}>Min stock</th><th style={th} />
               </tr>
             </thead>
             <tbody>
               {parts.length === 0 && (
-                <tr><td colSpan={10}><Empty>{state.catalogue.length === 0 ? 'No parts yet. Add one or import a CSV.' : 'Nothing matches those filters.'}</Empty></td></tr>
+                <tr><td colSpan={12}><Empty>{state.catalogue.length === 0 ? 'No parts yet. Add one or import a CSV.' : 'Nothing matches those filters.'}</Empty></td></tr>
               )}
-              {parts.map(p => {
-                return (
-                  <tr key={p.id} style={{ borderBottom: rowBorder, opacity: p.active ? 1 : 0.45 }}>
-                    <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber || '—'}</td>
-                    <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 230 }}>
-                      {p.name}{!p.active && <span style={{ marginLeft: 7 }}><Tag tone={C.dim}>retired</Tag></span>}
-                    </td>
-                    <td style={{ ...tdMono, color: p.serialNumber ? C.muted : C.dim }}>{p.serialNumber || '—'}</td>
-                    <td style={td}><Tag tone={C.dim}>{p.category}</Tag></td>
-                    <td style={{ ...td, color: C.muted }}>{p.formation || '—'}</td>
-                    <td style={tdN}>{money(p.rate)}</td>
-                    <td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td>
-                    <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(costPerMetre(p))}</td>
-                    <td style={td}>{p.supplier}</td>
-                    <td style={tdN}>{p.leadTimeDays}d</td>
-                    <td style={{ ...tdN, color: C.faint }}>{p.minStock}</td>
-                    <td style={{ ...td, textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: 6 }}>
-                        <Btn size="sm" onClick={() => onEdit(p)}>Edit</Btn>
-                        <Btn size="sm" tone="danger" onClick={() => deletePart(p.id)}>Delete</Btn>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
+              {parts.map(p => (
+                <tr key={p.id} style={{ borderBottom: rowBorder, opacity: p.active ? 1 : 0.45 }}>
+                  <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber || '—'}</td>
+                  <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 230 }}>
+                    {p.name}{!p.active && <span style={{ marginLeft: 7 }}><Tag tone={C.dim}>retired</Tag></span>}
+                  </td>
+                  <td style={{ ...tdMono, color: p.serialNumber ? C.muted : C.dim }}>{p.serialNumber || '—'}</td>
+                  <td style={td}><Tag tone={C.dim}>{p.category}</Tag></td>
+                  <td style={{ ...td, color: C.muted }}>{FORMATION_USE_LABEL[formationUse(p)]}</td>
+                  <td style={tdN}>{money(p.rate)}</td>
+                  <td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td>
+                  <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(costPerMetre(p))}</td>
+                  <td style={td}>{p.supplier}</td>
+                  <td style={tdN}>{p.leadTimeDays}d</td>
+                  <td style={{ ...tdN, color: C.faint }}>{p.minStock}</td>
+                  <td style={{ ...td, textAlign: 'right' }}>
+                    <div style={{ display: 'inline-flex', gap: 6 }}>
+                      <Btn size="sm" onClick={() => onEdit(p)}>Edit</Btn>
+                      <Btn size="sm" tone="danger" onClick={() => deletePart(p.id)}>Delete</Btn>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={8}>Total cost per metre (active parts)</td>
+                <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>
+                  Whole catalogue, every active part
+                  <span style={{ fontWeight: 400, color: C.faint, marginLeft: 8 }}>
+                    a reference price — a rig is charged on what it is actually carrying
+                  </span>
+                </td>
                 <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{perMetre(toolingPerMetre(parts))}</td>
-                <td style={td} colSpan={3} />
+                <td style={td} colSpan={4} />
               </tr>
             </tfoot>
           </table>
@@ -333,18 +351,9 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
   )
 }
 
-function KVBlock({ k, v }: { k: string; v: string }) {
-  return (
-    <div>
-      <div style={{ fontSize: 10, color: C.faint, marginBottom: 4 }}>{k}</div>
-      <div style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>{v}</div>
-    </div>
-  )
-}
-
 function PartModal({ part, onSave, onClose }: { part: Part; onSave: (p: Part) => void; onClose: () => void }) {
   const { state } = useInventory()
-  const [f, setF] = useState<Part>(part)
+  const [f, setF] = useState<Part>({ ...part, formationUse: formationUse(part) })
   const u = (p: Partial<Part>) => setF(x => ({ ...x, ...p }))
   return (
     <Modal title={f.name || 'New part'} subtitle="Life in metres drives cost per metre — the figure worth getting right" width={720} onClose={onClose}
@@ -355,29 +364,33 @@ function PartModal({ part, onSave, onClose }: { part: Part; onSave: (p: Part) =>
           <Field label="Item"><input value={f.name} onChange={e => u({ name: e.target.value })} style={iStyle} /></Field>
           <Field label="Serial number" hint="Optional"><input value={f.serialNumber ?? ''} onChange={e => u({ serialNumber: e.target.value || undefined })} style={{ ...iStyle, fontFamily: 'ui-monospace, monospace' }} /></Field>
         </Grid>
-        <Grid cols={4}>
+        <Grid cols={3}>
           <Field label="Category">
             <select value={f.category} onChange={e => u({ category: e.target.value as PartCategory })} style={{ ...iStyle, cursor: 'pointer' }}>
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </Field>
           <Field label="Rate (₹)"><input type="number" value={f.rate} onChange={e => u({ rate: parseFloat(e.target.value) || 0 })} style={{ ...numStyle, color: C.orange }} /></Field>
-          <Field label="Formation"><select value={f.formation ?? 'Hard'} onChange={e => u({ formation: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}><option value="Soft">Soft</option><option value="Medium">Medium</option><option value="Hard">Hard</option><option value="Very Hard">Very Hard</option></select></Field>
-          </Grid>
-        <Grid cols={4}>
+          <Field label="Used in" hint="Which ground this part is consumed in. Only metres of that ground carry its cost.">
+            <select value={formationUse(f)} onChange={e => u({ formationUse: e.target.value as FormationUse })} style={{ ...iStyle, cursor: 'pointer' }}>
+              {FORMATION_USES.map(k => <option key={k} value={k}>{FORMATION_USE_LABEL[k]}</option>)}
+            </select>
+          </Field>
+        </Grid>
+        <Grid cols={3}>
           <Field label="Life in metres" hint="Metres before replacement">
             <input type="number" value={f.lifeMetres} onChange={e => u({ lifeMetres: parseFloat(e.target.value) || 0 })} style={numStyle} />
             {f.lifeMetres > 0 && f.rate > 0 && <div style={{ fontSize: 11, color: C.orange, marginTop: 5, textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontWeight: 700 }}>{perMetre(f.rate / f.lifeMetres)}</div>}
           </Field>
           <Field label="Minimum stock" hint="units"><input type="number" value={f.minStock} onChange={e => u({ minStock: parseFloat(e.target.value) || 0 })} style={numStyle} /></Field>
+          <Field label="Lead time" hint="days"><input type="number" value={f.leadTimeDays} onChange={e => u({ leadTimeDays: parseFloat(e.target.value) || 0 })} style={numStyle} /></Field>
         </Grid>
-        <Grid cols={3}>
+        <Grid cols={2}>
           <Field label="Supplier">
             <select value={f.supplier} onChange={e => u({ supplier: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}>
               {state.suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
             </select>
           </Field>
-          <Field label="Lead time" hint="days"><input type="number" value={f.leadTimeDays} onChange={e => u({ leadTimeDays: parseFloat(e.target.value) || 0 })} style={numStyle} /></Field>
         </Grid>
         <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
           <input type="checkbox" checked={f.active} onChange={e => u({ active: e.target.checked })} />
@@ -392,7 +405,7 @@ function PartModal({ part, onSave, onClose }: { part: Part; onSave: (p: Part) =>
 function ImportModal({ onClose }: { onClose: () => void }) {
   const { state, importParts } = useInventory()
   const [text, setText] = useState('')
-  const TEMPLATE = 'part_number,name,serial_number,category,rate,life_metres,supplier,lead_days,min_stock\nHQ-BIT-IMP,HQ Impregnated Bit,,Bit,22000,100,Sandvik Mining,18,3\nHQ-ROD-30,HQ Wire Line Drill Rod 3.0 m,,Rod & Casing,7840,5000,Boart Longyear India,21,6\n'
+  const TEMPLATE = 'part_number,name,serial_number,category,rate,life_metres,used_in,supplier,lead_days,min_stock\nHQ-BIT-IMP,HQ Impregnated Bit,,Bit,22000,100,hard+,Sandvik Mining,18,3\nHQ-ROD-30,HQ Wire Line Drill Rod 3.0 m,,Rod & Casing,7840,5000,all,Boart Longyear India,21,6\n'
 
   const parsed = useMemo<Part[]>(() => {
     if (!text.trim()) return []
@@ -406,10 +419,11 @@ function ImportModal({ onClose }: { onClose: () => void }) {
       const num = (n: string, d = 0) => parseFloat(at(n)) || d
       const name = at('name') || c[0]?.trim()
       if (!name) return
+      const rawUse = at('used_in') || at('formation')
       out.push({
         id: uid('t'), partNumber: at('part_number'), name, serialNumber: at('serial_number') || undefined,
         category: (CATEGORIES as string[]).includes(at('category')) ? at('category') as PartCategory : 'Accessory',
-        formation: at('formation') || 'Hard',
+        formation: rawUse || 'all',
         rate: num('rate'), lifeMetres: num('life_metres') || num('life'),
         supplier: at('supplier') || (state.suppliers[0]?.name ?? ''),
         leadTimeDays: num('lead_days', 14), minStock: num('min_stock', 1), active: true,
@@ -421,19 +435,20 @@ function ImportModal({ onClose }: { onClose: () => void }) {
   const existing = (p: Part) => state.catalogue.some(x => x.name.toLowerCase() === p.name.toLowerCase() || (p.partNumber && x.partNumber?.toLowerCase() === p.partNumber.toLowerCase()))
 
   return (
-    <Modal title="Import parts" subtitle="Paste a CSV with part_number, name, category, rate, life_metres, supplier, lead_days, min_stock" width={840} onClose={onClose}
+    <Modal title="Import parts" subtitle="Paste a CSV. used_in takes all, soft, hard+ or veryHard." width={840} onClose={onClose}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn tone="primary" disabled={parsed.length === 0} onClick={() => { importParts(parsed); onClose() }}>Import {parsed.length} part{parsed.length === 1 ? '' : 's'}</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Btn size="sm" onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([TEMPLATE], { type: 'text/csv' })); a.download = 'xplorix-parts-template.csv'; a.click() }}>Download template</Btn>
         <Field label="CSV"><textarea value={text} onChange={e => setText(e.target.value)} rows={7} placeholder={TEMPLATE} style={{ ...iStyle, fontFamily: 'ui-monospace, monospace', fontSize: 11.5, lineHeight: 1.6, resize: 'vertical' }} /></Field>
         {parsed.length > 0 && (
-          <Card title="Preview" pad={false} subtitle={`${parsed.filter(p => !existing(p)).length} new · ${parsed.filter(existing).length} updates`}>
+          <Card title="Preview" pad={false} subtitle={`${parsed.filter(p => !existing(p)).length} new, ${parsed.filter(existing).length} updates`}>
             <table style={tableStyle}>
-              <thead><tr><th style={th}>Part</th><th style={thR}>Rate</th><th style={thR}>Life</th><th style={thR}>Cost/m</th><th style={th} /></tr></thead>
+              <thead><tr><th style={th}>Part</th><th style={th}>Used in</th><th style={thR}>Rate</th><th style={thR}>Life</th><th style={thR}>Cost/m</th><th style={th} /></tr></thead>
               <tbody>
                 {parsed.map((p, k) => (
                   <tr key={k} style={{ borderBottom: rowBorder }}>
                     <td style={{ ...td, color: C.text }}>{p.name}</td>
+                    <td style={{ ...td, color: C.muted }}>{FORMATION_USE_LABEL[formationUse(p)]}</td>
                     <td style={tdN}>{money(p.rate)}</td>
                     <td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td>
                     <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{p.lifeMetres > 0 ? perMetre(p.rate / p.lifeMetres) : '—'}</td>
@@ -450,7 +465,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 }
 
 /* ==========================================================================
- * ORDERS (unchanged from previous version, abbreviated)
+ * ORDERS
  * ========================================================================== */
 
 const PO_TONE: Record<string, string> = { draft: C.faint, ordered: C.blue, partial: C.amber, received: C.green }
@@ -478,8 +493,8 @@ function OrdersTab({ onReceive, onCreate, onEdit, onRaiseReorder, onReceiveReord
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Grid cols={4}>
         <Stat label="On order" value={moneyL(t.ordered - t.received)} note="placed, not yet delivered" color={C.blue} />
-        <Stat label="Received" value={moneyL(t.received)} note="accepted into regular store" />
-        <Stat label="In regular store" value={moneyL(t.store)} note="on the shelf, not yet on a rig" color={C.amber} />
+        <Stat label="Received" value={moneyL(t.received)} note="accepted into the store" />
+        <Stat label="On the shelf" value={moneyL(t.store)} note="in the store, not yet on a rig" color={C.amber} />
         <Stat label="Owed on reorders" value={moneyL(t.owed)} note="sent back, replacement pending" color={t.owed > 0 ? C.red : C.dim} />
       </Grid>
 
@@ -489,14 +504,14 @@ function OrdersTab({ onReceive, onCreate, onEdit, onRaiseReorder, onReceiveReord
         <div style={{ width: 185 }}><Field label="Supplier"><select value={sup} onChange={e => setSup(e.target.value)} style={{ ...iStyle, cursor: 'pointer' }}><option value="All">All suppliers</option>{state.suppliers.map(x => <option key={x.id} value={x.name}>{x.name}</option>)}</select></Field></div>
         <div style={{ width: 175 }}><Field label="Project"><select value={proj} onChange={e => setProj(e.target.value)} style={{ ...iStyle, cursor: 'pointer' }}><option value="All">All projects</option>{PROJECTS.map(x => <option key={x} value={x}>{projectCode(x)}</option>)}</select></Field></div>
         <div style={{ flex: 1 }} />
-        {(q || status !== 'all' || sup !== 'All' || proj !== 'All') && <Btn size="sm" onClick={() => { setQ(''); setStatus('all'); setSup('All'); setProj('All') }}>Clear</Btn>}
+        {(q || status !== 'all' || sup !== 'All' || proj !== 'All') && <Btn size="sm" onClick={() => { setQ(''); setStatus('all'); setSup('All'); setProj('All') }}>Clear filters</Btn>}
         <Btn size="sm" tone="primary" onClick={onCreate}>New order</Btn>
       </div>
 
-      <Card title="Purchase orders" pad={false} subtitle={`${pos.length} of ${state.pos.length} · all receipts land in the regular store`}>
+      <Card title="Purchase orders" pad={false} subtitle={`${pos.length} of ${state.pos.length}. Everything accepted lands on the store shelf.`}>
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
-            <thead><tr><th style={th}>Order</th><th style={th}>Supplier</th><th style={th}>Project</th><th style={th}>Status</th><th style={th}>Ordered</th><th style={th}>Promised</th><th style={th}>Delivered</th><th style={thR}>Delay</th><th style={thR}>Value</th><th style={thR}>In store</th><th style={th} /></tr></thead>
+            <thead><tr><th style={th}>Order</th><th style={th}>Supplier</th><th style={th}>Project</th><th style={th}>Status</th><th style={th}>Ordered</th><th style={th}>Promised</th><th style={th}>Delivered</th><th style={thR}>Delay</th><th style={thR}>Value</th><th style={thR}>On shelf</th><th style={th} /></tr></thead>
             <tbody>
               {pos.length === 0 && <tr><td colSpan={11}><Empty>Nothing matches those filters.</Empty></td></tr>}
               {pos.map(po => {
@@ -532,7 +547,7 @@ function OrdersTab({ onReceive, onCreate, onEdit, onRaiseReorder, onReceiveReord
                           <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: 24 }}>
                             <div>
                               <SubHead tone={C.orange}>Lines</SubHead>
-                              <table style={tableStyle}><thead><tr><th style={th}>Part</th><th style={thR}>Ordered</th><th style={thR}>Accepted</th><th style={thR}>Faulty</th><th style={thR}>In store</th><th style={thR}>Value</th></tr></thead>
+                              <table style={tableStyle}><thead><tr><th style={th}>Part</th><th style={thR}>Ordered</th><th style={thR}>Accepted</th><th style={thR}>Faulty</th><th style={thR}>On shelf</th><th style={thR}>Value</th></tr></thead>
                                 <tbody>{po.lines.map(l => (<tr key={l.itemId} style={{ borderBottom: rowBorder }}><td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{nameOf(l.itemId)}</td><td style={tdN}>{l.qty}</td><td style={{ ...tdN, color: C.green }}>{qtyReceived(po, l.itemId)}</td><td style={{ ...tdN, color: qtyFaulty(po, l.itemId) > 0 ? C.red : C.dim }}>{qtyFaulty(po, l.itemId) || '—'}</td><td style={{ ...tdN, color: qtyInStore(po, l.itemId) > 0 ? C.amber : C.dim }}>{qtyInStore(po, l.itemId)}</td><td style={tdN}>{money(l.qty * l.rate)}</td></tr>))}</tbody>
                               </table>
                             </div>
@@ -572,7 +587,7 @@ function ReordersTable({ onReceiveReorder }: { onReceiveReorder: (po: PurchaseOr
   const open = state.pos.flatMap(po => openReorders(po).map(r => ({ po, r })))
   const owed = open.reduce((s, { po, r }) => s + r.qty * rateOfLine(po, r.itemId), 0)
   return (
-    <Card title="Reorders" pad={false} subtitle={`${open.length} open · ${money(owed)} owed by suppliers`} accent={open.length ? C.red : undefined} right={<label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer' }}><input type="checkbox" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} /><span style={{ fontSize: 11.5, color: C.muted }}>Show settled</span></label>}>
+    <Card title="Reorders" pad={false} subtitle={`${open.length} open, ${money(owed)} owed by suppliers`} accent={open.length ? C.red : undefined} right={<label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer' }}><input type="checkbox" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} /><span style={{ fontSize: 11.5, color: C.muted }}>Show settled</span></label>}>
       {rows.length === 0 ? <Empty>No reorders. Nothing has come in faulty.</Empty> : (
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
@@ -642,7 +657,7 @@ function SupplierTable() {
         </div>
       </Card>
       {editing && (
-        <Modal title={editing.name || 'New supplier'} width={500} onClose={() => setEditing(null)} footer={<><Btn onClick={() => setEditing(null)}>Cancel</Btn><Btn tone="primary" disabled={!editing.name.trim()} onClick={() => { saveSupplier(editing); setEditing(null) }}>Save</Btn></>}>
+        <Modal title={editing.name || 'New supplier'} width={500} onClose={() => setEditing(null)} footer={<><Btn onClick={() => setEditing(null)}>Cancel</Btn><Btn tone="primary" disabled={!editing.name.trim()} onClick={() => { saveSupplier(editing); setEditing(null) }}>Save supplier</Btn></>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <Grid cols={2}>
               <Field label="Name"><input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} style={iStyle} /></Field>
@@ -659,45 +674,41 @@ function SupplierTable() {
   )
 }
 
-
 /* ==========================================================================
- * STORE TAB
+ * STORE
+ *
+ * The shelf, then what each rig is carrying. Two ways onto a rig: the
+ * starting kit it needs before it can turn, and replacements issued since.
+ * Both together decide the rig's tooling cost per metre.
  * ========================================================================== */
 
-function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
-  const { state, addIssue, addOpeningStock, addOpeningBalance } = useInventory()
+function StoreTab() {
+  const { state, addIssue, addRigKit, addStoreStock } = useInventory()
   const { state: cost } = useCosting()
   const nameOf = (id: string) => state.catalogue.find(p => p.id === id)?.name ?? id
 
-  const [project, setProject]             = useState(PROJECTS.find(isLiveProject) ?? PROJECTS[0])
-  const [addingOpening, setAddingOpening]   = useState(false)
-  const [addingBalance, setAddingBalance]   = useState(false)
-  const [issuingLine, setIssuingLine]     = useState<StockLine | null>(null)
+  const [project, setProject]   = useState(PROJECTS.find(isLiveProject) ?? PROJECTS[0])
+  const [addingStock, setAddingStock] = useState(false)
+  const [addingKit, setAddingKit]     = useState(false)
+  const [issuingLine, setIssuingLine] = useState<StockLine | null>(null)
 
-  const poStock  = useMemo(() => stockInStore(state.pos, TODAY).filter(l => l.project === project), [state.pos, project])
-  const openRows = useMemo(() => state.openingStock.filter(e => e.project === project), [state.openingStock, project])
+  const poStock = useMemo(() => stockInStore(state.pos, TODAY).filter(l => l.project === project), [state.pos, project])
 
-  const storeRows = useMemo(() => {
-    const rows: { key: string; source: 'opening'|'balance'|'po'; itemId: string; qty: number; rate: number; value: number; ref: string; ageDays: number; poKey?: string }[] = []
-    /* Opening balance — not tied to project, shown for all projects */
-    state.openingBalance.forEach(e => e.lines.forEach((l, k) => rows.push({
-      key: `ob_${e.id}_${k}`, source: 'balance', itemId: l.itemId,
-      qty: l.qty, rate: l.rate, value: l.qty * l.rate, ref: 'Opening balance',
-      ageDays: daysBetween(e.date, TODAY),
-    })))
-    openRows.forEach(e => e.lines.forEach((l, k) => rows.push({
-      key: `os_${e.id}_${k}`, source: 'opening', itemId: l.itemId,
-      qty: l.qty, rate: l.rate, value: l.qty * l.rate, ref: 'Rig stock',
+  const shelfRows = useMemo(() => {
+    const rows: { key: string; source: 'existing' | 'po'; itemId: string; qty: number; rate: number; value: number; ref: string; ageDays: number }[] = []
+    state.storeStock.forEach(e => e.lines.forEach((l, k) => rows.push({
+      key: `ss_${e.id}_${k}`, source: 'existing', itemId: l.itemId,
+      qty: l.qty, rate: l.rate, value: l.qty * l.rate, ref: 'Existing stock',
       ageDays: daysBetween(e.date, TODAY),
     })))
     poStock.forEach(l => rows.push({
       key: l.key, source: 'po', itemId: l.itemId, qty: l.qty, rate: l.rate,
-      value: l.value, ref: l.poNumber, ageDays: l.ageDays, poKey: l.key,
+      value: l.value, ref: l.poNumber, ageDays: l.ageDays,
     }))
     return rows.sort((a, b) => b.value - a.value)
-  }, [openRows, poStock])
+  }, [state.storeStock, poStock])
 
-  const totalValue = storeRows.reduce((s, r) => s + r.value, 0)
+  const shelfValue = shelfRows.reduce((s, r) => s + r.value, 0)
 
   const partsUsedByRig = useMemo(() => {
     const out: Record<string, { itemId: string; qty: number }[]> = {}
@@ -712,13 +723,14 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
     return out
   }, [cost.shiftLogs, project])
 
-  const rigLines = useMemo(() =>
+  const rigs = useMemo(() =>
     RIGS.map(rig => {
-      const lines   = startupStore(state.pos, state.catalogue, rig, project, partsUsedByRig[rig] ?? [], state.openingStock)
+      const lines   = rigHoldings(state.pos, state.catalogue, rig, project, partsUsedByRig[rig] ?? [], state.rigKit)
       const metres  = cost.shiftLogs.filter(l => l.rig === rig && l.project === project).reduce((s, l) => s + l.metresDrilled, 0)
-      return { rig, lines, total: lines.reduce((s, l) => s + l.totalValue, 0), metres }
+      const tooling = toolingRatesFor(state.pos, state.rigKit, state.catalogue, rig, project)
+      return { rig, lines, tooling, total: lines.reduce((s, l) => s + l.totalValue, 0), metres }
     }).filter(r => r.lines.length > 0),
-  [state.pos, state.catalogue, state.openingStock, project, partsUsedByRig, cost.shiftLogs])
+  [state.pos, state.catalogue, state.rigKit, project, partsUsedByRig, cost.shiftLogs])
 
   const issueFromShelf = (date: string, rig: string, by: string, picks: { poId: string; itemId: string; qty: number }[]) => {
     const byPO: Record<string, { itemId: string; qty: number }[]> = {}
@@ -729,32 +741,32 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* Project selector */}
       <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px' }}>
         <Chain label="Project">
           {PROJECTS.map(p => <Chip key={p} on={project === p} label={projectCode(p)} onClick={() => setProject(p)} />)}
         </Chain>
       </div>
 
-      {/* ── Store table ── */}
-      <Card title="Store" pad={false}
-        subtitle={`${storeRows.length} lines · ${money(totalValue)} · ${projectCode(project)}`}
+      {/* ── The shelf ── */}
+      <Card title="On the shelf" pad={false}
+        subtitle={`${shelfRows.length} lines, ${money(shelfValue)}. Nothing here is costing a hole anything yet.`}
         right={
           <div style={{ display: 'flex', gap: 8 }}>
-            <Btn size="sm" onClick={() => setAddingBalance(true)}>+ Opening balance</Btn>
-            <Btn size="sm" tone="primary" onClick={() => setAddingOpening(true)}>Assign rig stock</Btn>
+            <Btn size="sm" onClick={() => setAddingStock(true)}>Add existing stock</Btn>
+            <Btn size="sm" tone="primary" onClick={() => setAddingKit(true)}>Assign starting kit</Btn>
           </div>
         }>
-        {storeRows.length === 0 ? (
+        {shelfRows.length === 0 ? (
           <div style={{ padding: 36, textAlign: 'center' }}>
-            <p style={{ fontSize: 13, color: C.muted, fontWeight: 600, marginBottom: 8 }}>No stock in the store for {projectCode(project)} yet.</p>
-            <p style={{ fontSize: 12, color: C.faint, lineHeight: 1.7, maxWidth: 440, margin: '0 auto 20px' }}>
-              If parts are already on site, use <strong style={{ color: C.orange }}>Assign rig stock</strong> to put them on a rig, or <strong style={{ color: C.text }}>+ Opening balance</strong> to add them to the store.
-              Parts received from purchase orders appear here automatically.
+            <p style={{ fontSize: 13, color: C.muted, fontWeight: 600, marginBottom: 8 }}>The shelf is empty for {projectCode(project)}.</p>
+            <p style={{ fontSize: 12, color: C.faint, lineHeight: 1.7, maxWidth: 460, margin: '0 auto 20px' }}>
+              Parts a rig needs to start drilling go on with <strong style={{ color: C.orange }}>Assign starting kit</strong>.
+              Parts already sitting in the store go on with <strong style={{ color: C.text }}>Add existing stock</strong>.
+              Anything received against a purchase order appears here on its own.
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <Btn onClick={() => setAddingBalance(true)}>+ Opening balance</Btn>
-              <Btn tone="primary" onClick={() => setAddingOpening(true)}>Assign rig stock</Btn>
+              <Btn onClick={() => setAddingStock(true)}>Add existing stock</Btn>
+              <Btn tone="primary" onClick={() => setAddingKit(true)}>Assign starting kit</Btn>
             </div>
           </div>
         ) : (
@@ -762,13 +774,13 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
             <table style={tableStyle}>
               <thead><tr>
                 <th style={th}>Part number</th><th style={th}>Item</th>
-                <th style={th}>Category</th><th style={th}>Formation</th>
-                <th style={th}>Source</th>
+                <th style={th}>Category</th><th style={th}>Used in</th>
+                <th style={th}>Came from</th>
                 <th style={thR}>Qty</th><th style={thR}>Rate</th><th style={thR}>Value</th>
-                <th style={thR}>Age</th><th style={th} />
+                <th style={thR}>Waiting</th><th style={th} />
               </tr></thead>
               <tbody>
-                {storeRows.map(r => {
+                {shelfRows.map(r => {
                   const part = state.catalogue.find(p => p.id === r.itemId)
                   const old  = r.ageDays >= state.alerts.idleDays
                   return (
@@ -776,12 +788,10 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
                       <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{part?.partNumber || '—'}</td>
                       <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 200 }}>{nameOf(r.itemId)}</td>
                       <td style={td}>{part ? <Tag tone={C.dim}>{part.category}</Tag> : '—'}</td>
-                      <td style={{ ...td, color: C.muted }}>{part?.formation || '—'}</td>
+                      <td style={{ ...td, color: C.muted }}>{part ? FORMATION_USE_LABEL[formationUse(part)] : '—'}</td>
                       <td style={td}>
-                        {r.source === 'opening'
-                          ? <Tag tone={C.purple}>Rig stock</Tag>
-                          : r.source === 'balance'
-                          ? <Tag tone={C.teal}>Opening balance</Tag>
+                        {r.source === 'existing'
+                          ? <Tag tone={C.teal}>Existing stock</Tag>
                           : <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11 }}>{r.ref}</span>}
                       </td>
                       <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{r.qty}</td>
@@ -789,7 +799,7 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
                       <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(r.value)}</td>
                       <td style={{ ...tdN, color: old ? C.red : C.faint, fontWeight: old ? 700 : 400 }}>{r.ageDays}d</td>
                       <td style={{ ...td, textAlign: 'right' }}>
-                        {(r.source === 'po') && isLiveProject(project) && (() => {
+                        {r.source === 'po' && isLiveProject(project) && (() => {
                           const sl = poStock.find(l => l.key === r.key)
                           return sl ? <Btn size="sm" tone="primary" onClick={() => setIssuingLine(sl)}>Issue to rig</Btn> : null
                         })()}
@@ -800,8 +810,8 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                  <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>Total in store</td>
-                  <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(totalValue)}</td>
+                  <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>Total on the shelf</td>
+                  <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(shelfValue)}</td>
                   <td style={td} colSpan={2} />
                 </tr>
               </tfoot>
@@ -811,69 +821,80 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
       </Card>
 
       {/* ── On the rigs ── */}
-      {rigLines.length > 0 && (
+      {rigs.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
             On the rigs
             <span style={{ fontSize: 11, color: C.faint, fontWeight: 400, marginLeft: 10 }}>
-              {projectCode(project)} · opening stock + issued from store
+              {projectCode(project)} — starting kit plus everything issued since
             </span>
           </div>
-          {rigLines.map(({ rig, lines, total, metres }) => {
-            const totalUsed  = lines.reduce((s, l) => s + l.totalUsed, 0)
-            const onRigVal   = lines.reduce((s, l) => s + l.onRig * (l.totalValue / Math.max(1, l.totalQty)), 0)
+          {rigs.map(({ rig, lines, tooling, total, metres }) => {
+            const amortised = lines.reduce((s, l) => s + l.costPerMetre, 0)
+            const spent = metres > 0 ? total / metres : 0
             return (
               <Card key={rig} pad={false} title={rig}
-                subtitle={`${money(total)} issued · ${metres.toLocaleString('en-IN')} m drilled`}
+                subtitle={`${money(total)} of parts on this rig, ${metres.toLocaleString('en-IN')} m drilled`}
                 accent={C.blue}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, padding: '12px 16px', borderBottom: `1px solid ${C.border}` }}>
-                  <Stat label="Rig stock"   value={moneyL(lines.reduce((s,l)=>s+l.openingValue,0))} color={C.purple} />
-                  <Stat label="Issued"       value={moneyL(lines.reduce((s,l)=>s+l.issuedValue,0))}  color={C.amber} />
-                  <Stat label="Total value"  value={moneyL(total)}                                    color={C.text} />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, padding: '12px 16px', borderBottom: `1px solid ${C.border}` }}>
+                  <Stat label="Starting kit" value={moneyL(lines.reduce((s, l) => s + l.kitValue, 0))} color={C.purple} />
+                  <Stat label="Issued since" value={moneyL(lines.reduce((s, l) => s + l.issuedValue, 0))} color={C.amber} />
+                  <Stat label="Tooling cost" value={perMetre(amortised)} color={C.orange} note="charged per metre drilled" />
+                  <Stat label="Spent per metre" value={metres > 0 ? perMetre(spent) : '—'} color={C.muted} note="cash out ÷ metres so far" />
                 </div>
+
+                {/* Per-formation rates: the figures finance actually charges. */}
+                <div style={{ display: 'flex', gap: 8, padding: '11px 16px', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Per metre of</span>
+                  {FORMATIONS.map(f => (
+                    <span key={f} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7, padding: '4px 10px', borderRadius: 7, background: `${FORMATION_TONE[f]}14`, border: `1px solid ${FORMATION_TONE[f]}33` }}>
+                      <span style={{ fontSize: 11, color: FORMATION_TONE[f], fontWeight: 700 }}>{f}</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: C.text, fontFamily: 'ui-monospace, monospace' }}>{perMetre(tooling.byFormation[f])}</span>
+                    </span>
+                  ))}
+                  {tooling.fellBack.length > 0 && (
+                    <span style={{ fontSize: 11, color: C.amber }}>
+                      {tooling.fellBack.join(', ')} has no parts tagged for it, so it carries the blended rate. Fix the Used in tag on the catalogue.
+                    </span>
+                  )}
+                </div>
+
                 <div style={{ overflowX: 'auto' }}>
                   <table style={tableStyle}>
                     <thead><tr>
                       <th style={th}>Part number</th><th style={th}>Item</th>
+                      <th style={th}>Used in</th>
                       <th style={thR}>Life</th>
-                      <th style={thR}>Rig stock</th>
+                      <th style={thR}>Starting kit</th>
                       <th style={thR}>Issued</th>
                       <th style={thR}>Total qty</th>
-                      <th style={thR}>Rate</th>
+                      <th style={thR}>Scrapped</th>
+                      <th style={thR}>Rate paid</th>
                       <th style={thR}>Value</th>
                       <th style={thR}>Cost / m</th>
                     </tr></thead>
                     <tbody>
-                      {lines.map(l => {
-                        /* Average rate actually paid — total spent divided by
-                         * how many units came in. Differs from the catalogue
-                         * rate when opening stock was entered at a different
-                         * price or a PO rate has moved. */
-                        const avgRate = l.totalQty > 0 ? l.totalValue / l.totalQty : 0
-                        return (
-                          <tr key={l.itemId} style={{ borderBottom: rowBorder }}>
-                            <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{l.partNumber || '—'}</td>
-                            <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 190 }}>{l.name}</td>
-                            <td style={{ ...tdN, color: C.faint }}>{l.lifeMetres.toLocaleString('en-IN')} m</td>
-                            <td style={{ ...tdN, color: l.openingQty > 0 ? C.purple : C.dim }}>
-                              {l.openingQty > 0 ? l.openingQty : '—'}
-                            </td>
-                            <td style={{ ...tdN, color: l.issuedQty > 0 ? C.text : C.dim, fontWeight: l.issuedQty > 0 ? 700 : 400 }}>
-                              {l.issuedQty > 0 ? l.issuedQty : '—'}
-                            </td>
-                            <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{l.totalQty}</td>
-                            <td style={tdN}>{money(avgRate)}</td>
-                            <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(l.totalValue)}</td>
-                            <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(l.costPerMetre)}</td>
-                          </tr>
-                        )
-                      })}
+                      {lines.sort((a, b) => b.costPerMetre - a.costPerMetre).map(l => (
+                        <tr key={l.itemId} style={{ borderBottom: rowBorder }}>
+                          <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{l.partNumber || '—'}</td>
+                          <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 190 }}>{l.name}</td>
+                          <td style={{ ...td, color: C.muted }}>{FORMATION_USE_LABEL[l.use]}</td>
+                          <td style={{ ...tdN, color: C.faint }}>{l.lifeMetres.toLocaleString('en-IN')} m</td>
+                          <td style={{ ...tdN, color: l.kitQty > 0 ? C.purple : C.dim }}>{l.kitQty > 0 ? l.kitQty : '—'}</td>
+                          <td style={{ ...tdN, color: l.issuedQty > 0 ? C.amber : C.dim, fontWeight: l.issuedQty > 0 ? 700 : 400 }}>{l.issuedQty > 0 ? l.issuedQty : '—'}</td>
+                          <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{l.totalQty}</td>
+                          <td style={{ ...tdN, color: l.totalUsed > 0 ? C.red : C.dim }}>{l.totalUsed > 0 ? l.totalUsed : '—'}</td>
+                          <td style={tdN}>{money(l.avgRate)}</td>
+                          <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(l.totalValue)}</td>
+                          <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(l.costPerMetre)}</td>
+                        </tr>
+                      ))}
                     </tbody>
                     <tfoot>
                       <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                        <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>Total</td>
+                        <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={9}>Every part on this rig</td>
                         <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(total)}</td>
-                        <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{metres > 0 ? perMetre(total / metres) : '—'}</td>
+                        <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{perMetre(amortised)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -884,145 +905,44 @@ function StoreTab({ onMove }: { onMove: (l: StockLine) => void }) {
         </div>
       )}
 
-      {addingBalance && (
-        <OpeningBalanceModal
-          onSave={e => { addOpeningBalance(e); setAddingBalance(false) }}
-          onClose={() => setAddingBalance(false)} />
+      {addingStock && (
+        <PickPartsModal
+          title="Add existing stock"
+          subtitle="Parts already in the store before the system started. No project, no rig — they wait on the shelf."
+          tone={C.teal}
+          note="These land on the shelf tagged as Existing stock. Issue them to a rig whenever one needs them."
+          qtyLabel="Qty in store"
+          confirm={n => `Add ${n} part${n === 1 ? '' : 's'} to the shelf`}
+          onSave={({ date, by, lines }) => { addStoreStock({ date, addedBy: by, lines }); setAddingStock(false) }}
+          onClose={() => setAddingStock(false)} />
       )}
-      {addingOpening && (
-        <OpeningStockModal project={project}
-          onSave={e => { addOpeningStock(e); setAddingOpening(false) }}
-          onClose={() => setAddingOpening(false)} />
+      {addingKit && (
+        <PickPartsModal
+          title="Assign starting kit"
+          subtitle={`What a rig needs on it before it can turn — ${projectCode(project)}`}
+          tone={C.purple}
+          note="Date this on or before the rig's first shift. A day drilled before its kit was assigned carries no tooling cost and reads free."
+          qtyLabel="Qty on the rig"
+          withRig
+          confirm={(n, rig) => `Assign ${n} part${n === 1 ? '' : 's'} to ${rig}`}
+          onSave={({ date, by, rig, lines }) => { addRigKit({ date, project, rig: rig!, addedBy: by, lines }); setAddingKit(false) }}
+          onClose={() => setAddingKit(false)} />
       )}
       {issuingLine && (
-        <InlineIssueModal project={project} prefill={issuingLine}
+        <IssueModal project={project} prefill={issuingLine}
           onSave={issueFromShelf} onClose={() => setIssuingLine(null)} />
       )}
     </div>
   )
 }
 
-/* ── Opening balance modal ───────────────────────────────────────────────
- * Parts already in the store when the system starts — not assigned to any
- * rig or project. They sit on the shelf until the store manager issues them.
- * ─────────────────────────────────────────────────────────────────────── */
-function OpeningBalanceModal({ onSave, onClose }: {
-  onSave: (e: Omit<OpeningBalanceEntry, 'id'>) => void
-  onClose: () => void
-}) {
-  const { state } = useInventory()
-  const [date, setDate] = useState(TODAY)
-  const [by,   setBy]   = useState('Store')
-  const [rows, setRows] = useState<{ id: string; itemId: string; qty: string; rate: string }[]>([])
-
-  const updateRow = (id: string, patch: Partial<typeof rows[0]>) =>
-    setRows(r => r.map(x => x.id === id ? { ...x, ...patch } : x))
-  const pickQty = (itemId: string, val: string) => {
-    const part = state.catalogue.find(p => p.id === itemId)
-    if (!val || parseFloat(val) === 0) {
-      setRows(r => r.filter(x => x.itemId !== itemId))
-    } else {
-      const existing = rows.find(x => x.itemId === itemId)
-      if (existing) updateRow(existing.id, { qty: val })
-      else setRows(r => [...r, { id: rowId(), itemId, qty: val, rate: String(part?.rate ?? 0) }])
-    }
-  }
-  const pickRate = (itemId: string, val: string) => {
-    const existing = rows.find(x => x.itemId === itemId)
-    if (existing) updateRow(existing.id, { rate: val })
-  }
-
-  const valid = rows.filter(r => r.itemId && parseFloat(r.qty) > 0)
-  const total = valid.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.rate) || 0), 0)
-  const byCategory = (['Bit', 'Rod & Casing', 'Core Barrel', 'Accessory', 'Spares'] as const).map(cat => ({
-    cat, parts: state.catalogue.filter(p => p.active && p.category === cat),
-  })).filter(g => g.parts.length > 0)
-
-  return (
-    <Modal title="Opening balance" subtitle="Parts already in the store before the system started — not assigned to any rig or project"
-      width={860} onClose={onClose}
-      footer={<>
-        <Btn onClick={onClose}>Cancel</Btn>
-        <Btn tone="primary" disabled={valid.length === 0}
-          onClick={() => onSave({ date, addedBy: by, lines: valid.map(r => ({ itemId: r.itemId, qty: parseFloat(r.qty), rate: parseFloat(r.rate) || 0 })) })}>
-          Add {valid.length} part{valid.length === 1 ? '' : 's'} to store
-        </Btn>
-      </>}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Grid cols={2}>
-          <Field label="Date recorded"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field>
-          <Field label="Recorded by"><input value={by} onChange={e => setBy(e.target.value)} style={iStyle} /></Field>
-        </Grid>
-        <Note tone={C.teal}>
-          These parts land in the store with no project or rig attached — tagged as <strong>Opening balance</strong>.
-          Issue them to a rig from the store table whenever needed.
-        </Note>
-        <div style={{ maxHeight: 400, overflowY: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={th}>Part number</th><th style={th}>Item</th>
-                <th style={th}>Category</th><th style={th}>Formation</th>
-                <th style={thR}>Catalogue rate</th>
-                <th style={thR}>Qty in store</th>
-                <th style={thR}>Rate paid (₹)</th>
-                <th style={thR}>Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byCategory.map(({ cat, parts }) => (
-                <Fragment key={cat}>
-                  <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    <td colSpan={8} style={{ ...td, fontSize: 10, fontWeight: 800, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '6px 12px' }}>{cat}</td>
-                  </tr>
-                  {parts.map(p => {
-                    const row  = rows.find(r => r.itemId === p.id)
-                    const qty  = parseFloat(row?.qty  || '0') || 0
-                    const rate = parseFloat(row?.rate || '0') || p.rate
-                    const val  = qty * rate
-                    const on   = qty > 0
-                    return (
-                      <tr key={p.id} style={{ borderBottom: rowBorder, background: on ? 'rgba(20,184,166,0.07)' : undefined }}>
-                        <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber}</td>
-                        <td style={{ ...td, color: on ? C.text : C.muted, fontWeight: on ? 700 : 400, whiteSpace: 'normal', maxWidth: 200 }}>{p.name}</td>
-                        <td style={td}><Tag tone={C.dim}>{p.category}</Tag></td>
-                        <td style={{ ...td, color: C.muted }}>{p.formation}</td>
-                        <td style={tdN}>{money(p.rate)}</td>
-                        <td style={{ padding: '4px 8px', width: 90 }}>
-                          <input type="number" min={0} placeholder="0" value={row?.qty ?? ''}
-                            onChange={e => pickQty(p.id, e.target.value)}
-                            style={{ ...numStyle, color: on ? C.teal : C.muted }} />
-                        </td>
-                        <td style={{ padding: '4px 8px', width: 110 }}>
-                          <input type="number" min={0} placeholder={String(p.rate)} value={row?.rate ?? ''} disabled={!on}
-                            onChange={e => pickRate(p.id, e.target.value)}
-                            style={{ ...numStyle, opacity: on ? 1 : 0.35 }} />
-                        </td>
-                        <td style={{ ...tdN, color: on ? C.teal : C.dim, fontWeight: on ? 700 : 400 }}>{on ? money(val) : '—'}</td>
-                      </tr>
-                    )
-                  })}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {valid.length > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: 16 }}>
-            <span style={{ fontSize: 11, color: C.faint }}>{valid.length} part{valid.length === 1 ? '' : 's'} selected</span>
-            <span style={{ fontSize: 15, fontWeight: 900, color: C.teal, fontFamily: 'ui-monospace, monospace' }}>{money(total)}</span>
-          </div>
-        )}
-      </div>
-    </Modal>
-  )
-}
-
-
-/* ── Opening stock modal ──────────────────────────────────────────────── */
-function OpeningStockModal({ project, onSave, onClose }: {
-  project: string
-  onSave: (e: Omit<OpeningStockEntry, 'id'>) => void
+/* One picker serves both the starting kit and existing stock — the only
+ * differences are the words and whether a rig is named. */
+function PickPartsModal({ title, subtitle, tone, note, qtyLabel, withRig, confirm, onSave, onClose }: {
+  title: string; subtitle: string; tone: string; note: string; qtyLabel: string
+  withRig?: boolean
+  confirm: (n: number, rig: string) => string
+  onSave: (v: { date: string; by: string; rig?: string; lines: { itemId: string; qty: number; rate: number }[] }) => void
   onClose: () => void
 }) {
   const { state } = useInventory()
@@ -1033,7 +953,6 @@ function OpeningStockModal({ project, onSave, onClose }: {
 
   const updateRow = (id: string, patch: Partial<typeof rows[0]>) =>
     setRows(r => r.map(x => x.id === id ? { ...x, ...patch } : x))
-
   const pickQty = (itemId: string, val: string) => {
     const part = state.catalogue.find(p => p.id === itemId)
     if (!val || parseFloat(val) === 0) {
@@ -1051,41 +970,48 @@ function OpeningStockModal({ project, onSave, onClose }: {
 
   const valid = rows.filter(r => r.itemId && parseFloat(r.qty) > 0)
   const total = valid.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.rate) || 0), 0)
-  const byCategory = (['Bit', 'Rod & Casing', 'Core Barrel', 'Accessory', 'Spares'] as const).map(cat => ({
+  const byCategory = CATEGORIES.map(cat => ({
     cat, parts: state.catalogue.filter(p => p.active && p.category === cat),
   })).filter(g => g.parts.length > 0)
 
   return (
-    <Modal title="Opening stock" subtitle={`Parts already on site for ${projectCode(project)} — no purchase order needed`}
-      width={860} onClose={onClose}
+    <Modal title={title} subtitle={subtitle} width={880} onClose={onClose}
       footer={<>
         <Btn onClick={onClose}>Cancel</Btn>
         <Btn tone="primary" disabled={valid.length === 0}
-          onClick={() => onSave({ date, project, rig, addedBy: by, lines: valid.map(r => ({ itemId: r.itemId, qty: parseFloat(r.qty), rate: parseFloat(r.rate) || 0 })) })}>
-          Assign {valid.length} part{valid.length === 1 ? '' : 's'} to {rig}
+          onClick={() => onSave({
+            date, by, rig: withRig ? rig : undefined,
+            lines: valid.map(r => ({ itemId: r.itemId, qty: parseFloat(r.qty), rate: parseFloat(r.rate) || 0 })),
+          })}>
+          {confirm(valid.length, rig)}
         </Btn>
       </>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Grid cols={3}>
-          <Field label="Rig">
-            <select value={rig} onChange={e => setRig(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}>
-              {RIGS.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+        <Grid cols={withRig ? 3 : 2}>
+          {withRig && (
+            <Field label="Rig">
+              <select value={rig} onChange={e => setRig(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}>
+                {RIGS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </Field>
+          )}
+          <Field label="Date recorded" hint={withRig ? 'Tooling costs start from this date' : undefined}>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} />
           </Field>
-          <Field label="Date recorded"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field>
           <Field label="Recorded by"><input value={by} onChange={e => setBy(e.target.value)} style={iStyle} /></Field>
         </Grid>
-        <Note tone={C.purple}>Set quantity for each part that is already on site. Rate defaults to catalogue rate — edit if you paid differently. Parts with zero quantity are ignored.</Note>
-        <div style={{ maxHeight: 400, overflowY: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+        <Note tone={tone}>{note}</Note>
+        <div style={{ maxHeight: 400, overflowY: 'auto', border: `1px solid ${C.border}`, borderRadius: 10 }}>
           <table style={tableStyle}>
             <thead>
               <tr>
                 <th style={th}>Part number</th><th style={th}>Item</th>
-                <th style={th}>Category</th><th style={th}>Formation</th>
+                <th style={th}>Used in</th>
+                <th style={thR}>Life</th>
                 <th style={thR}>Catalogue rate</th>
-                <th style={thR}>Qty on site</th>
+                <th style={thR}>{qtyLabel}</th>
                 <th style={thR}>Rate paid (₹)</th>
-                <th style={thR}>Value</th>
+                <th style={thR}>Cost / m</th>
               </tr>
             </thead>
             <tbody>
@@ -1098,26 +1024,27 @@ function OpeningStockModal({ project, onSave, onClose }: {
                     const row  = rows.find(r => r.itemId === p.id)
                     const qty  = parseFloat(row?.qty  || '0') || 0
                     const rate = parseFloat(row?.rate || '0') || p.rate
-                    const val  = qty * rate
                     const on   = qty > 0
                     return (
-                      <tr key={p.id} style={{ borderBottom: rowBorder, background: on ? 'rgba(139,92,246,0.07)' : undefined }}>
+                      <tr key={p.id} style={{ borderBottom: rowBorder, background: on ? `${tone}12` : undefined }}>
                         <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber}</td>
-                        <td style={{ ...td, color: on ? C.text : C.muted, fontWeight: on ? 700 : 400, whiteSpace: 'normal', maxWidth: 200 }}>{p.name}</td>
-                        <td style={td}><Tag tone={C.dim}>{p.category}</Tag></td>
-                        <td style={{ ...td, color: C.muted }}>{p.formation}</td>
+                        <td style={{ ...td, color: on ? C.text : C.muted, fontWeight: on ? 700 : 400, whiteSpace: 'normal', maxWidth: 190 }}>{p.name}</td>
+                        <td style={{ ...td, color: C.muted }}>{FORMATION_USE_LABEL[formationUse(p)]}</td>
+                        <td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td>
                         <td style={tdN}>{money(p.rate)}</td>
-                        <td style={{ padding: '4px 8px', width: 90 }}>
+                        <td style={{ padding: '4px 8px', width: 92 }}>
                           <input type="number" min={0} placeholder="0" value={row?.qty ?? ''}
                             onChange={e => pickQty(p.id, e.target.value)}
-                            style={{ ...numStyle, color: on ? C.orange : C.muted }} />
+                            style={{ ...numStyle, color: on ? tone : C.muted }} />
                         </td>
-                        <td style={{ padding: '4px 8px', width: 110 }}>
+                        <td style={{ padding: '4px 8px', width: 112 }}>
                           <input type="number" min={0} placeholder={String(p.rate)} value={row?.rate ?? ''} disabled={!on}
                             onChange={e => pickRate(p.id, e.target.value)}
                             style={{ ...numStyle, opacity: on ? 1 : 0.35 }} />
                         </td>
-                        <td style={{ ...tdN, color: on ? C.purple : C.dim, fontWeight: on ? 700 : 400 }}>{on ? money(val) : '—'}</td>
+                        <td style={{ ...tdN, color: on ? C.orange : C.dim, fontWeight: on ? 700 : 400 }}>
+                          {on && p.lifeMetres > 0 ? perMetre(rate / p.lifeMetres) : '—'}
+                        </td>
                       </tr>
                     )
                   })}
@@ -1129,7 +1056,7 @@ function OpeningStockModal({ project, onSave, onClose }: {
         {valid.length > 0 && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: 16 }}>
             <span style={{ fontSize: 11, color: C.faint }}>{valid.length} part{valid.length === 1 ? '' : 's'} selected</span>
-            <span style={{ fontSize: 15, fontWeight: 900, color: C.purple, fontFamily: 'ui-monospace, monospace' }}>{money(total)}</span>
+            <span style={{ fontSize: 15, fontWeight: 900, color: tone, fontFamily: 'ui-monospace, monospace' }}>{money(total)}</span>
           </div>
         )}
       </div>
@@ -1137,8 +1064,7 @@ function OpeningStockModal({ project, onSave, onClose }: {
   )
 }
 
-/* ── Inline issue modal ───────────────────────────────────────────────── */
-function InlineIssueModal({ project, prefill, onSave, onClose }: {
+function IssueModal({ project, prefill, onSave, onClose }: {
   project: string; prefill?: StockLine
   onSave: (date: string, rig: string, by: string, picks: { poId: string; itemId: string; qty: number }[]) => void
   onClose: () => void
@@ -1153,7 +1079,7 @@ function InlineIssueModal({ project, prefill, onSave, onClose }: {
   const picks = stock.map(l => ({ line: l, qty: Math.min(l.qty, qty[l.key] ?? 0) })).filter(x => x.qty > 0)
   const value = picks.reduce((s, p) => s + p.qty * p.line.rate, 0)
   return (
-    <Modal title="Issue parts to a rig" subtitle={`From store · ${projectCode(project)}`} width={760} onClose={onClose}
+    <Modal title="Issue parts to a rig" subtitle={`From the shelf — ${projectCode(project)}`} width={760} onClose={onClose}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn tone="primary" disabled={picks.length === 0}
         onClick={() => { onSave(date, rig, by, picks.map(p => ({ poId: p.line.poId, itemId: p.line.itemId, qty: p.qty }))); onClose() }}>
         Issue {picks.reduce((s, p) => s + p.qty, 0)} parts to {rig}
@@ -1161,7 +1087,7 @@ function InlineIssueModal({ project, prefill, onSave, onClose }: {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Grid cols={3}>
           <Field label="Rig"><select value={rig} onChange={e => setRig(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}>{RIGS.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
-          <Field label="Issued on"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field>
+          <Field label="Issued on" hint="This date changes the rig's tooling cost from here on"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field>
           <Field label="Issued by"><input value={by} onChange={e => setBy(e.target.value)} style={iStyle} /></Field>
         </Grid>
         {stock.length === 0 ? <Empty>Nothing on the shelf from purchase orders for {projectCode(project)}.</Empty> : (
@@ -1189,17 +1115,394 @@ function InlineIssueModal({ project, prefill, onSave, onClose }: {
             </tr></tfoot>
           </table>
         )}
-        <Note tone={C.blue}>Once issued, these parts appear immediately in &quot;On the rigs&quot; below.</Note>
+        <Note tone={C.blue}>Once issued, these parts join the rig below and start carrying cost from the issue date.</Note>
       </div>
     </Modal>
   )
 }
 
+/* ==========================================================================
+ * INSIGHTS
+ *
+ * Not a display of the data. Each panel exists because somebody has to make
+ * a decision and currently has nothing to make it on.
+ * ========================================================================== */
 
+function InsightsTab() {
+  const { state } = useInventory()
+  const { state: cost } = useCosting()
+  const [project, setProject] = useState(PROJECTS.find(isLiveProject) ?? PROJECTS[0])
+  const [rig, setRig] = useState<string | 'All'>('All')
 
+  const facts: ShiftFact[] = useMemo(() =>
+    cost.shiftLogs
+      .filter(l => l.project === project && (rig === 'All' || l.rig === rig))
+      .map(l => ({
+        rig: l.rig, project: l.project, date: l.date,
+        metres: l.metresDrilled, formation: normFormation(l.formationType),
+        used: (l.partsUsed ?? []).map(u => ({ itemId: u.itemId, qty: u.qty ?? 0 })),
+      })),
+  [cost.shiftLogs, project, rig])
+
+  const rows = useMemo(() => terrainRows(facts, state.catalogue), [facts, state.catalogue])
+
+  const tooling = useMemo(() => {
+    const r = rig === 'All' ? RIGS[0] : rig
+    return toolingRatesFor(state.pos, state.rigKit, state.catalogue, r, project)
+  }, [state.pos, state.rigKit, state.catalogue, rig, project])
+
+  const bands = useMemo(() => groundMix(facts, tooling), [facts, tooling])
+  const metres = facts.reduce((s, f) => s + f.metres, 0)
+
+  const rigsOnProject = Array.from(new Set(cost.shiftLogs.filter(l => l.project === project).map(l => l.rig))).sort()
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px' }}>
+        <Chain label="Project">
+          {PROJECTS.map(p => <Chip key={p} on={project === p} label={projectCode(p)} onClick={() => { setProject(p); setRig('All') }} />)}
+        </Chain>
+        <span style={{ width: 1, height: 22, background: C.border }} />
+        <Chain label="Rig">
+          <Chip on={rig === 'All'} label="All" onClick={() => setRig('All')} />
+          {rigsOnProject.map(r => <Chip key={r} on={rig === r} label={r} onClick={() => setRig(r)} />)}
+        </Chain>
+      </div>
+
+      {metres === 0 ? (
+        <Card><Empty>No driller logs for {projectCode(project)} yet.<br />Parts life is measured from the log — once shifts are recorded, the ground starts answering for itself.</Empty></Card>
+      ) : (
+        <>
+          <TerrainPanel rows={rows} metres={metres} />
+          <GroundPanel bands={bands} tooling={tooling} rig={rig === 'All' ? RIGS[0] : rig} />
+          <SpendPanel rows={rows} />
+          <SupplierInsightPanel />
+        </>
+      )}
+    </div>
+  )
+}
+
+/* The catalogue's life figure is a claim. The log is the evidence. */
+function TerrainPanel({ rows, metres }: { rows: TerrainRow[]; metres: number }) {
+  const [mode, setMode] = useState<'life' | 'cost'>('life')
+  const real = rows.filter(r => r.totalScrapped > 0)
+
+  if (real.length === 0) {
+    return <Card title="What the ground is doing to your parts">
+      <Empty>No parts have been scrapped in the log yet, so there is nothing to measure life against.</Empty>
+    </Card>
+  }
+
+  const headline = real
+    .map(r => ({ r, worst: r.worst }))
+    .filter(x => x.worst && x.worst.lifeDeltaPct != null)
+    .sort((a, b) => (a.worst!.lifeDeltaPct ?? 0) - (b.worst!.lifeDeltaPct ?? 0))[0]
+
+  const deltaTone = (d: number | null) =>
+    d == null ? C.dim : d <= -30 ? C.red : d <= -10 ? C.amber : d >= 20 ? C.green : C.muted
+
+  return (
+    <Card title="What the ground is doing to your parts"
+      subtitle={`${metres.toLocaleString('en-IN')} m of log. Catalogue life is what was assumed; observed life is what the ground actually gave.`}
+      pad={false} accent={C.amber}
+      right={
+        <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: 4 }}>
+          {(['life', 'cost'] as const).map(m => (
+            <button key={m} onClick={() => setMode(m)} style={{ padding: '5px 12px', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', border: 'none', fontFamily: 'inherit', background: mode === m ? C.orange : 'transparent', color: mode === m ? '#fff' : C.faint }}>
+              {m === 'life' ? 'Life in metres' : 'Cost per metre'}
+            </button>
+          ))}
+        </div>
+      }>
+      {headline?.worst && (
+        <div style={{ padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
+          <Note tone={C.red}>
+            <strong>{headline.r.name}</strong> is priced at {perMetre(headline.worst.cataloguePerMetre)} on a
+            catalogue life of {headline.r.catalogueLife.toLocaleString('en-IN')} m. In {headline.worst.formation.toLowerCase()} ground
+            it is lasting {Math.round(headline.worst.observedLife!).toLocaleString('en-IN')} m, which makes those
+            metres {perMetre(headline.worst.observedPerMetre!)} — every one of them was quoted
+            {' '}{money(headline.worst.observedPerMetre! - headline.worst.cataloguePerMetre)} too cheap.
+          </Note>
+        </div>
+      )}
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th style={th}>Part</th>
+              <th style={thR}>{mode === 'life' ? 'Catalogue life' : 'Catalogue cost'}</th>
+              {FORMATIONS.map(f => <th key={f} style={{ ...thR, color: FORMATION_TONE[f] }}>{f}</th>)}
+              <th style={thR}>Scrapped</th>
+              <th style={thR}>Spend</th>
+            </tr>
+          </thead>
+          <tbody>
+            {real.map(r => (
+              <tr key={r.itemId} style={{ borderBottom: rowBorder }}>
+                <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 220 }}>
+                  {r.name}
+                  <span style={{ marginLeft: 7 }}><Tag tone={C.dim}>{FORMATION_USE_LABEL[r.use]}</Tag></span>
+                </td>
+                <td style={{ ...tdN, color: C.faint }}>
+                  {mode === 'life'
+                    ? `${r.catalogueLife.toLocaleString('en-IN')} m`
+                    : perMetre(r.cells.Hard.cataloguePerMetre)}
+                </td>
+                {FORMATIONS.map(f => {
+                  const c = r.cells[f]
+                  if (c.scrapped === 0) return <td key={f} style={{ ...tdN, color: C.dim }}>—</td>
+                  const tone = deltaTone(c.lifeDeltaPct)
+                  return (
+                    <td key={f} style={{ ...tdN, color: c.confident ? tone : C.faint, fontWeight: c.confident ? 700 : 400 }}>
+                      <div>{mode === 'life'
+                        ? `${Math.round(c.observedLife!).toLocaleString('en-IN')} m`
+                        : perMetre(c.observedPerMetre!)}</div>
+                      <div style={{ fontSize: 9.5, color: c.confident ? tone : C.dim, opacity: 0.85 }}>
+                        {c.confident
+                          ? `${c.lifeDeltaPct! >= 0 ? '+' : ''}${c.lifeDeltaPct!.toFixed(0)}%`
+                          : `${c.scrapped} of ${TERRAIN_MIN_SAMPLE}`}
+                      </div>
+                    </td>
+                  )
+                })}
+                <td style={tdN}>{r.totalScrapped}</td>
+                <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(r.totalSpend)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ padding: '10px 16px', fontSize: 11, color: C.faint, lineHeight: 1.6, background: 'rgba(255,255,255,0.02)' }}>
+        A formation needs {TERRAIN_MIN_SAMPLE} scrapped units before its figure is worth acting on — below that it is one unlucky part, not a pattern.
+        Where the gap is real and holding, change the life on the catalogue and every cost per metre follows.
+      </div>
+    </Card>
+  )
+}
+
+/* Where the metres actually are, and what each band costs to cut. */
+function GroundPanel({ bands, tooling, rig }: { bands: ReturnType<typeof groundMix>; tooling: ToolingRates; rig: string }) {
+  if (bands.length === 0) return null
+  const maxM = Math.max(...bands.map(b => b.metres))
+  const total = bands.reduce((s, b) => s + b.metres, 0)
+  const spend = bands.reduce((s, b) => s + b.toolingSpend, 0)
+
+  return (
+    <Card title="Which ground you are actually drilling"
+      subtitle={`Tooling rates are ${rig}'s. A band you assumed was thin but is carrying half the hole is where a tender goes wrong.`}
+      pad={false} accent={C.teal}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={tableStyle}>
+          <thead><tr>
+            <th style={th}>Formation</th><th style={th}>Share of the hole</th>
+            <th style={thR}>Metres</th><th style={thR}>Share</th>
+            <th style={thR}>Tooling / m</th><th style={thR}>Tooling spend</th>
+          </tr></thead>
+          <tbody>
+            {bands.map(b => (
+              <tr key={b.formation} style={{ borderBottom: rowBorder }}>
+                <td style={{ ...td, color: FORMATION_TONE[b.formation], fontWeight: 700 }}>{b.formation}</td>
+                <td style={{ ...td, width: '38%' }}><Bar value={b.metres} max={maxM} tone={FORMATION_TONE[b.formation]} /></td>
+                <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{b.metres.toLocaleString('en-IN')}</td>
+                <td style={{ ...tdN, color: C.faint }}>{b.sharePct.toFixed(1)}%</td>
+                <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(b.toolingPerMetre)}</td>
+                <td style={{ ...tdN, color: C.amber }}>{money(b.toolingSpend)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+              <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={2}>Whole project</td>
+              <td style={{ ...tdN, fontWeight: 900, color: C.text }}>{total.toLocaleString('en-IN')}</td>
+              <td style={tdN} />
+              <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{total > 0 ? perMetre(spend / total) : '—'}</td>
+              <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(spend)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {tooling.fellBack.length > 0 && (
+        <div style={{ padding: '11px 16px' }}>
+          <Note tone={C.amber}>
+            {tooling.fellBack.join(', ')} has no part on {rig} tagged for it, so those metres carry the blended rate
+            across everything. Set Used in correctly on the catalogue and the figure sharpens.
+          </Note>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+/* A part that is cheap per unit can still be the biggest line on the rig. */
+function SpendPanel({ rows }: { rows: TerrainRow[] }) {
+  const real = rows.filter(r => r.totalSpend > 0).slice(0, 10)
+  if (real.length === 0) return null
+  const max = Math.max(...real.map(r => r.totalSpend))
+  const total = rows.reduce((s, r) => s + r.totalSpend, 0)
+
+  return (
+    <Card title="Where the tooling money went"
+      subtitle="Scrapped units at catalogue rate. Sorted by spend, not by unit price — the cheap part replaced constantly usually wins."
+      pad={false} accent={C.orange}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={tableStyle}>
+          <thead><tr>
+            <th style={th}>Part</th><th style={th}>Share of tooling spend</th>
+            <th style={thR}>Unit rate</th><th style={thR}>Scrapped</th><th style={thR}>Spend</th><th style={thR}>Share</th>
+          </tr></thead>
+          <tbody>
+            {real.map(r => (
+              <tr key={r.itemId} style={{ borderBottom: rowBorder }}>
+                <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 230 }}>{r.name}</td>
+                <td style={{ ...td, width: '34%' }}><Bar value={r.totalSpend} max={max} tone={C.orange} /></td>
+                <td style={{ ...tdN, color: C.faint }}>{money(r.rate)}</td>
+                <td style={tdN}>{r.totalScrapped}</td>
+                <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(r.totalSpend)}</td>
+                <td style={{ ...tdN, color: C.faint }}>{total > 0 ? `${((r.totalSpend / total) * 100).toFixed(1)}%` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+/* The cheapest supplier is rarely the one with the lowest price. */
+function SupplierInsightPanel() {
+  const { state } = useInventory()
+  const [open, setOpen] = useState<string | null>(null)
+  const nameOf = (id: string) => state.catalogue.find(p => p.id === id)?.name ?? id
+
+  const rows = state.suppliers
+    .map(s => supplierInsight(state.pos, state.suppliers, s.name, TODAY))
+    .filter(r => r.orders > 0)
+    .sort((a, b) => (b.faultyPct ?? 0) - (a.faultyPct ?? 0))
+
+  if (rows.length === 0) return null
+
+  return (
+    <Card title="What each supplier actually costs you"
+      subtitle="A low price with a high fault rate is not a low price. Click a supplier for where its faults sit."
+      pad={false} accent={C.blue}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={tableStyle}>
+          <thead><tr>
+            <th style={th}>Supplier</th><th style={thR}>Spend</th>
+            <th style={thR}>Faulty</th><th style={thR}>Price loading</th>
+            <th style={th}>Lead time seen</th><th style={thR}>Against quote</th>
+            <th style={thR}>Replacements held</th><th style={thR}>Owed now</th><th style={thR}>Worst delay</th>
+          </tr></thead>
+          <tbody>
+            {rows.map(r => {
+              const isOpen = open === r.supplier
+              const spreadTone = r.leadSpread == null ? C.dim : r.leadSpread > 14 ? C.red : r.leadSpread > 7 ? C.amber : C.green
+              return (
+                <Fragment key={r.supplier}>
+                  <tr onClick={() => setOpen(isOpen ? null : r.supplier)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'rgba(249,115,22,0.05)' : undefined }}>
+                    <td style={{ ...td, color: C.text, fontWeight: 700 }}>{r.supplier}</td>
+                    <td style={tdN}>{money(r.value)}</td>
+                    <td style={{ ...tdN, color: r.faultyPct ? C.red : C.dim, fontWeight: 700 }}>
+                      {r.faultyPct ? `${r.faultyPct.toFixed(1)}%` : '—'}
+                    </td>
+                    <td style={{ ...tdN, color: r.effectiveLoadingPct > 0 ? C.amber : C.dim }}>
+                      {r.effectiveLoadingPct > 0 ? `+${r.effectiveLoadingPct.toFixed(1)}%` : '—'}
+                    </td>
+                    <td style={{ ...tdMono, color: spreadTone }}>
+                      {r.leadMin == null ? '—' : r.leadMin === r.leadMax ? `${r.leadMin}d` : `${r.leadMin}–${r.leadMax}d`}
+                      {r.leadSpread != null && r.leadSpread > 7 && <span style={{ fontSize: 10, marginLeft: 6 }}>unpredictable</span>}
+                    </td>
+                    <td style={{ ...tdN, color: r.avgDelay == null ? C.dim : r.avgDelay > 0 ? C.red : C.green, fontWeight: 700 }}>
+                      {r.avgDelay == null ? '—' : r.avgDelay > 0 ? `+${Math.round(r.avgDelay)}d` : `${Math.round(r.avgDelay)}d`}
+                    </td>
+                    <td style={{ ...tdN, color: r.survivedPct == null ? C.dim : r.survivedPct >= 90 ? C.green : C.red }}>
+                      {r.survivedPct == null ? '—' : `${Math.round(r.survivedPct)}%`}
+                    </td>
+                    <td style={{ ...tdN, color: r.owedValue > 0 ? C.red : C.dim, fontWeight: r.owedValue > 0 ? 700 : 400 }}>
+                      {r.owedValue > 0 ? money(r.owedValue) : '—'}
+                    </td>
+                    <td style={{ ...tdN, color: r.worstLateDays > 0 ? C.red : C.dim }}>
+                      {r.worstLateDays > 0 ? `${r.worstLateDays}d` : '—'}
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
+                      <td colSpan={9} style={{ padding: '16px 18px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 26 }}>
+                          <div>
+                            <SubHead tone={C.red}>Where the faults are</SubHead>
+                            {r.faultByItem.length === 0
+                              ? <div style={{ fontSize: 12, color: C.faint }}>Nothing from this supplier has come in faulty.</div>
+                              : (
+                                <table style={tableStyle}>
+                                  <thead><tr><th style={th}>Part</th><th style={thR}>Delivered</th><th style={thR}>Faulty</th><th style={thR}>Rate</th></tr></thead>
+                                  <tbody>{r.faultByItem.map(f => (
+                                    <tr key={f.itemId} style={{ borderBottom: rowBorder }}>
+                                      <td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{nameOf(f.itemId)}</td>
+                                      <td style={tdN}>{f.delivered}</td>
+                                      <td style={{ ...tdN, color: C.red }}>{f.faulty}</td>
+                                      <td style={{ ...tdN, color: C.red, fontWeight: 700 }}>{f.pct.toFixed(1)}%</td>
+                                    </tr>
+                                  ))}</tbody>
+                                </table>
+                              )}
+                            {r.faultByItem.length === 1 && (
+                              <div style={{ marginTop: 12 }}>
+                                <Note tone={C.blue}>
+                                  Every fault is on one part. That is a conversation about {nameOf(r.faultByItem[0].itemId)},
+                                  not a reason to drop the supplier.
+                                </Note>
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <SubHead tone={C.blue}>Reliability</SubHead>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {([
+                                ['Orders placed', `${r.orders}`],
+                                ['Delivered in full', `${r.completed}`],
+                                ['Quoted lead time', r.quotedLead != null ? `${r.quotedLead} days` : '—'],
+                                ['Every delivery took', r.leadTimes.length ? r.leadTimes.map(d => `${d}d`).join(', ') : '—'],
+                                ['Replacement rounds', `${r.reorderRounds}`],
+                                ['Repeat failures', `${r.repeatFailures}`],
+                              ] as [string, string][]).map(([k, v]) => (
+                                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 18 }}>
+                                  <span style={{ fontSize: 11, color: C.faint }}>{k}</span>
+                                  <span style={{ fontSize: 12, color: C.text, fontFamily: 'ui-monospace, monospace', fontWeight: 600, textAlign: 'right' }}>{v}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {r.repeatFailures > 0 && (
+                              <div style={{ marginTop: 12 }}>
+                                <Note tone={C.red}>
+                                  {r.repeatFailures} replacement{r.repeatFailures === 1 ? '' : 's'} arrived faulty a second time.
+                                  A supplier that cannot fix a fault on the second attempt will not fix it on the third.
+                                </Note>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ padding: '10px 16px', fontSize: 11, color: C.faint, lineHeight: 1.6, background: 'rgba(255,255,255,0.02)' }}>
+        Price loading is the share of units that had to be sent back — the amount by which the quoted price understates what you paid.
+        Lead time is shown as every delivery seen rather than an average, because a supplier reliably at 25 days is easier to plan around than one averaging 18 between 8 and 40.
+      </div>
+    </Card>
+  )
+}
 
 /* ==========================================================================
- * MODALS (receive, reorder, issue, move)
+ * ORDER MODALS
  * ========================================================================== */
 
 function ReceiveModal({ po, onSave, onClose }: { po: PurchaseOrder; onSave: (date: string, lines: ReceiptLine[], delayReason: DelayReason | undefined, note: string) => void; onClose: () => void }) {
@@ -1226,10 +1529,10 @@ function ReceiveModal({ po, onSave, onClose }: { po: PurchaseOrder; onSave: (dat
   const late = delay != null && delay > 0
 
   return (
-    <Modal title={`Receive against ${po.number}`} subtitle={`${po.supplier} · ${projectCode(po.project)}`} width={760} onClose={onClose}
+    <Modal title={`Receive against ${po.number}`} subtitle={`${po.supplier} — ${projectCode(po.project)}`} width={760} onClose={onClose}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn tone="primary" disabled={lines.length === 0 || (late && !reason)} onClick={() => { onSave(date, lines, reason || undefined, note); onClose() }}>Record receipt</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <Note tone={C.dim}>Accepted parts go straight onto the shelf in the regular store. Damaged and wrong stock becomes a reorder.</Note>
+        <Note tone={C.dim}>Accepted parts go onto the store shelf. Damaged and wrong stock becomes a reorder.</Note>
         <Grid cols={2}>
           <Field label="Delivered on"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field>
           <Field label="Note"><input value={note} onChange={e => setNote(e.target.value)} placeholder="Optional" style={iStyle} /></Field>
@@ -1322,7 +1625,7 @@ function POModal({ po, onSave, onPlace, onClose }: { po: PurchaseOrder; onSave: 
   const value = f.lines.reduce((s, l) => s + l.qty * l.rate, 0)
 
   if (placing) return (
-    <Modal title={`Place ${f.number}`} subtitle={`${f.supplier} · ${money(value)}`} width={520} onClose={() => setPlacing(false)}
+    <Modal title={`Place ${f.number}`} subtitle={`${f.supplier} — ${money(value)}`} width={520} onClose={() => setPlacing(false)}
       footer={<><Btn onClick={() => setPlacing(false)}>Back</Btn><Btn tone="primary" onClick={() => { onSave(f); onPlace(f.id, ordered, promised); onClose() }}>Place order</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Grid cols={2}><Field label="Ordered on"><input type="date" value={ordered} onChange={e => { setOrdered(e.target.value); setPromised(addDays(e.target.value, quoted)) }} style={{ ...iStyle, colorScheme: 'dark' }} /></Field><Field label="Promised delivery" hint={`${f.supplier} quotes ${quoted} days`}><input type="date" value={promised} onChange={e => setPromised(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field></Grid>
@@ -1365,35 +1668,15 @@ function POModal({ po, onSave, onPlace, onClose }: { po: PurchaseOrder; onSave: 
   )
 }
 
-function MoveModal({ line, onSave, onClose }: { line: StockLine; onSave: (poId: string, t: { date: string; itemId: string; qty: number; toProject: string; note?: string }) => void; onClose: () => void }) {
-  const { state } = useInventory()
-  const nameOf = (id: string) => state.catalogue.find(p => p.id === id)?.name ?? id
-  const live = PROJECTS.filter(p => p !== line.project && isLiveProject(p))
-  const [to, setTo] = useState(live[0] ?? ''); const [qty, setQty] = useState(line.qty); const [note, setNote] = useState('')
-  return (
-    <Modal title={`Move ${nameOf(line.itemId)}`} subtitle={`${line.qty} on the shelf against ${projectCode(line.project)}`} width={560} onClose={onClose}
-      footer={<><Btn onClick={onClose}>Cancel</Btn><Btn tone="primary" disabled={!to || qty < 1} onClick={() => { onSave(line.poId, { date: TODAY, itemId: line.itemId, qty, toProject: to, note: note || undefined }); onClose() }}>Move to {to ? projectCode(to) : '—'}</Btn></>}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <Grid cols={2}>
-          <Field label="Quantity" hint={`${line.qty} available`}><input type="number" min={1} max={line.qty} value={qty} onChange={e => setQty(Math.min(line.qty, Math.max(1, parseFloat(e.target.value) || 1)))} style={numStyle} /></Field>
-          <Field label="Move to"><select value={to} onChange={e => setTo(e.target.value)} style={{ ...iStyle, cursor: 'pointer' }}>{live.map(p => <option key={p} value={p}>{projectCode(p)} — {p}</option>)}</select></Field>
-        </Grid>
-        <Field label="Note"><input value={note} onChange={e => setNote(e.target.value)} placeholder="Optional" style={iStyle} /></Field>
-        <Note tone={C.dim}>The order keeps its original project. The move is recorded separately so both records stay true.</Note>
-      </div>
-    </Modal>
-  )
-}
-
 /* ==========================================================================
  * SCREEN
  * ========================================================================== */
 
-const TABS = ['Catalogue', 'Orders', 'Store'] as const
+const TABS = ['Catalogue', 'Orders', 'Store', 'Insights'] as const
 type Tab = typeof TABS[number]
 
 export default function InventoryPage() {
-  const { state, savePart, savePO, placeOrder, addReceipt, addReorder, receiveReorder, addTransfer } = useInventory()
+  const { state, savePart, savePO, placeOrder, addReceipt, addReorder, receiveReorder } = useInventory()
   const { state: cost } = useCosting()
   const [tab, setTab] = useState<Tab>('Catalogue')
   const [editPart, setEditPart] = useState<Part | null>(null)
@@ -1402,14 +1685,12 @@ export default function InventoryPage() {
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null)
   const [raising, setRaising] = useState<PurchaseOrder | null>(null)
   const [replacing, setReplacing] = useState<{ po: PurchaseOrder; reorder: Reorder } | null>(null)
-  const [moving, setMoving] = useState<StockLine | null>(null)
 
   const blankPO = (): PurchaseOrder => ({
     id: uid('po'), number: `PO-${TODAY.slice(0, 4)}-${String(state.pos.length + 1).padStart(3, '0')}`,
     supplier: state.suppliers[0]?.name ?? '', project: PROJECTS.find(isLiveProject) ?? PROJECTS[0],
     status: 'draft', createdDate: TODAY, lines: [], receipts: [], reorders: [], issues: [], transfers: [],
   })
-
 
   const burnMonth = useMemo(() => {
     const months = cost.shiftLogs.filter(l => l.metresDrilled > 0).map(l => monthOf(l.date)).sort()
@@ -1423,14 +1704,12 @@ export default function InventoryPage() {
     const metres = shifts.reduce((s, l) => s + l.metresDrilled, 0)
     const counts: Record<string, number> = {}
     shifts.forEach(s => { const f = normFormation(s.formationType); counts[f] = (counts[f] ?? 0) + s.metresDrilled })
-    const formation = (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Hard') as typeof FORMATIONS[number]
+    const formation = (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Hard') as Formation
     return { rig, metresPerDay: Math.round((metres / days) * 10) / 10, formation }
-  }).filter(Boolean) as { rig: string; metresPerDay: number; formation: typeof FORMATIONS[number] }[], [cost.shiftLogs, burnMonth])
+  }).filter(Boolean) as { rig: string; metresPerDay: number; formation: Formation }[], [cost.shiftLogs, burnMonth])
 
   const alerts = useMemo(() => buildAlerts(state.pos, state.catalogue, TODAY, COMPLETED_PROJECTS, burn, state.alerts), [state.pos, state.catalogue, state.alerts, burn])
   const urgent = alerts.filter(a => a.level === 'urgent').length
-
-  const [month, setMonth] = useState(burnMonth)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: 20, paddingBottom: 56 }}>
@@ -1438,8 +1717,8 @@ export default function InventoryPage() {
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 900, color: C.text, margin: 0 }}>Parts &amp; inventory</h1>
           <p style={{ fontSize: 13, color: C.faint, marginTop: 5, maxWidth: 700, lineHeight: 1.6 }}>
-            Parts catalogue · purchase orders · regular store · startup store per rig.
-            Finance charges parts from this catalogue, so the two modules can never disagree.
+            The catalogue, what is on order, what is on the shelf, and what each rig is carrying.
+            Finance charges every metre from what the rig holds, so the two modules can never disagree.
           </p>
         </div>
         {alerts.length > 0 && (
@@ -1462,8 +1741,8 @@ export default function InventoryPage() {
 
       {tab === 'Catalogue' && <CatalogueTab onEdit={setEditPart} onImport={() => setImporting(true)} />}
       {tab === 'Orders' && <OrdersTab onReceive={setReceiving} onCreate={() => setEditPO(blankPO())} onEdit={setEditPO} onRaiseReorder={setRaising} onReceiveReorder={(po, reorder) => setReplacing({ po, reorder })} />}
-      {tab === 'Store' && <StoreTab onMove={setMoving} />}
-      
+      {tab === 'Store' && <StoreTab />}
+      {tab === 'Insights' && <InsightsTab />}
 
       {editPart && <PartModal part={editPart} onSave={savePart} onClose={() => setEditPart(null)} />}
       {importing && <ImportModal onClose={() => setImporting(false)} />}
@@ -1471,7 +1750,6 @@ export default function InventoryPage() {
       {receiving && <ReceiveModal po={receiving} onClose={() => setReceiving(null)} onSave={(date, lines, delayReason, note) => addReceipt(receiving.id, { date, lines, delayReason, note })} />}
       {raising && <RaiseReorderModal po={raising} onClose={() => setRaising(null)} onSave={rs => rs.forEach(r => addReorder(raising.id, r))} />}
       {replacing && <ReceiveReorderModal po={replacing.po} reorder={replacing.reorder} onClose={() => setReplacing(null)} onSave={receipt => receiveReorder(replacing.po.id, replacing.reorder.id, receipt)} />}
-      {moving && <MoveModal line={moving} onSave={addTransfer} onClose={() => setMoving(null)} />}
     </div>
   )
 }
