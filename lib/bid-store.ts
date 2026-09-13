@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, createElement, useContext, useEffect, useState, ReactNode } from 'react'
 import { ownershipBreakdown, SEED_OWNERSHIP, type RigOwnership } from './costing-store'
 import { SEED_CATALOGUE, normFormation, partWorksIn, type Part, type Formation, FORMATIONS } from './inventory-store'
 
@@ -920,23 +920,27 @@ export function BidProvider({ children }: { children: ReactNode }) {
   }, [])
   useEffect(() => { if (loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }, [state, loaded])
 
-  return (
-    <BidCtx.Provider value={{
-      state,
-      saveBid: b => setState(s => ({
-        bids: s.bids.some(x => x.id === b.id) ? s.bids.map(x => x.id === b.id ? b : x) : [b, ...s.bids],
-      })),
-      deleteBid: id => setState(s => ({ bids: s.bids.filter(b => b.id !== id) })),
-      /* Scenarios are whole copies rather than a diff, so changing one can
-       * never reach back into the bid it came from. */
-      duplicateBid: (id, name) => setState(s => {
-        const src = s.bids.find(b => b.id === id)
-        if (!src) return s
-        return { bids: [{ ...src, id: uid('bid'), number: `${src.number}-S`, name, status: 'draft' }, ...s.bids] }
-      }),
-      resetAll: () => setState({ bids: SEED_BIDS }),
-    }}>{children}</BidCtx.Provider>
-  )
+  const value: Ctx = {
+    state,
+    saveBid: b => setState(s => ({
+      bids: s.bids.some(x => x.id === b.id) ? s.bids.map(x => x.id === b.id ? b : x) : [b, ...s.bids],
+    })),
+    deleteBid: id => setState(s => ({ bids: s.bids.filter(b => b.id !== id) })),
+    /* Scenarios are whole copies rather than a diff, so changing one can
+     * never reach back into the bid it came from. */
+    duplicateBid: (id, name) => setState(s => {
+      const src = s.bids.find(b => b.id === id)
+      if (!src) return s
+      return { bids: [{ ...src, id: uid('bid'), number: `${src.number}-S`, name, status: 'draft' }, ...s.bids] }
+    }),
+    resetAll: () => setState({ bids: SEED_BIDS }),
+  }
+
+  /* createElement rather than JSX, so this file stays a plain .ts module. The
+   * engine above is pure arithmetic with no React in it at all — keeping the
+   * one provider JSX-free means the whole thing can be imported, tested or
+   * moved to a server without dragging a .tsx extension along with it. */
+  return createElement(BidCtx.Provider, { value }, children)
 }
 
 export function useBids() {
