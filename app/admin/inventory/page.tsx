@@ -180,9 +180,9 @@ const FORMATION_TONE: Record<Formation, string> = {
  * ========================================================================== */
 
 const LEVEL_TONE: Record<AlertLevel, string> = { urgent: C.red, warn: C.amber, info: C.blue }
-const KIND_LABEL: Record<AlertKind, string> = { runningOut: 'Running out', overdue: 'Late delivery', replacement: 'Replacement owed', idle: 'Idle stock', stranded: 'Stranded', lowStock: 'Low stock' }
-const KIND_ORDER: AlertKind[] = ['runningOut', 'overdue', 'replacement', 'idle', 'stranded', 'lowStock']
-const KIND_TONE: Record<AlertKind, string> = { runningOut: C.red, overdue: C.red, replacement: C.amber, idle: C.amber, stranded: C.amber, lowStock: C.blue }
+const KIND_LABEL: Record<AlertKind, string> = { runningOut: 'Running out', overdue: 'Late delivery', dueSoon: 'Arriving soon', replacement: 'Replacement owed', idle: 'Idle stock', stranded: 'Stranded', lowStock: 'Low stock' }
+const KIND_ORDER: AlertKind[] = ['runningOut', 'overdue', 'dueSoon', 'replacement', 'idle', 'stranded', 'lowStock']
+const KIND_TONE: Record<AlertKind, string> = { runningOut: C.red, overdue: C.red, dueSoon: C.teal, replacement: C.amber, idle: C.amber, stranded: C.amber, lowStock: C.blue }
 
 function AlertsPanel({ alerts }: { alerts: Alert[] }) {
   const [kind, setKind] = useState<AlertKind | 'all'>('all')
@@ -1159,7 +1159,17 @@ function InsightsTab() {
       })),
   [cost.shiftLogs, project, rig])
 
-  const rows = useMemo(() => terrainRows(facts, state.catalogue), [facts, state.catalogue])
+  /* Everything any rig on this project is carrying, so a part that has not
+   * worn out yet still appears rather than silently vanishing. */
+  const held = useMemo(() => {
+    const ids = new Set<string>()
+    RIGS.filter(r => rig === 'All' || r === rig).forEach(r =>
+      rigHoldings(state.pos, state.catalogue, r, project, [], state.rigKit)
+        .forEach(l => ids.add(l.itemId)))
+    return Array.from(ids)
+  }, [state.pos, state.catalogue, state.rigKit, project, rig])
+
+  const rows = useMemo(() => terrainRows(facts, state.catalogue, held), [facts, state.catalogue, held])
 
   const tooling = useMemo(() => {
     const r = rig === 'All' ? RIGS[0] : rig
@@ -1201,15 +1211,16 @@ function InsightsTab() {
 /* The catalogue's life figure is a claim. The log is the evidence. */
 function TerrainPanel({ rows, metres }: { rows: TerrainRow[]; metres: number }) {
   const [mode, setMode] = useState<'life' | 'cost'>('life')
-  const real = rows.filter(r => r.totalScrapped > 0)
+  const worn = rows.filter(r => r.totalScrapped > 0)
+  const unworn = rows.filter(r => r.totalScrapped === 0)
 
-  if (real.length === 0) {
+  if (rows.length === 0) {
     return <Card title="What the ground is doing to your parts">
-      <Empty>No parts have been scrapped in the log yet, so there is nothing to measure life against.</Empty>
+      <Empty>No parts on a rig for this project yet, so there is nothing to measure life against.</Empty>
     </Card>
   }
 
-  const headline = real
+  const headline = worn
     .map(r => ({ r, worst: r.worst }))
     .filter(x => x.worst && x.worst.lifeDeltaPct != null)
     .sort((a, b) => (a.worst!.lifeDeltaPct ?? 0) - (b.worst!.lifeDeltaPct ?? 0))[0]
@@ -1246,7 +1257,7 @@ function TerrainPanel({ rows, metres }: { rows: TerrainRow[]; metres: number }) 
         <table style={tableStyle}>
           <thead>
             <tr>
-              <th style={th}>Part</th>
+              <th style={th}>Part number</th><th style={th}>Item</th>
               <th style={thR}>{mode === 'life' ? 'Catalogue life' : 'Catalogue cost'}</th>
               {FORMATIONS.map(f => <th key={f} style={{ ...thR, color: FORMATION_TONE[f] }}>{f}</th>)}
               <th style={thR}>Scrapped</th>
@@ -1254,8 +1265,9 @@ function TerrainPanel({ rows, metres }: { rows: TerrainRow[]; metres: number }) 
             </tr>
           </thead>
           <tbody>
-            {real.map(r => (
+            {worn.map(r => (
               <tr key={r.itemId} style={{ borderBottom: rowBorder }}>
+                <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{r.partNumber || '—'}</td>
                 <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 220 }}>
                   {r.name}
                   <span style={{ marginLeft: 7 }}><Tag tone={C.dim}>{FORMATION_USE_LABEL[r.use]}</Tag></span>
@@ -1284,6 +1296,33 @@ function TerrainPanel({ rows, metres }: { rows: TerrainRow[]; metres: number }) 
                 })}
                 <td style={tdN}>{r.totalScrapped}</td>
                 <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(r.totalSpend)}</td>
+              </tr>
+            ))}
+
+            {/* On a rig, nothing scrapped yet. Either it is outlasting its
+                catalogue life, or the driller is not recording it. */}
+            {unworn.length > 0 && (
+              <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                <td colSpan={9} style={{ ...td, fontSize: 10, fontWeight: 800, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '6px 12px' }}>
+                  On a rig, no wear recorded yet
+                </td>
+              </tr>
+            )}
+            {unworn.map(r => (
+              <tr key={r.itemId} style={{ borderBottom: rowBorder, opacity: 0.6 }}>
+                <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{r.partNumber || '—'}</td>
+                <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 220 }}>
+                  {r.name}
+                  <span style={{ marginLeft: 7 }}><Tag tone={C.dim}>{FORMATION_USE_LABEL[r.use]}</Tag></span>
+                </td>
+                <td style={{ ...tdN, color: C.faint }}>
+                  {mode === 'life'
+                    ? `${r.catalogueLife.toLocaleString('en-IN')} m`
+                    : perMetre(r.cells.Hard.cataloguePerMetre)}
+                </td>
+                {FORMATIONS.map(f => <td key={f} style={{ ...tdN, color: C.dim }}>—</td>)}
+                <td style={{ ...tdN, color: C.dim }}>—</td>
+                <td style={{ ...tdN, color: C.dim }}>—</td>
               </tr>
             ))}
           </tbody>
@@ -1364,12 +1403,13 @@ function SpendPanel({ rows }: { rows: TerrainRow[] }) {
       <div style={{ overflowX: 'auto' }}>
         <table style={tableStyle}>
           <thead><tr>
-            <th style={th}>Part</th><th style={th}>Share of tooling spend</th>
+            <th style={th}>Part number</th><th style={th}>Item</th><th style={th}>Share of tooling spend</th>
             <th style={thR}>Unit rate</th><th style={thR}>Scrapped</th><th style={thR}>Spend</th><th style={thR}>Share</th>
           </tr></thead>
           <tbody>
             {real.map(r => (
               <tr key={r.itemId} style={{ borderBottom: rowBorder }}>
+                <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{r.partNumber || '—'}</td>
                 <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 230 }}>{r.name}</td>
                 <td style={{ ...td, width: '34%' }}><Bar value={r.totalSpend} max={max} tone={C.orange} /></td>
                 <td style={{ ...tdN, color: C.faint }}>{money(r.rate)}</td>
@@ -1390,6 +1430,7 @@ function SupplierInsightPanel() {
   const { state } = useInventory()
   const [open, setOpen] = useState<string | null>(null)
   const nameOf = (id: string) => state.catalogue.find(p => p.id === id)?.name ?? id
+  const numberOf = (id: string) => state.catalogue.find(p => p.id === id)?.partNumber ?? '—'
 
   const rows = state.suppliers
     .map(s => supplierInsight(state.pos, state.suppliers, s.name, TODAY))
@@ -1452,9 +1493,10 @@ function SupplierInsightPanel() {
                               ? <div style={{ fontSize: 12, color: C.faint }}>Nothing from this supplier has come in faulty.</div>
                               : (
                                 <table style={tableStyle}>
-                                  <thead><tr><th style={th}>Part</th><th style={thR}>Delivered</th><th style={thR}>Faulty</th><th style={thR}>Rate</th></tr></thead>
+                                  <thead><tr><th style={th}>Part number</th><th style={th}>Item</th><th style={thR}>Delivered</th><th style={thR}>Faulty</th><th style={thR}>Rate</th></tr></thead>
                                   <tbody>{r.faultByItem.map(f => (
                                     <tr key={f.itemId} style={{ borderBottom: rowBorder }}>
+                                      <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{numberOf(f.itemId)}</td>
                                       <td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{nameOf(f.itemId)}</td>
                                       <td style={tdN}>{f.delivered}</td>
                                       <td style={{ ...tdN, color: C.red }}>{f.faulty}</td>
@@ -1723,7 +1765,7 @@ export default function InventoryPage() {
     return { rig, metresPerDay: Math.round((metres / days) * 10) / 10, formation }
   }).filter(Boolean) as { rig: string; metresPerDay: number; formation: Formation }[], [cost.shiftLogs, burnMonth])
 
-  const alerts = useMemo(() => buildAlerts(state.pos, state.catalogue, TODAY, COMPLETED_PROJECTS, burn, state.alerts), [state.pos, state.catalogue, state.alerts, burn])
+  const alerts = useMemo(() => buildAlerts(state.pos, state.catalogue, TODAY, COMPLETED_PROJECTS, burn, state.alerts, state.suppliers), [state.pos, state.catalogue, state.alerts, state.suppliers, burn])
   const urgent = alerts.filter(a => a.level === 'urgent').length
 
   return (
