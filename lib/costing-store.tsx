@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { normFormation as invFormation } from './inventory-store'
+import { normFormation as groundOf } from './inventory-store'
 import type { ToolingRates, Formation } from './inventory-store'
 
 /* ==========================================================================
@@ -70,7 +70,7 @@ export interface ShiftLog {
   metresDrilled: number
   coreRecovery: number      // metres of core recovered
   holeSize: string          // NQ / HQ / PQ — drives the size adjustment
-  formationType: string     // lithology; affects COST, not revenue
+  formationType: string     // lithology; drives both cost and revenue
   // Set from "Hole Closed This Shift?" in the driller's log. Finance never
   // decides when a hole is finished — it reads that decision and the hole
   // appears in Drillholes as Closed, waiting for approval.
@@ -455,6 +455,14 @@ export function labourForDay(shifts: ShiftLog[], units: number, r: OperatingRate
   return { labour, lodging, transport, heads, dayCrew, nightCrew, perMetre: false, total: labour + lodging + transport }
 }
 
+/* What the parts cost on a day, split by the ground that wore them out. */
+export interface ToolingCharge {
+  formation: Formation
+  metres: number
+  rate: number
+  amount: number
+}
+
 export interface DayCost {
   date: string; rig: string; project: string
   shifts: ShiftLog[]
@@ -469,11 +477,11 @@ export interface DayCost {
   repairs: number; parts: number
   partsByMetre: number
   /* The tooling rate this day was actually charged at — a weighted average
-   * across the formations drilled, so a day that cut soft then hard reads
-   * between the two. Shown in the day breakdown so the figure can be
-   * traced back to the rig that produced it. */
+   * across the formations drilled, so a day that cut soft and then hard reads
+   * between the two. Shown in the day breakdown so any figure can be traced
+   * back to the rig that produced it. */
   toolingRate: number
-  toolingByFormation: { formation: Formation; metres: number; rate: number; amount: number }[]
+  toolingByFormation: ToolingCharge[]
   operating: number; ownership: number; total: number
   cpu: number | null
   rate: number
@@ -506,27 +514,29 @@ export function dayCost(
   const maintenanceHours = maint.reduce((a, m) => a + m.hours, 0)
 
   /* Parts are amortised, not charged on the day they were bought, and each
-   * stretch of hole is charged for the ground it was actually in. Seven
-   * metres of soft and eleven of hard on the same day are two different
-   * rates, because they wear out two different sets of parts.
+   * stretch of hole is charged for the ground it was actually in. Seven metres
+   * of soft and eleven of hard on the same day are two different rates,
+   * because they wear out two different sets of parts.
    *
-   * The rate comes from what this rig was carrying on this date — starting
+   * The rate comes from what this rig was carrying on this date — its starting
    * kit plus everything issued up to it — so issuing a bit on the 14th moves
-   * the 14th onward and leaves every day already costed exactly as it was. */
-  const byFormation: DayCost['toolingByFormation'] = []
+   * the 14th onward and leaves every day already costed exactly as it was. A
+   * standby or breakdown day drills nothing, wears nothing and carries
+   * nothing. */
+  const toolingByFormation: ToolingCharge[] = []
   shifts.forEach(sh => {
     if (sh.metresDrilled <= 0) return
-    const f = invFormation(sh.formationType)
-    const rate = tooling.byFormation[f] ?? tooling.blended
-    const existing = byFormation.find(x => x.formation === f)
+    const formation = groundOf(sh.formationType)
+    const rate = tooling.byFormation[formation] ?? tooling.blended
+    const existing = toolingByFormation.find(x => x.formation === formation)
     if (existing) {
       existing.metres += sh.metresDrilled
       existing.amount += sh.metresDrilled * rate
     } else {
-      byFormation.push({ formation: f, metres: sh.metresDrilled, rate, amount: sh.metresDrilled * rate })
+      toolingByFormation.push({ formation, metres: sh.metresDrilled, rate, amount: sh.metresDrilled * rate })
     }
   })
-  const partsByMetre = byFormation.reduce((a, x) => a + x.amount, 0)
+  const partsByMetre = toolingByFormation.reduce((a, x) => a + x.amount, 0)
   const parts = partsByMetre
   const toolingRate = units > 0 ? partsByMetre / units : tooling.blended
 
@@ -558,7 +568,7 @@ export function dayCost(
     units, coreRecovery: sum(s => s.coreRecovery),
     fuelLitres, waterLitres, additivesKg,
     fuel, water, additives, labour, repairs, parts, partsByMetre,
-    toolingRate, toolingByFormation: byFormation,
+    toolingRate, toolingByFormation,
     operating, ownership, total,
     cpu: units > 0 ? total / units : null,
     rate, adjustmentPct, revenue, unmatched, charges,
@@ -583,8 +593,8 @@ export interface Rollup {
   labour: number; repairs: number; parts: number
   operating: number; ownership: number; total: number; revenue: number
   cpu: number; operatingCPU: number; ownershipCPU: number
-  revenuePerUnit: number; margin: number; marginPct: number
   toolingPerUnit: number
+  revenuePerUnit: number; margin: number; marginPct: number
 }
 
 export function rollup(days: DayCost[]): Rollup {
@@ -593,7 +603,8 @@ export function rollup(days: DayCost[]): Rollup {
     units: 0, coreRecovery: 0, coreRecoveryPct: 0, drillingHours: 0, downtimeHours: 0, maintenanceHours: 0,
     fuelLitres: 0, fuel: 0, water: 0, additives: 0,
     labour: 0, repairs: 0, parts: 0, operating: 0, ownership: 0, total: 0, revenue: 0,
-    cpu: 0, operatingCPU: 0, ownershipCPU: 0, revenuePerUnit: 0, margin: 0, marginPct: 0, toolingPerUnit: 0,
+    cpu: 0, operatingCPU: 0, ownershipCPU: 0, toolingPerUnit: 0,
+    revenuePerUnit: 0, margin: 0, marginPct: 0,
   }
   days.forEach(d => {
     z.days++
@@ -615,8 +626,8 @@ export function rollup(days: DayCost[]): Rollup {
     z.cpu = z.total / z.units
     z.operatingCPU = z.operating / z.units
     z.ownershipCPU = z.ownership / z.units
-    z.revenuePerUnit = z.revenue / z.units
     z.toolingPerUnit = z.parts / z.units
+    z.revenuePerUnit = z.revenue / z.units
     z.coreRecoveryPct = (z.coreRecovery / z.units) * 100
   }
   z.margin = z.revenue - z.total
@@ -1073,6 +1084,10 @@ const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','
 export function monthLabel(ym: string) {
   const [y, m] = ym.split('-').map(Number)
   return `${MONTHS[m - 1]} ${y}`
+}
+export function monthShort(ym: string) {
+  const [, m] = ym.split('-').map(Number)
+  return MON[m - 1]
 }
 export function dayLabel(date: string) {
   const [, m, d] = date.split('-').map(Number)
