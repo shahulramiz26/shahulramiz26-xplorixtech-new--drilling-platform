@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Users, FolderOpen, Settings,
   Truck, CreditCard, BarChart3, LogOut, Menu,
   ChevronRight, Search, DollarSign, X, Boxes, FileText, Brain,
-  Store, MessageSquareQuote, Bookmark, HardHat,
+  Store, MessageSquareQuote, Bookmark, HardHat, Target,
 } from 'lucide-react'
 import NotificationCenter from '../components/NotificationCenter'
 import { CurrencyProvider } from '../components/currency-context'
@@ -18,6 +18,11 @@ import CurrencySwitcher from '../components/CurrencySwitcher'
 /* ------------------------------------------------------------------ *
  * Nav is now grouped. Operations and Exchange are different mental
  * modes — a flat 14-item list buries both.
+ *
+ * Bid Intelligence sits directly above Finance & Costing because that
+ * is the order the work happens in: you price a tender, you win it, it
+ * becomes a project, and then it costs out. The two screens share an
+ * engine, so they belong next to each other in the eye as well.
  * ------------------------------------------------------------------ */
 type NavItem = {
   href: string
@@ -31,6 +36,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: 'Main Menu',
     items: [
       { href: '/admin/dashboard',            label: 'Dashboard',            icon: LayoutDashboard },
+      { href: '/admin/bid-intelligence',     label: 'Bid Intelligence',     icon: Target          },
       { href: '/admin/finance',              label: 'Finance & Costing',    icon: DollarSign      },
       { href: '/admin/inventory',            label: 'Inventory',            icon: Boxes           },
       { href: '/admin/users',                label: 'User Management',      icon: Users           },
