@@ -1024,6 +1024,17 @@ function delta(from: number, to: number) {
 
 const WINDOW = 15
 
+const FORMATION_TONE: Record<string, string> = {
+  Soft: C.green, Medium: C.teal, Hard: C.amber, 'Very Hard': C.red,
+}
+
+/* The ground a day spent most of its metres in. A day that crossed a boundary
+ * still has one dominant band, and that is what colours its point. */
+function dominantGround(d: DayCostMTD): string | null {
+  if (!d.toolingByFormation.length) return null
+  return d.toolingByFormation.reduce((a, b) => (a.metres >= b.metres ? a : b)).formation
+}
+
 function PerformanceTab({ v, rig, project, month }: {
   v: RigMonthView; rig: string; project: string; month: string
 }) {
@@ -1042,6 +1053,9 @@ function PerformanceTab({ v, rig, project, month }: {
    * calendar days from month end would show empty rows for a rig that stopped
    * early. A missing log inside the run still shows — that is information. */
   const lastLogged = v.days.reduce((acc, d, i) => (d.submitted ? i : acc), 0)
+  /* The most recent day that actually put metres in the ground. A standby day
+   * has no cost per metre, so it cannot be the live rate. */
+  const live = [...v.days].reverse().find(d => d.cpu != null) ?? null
   const from = showAll ? 0 : Math.max(0, lastLogged - WINDOW + 1)
   const days = showAll ? v.days : v.days.slice(from, lastLogged + 1)
   const hidden = v.days.length - days.length
@@ -1086,18 +1100,25 @@ function PerformanceTab({ v, rig, project, month }: {
           })}
         </div>
 
-        {/* The figure that actually settles, as it stands today. */}
+        {/* The rate as it stands right now — the most recent day that actually
+            drilled. The month-to-date figure lives in the strip on the left,
+            where it can be read against the months before it. */}
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            {monthLabel(month)} so far
+            {live ? `Today's rate · ${fullDate(live.date)}` : 'No metres drilled yet'}
           </div>
-          <div style={{ fontSize: 27, fontWeight: 900, fontFamily: 'ui-monospace, monospace', lineHeight: 1.15, color: rate ? cpuColor(r.cpu, rate) : C.text }}>
-            {perUnit(r.cpu)}
+          <div style={{ fontSize: 27, fontWeight: 900, fontFamily: 'ui-monospace, monospace', lineHeight: 1.15, color: live && live.rate ? cpuColor(live.cpu!, live.rate) : C.text }}>
+            {live ? perUnit(live.cpu) : '—'}
           </div>
           <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>
-            {rate > 0
-              ? `against ${perUnit(rate)} billed, ${perUnit(rate - r.cpu)} a metre`
-              : 'no client rate set for this project'}
+            {live && live.rate > 0
+              ? `${dominantGround(live) ?? 'ground'} at ${perUnit(live.rate)} billed, ${perUnit(live.rate - live.cpu!)} a metre`
+              : live
+              ? 'no client rate matched this ground'
+              : 'the last logged day drilled nothing'}
+          </div>
+          <div style={{ fontSize: 10.5, color: C.dim, marginTop: 4 }}>
+            {monthLabel(month)} to date {perUnit(r.cpu)}
           </div>
         </div>
       </div>
@@ -1108,7 +1129,7 @@ function PerformanceTab({ v, rig, project, month }: {
           : `${rigCode(rig)} · the last ${days.length} logged days · click a day for the full breakdown`}
         pad={false}
         right={hidden > 0 || showAll
-          ? <Btn size="sm" onClick={() => setShowAll(!showAll)}>{showAll ? `Show last ${WINDOW} days` : `Show all ${v.days.length} days`}</Btn>
+          ? <Btn size="sm" onClick={() => setShowAll(!showAll)}>{showAll ? `Show last ${WINDOW} days` : 'Show whole month'}</Btn>
           : undefined}>
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
@@ -1289,7 +1310,7 @@ function PerformanceTab({ v, rig, project, month }: {
 
       {/* The chart keeps the whole month. A cost trend with two thirds of its
           points cut off is worse than no trend. */}
-      <CPUChart days={v.days} rate={rate} />
+      <CPUChart days={v.days} rate={rate} clientRate={v.clientRate} month={month} />
     </div>
   )
 }
@@ -1313,70 +1334,141 @@ function Detail({ title, tone, rows }: { title: string; tone: string; rows: stri
   )
 }
 
-/* Daily points, month-to-date line. Daily cost is genuinely spiky, so joining
- * the points would imply a continuity that isn't there; month to date really
- * is cumulative, so that one is a line. */
-function CPUChart({ days, rate }: { days: DayCostMTD[]; rate: number }) {
+/* COST AGAINST WHAT THE GROUND PAYS
+ *
+ * The old version drew one dashed line at the blended average of every rate
+ * line on the contract — a figure that matches no metre anyone ever drills.
+ * Site A bills soft at ₹6,200 and very hard at ₹14,100; averaging them to
+ * ₹9,954 hides the fact that a cheap-looking soft day can be the thinnest
+ * margin of the month.
+ *
+ * So: one ceiling per formation, in the formation's own colour, and each day's
+ * point painted with the ground it actually cut. A day sitting just under the
+ * green line is in trouble even though it looks cheap.
+ *
+ * A depth-priced contract has no formation ceilings to draw — its bands are
+ * depth, not rock — so it keeps a single line at the rate actually achieved.
+ */
+function CPUChart({ days, rate, clientRate, month }: {
+  days: DayCostMTD[]; rate: number; clientRate?: ClientRate; month: string
+}) {
   const [hover, setHover] = useState<number | null>(null)
   const pts = days.filter(d => d.cpu != null)
   if (pts.length < 2) return null
 
-  const W = 1000, H = 220, PL = 66, PR = 20, PT = 20, PB = 32
-  const maxV = Math.max(...pts.map(p => p.cpu!), ...days.map(d => d.mtdCPU ?? 0), rate || 0) * 1.1
+  /* One ceiling per rock category the contract prices, at the size most of the
+   * month was drilled in — mixing NQ and PQ lines on one chart would draw
+   * ceilings that never applied to the days beneath them. */
+  const sizeCount: Record<string, number> = {}
+  days.forEach(d => d.shifts.forEach(sh => {
+    if (sh.metresDrilled > 0) sizeCount[sh.holeSize] = (sizeCount[sh.holeSize] ?? 0) + sh.metresDrilled
+  }))
+  const mainSize = Object.entries(sizeCount).sort((a, b) => b[1] - a[1])[0]?.[0]
+
+  const isFlat = clientRate?.structure !== 'slab'
+  const ceilings = isFlat && clientRate
+    ? clientRate.rateRows
+        .filter(r => r.holeSize === mainSize && r.rate > 0)
+        .map(r => ({
+          label: r.formation.replace(/ rock$/i, ''),
+          rate: r.rate,
+          tone: FORMATION_TONE[
+            Object.keys(FORMATION_TONE).find(k => k.toLowerCase() === r.formation.replace(/ rock$/i, '').toLowerCase()) ?? 'Hard'
+          ] ?? C.blue,
+        }))
+        .sort((a, b) => a.rate - b.rate)
+    : rate > 0
+      ? [{ label: 'Rate achieved', rate, tone: C.blue }]
+      : []
+
+  const W = 1000, H = 260, PL = 66, PR = 116, PT = 22, PB = 34
+  const maxV = Math.max(
+    ...pts.map(p => p.cpu!),
+    ...days.map(d => d.mtdCPU ?? 0),
+    ...ceilings.map(c => c.rate),
+  ) * 1.08
   const x = (i: number) => PL + (i / Math.max(1, days.length - 1)) * (W - PL - PR)
   const y = (val: number) => PT + (1 - val / maxV) * (H - PT - PB)
-  const mtd = days.map((d, i) => d.mtdCPU == null ? null : `${i === 0 || days[i - 1].mtdCPU == null ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.mtdCPU).toFixed(1)}`).filter(Boolean).join(' ')
 
-  // Hit areas are full-height columns rather than the dots themselves — a 4px
-  // circle is far too small a target, and a day with no metres has its point
-  // parked on the axis where nobody would think to aim.
+  const mtdPts = days.map((d, i) => d.mtdCPU == null ? null : { i, v: d.mtdCPU }).filter(Boolean) as { i: number; v: number }[]
+  const mtd = mtdPts.map((p, k) => `${k === 0 ? 'M' : 'L'}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')
+  const mtdArea = mtdPts.length
+    ? `${mtd} L${x(mtdPts[mtdPts.length - 1].i).toFixed(1)},${(H - PB).toFixed(1)} L${x(mtdPts[0].i).toFixed(1)},${(H - PB).toFixed(1)} Z`
+    : ''
+
   const band = (W - PL - PR) / Math.max(1, days.length - 1)
   const hd = hover != null ? days[hover] : null
 
   return (
-    <Card title="Cost per metre through the month"
-      subtitle="Points are single days. The line is month to date, which is the figure that actually settles." pad={false}>
+    <Card title="What a metre costs, against what the ground pays"
+      subtitle={ceilings.length > 1
+        ? `${monthLabel(month)} · a dashed line per formation the contract prices, at ${mainSize}. Each point is coloured by the ground that day cut.`
+        : `${monthLabel(month)} · points are single days, the line is month to date.`}
+      pad={false}>
       <div style={{ padding: '18px 20px 8px', overflowX: 'auto', position: 'relative' }}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: 620, height: 'auto', display: 'block' }}
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: 640, height: 'auto', display: 'block' }}
           onMouseLeave={() => setHover(null)}>
+          <defs>
+            <linearGradient id="mtdFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={C.orange} stopOpacity={0.20} />
+              <stop offset="100%" stopColor={C.orange} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+
+          {/* Quieter grid than before — the rules are there to be read against,
+              not to be looked at. */}
           {[0, 0.25, 0.5, 0.75, 1].map(fr => {
             const val = maxV * (1 - fr)
             return (
               <g key={fr}>
-                <line x1={PL} x2={W - PR} y1={y(val)} y2={y(val)} stroke={C.border} strokeWidth={1} />
-                <text x={PL - 10} y={y(val) + 4} textAnchor="end" fill={C.dim} fontSize={11} fontFamily="ui-monospace, monospace">{Math.round(val / 1000)}k</text>
+                <line x1={PL} x2={W - PR} y1={y(val)} y2={y(val)} stroke={C.border} strokeWidth={1} opacity={0.45} />
+                <text x={PL - 10} y={y(val) + 4} textAnchor="end" fill={C.dim} fontSize={10.5} fontFamily="ui-monospace, monospace">
+                  {Math.round(val / 1000)}k
+                </text>
               </g>
             )
           })}
-          {rate > 0 && (
-            <g>
-              <line x1={PL} x2={W - PR} y1={y(rate)} y2={y(rate)} stroke={C.blue} strokeWidth={1.5} strokeDasharray="6 5" />
-              <text x={W - PR} y={y(rate) - 8} textAnchor="end" fill={C.blue} fontSize={11} fontWeight={700}>client rate {Math.round(rate).toLocaleString('en-IN')}</text>
+
+          {/* One ceiling per formation, labelled in the right margin so the
+              labels never sit on top of the data. */}
+          {ceilings.map(c => (
+            <g key={c.label}>
+              <line x1={PL} x2={W - PR} y1={y(c.rate)} y2={y(c.rate)} stroke={c.tone} strokeWidth={1.5} strokeDasharray="7 6" opacity={0.85} />
+              <text x={W - PR + 9} y={y(c.rate) + 3} fill={c.tone} fontSize={10.5} fontWeight={700}>{c.label}</text>
+              <text x={W - PR + 9} y={y(c.rate) + 15} fill={c.tone} fontSize={10} opacity={0.7} fontFamily="ui-monospace, monospace">
+                {Math.round(c.rate).toLocaleString('en-IN')}
+              </text>
             </g>
-          )}
+          ))}
 
           {hover != null && (
-            <line x1={x(hover)} x2={x(hover)} y1={PT} y2={H - PB} stroke={C.muted} strokeWidth={1} opacity={0.28} />
+            <line x1={x(hover)} x2={x(hover)} y1={PT} y2={H - PB} stroke={C.muted} strokeWidth={1} opacity={0.3} />
           )}
 
-          {mtd && <path d={mtd} fill="none" stroke={C.orange} strokeWidth={2.5} strokeLinejoin="round" />}
+          {mtdArea && <path d={mtdArea} fill="url(#mtdFill)" />}
+          {mtd && <path d={mtd} fill="none" stroke={C.orange} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />}
 
           {days.map((d, i) => {
             const on = hover === i
-            return d.cpu == null ? (
-              <g key={i}>
-                <line x1={x(i)} x2={x(i)} y1={PT} y2={H - PB} stroke={C.red} strokeWidth={1} strokeDasharray="3 4" opacity={on ? 0.75 : 0.4} />
-                <circle cx={x(i)} cy={H - PB} r={on ? 5 : 3} fill={C.red} opacity={on ? 1 : 0.7} />
-              </g>
-            ) : (
-              <circle key={i} cx={x(i)} cy={y(d.cpu)} r={on ? 6 : 4}
-                fill={rate ? cpuColor(d.cpu, rate) : C.muted}
-                stroke={on ? '#fff' : 'none'} strokeWidth={on ? 1.5 : 0} />
+            if (d.cpu == null) {
+              return (
+                <g key={i}>
+                  <line x1={x(i)} x2={x(i)} y1={H - PB - 14} y2={H - PB} stroke={C.red} strokeWidth={1.5} opacity={on ? 0.9 : 0.5} />
+                  <circle cx={x(i)} cy={H - PB} r={on ? 5 : 3} fill={C.red} opacity={on ? 1 : 0.7} />
+                </g>
+              )
+            }
+            const ground = dominantGround(d)
+            const tone = ground ? (FORMATION_TONE[ground] ?? C.muted) : C.muted
+            return (
+              <circle key={i} cx={x(i)} cy={y(d.cpu)} r={on ? 6.5 : 4.5}
+                fill={tone} fillOpacity={on ? 1 : 0.9}
+                stroke={on ? '#fff' : C.bg} strokeWidth={on ? 1.5 : 1} />
             )
           })}
 
           {days.map((d, i) => (i % Math.ceil(days.length / 12) === 0
-            ? <text key={i} x={x(i)} y={H - 10} textAnchor="middle" fill={C.dim} fontSize={10}>{d.date.slice(8)}</text> : null))}
+            ? <text key={i} x={x(i)} y={H - 12} textAnchor="middle" fill={C.dim} fontSize={10}>{d.date.slice(8)}</text> : null))}
 
           {days.map((_, i) => (
             <rect key={`h${i}`} x={x(i) - band / 2} y={PT} width={band} height={H - PT - PB}
@@ -1386,12 +1478,17 @@ function CPUChart({ days, rate }: { days: DayCostMTD[]; rate: number }) {
 
         {hd && <ChartTip d={hd} rate={rate} left={((x(hover!) - PL) / (W - PL - PR)) * 100} />}
       </div>
-      <div style={{ display: 'flex', gap: 20, padding: '4px 20px 16px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 18, padding: '4px 20px 16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <Legend color={C.orange} label="Month to date" line />
-        <Legend color={C.green} label="Healthy margin" />
-        <Legend color={C.amber} label="Thin margin" />
+        {Object.entries(FORMATION_TONE)
+          .filter(([f]) => days.some(d => dominantGround(d) === f))
+          .map(([f, tone]) => <Legend key={f} color={tone} label={f} />)}
         <Legend color={C.red} label="Nothing drilled" />
-        {rate > 0 && <Legend color={C.blue} label="Client rate" line />}
+        {ceilings.length > 0 && (
+          <span style={{ fontSize: 10.5, color: C.dim, marginLeft: 'auto' }}>
+            Dashed lines are the client rate for each formation
+          </span>
+        )}
       </div>
     </Card>
   )
