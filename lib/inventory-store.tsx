@@ -41,7 +41,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
  *      charged at different rates.
  * ========================================================================== */
 
-export const TODAY = '2026-09-09'
+export const TODAY = '2026-09-13'
 
 // ── FORMATIONS ────────────────────────────────────────────────────────────
 
@@ -762,7 +762,11 @@ export interface TerrainRow {
  * a pattern, so it is shown as evidence rather than as a number to act on. */
 export const TERRAIN_MIN_SAMPLE = 3
 
-export function terrainRows(facts: ShiftFact[], parts: Part[]): TerrainRow[] {
+/* `alsoInclude` carries the parts a rig is holding that have not scrapped a
+ * unit yet. They belong in the table: a part running far past its catalogue
+ * life is as much a finding as one falling short, and a part that never shows
+ * wear usually means the driller is not logging it. */
+export function terrainRows(facts: ShiftFact[], parts: Part[], alsoInclude: string[] = []): TerrainRow[] {
   const metresBy: Record<Formation, number> = { Soft: 0, Medium: 0, Hard: 0, 'Very Hard': 0 }
   facts.forEach(f => { metresBy[f.formation] += f.metres })
 
@@ -771,6 +775,8 @@ export function terrainRows(facts: ShiftFact[], parts: Part[]): TerrainRow[] {
     const row = scrapBy[u.itemId] ??= { Soft: 0, Medium: 0, Hard: 0, 'Very Hard': 0 }
     row[f.formation] += u.qty
   }))
+
+  alsoInclude.forEach(id => { scrapBy[id] ??= { Soft: 0, Medium: 0, Hard: 0, 'Very Hard': 0 } })
 
   return Object.entries(scrapBy).map(([itemId, scrap]) => {
     const part = parts.find(p => p.id === itemId)
@@ -801,7 +807,9 @@ export function terrainRows(facts: ShiftFact[], parts: Part[]): TerrainRow[] {
       worst: rated.length ? rated.reduce((a, b) => (a.observedLife! < b.observedLife! ? a : b)) : null,
       best: rated.length ? rated.reduce((a, b) => (a.observedLife! > b.observedLife! ? a : b)) : null,
     }
-  }).filter(Boolean).sort((a, b) => b!.totalSpend - a!.totalSpend) as TerrainRow[]
+  }).filter(Boolean).sort((a, b) =>
+    (b!.totalScrapped > 0 ? 1 : 0) - (a!.totalScrapped > 0 ? 1 : 0) ||
+    b!.totalSpend - a!.totalSpend) as TerrainRow[]
 }
 
 /* Where the ground actually is, and what each band really costs to drill.
@@ -903,7 +911,7 @@ export function supplierInsight(
 
 // ── ALERTS ────────────────────────────────────────────────────────────────
 
-export type AlertKind = 'runningOut' | 'lowStock' | 'overdue' | 'replacement' | 'idle' | 'stranded'
+export type AlertKind = 'runningOut' | 'dueSoon' | 'lowStock' | 'overdue' | 'replacement' | 'idle' | 'stranded'
 export type AlertLevel = 'info' | 'warn' | 'urgent'
 
 export interface Alert {
@@ -920,6 +928,7 @@ export interface RigBurn { rig: string; metresPerDay: number; formation: Formati
 export function buildAlerts(
   pos: PurchaseOrder[], parts: Part[], today: string,
   completedProjects: string[], burn: RigBurn[], s: AlertSettings = DEFAULT_ALERTS,
+  suppliers: Supplier[] = [],
 ): Alert[] {
   const out: Alert[] = []
   const nameOf = (id: string) => parts.find(p => p.id === id)?.name ?? id
@@ -944,6 +953,29 @@ export function buildAlerts(
         ? `Replacement for ${nameOf(l.itemId)} is ${l.overdueDays} days late`
         : `${nameOf(l.itemId)} is ${l.overdueDays} days late`,
       detail: `${l.qty} on ${l.poNumber} from ${l.supplier}, due ${l.promisedDate}. Chase it or re-source.`,
+      value: l.value,
+    })
+  })
+
+  /* Arriving soon, and not late yet. The window between "promised next week"
+   * and "three days late" is the only stretch where a phone call still changes
+   * the outcome, and until now nothing appeared in it at all. A supplier that
+   * habitually slips gets a louder warning than one that never has. */
+  onOrder(pos, today).forEach(l => {
+    if (!l.promisedDate || (l.overdueDays != null && l.overdueDays > 0)) return
+    const daysAway = daysBetween(today, l.promisedDate)
+    if (daysAway < 0 || daysAway > s.coverDays) return
+    const record = suppliers.length ? supplierPerformance(pos, suppliers, l.supplier) : null
+    const slips = record?.onTimePct != null && record.onTimePct < 50
+    out.push({
+      id: `duesoon_${l.poNumber}_${l.itemId}`, kind: 'dueSoon',
+      level: slips ? 'warn' : 'info',
+      title: l.awaitingReplacement
+        ? `Replacement for ${nameOf(l.itemId)} is due ${daysAway === 0 ? 'today' : `in ${daysAway} day${daysAway === 1 ? '' : 's'}`}`
+        : `${nameOf(l.itemId)} is due ${daysAway === 0 ? 'today' : `in ${daysAway} day${daysAway === 1 ? '' : 's'}`}`,
+      detail: `${l.qty} on ${l.poNumber} from ${l.supplier}, promised ${l.promisedDate}.`
+        + (slips ? ` ${l.supplier} has only made ${Math.round(record!.onTimePct!)}% of its dates — worth confirming now.`
+                 : ' Confirm it is on its way.'),
       value: l.value,
     })
   })
@@ -1119,6 +1151,17 @@ export const SEED_POS: PurchaseOrder[] = [
   PO('po7', 'PO-2026-058', 'Boart Longyear India', 'Site A - North Field', '2026-08-20', '2026-08-21', '2026-09-18',
     [['t01', 6], ['t02', 1]], [], []),
 
+  PO('po10', 'PO-2026-063', 'Sandvik Mining', 'Site A - North Field', '2026-08-22', '2026-08-23', '2026-09-10',
+    [['t08', 4], ['t04', 2]],
+    [['2026-09-08', [['t08', 4], ['t04', 2]]]],
+    [['2026-09-04', 'RIG-001', [['t08', 1]]], ['2026-09-09', 'RIG-001', [['t08', 1], ['t04', 1]]],
+     ['2026-09-05', 'RIG-002', [['t08', 1]]]]),
+
+  PO('po11', 'PO-2026-064', 'Drillco Tools', 'Site A - North Field', '2026-09-01', '2026-09-02', '2026-09-16',
+    [['t06', 24], ['t07', 16]],
+    [],
+    []),
+
   PO('po9', 'PO-2026-060', 'Boart Longyear India', 'Site A - North Field', '2026-08-02', '2026-08-03', '2026-08-24',
     [['t03', 2]],
     [['2026-08-20', [['t03', 1, 1]]]],
@@ -1140,7 +1183,7 @@ export const SEED_POS: PurchaseOrder[] = [
  * after the first log and the early days of the month read free. */
 export const SEED_RIG_KIT: RigKitEntry[] = [
   {
-    id: 'rk_seed_1', date: '2026-07-25', addedBy: 'Store',
+    id: 'rk_seed_1', date: '2026-05-28', addedBy: 'Store',
     project: 'Site A - North Field', rig: 'RIG-001',
     lines: [
       { itemId: 't08', qty: 2, rate: 22000 },
@@ -1152,7 +1195,7 @@ export const SEED_RIG_KIT: RigKitEntry[] = [
     ],
   },
   {
-    id: 'rk_seed_2', date: '2026-07-25', addedBy: 'Store',
+    id: 'rk_seed_2', date: '2026-05-28', addedBy: 'Store',
     project: 'Site A - North Field', rig: 'RIG-002',
     lines: [
       { itemId: 't08', qty: 1, rate: 22000 },
@@ -1162,7 +1205,7 @@ export const SEED_RIG_KIT: RigKitEntry[] = [
     ],
   },
   {
-    id: 'rk_seed_3', date: '2026-07-25', addedBy: 'Store',
+    id: 'rk_seed_3', date: '2026-05-28', addedBy: 'Store',
     project: 'Site B - South Ridge', rig: 'RIG-003',
     lines: [
       { itemId: 't08', qty: 1, rate: 22000 },
