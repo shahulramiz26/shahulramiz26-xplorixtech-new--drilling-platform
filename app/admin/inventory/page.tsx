@@ -830,7 +830,17 @@ function StoreTab() {
             </span>
           </div>
           {rigs.map(({ rig, lines, tooling, total, metres }) => {
-            const amortised = lines.reduce((s, l) => s + l.costPerMetre, 0)
+            /* Never sum the Cost/m column. A metre of soft ground does not
+             * consume an impregnated bit and a metre of granite does not
+             * consume surface casing, so adding every part's rate together
+             * produces a figure no metre is ever charged. What a rig costs per
+             * metre is a range across the ground it is equipped for. */
+            const charged = FORMATIONS.map(f => tooling.byFormation[f]).filter(x => x > 0)
+            const lowRate = charged.length ? Math.min(...charged) : 0
+            const highRate = charged.length ? Math.max(...charged) : 0
+            const rateRange = charged.length === 0 ? '—'
+              : Math.round(lowRate) === Math.round(highRate) ? perMetre(highRate)
+              : `${perMetre(lowRate)} – ${perMetre(highRate)}`
             const spent = metres > 0 ? total / metres : 0
             return (
               <Card key={rig} pad={false} title={rig}
@@ -839,7 +849,7 @@ function StoreTab() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, padding: '12px 16px', borderBottom: `1px solid ${C.border}` }}>
                   <Stat label="Starting kit" value={moneyL(lines.reduce((s, l) => s + l.kitValue, 0))} color={C.purple} />
                   <Stat label="Issued since" value={moneyL(lines.reduce((s, l) => s + l.issuedValue, 0))} color={C.amber} />
-                  <Stat label="Tooling cost" value={perMetre(amortised)} color={C.orange} note="charged per metre drilled" />
+                  <Stat label="Tooling cost" value={rateRange} color={C.orange} note="per metre, soft ground to hardest" />
                   <Stat label="Spent per metre" value={metres > 0 ? perMetre(spent) : '—'} color={C.muted} note="cash out ÷ metres so far" />
                 </div>
 
@@ -892,9 +902,14 @@ function StoreTab() {
                     </tbody>
                     <tfoot>
                       <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                        <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={9}>Every part on this rig</td>
+                        <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={9}>
+                          Every part on this rig
+                          <span style={{ fontWeight: 400, color: C.faint, marginLeft: 8 }}>
+                            rates do not add up — each metre is charged only the parts that work in its ground
+                          </span>
+                        </td>
                         <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(total)}</td>
-                        <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{perMetre(amortised)}</td>
+                        <td style={{ ...tdN, fontWeight: 900, color: C.orange, fontSize: 11 }}>{rateRange}</td>
                       </tr>
                     </tfoot>
                   </table>
