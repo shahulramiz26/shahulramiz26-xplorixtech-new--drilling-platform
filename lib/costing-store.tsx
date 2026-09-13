@@ -1,8 +1,8 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { toolingPerMetre } from './inventory-store'
-import type { ToolingItem } from './inventory-store'
+import { normFormation as invFormation } from './inventory-store'
+import type { ToolingRates, Formation } from './inventory-store'
 
 /* ==========================================================================
  * XPLORIX COSTING
@@ -468,6 +468,12 @@ export interface DayCost {
   labour: LabourBreakdown
   repairs: number; parts: number
   partsByMetre: number
+  /* The tooling rate this day was actually charged at — a weighted average
+   * across the formations drilled, so a day that cut soft then hard reads
+   * between the two. Shown in the day breakdown so the figure can be
+   * traced back to the rig that produced it. */
+  toolingRate: number
+  toolingByFormation: { formation: Formation; metres: number; rate: number; amount: number }[]
   operating: number; ownership: number; total: number
   cpu: number | null
   rate: number
@@ -481,7 +487,7 @@ export function dayCost(
   date: string, rig: string, project: string,
   shifts: ShiftLog[], maint: MaintenanceLog[],
   op: OperatingRate, own: RigOwnership, ob: OwnershipBreakdown,
-  cr: ClientRate | undefined, catalogue: ToolingItem[], depthSoFar: number,
+  cr: ClientRate | undefined, tooling: ToolingRates, depthSoFar: number,
 ): DayCost {
   const submitted = shifts.length > 0
   const status = submitted ? statusForShifts(shifts) : 'standby'
@@ -499,15 +505,30 @@ export function dayCost(
   const repairs = maint.reduce((a, m) => a + m.cost, 0)
   const maintenanceHours = maint.reduce((a, m) => a + m.hours, 0)
 
-  /* Parts are amortised, not charged on the day they were bought, and each one
-   * is charged the way it actually wears out. A ₹22,000 bit with 100 m of life
-   * in hard rock costs ₹220 for every metre it drills, so that charge follows
-   * the ground the driller recorded. A water swivel wears with time on the rig,
-   * so it is charged once for each day the rig turned — a standby or breakdown
-   * day wears nothing and carries nothing. */
-  const partsByMetre = shifts.reduce((a, sh) =>
-    a + sh.metresDrilled * toolingPerMetre(catalogue), 0)
+  /* Parts are amortised, not charged on the day they were bought, and each
+   * stretch of hole is charged for the ground it was actually in. Seven
+   * metres of soft and eleven of hard on the same day are two different
+   * rates, because they wear out two different sets of parts.
+   *
+   * The rate comes from what this rig was carrying on this date — starting
+   * kit plus everything issued up to it — so issuing a bit on the 14th moves
+   * the 14th onward and leaves every day already costed exactly as it was. */
+  const byFormation: DayCost['toolingByFormation'] = []
+  shifts.forEach(sh => {
+    if (sh.metresDrilled <= 0) return
+    const f = invFormation(sh.formationType)
+    const rate = tooling.byFormation[f] ?? tooling.blended
+    const existing = byFormation.find(x => x.formation === f)
+    if (existing) {
+      existing.metres += sh.metresDrilled
+      existing.amount += sh.metresDrilled * rate
+    } else {
+      byFormation.push({ formation: f, metres: sh.metresDrilled, rate, amount: sh.metresDrilled * rate })
+    }
+  })
+  const partsByMetre = byFormation.reduce((a, x) => a + x.amount, 0)
   const parts = partsByMetre
+  const toolingRate = units > 0 ? partsByMetre / units : tooling.blended
 
   const operating = fuel + water + additives + labour.total + repairs + parts
   const ownership = own.allocationBasis === 'expectedUnit' ? units * ob.perUnit : ob.perDay
@@ -537,6 +558,7 @@ export function dayCost(
     units, coreRecovery: sum(s => s.coreRecovery),
     fuelLitres, waterLitres, additivesKg,
     fuel, water, additives, labour, repairs, parts, partsByMetre,
+    toolingRate, toolingByFormation: byFormation,
     operating, ownership, total,
     cpu: units > 0 ? total / units : null,
     rate, adjustmentPct, revenue, unmatched, charges,
@@ -562,6 +584,7 @@ export interface Rollup {
   operating: number; ownership: number; total: number; revenue: number
   cpu: number; operatingCPU: number; ownershipCPU: number
   revenuePerUnit: number; margin: number; marginPct: number
+  toolingPerUnit: number
 }
 
 export function rollup(days: DayCost[]): Rollup {
@@ -570,7 +593,7 @@ export function rollup(days: DayCost[]): Rollup {
     units: 0, coreRecovery: 0, coreRecoveryPct: 0, drillingHours: 0, downtimeHours: 0, maintenanceHours: 0,
     fuelLitres: 0, fuel: 0, water: 0, additives: 0,
     labour: 0, repairs: 0, parts: 0, operating: 0, ownership: 0, total: 0, revenue: 0,
-    cpu: 0, operatingCPU: 0, ownershipCPU: 0, revenuePerUnit: 0, margin: 0, marginPct: 0,
+    cpu: 0, operatingCPU: 0, ownershipCPU: 0, revenuePerUnit: 0, margin: 0, marginPct: 0, toolingPerUnit: 0,
   }
   days.forEach(d => {
     z.days++
@@ -593,6 +616,7 @@ export function rollup(days: DayCost[]): Rollup {
     z.operatingCPU = z.operating / z.units
     z.ownershipCPU = z.ownership / z.units
     z.revenuePerUnit = z.revenue / z.units
+    z.toolingPerUnit = z.parts / z.units
     z.coreRecoveryPct = (z.coreRecovery / z.units) * 100
   }
   z.margin = z.revenue - z.total
