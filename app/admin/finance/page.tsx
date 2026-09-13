@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, Fragment, ReactNode } from 'react'
-import { useInventory, PROJECTS as INV_PROJECTS } from '../../../lib/inventory-store'
+import { useInventory, PROJECTS as INV_PROJECTS, toolingRatesFor } from '../../../lib/inventory-store'
 import {
   CostingProvider, useCosting,
   C, LAYER, iStyle, derivedStyle, money, perUnit, pct,
@@ -314,75 +314,94 @@ const EMPTY_OB: OwnershipBreakdown = {
   perMonth: 0, perDay: 0, perUnit: 0, basisLabel: '',
 }
 
+type CostingState = ReturnType<typeof useCosting>['state']
+type InvState = ReturnType<typeof useInventory>['state']
+
+function computeRigMonth(state: CostingState, inv: InvState, project: string, rig: string, month: string): RigMonthView {
+  const logs = state.shiftLogs.filter(l => l.rig === rig && l.project === project && monthOf(l.date) === month)
+  if (logs.length === 0) {
+    return {
+      hasLogs: false, ob: EMPTY_OB, days: [], roll: rollup([]),
+      holes: [], unallocated: 0, unallocatedDays: 0,
+      budgetOwnershipCPU: 0, productionVariancePct: 0, loggedFormation: '',
+    }
+  }
+
+  const ownVersions = state.ownership.filter(o => o.rig === rig)
+  const opVersions = state.operating.filter(o => o.rig === rig && o.project === project)
+  const crVersions = state.clientRates.filter(c => c.project === project)
+
+  const monthEnd = `${month}-${String(daysInMonth(month)).padStart(2, '0')}`
+  const lastLogged = logs.map(l => l.date).sort()[logs.length - 1]
+  const lastDay = Math.min(Number(lastLogged.slice(8)), Number(monthEnd.slice(8)))
+
+  const ownership = versionOn(ownVersions, monthEnd)
+  const ob = ownership ? ownershipBreakdown(ownership, month) : EMPTY_OB
+  const operating = versionOn(opVersions, monthEnd)
+  const clientRate = versionOn(crVersions, monthEnd)
+
+  const raw: DayCost[] = []
+  const depthByHole: Record<string, number> = {}
+
+  for (let n = 1; n <= lastDay; n++) {
+    const date = `${month}-${String(n).padStart(2, '0')}`
+    const shifts = logs.filter(l => l.date === date)
+    const maint = state.maintenance.filter(m => m.rig === rig && m.project === project && m.date === date)
+    const op = versionOn(opVersions, date) ?? blankOperating(rig, project, date)
+    const own = versionOn(ownVersions, date) ?? blankOwnership(rig, date)
+    const obDay = versionOn(ownVersions, date) ? ownershipBreakdown(own, month) : EMPTY_OB
+    const cr = versionOn(crVersions, date)
+
+    /* The tooling rate as it stood on this date. Parts issued later do not
+     * reach back and change a day that was already costed. */
+    const tooling = toolingRatesFor(inv.pos, inv.rigKit, inv.catalogue, rig, project, date)
+
+    const hole = shifts.find(s => s.holeNumber)?.holeNumber ?? null
+    const depthSoFar = hole ? (depthByHole[hole] ?? 0) : 0
+
+    const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, tooling, depthSoFar)
+    if (hole) depthByHole[hole] = depthSoFar + d.units
+    raw.push(d)
+  }
+
+  const days = withCumulative(raw)
+  const roll = rollup(raw)
+  const holes = holesFromDays(raw, state.holeStatus).map(h => holeResult(h, raw))
+  const orphan = raw.filter(d => !d.holeNumber)
+
+  const counts: Record<string, number> = {}
+  logs.forEach(l => { if (l.formationType) counts[l.formationType] = (counts[l.formationType] || 0) + l.metresDrilled })
+  const loggedFormation = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
+
+  return {
+    hasLogs: true, ownership, ob, operating, clientRate, days, roll, holes,
+    unallocated: orphan.reduce((s, d) => s + d.total, 0),
+    unallocatedDays: orphan.length,
+    budgetOwnershipCPU: ownership && ownership.expectedUnitsPerMonth > 0 ? ob.perMonth / ownership.expectedUnitsPerMonth : 0,
+    productionVariancePct: ownership && ownership.expectedUnitsPerMonth > 0
+      ? ((roll.units - ownership.expectedUnitsPerMonth) / ownership.expectedUnitsPerMonth) * 100 : 0,
+    loggedFormation,
+  }
+}
+
 function useRigMonthView(project: string, rig: string, month: string): RigMonthView {
   const { state } = useCosting()
   const { state: inv } = useInventory()
+  return useMemo(() => computeRigMonth(state, inv, project, rig, month), [state, inv, project, rig, month])
+}
 
+/* Every month this rig has logs for, costed, so the strip above the table can
+ * show where the month sits against the ones before it. */
+function useMonthTrend(project: string, rig: string): { month: string; cpu: number; rate: number; units: number }[] {
+  const { state } = useCosting()
+  const { state: inv } = useInventory()
   return useMemo(() => {
-    const logs = state.shiftLogs.filter(l => l.rig === rig && l.project === project && monthOf(l.date) === month)
-    if (logs.length === 0) {
-      return {
-        hasLogs: false, ob: EMPTY_OB, days: [], roll: rollup([]),
-        holes: [], unallocated: 0, unallocatedDays: 0,
-        budgetOwnershipCPU: 0, productionVariancePct: 0, loggedFormation: '',
-      }
-    }
-
-    const ownVersions = state.ownership.filter(o => o.rig === rig)
-    const opVersions = state.operating.filter(o => o.rig === rig && o.project === project)
-    const crVersions = state.clientRates.filter(c => c.project === project)
-
-    const monthEnd = `${month}-${String(daysInMonth(month)).padStart(2, '0')}`
-    const lastLogged = logs.map(l => l.date).sort()[logs.length - 1]
-    const lastDay = Math.min(Number(lastLogged.slice(8)), Number(monthEnd.slice(8)))
-
-    const ownership = versionOn(ownVersions, monthEnd)
-    const ob = ownership ? ownershipBreakdown(ownership, month) : EMPTY_OB
-    const operating = versionOn(opVersions, monthEnd)
-    const clientRate = versionOn(crVersions, monthEnd)
-
-    const raw: DayCost[] = []
-    const depthByHole: Record<string, number> = {}
-
-    for (let n = 1; n <= lastDay; n++) {
-      const date = `${month}-${String(n).padStart(2, '0')}`
-      const shifts = logs.filter(l => l.date === date)
-      const maint = state.maintenance.filter(m => m.rig === rig && m.project === project && m.date === date)
-      const op = versionOn(opVersions, date) ?? blankOperating(rig, project, date)
-      const own = versionOn(ownVersions, date) ?? blankOwnership(rig, date)
-      const obDay = versionOn(ownVersions, date) ? ownershipBreakdown(own, month) : EMPTY_OB
-      const cr = versionOn(crVersions, date)
-
-      const hole = shifts.find(s => s.holeNumber)?.holeNumber ?? null
-      const depthSoFar = hole ? (depthByHole[hole] ?? 0) : 0
-
-      const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, inv.catalogue, depthSoFar)
-      if (hole) depthByHole[hole] = depthSoFar + d.units
-      raw.push(d)
-    }
-
-    const days = withCumulative(raw)
-    const roll = rollup(raw)
-
-    const holes = holesFromDays(raw, state.holeStatus).map(h => holeResult(h, raw))
-
-    const orphan = raw.filter(d => !d.holeNumber)
-
-    // Most common lithology in the logs, for the category check.
-    const counts: Record<string, number> = {}
-    logs.forEach(l => { if (l.formationType) counts[l.formationType] = (counts[l.formationType] || 0) + l.metresDrilled })
-    const loggedFormation = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
-
-    return {
-      hasLogs: true, ownership, ob, operating, clientRate, days, roll, holes,
-      unallocated: orphan.reduce((s, d) => s + d.total, 0),
-      unallocatedDays: orphan.length,
-      budgetOwnershipCPU: ownership && ownership.expectedUnitsPerMonth > 0 ? ob.perMonth / ownership.expectedUnitsPerMonth : 0,
-      productionVariancePct: ownership && ownership.expectedUnitsPerMonth > 0
-        ? ((roll.units - ownership.expectedUnitsPerMonth) / ownership.expectedUnitsPerMonth) * 100 : 0,
-      loggedFormation,
-    }
-  }, [state, inv.catalogue, project, rig, month])
+    const months = monthsFor(state.shiftLogs, rig, project)
+    return months.map(m => {
+      const v = computeRigMonth(state, inv, project, rig, m)
+      return { month: m, cpu: v.roll.cpu, rate: v.roll.revenuePerUnit, units: v.roll.units }
+    }).filter(x => x.units > 0)
+  }, [state, inv, project, rig])
 }
 
 /* ==========================================================================
@@ -982,26 +1001,97 @@ function delta(from: number, to: number) {
  * Every figure left of Service cost comes from a log. Everything right of it
  * is that quantity priced by the rate version in force on that day. */
 
-function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month: string }) {
+function PerformanceTab({ v, rig, project, month }: { v: RigMonthView; rig: string; project: string; month: string }) {
   const [open, setOpen] = useState<string | null>(null)
+  const [showAll, setShowAll] = useState(false)
+  const trend = useMonthTrend(project, rig)
+
   if (!v.hasLogs) {
     return <Card><Empty>No driller logs for {rigCode(rig)} in {monthLabel(month)}.<br />Costing reads metres, hours, crew and fuel from the log — once shifts are recorded they cost out here.</Empty></Card>
   }
 
-  const days = v.days
   const rate = v.roll.revenuePerUnit
   const r = v.roll
 
+  /* The latest fifteen days that actually have a log. A day with no log in
+   * the middle of the run still shows, because a missing log is information. */
+  const WINDOW = 15
+  const lastLogged = v.days.reduce((acc, d, i) => (d.submitted ? i : acc), 0)
+  const from = showAll ? 0 : Math.max(0, lastLogged - WINDOW + 1)
+  const days = showAll ? v.days : v.days.slice(from, lastLogged + 1)
+  const hidden = v.days.length - days.length
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <Card title="Performance" subtitle={`${rigCode(rig)} · ${monthLabel(month)} · click a day for the full breakdown`} pad={false}>
+
+      {/* Where this month sits, and where it stands right now. */}
+      <div style={{
+        background: C.card, border: `1px solid ${C.border}`, borderRadius: 16,
+        padding: '14px 16px', display: 'flex', alignItems: 'center',
+        justifyContent: 'space-between', gap: 20, flexWrap: 'wrap',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em', marginRight: 4 }}>
+            Cost per metre by month
+          </span>
+          {trend.length === 0 && <span style={{ fontSize: 12, color: C.faint }}>No costed months yet.</span>}
+          {trend.map((t, i) => {
+            const prev = trend[i - 1]
+            const move = prev && prev.cpu > 0 ? ((t.cpu - prev.cpu) / prev.cpu) * 100 : null
+            const on = t.month === month
+            return (
+              <div key={t.month} style={{
+                padding: '7px 12px', borderRadius: 9, minWidth: 104,
+                background: on ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${on ? `${C.orange}66` : C.border}`,
+              }}>
+                <div style={{ fontSize: 10, color: on ? C.orange : C.faint, fontWeight: 700 }}>
+                  {monthLabel(t.month).replace(/ \d{4}$/, '')}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: rate ? cpuColor(t.cpu, t.rate) : C.text, fontFamily: 'ui-monospace, monospace', marginTop: 2 }}>
+                  {perUnit(t.cpu)}
+                </div>
+                {move != null && (
+                  <div style={{ fontSize: 10, color: move > 0 ? C.red : C.green, marginTop: 2, fontFamily: 'ui-monospace, monospace' }}>
+                    {move > 0 ? '▲' : '▼'} {Math.abs(move).toFixed(1)}%
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* The figure that actually settles, as it stands today. */}
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            {monthLabel(month)} so far
+          </div>
+          <div style={{ fontSize: 27, fontWeight: 900, fontFamily: 'ui-monospace, monospace', lineHeight: 1.15, color: rate ? cpuColor(r.cpu, rate) : C.text }}>
+            {perUnit(r.cpu)}
+          </div>
+          <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>
+            {rate > 0
+              ? `against ${perUnit(rate)} billed — ${perUnit(rate - r.cpu)} a metre`
+              : 'no client rate set for this project'}
+          </div>
+        </div>
+      </div>
+
+      <Card title="Performance"
+        subtitle={showAll
+          ? `${rigCode(rig)} · ${monthLabel(month)} · every day · click a day for the full breakdown`
+          : `${rigCode(rig)} · the last ${days.length} logged days · click a day for the full breakdown`}
+        pad={false}
+        right={hidden > 0 || showAll
+          ? <Btn size="sm" onClick={() => setShowAll(!showAll)}>{showAll ? `Show last ${WINDOW} days` : `Show all ${v.days.length} days`}</Btn>
+          : undefined}>
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead>
               <tr>
                 <th style={th}>Date</th><th style={th}>Hole</th>
                 <th style={th}>Size</th><th style={th}>Formation</th><th style={thR}>Crew</th><th style={thR}>Drill hrs</th><th style={thR}>Downtime</th><th style={thR}>Metres</th>
-                <th style={thR}>Maint hrs</th><th style={thR}>Service</th><th style={thR}>Parts</th>
+                <th style={thR}>Maint hrs</th><th style={thR}>Service</th><th style={thR}>Tooling</th><th style={thR}>Tooling/m</th>
                 <th style={thR}>Fuel</th><th style={thR}>Labour</th>
                 <th style={thR}>Operating</th><th style={thR}>Ownership</th><th style={thR}>Total</th>
                 <th style={thR}>CPM</th><th style={thR}>Revenue</th>
@@ -1029,7 +1119,9 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                       <td style={{ ...td, color: d.holeNumber ? C.muted : C.dim }}>{d.holeNumber || '—'}</td>
                       <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{d.shifts[0]?.holeSize ?? '—'}</td>
                       <td style={{ ...td, color: d.units ? C.muted : C.dim }}>
-                        {d.units ? Array.from(new Set(d.charges.map(c => c.formation.replace(/ Formation$/, '')))).join(' → ') : '—'}
+                        {d.toolingByFormation.length
+                          ? d.toolingByFormation.map(x => x.formation).join(' → ')
+                          : '—'}
                       </td>
                       <td style={tdN}>{d.labour.heads || '—'}</td>
                       <td style={tdN}>{d.drillingHours || '—'}</td>
@@ -1038,6 +1130,7 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                       <td style={tdN}>{d.maintenanceHours || '—'}</td>
                       <td style={{ ...tdN, color: d.repairs ? C.purple : C.dim }}>{d.repairs ? money(d.repairs) : '—'}</td>
                       <td style={{ ...tdN, color: d.parts ? C.muted : C.dim }}>{d.parts ? money(d.parts) : '—'}</td>
+                      <td style={{ ...tdN, color: d.units ? C.orange : C.dim }}>{d.units ? perUnit(d.toolingRate) : '—'}</td>
                       <td style={tdN}>{money(d.fuel)}</td>
                       <td style={tdN}>{money(d.labour.total)}</td>
                       <td style={{ ...tdN, color: LAYER.operating }}>{money(d.operating)}</td>
@@ -1050,7 +1143,7 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                     </tr>
                     {isOpen && (
                       <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
-                        <td colSpan={18} style={{ padding: '16px 18px' }}>
+                        <td colSpan={19} style={{ padding: '16px 18px' }}>
                           <div style={{ display: 'flex', gap: 44, flexWrap: 'wrap' }}>
                             <Detail title="From the log" tone={C.blue} rows={[
                               ['Status', DAY_STATUS_LABEL[d.status]],
@@ -1078,6 +1171,34 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                               ['Revenue', money(d.revenue)],
                             ]} />
                           </div>
+
+                          {/* Tooling is the one cost that changes with the ground,
+                              so the day shows which ground it charged and at what. */}
+                          {d.toolingByFormation.length > 0 && (
+                            <div style={{ marginTop: 14 }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: C.orange, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                                What the parts cost this day
+                              </div>
+                              <table style={tableStyle}>
+                                <thead><tr><th style={th}>Ground</th><th style={thR}>Metres</th><th style={thR}>Tooling rate</th><th style={thR}>Amount</th></tr></thead>
+                                <tbody>
+                                  {d.toolingByFormation.map((x, k) => (
+                                    <tr key={k} style={{ borderBottom: rowBorder }}>
+                                      <td style={{ ...td, color: C.text }}>{x.formation}</td>
+                                      <td style={tdN}>{x.metres}</td>
+                                      <td style={{ ...tdN, color: C.orange }}>{perUnit(x.rate)}</td>
+                                      <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{money(x.amount)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              <div style={{ fontSize: 10.5, color: C.dim, marginTop: 7, lineHeight: 1.6 }}>
+                                Rates are what {rigCode(rig)} was carrying on {fullDate(d.date)} — its starting kit plus
+                                everything issued up to that date. Parts issued later do not change this day.
+                              </div>
+                            </div>
+                          )}
+
                           {d.charges.length > 0 && (
                             <div style={{ marginTop: 14 }}>
                               <div style={{ fontSize: 10, fontWeight: 700, color: LAYER.revenue, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
@@ -1118,7 +1239,10 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
-                <td style={{ ...td, color: C.text, fontWeight: 800 }} colSpan={4}>{r.days} days</td>
+                <td style={{ ...td, color: C.text, fontWeight: 800 }} colSpan={4}>
+                  {monthLabel(month)}, all {r.days} days
+                  {hidden > 0 && <span style={{ fontWeight: 400, color: C.faint, marginLeft: 8 }}>{hidden} not shown above</span>}
+                </td>
                 <td style={tdN} />
                 <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{r.drillingHours}</td>
                 <td style={{ ...tdN, fontWeight: 800, color: C.red }}>{r.downtimeHours}</td>
@@ -1126,6 +1250,7 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
                 <td style={{ ...tdN, fontWeight: 800 }}>{r.maintenanceHours || '—'}</td>
                 <td style={{ ...tdN, fontWeight: 800, color: C.purple }}>{money(r.repairs)}</td>
                 <td style={{ ...tdN, fontWeight: 800 }}>{money(r.parts)}</td>
+                <td style={{ ...tdN, fontWeight: 800, color: C.orange }}>{perUnit(r.toolingPerUnit)}</td>
                 <td style={{ ...tdN, fontWeight: 800 }}>{money(r.fuel)}</td>
                 <td style={{ ...tdN, fontWeight: 800 }}>{money(r.labour)}</td>
                 <td style={{ ...tdN, fontWeight: 800, color: LAYER.operating }}>{money(r.operating)}</td>
@@ -1139,14 +1264,11 @@ function PerformanceTab({ v, rig, month }: { v: RigMonthView; rig: string; month
         </div>
       </Card>
 
-      <CPUChart days={days} rate={rate} />
+      <CPUChart days={v.days} rate={rate} />
     </div>
   )
 }
 
-/* Each panel is capped so the label and its number stay together. Left to its
- * own devices in a grid column spanning a 19-column table, space-between threw
- * them to opposite ends of the screen. */
 function Detail({ title, tone, rows }: { title: string; tone: string; rows: string[][] }) {
   return (
     <div style={{ minWidth: 210, maxWidth: 270 }}>
@@ -1967,7 +2089,7 @@ function CostingScreen() {
 
       </div>
 
-      {tab === 'Performance' && <PerformanceTab v={v} rig={rig} month={month} />}
+      {tab === 'Performance' && <PerformanceTab v={v} rig={rig} project={project} month={month} />}
       {tab === 'Drillholes' && <DrillholesTab v={v} onStatus={setHoleStatus} onInvoice={h => setQuickInvoice(h)} />}
       {tab === 'Tracker' && <TrackerTab invoices={invoices} onUpdate={updateInvoice} />}
 
