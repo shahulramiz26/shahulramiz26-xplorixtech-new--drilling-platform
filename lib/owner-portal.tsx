@@ -554,9 +554,16 @@ const order = (l: { date: string; shift: string }) => `${l.date}${l.shift === 'D
  * the same inputs Finance uses, so the value here is the value on the
  * invoice. Only what the owner is entitled to see is carried across. */
 export function liveHoles(state: CostingStateLike): LiveHole[] {
+  return holesFromLogs(state, true)
+}
+
+/* The same hole record for every project, linked or not. The contractor's own
+ * Dashboard reads this one; the mine owner only ever gets the linked subset
+ * through liveHoles above. */
+export function holesFromLogs(state: CostingStateLike, linkedOnly = false): LiveHole[] {
   const byHole: Record<string, ShiftLog[]> = {}
   state.shiftLogs.forEach(l => {
-    if (l.holeNumber && isOwnerLinked(l.project)) (byHole[l.holeNumber] ||= []).push(l)
+    if (l.holeNumber && (!linkedOnly || isOwnerLinked(l.project))) (byHole[l.holeNumber] ||= []).push(l)
   })
   return Object.entries(byHole).map(([id, raw]) => {
     const logs = [...raw].sort((a, b) => order(a).localeCompare(order(b)))

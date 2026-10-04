@@ -1,132 +1,84 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import { CreditCard, Download, FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react'
+import { downloadCsv } from '../../../lib/owner-portal'
+import { useAdminOverview } from '../../../lib/admin-overview'
+import { Page, Head, Card, Tile, Grid, Btn, Table, Status, Note, th, thR, td, tdR, tdStrong, rowLine, T } from '../../components/kit'
 
-const billingInfo = {
-  plan: 'Standard Subscription',
-  rate: '$10/day per rig',
-  includedLogins: '1 Admin + 5 Operational',
-  billingCycle: 'Monthly',
-  paymentMethod: '•••• 4242 (Visa)'
-}
+/* BILLING — what XPLORIX charges this company.
+ *
+ * Kept apart from Finance on purpose. Finance is the contractor's own money:
+ * what a hole cost and what the client pays. This screen is the subscription:
+ * rigs switched on, days used, and the invoices XPLORIX sent. */
 
-const invoices = [
-  {
-    id: 'INV-2024-001',
-    period: 'January 2024',
-    activeDays: '83 days',
-    amount: '$830.00',
-    status: 'PAID'
-  },
-  {
-    id: 'INV-2024-002',
-    period: 'February 2024',
-    activeDays: '95 days',
-    amount: '$950.00',
-    status: 'PENDING'
-  }
+const DAILY_RATE = 10
+const PLANS = [
+  { name: 'Standard', billing: 'Billed monthly', current: true, adds: 'Digital shift logs, dashboards, AI insights, unlimited supervisor logins, email support.' },
+  { name: 'Growth', billing: 'Billed half-yearly, 8% less', current: false, adds: 'Everything in Standard, plus 24/7 priority support, on-site training, forecasting and downloadable reports.' },
+  { name: 'Enterprise', billing: 'Billed yearly, 16% less', current: false, adds: 'Everything in Growth, plus an account manager, custom features, API links and your own branding.' },
+]
+const INVOICES = [
+  { id: 'XPL-2026-008', period: 'August 2026', days: 84, amount: 840, status: 'Pending', due: '2026-09-15' },
+  { id: 'XPL-2026-007', period: 'July 2026', days: 59, amount: 590, status: 'Paid', due: '2026-08-15' },
+  { id: 'XPL-2026-006', period: 'June 2026', days: 53, amount: 530, status: 'Paid', due: '2026-07-15' },
 ]
 
 export default function BillingPage() {
+  const o = useAdminOverview()
+  const rigDays = o.rigs.filter(r => r.project).length * o.dayOfMonth
+  const download = (inv: typeof INVOICES[number]) => downloadCsv(inv.id, [
+    ['Invoice', 'Period', 'Active rig-days', 'Rate per rig-day (USD)', 'Amount (USD)', 'Status', 'Due'],
+    [inv.id, inv.period, inv.days, DAILY_RATE, inv.amount, inv.status, inv.due],
+  ])
+
   return (
-    <div className="space-y-8 pb-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-[#F8FAFC]">Billing & Subscription</h1>
-        <p className="text-[#94A3B8] mt-2">Manage your subscription, view invoices, and update payment methods</p>
-      </div>
+    <Page>
+      <Head title="Billing" sub="Your XPLORIX subscription. You pay per rig, per day, only while a rig is switched on."
+        right={<Btn kind="primary" href="/#contact">Talk to us about plans</Btn>} />
 
-      {/* Current Plan */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]"
-      >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-[#F8FAFC]">Current Plan</h2>
-            <p className="text-[#94A3B8]">{billingInfo.plan}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-3xl font-bold text-[#F8FAFC]">{billingInfo.rate}</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 pt-6 border-t border-[#1E293B]">
-          <div>
-            <p className="text-sm text-[#64748B]">Included Logins</p>
-            <p className="text-[#F8FAFC] font-medium">{billingInfo.includedLogins}</p>
-          </div>
-          <div>
-            <p className="text-sm text-[#64748B]">Billing Cycle</p>
-            <p className="text-[#F8FAFC] font-medium">{billingInfo.billingCycle}</p>
-          </div>
-          <div>
-            <p className="text-sm text-[#64748B]">Payment Method</p>
-            <p className="text-[#F8FAFC] font-medium">{billingInfo.paymentMethod}</p>
-          </div>
-        </div>
-      </motion.div>
+      <Note tone="warn">
+        Free trial: 12 days left. Every feature is unlocked until the trial ends. Add a payment method to keep your rigs logging after that.
+      </Note>
 
-      {/* Invoices */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]"
-      >
-        <h2 className="text-xl font-semibold text-[#F8FAFC] mb-6">Invoices</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                <th className="pb-4">Invoice</th>
-                <th className="pb-4">Period</th>
-                <th className="pb-4">Active Days</th>
-                <th className="pb-4">Amount</th>
-                <th className="pb-4">Status</th>
-                <th className="pb-4">Actions</th>
+      <Grid>
+        <Tile label="Plan" value="Standard" note="1 admin and 5 operational logins" />
+        <Tile label="Rate" value={`$${DAILY_RATE} a day`} note="Per rig that is switched on" />
+        <Tile label="This month so far" value={`$${rigDays * DAILY_RATE}`} note={`${rigDays} rig-days up to today`} />
+        <Tile label="Payment method" value="Visa ···· 4242" note="Billed monthly" />
+      </Grid>
+
+      <Card title="Plans" subtitle="Pricing depends on fleet size. Longer billing periods cost less.">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
+          {PLANS.map(p => (
+            <div key={p.name} style={{ padding: '14px 16px', borderRadius: 12, border: `1px solid ${p.current ? 'rgba(249,115,22,0.45)' : T.border}`, background: p.current ? 'rgba(249,115,22,0.05)' : 'transparent' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 14.5, fontWeight: 700, color: T.text }}>{p.name}</span>
+                {p.current && <Status tone="info">Your plan</Status>}
+              </div>
+              <div style={{ fontSize: 12.5, color: T.faint, margin: '5px 0 9px' }}>{p.billing}</div>
+              <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.55 }}>{p.adds}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card title="Invoices from XPLORIX" pad={false}>
+        <Table>
+          <thead><tr><th style={th}>Invoice</th><th style={th}>Period</th><th style={thR}>Active rig-days</th><th style={thR}>Amount</th><th style={th}>Status</th><th style={th}>Due</th><th style={th} /></tr></thead>
+          <tbody>
+            {INVOICES.map(inv => (
+              <tr key={inv.id} style={{ borderBottom: rowLine }}>
+                <td style={tdStrong}>{inv.id}</td>
+                <td style={td}>{inv.period}</td>
+                <td style={tdR}>{inv.days}</td>
+                <td style={{ ...tdR, color: T.text, fontWeight: 600 }}>${inv.amount.toFixed(2)}</td>
+                <td style={td}><Status tone={inv.status === 'Paid' ? 'good' : 'warn'}>{inv.status}</Status></td>
+                <td style={td}>{inv.due}</td>
+                <td style={{ ...td, textAlign: 'right' }}><Btn size="sm" onClick={() => download(inv)}>Download</Btn></td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-[#1E293B]">
-              {invoices.map((invoice) => (
-                <tr key={invoice.id} className="hover:bg-[#1A2234]/50 transition">
-                  <td className="py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-[#3B82F6]/20 flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-[#3B82F6]" />
-                      </div>
-                      <span className="font-medium text-[#F8FAFC]">{invoice.id}</span>
-                    </div>
-                  </td>
-                  <td className="py-4 text-[#94A3B8]">{invoice.period}</td>
-                  <td className="py-4 text-[#94A3B8]">{invoice.activeDays}</td>
-                  <td className="py-4 font-semibold text-[#F8FAFC]">{invoice.amount}</td>
-                  <td className="py-4">
-                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-                      invoice.status === 'PAID' 
-                        ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30'
-                        : 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30'
-                    }`}>
-                      {invoice.status}
-                    </span>
-                  </td>
-                  <td className="py-4">
-                    <div className="flex items-center gap-2">
-                      <button className="text-[#3B82F6] hover:text-[#60A5FA] text-sm font-medium">
-                        View Details
-                      </button>
-                      <button className="p-2 text-[#64748B] hover:text-[#F8FAFC] transition">
-                        <Download className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </motion.div>
-    </div>
+            ))}
+          </tbody>
+        </Table>
+      </Card>
+    </Page>
   )
 }

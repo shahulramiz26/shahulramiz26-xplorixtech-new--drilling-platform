@@ -152,8 +152,8 @@ function Shell({ children }: { children: React.ReactNode }) {
         <header style={{ position: 'sticky', top: 0, zIndex: 30, background: 'rgba(8,11,16,0.92)', backdropFilter: 'blur(14px)', borderBottom: `1px solid ${T.line}`, padding: '0 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56, gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-              <button onClick={() => setOpen(true)} className="lg:hidden" aria-label="Open menu"
-                style={{ padding: 6, color: T.faint, background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><Menu size={20} /></button>
+              <button onClick={() => setOpen(true)} className="lg:hidden flex" aria-label="Open menu"
+                style={{ padding: 6, color: T.faint, background: 'none', border: 'none', cursor: 'pointer' }}><Menu size={20} /></button>
               <div className="hidden md:flex items-center gap-2" style={{ fontSize: 13, minWidth: 0 }}>
                 <span style={{ color: T.faint }}>North Block programme</span>
                 <ChevronRight size={14} style={{ color: T.dim }} />

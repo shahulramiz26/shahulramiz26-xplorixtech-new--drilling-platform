@@ -1,119 +1,128 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { Plus, Users, Power, RotateCcw, Trash2, CheckCircle, XCircle } from 'lucide-react'
+import { RIGS } from '../../../lib/inventory-store'
+import {
+  Page, Head, Card, Btn, Table, Status, Modal, Field, Note, Empty, inputStyle, th, td, tdStrong, rowLine, T,
+} from '../../components/kit'
 
-const initialUsers = [
-  { id: 1, name: '', username: 'RIG01_SUP01', role: 'Supervisor', status: 'ACTIVE', created: '2024-01-15' },
-  { id: 2, name: '', username: 'RIG01_SUP02', role: 'Supervisor', status: 'ACTIVE', created: '2024-01-15' },
-  { id: 3, name: '', username: 'RIG01_SUP03', role: 'Supervisor', status: 'INACTIVE', created: '2024-01-20' },
+/* USERS — logins for the people at the rig.
+ *
+ * A supervisor's username is made from his rig and a running number
+ * (RIG01_SUP04) and his password is generated, shown once, and never stored
+ * where it can be read back. The admin hands both over; nobody picks a weak
+ * password and nobody has to remember a naming rule. */
+
+interface User { id: number; name: string; username: string; role: string; rig: string; active: boolean; created: string }
+const START: User[] = [
+  { id: 1, name: 'Arun Verma', username: 'RIG01_SUP01', role: 'Supervisor', rig: 'RIG-001', active: true, created: '2026-06-01' },
+  { id: 2, name: 'Imran Shaikh', username: 'RIG02_SUP01', role: 'Supervisor', rig: 'RIG-002', active: true, created: '2026-06-01' },
+  { id: 3, name: 'Pradeep Rao', username: 'RIG03_SUP01', role: 'Supervisor', rig: 'RIG-003', active: false, created: '2026-08-01' },
 ]
+const INCLUDED = 5
+const TODAY_ISO = '2026-09-13'
+
+function makePassword() {
+  const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnpqrstuvwxyz', '23456789']
+  const pick = (s: string) => s[Math.floor(Math.random() * s.length)]
+  return Array.from({ length: 10 }, (_, i) => pick(sets[i % 3])).join('')
+}
 
 export default function UsersPage() {
-  const [users, setUsers] = useState(initialUsers)
-  const [showModal, setShowModal] = useState(false)
+  const [users, setUsers] = useState(START)
+  const [creating, setCreating] = useState(false)
+  const [form, setForm] = useState({ name: '', rig: RIGS[0] })
+  const [secret, setSecret] = useState<{ title: string; username: string; password: string } | null>(null)
+  const [removing, setRemoving] = useState<User | null>(null)
 
-  const toggleStatus = (id: number) => {
-    setUsers(users.map(u => u.id === id ? { ...u, status: u.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' } : u))
+  const active = users.filter(u => u.active).length
+  const full = users.length >= INCLUDED
+  const nextUsername = (rig: string) => {
+    const prefix = `${rig.replace('-0', '').replace('-', '')}_SUP`
+    const n = users.filter(u => u.username.startsWith(prefix)).length + 1
+    return `${prefix}${String(n).padStart(2, '0')}`
+  }
+
+  const create = () => {
+    if (!form.name.trim()) return
+    const username = nextUsername(form.rig)
+    setUsers([...users, { id: Date.now(), name: form.name.trim(), username, role: 'Supervisor', rig: form.rig, active: true, created: TODAY_ISO }])
+    setCreating(false); setForm({ name: '', rig: RIGS[0] })
+    setSecret({ title: 'Login created', username, password: makePassword() })
   }
 
   return (
-    <div className="space-y-8 pb-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-[#F8FAFC]">User Management</h1>
-          <p className="text-[#94A3B8] mt-2">Manage operational logins • {users.filter(u => u.status === 'ACTIVE').length}/{users.length} users active</p>
-        </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white font-semibold rounded-xl shadow-[0_4px_20px_rgba(59,130,246,0.4)] hover:shadow-[0_8px_30px_rgba(59,130,246,0.6)] transition-all"
-        >
-          <Plus className="w-5 h-5" />
-          Create User
-        </button>
-      </div>
+    <Page>
+      <Head
+        title="Users"
+        sub={<>{active} of {users.length} logins are active. Your plan includes {INCLUDED} operational logins; {Math.max(0, INCLUDED - users.length)} still free.</>}
+        right={<Btn kind="primary" disabled={full} onClick={() => setCreating(true)}>Create login</Btn>}
+      />
 
-      {/* Subscription Info - Dark Theme */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="p-4 rounded-xl bg-gradient-to-r from-[#3B82F6]/20 to-[#8B5CF6]/20 border border-[#3B82F6]/30"
-      >
-        <p className="text-[#F8FAFC]">
-          <span className="font-semibold text-[#3B82F6]">Standard Subscription:</span>{' '}
-          <span className="text-[#94A3B8]">5 operational logins included. Need more? </span>
-          <a href="/admin/billing" className="text-[#3B82F6] hover:underline">Upgrade your plan</a>
-        </p>
-      </motion.div>
+      {full && <Note tone="warn">All {INCLUDED} logins on your plan are used. Remove one, or <a href="/admin/billing" style={{ color: T.text }}>add logins to your plan</a>.</Note>}
 
-      {/* Users Table - Dark Theme */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]"
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                <th className="pb-4">Username</th>
-                <th className="pb-4">Role</th>
-                <th className="pb-4">Status</th>
-                <th className="pb-4">Created</th>
-                <th className="pb-4">Actions</th>
+      <Card pad={false}>
+        <Table>
+          <thead><tr><th style={th}>Name</th><th style={th}>Username</th><th style={th}>Role</th><th style={th}>Rig</th><th style={th}>Status</th><th style={th}>Created</th><th style={th} /></tr></thead>
+          <tbody>
+            {users.map(u => (
+              <tr key={u.id} style={{ borderBottom: rowLine }}>
+                <td style={tdStrong}>{u.name}</td>
+                <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{u.username}</td>
+                <td style={td}>{u.role}</td>
+                <td style={td}>{u.rig}</td>
+                <td style={td}><Status tone={u.active ? 'good' : 'neutral'}>{u.active ? 'Active' : 'Switched off'}</Status></td>
+                <td style={td}>{u.created}</td>
+                <td style={{ ...td, textAlign: 'right' }}>
+                  <div style={{ display: 'inline-flex', gap: 6 }}>
+                    <Btn size="sm" onClick={() => setSecret({ title: 'Password reset', username: u.username, password: makePassword() })}>Reset password</Btn>
+                    <Btn size="sm" onClick={() => setUsers(users.map(x => x.id === u.id ? { ...x, active: !x.active } : x))}>{u.active ? 'Switch off' : 'Switch on'}</Btn>
+                    <Btn size="sm" kind="danger" onClick={() => setRemoving(u)}>Remove</Btn>
+                  </div>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-[#1E293B]">
-              {users.map((user) => (
-                <tr key={user.id} className="hover:bg-[#1A2234]/50 transition">
-                  <td className="py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-[#3B82F6]/20 flex items-center justify-center">
-                        <Users className="w-5 h-5 text-[#3B82F6]" />
-                      </div>
-                      <span className="font-medium text-[#F8FAFC]">{user.username}</span>
-                    </div>
-                  </td>
-                  <td className="py-4 text-[#94A3B8]">{user.role}</td>
-                  <td className="py-4">
-                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-                      user.status === 'ACTIVE'
-                        ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30'
-                        : 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30'
-                    }`}>
-                      {user.status}
-                    </span>
-                  </td>
-                  <td className="py-4 text-[#94A3B8]">{user.created}</td>
-                  <td className="py-4">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => toggleStatus(user.id)}
-                        className={`p-2 rounded-lg transition ${
-                          user.status === 'ACTIVE' 
-                            ? 'text-[#EF4444] hover:bg-[#EF4444]/10' 
-                            : 'text-[#10B981] hover:bg-[#10B981]/10'
-                        }`}
-                      >
-                        <Power className="w-4 h-4" />
-                      </button>
-                      <button className="p-2 text-[#F59E0B] hover:bg-[#F59E0B]/10 rounded-lg transition">
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-                      <button className="p-2 text-[#EF4444] hover:bg-[#EF4444]/10 rounded-lg transition">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </motion.div>
-    </div>
+            ))}
+          </tbody>
+        </Table>
+        {users.length === 0 && <Empty>No logins yet. Create one for each supervisor who logs shifts.</Empty>}
+      </Card>
+
+      {creating && (
+        <Modal title="Create login" subtitle="For a supervisor who logs shifts at the rig" width={480} onClose={() => setCreating(false)}
+          footer={<><Btn onClick={() => setCreating(false)}>Cancel</Btn><Btn kind="primary" disabled={!form.name.trim()} onClick={create}>Create login</Btn></>}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <Field label="Supervisor's name">
+              <input autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Anil Kumar" style={inputStyle} />
+            </Field>
+            <Field label="Rig" hint={`Username will be ${nextUsername(form.rig)}. The password is generated for you.`}>
+              <select value={form.rig} onChange={e => setForm({ ...form, rig: e.target.value })} style={inputStyle}>
+                {RIGS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </Field>
+          </div>
+        </Modal>
+      )}
+
+      {secret && (
+        <Modal title={secret.title} subtitle="Write these down or copy them now. The password is shown only once." width={460} onClose={() => setSecret(null)}
+          footer={<>
+            <Btn onClick={() => navigator.clipboard?.writeText(`Username: ${secret.username}\nPassword: ${secret.password}`)}>Copy both</Btn>
+            <Btn kind="primary" onClick={() => setSecret(null)}>Done</Btn>
+          </>}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '12px 18px', fontSize: 14 }}>
+            <span style={{ color: T.faint }}>Username</span><span style={{ color: T.text, fontWeight: 600 }}>{secret.username}</span>
+            <span style={{ color: T.faint }}>Password</span><span style={{ color: T.text, fontWeight: 600, letterSpacing: '0.04em' }}>{secret.password}</span>
+          </div>
+        </Modal>
+      )}
+
+      {removing && (
+        <Modal title={`Remove ${removing.name}?`} subtitle={`${removing.username} will no longer be able to sign in. Shifts already logged are kept.`} width={460} onClose={() => setRemoving(null)}
+          footer={<><Btn onClick={() => setRemoving(null)}>Keep login</Btn>
+            <Btn kind="danger" onClick={() => { setUsers(users.filter(u => u.id !== removing.id)); setRemoving(null) }}>Remove login</Btn></>}>
+          <div style={{ fontSize: 13.5, color: T.muted, lineHeight: 1.6 }}>If he is only away for a while, switch the login off instead. It can be switched back on.</div>
+        </Modal>
+      )}
+    </Page>
   )
 }

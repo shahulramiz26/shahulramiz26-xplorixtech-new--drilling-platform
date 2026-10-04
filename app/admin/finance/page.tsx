@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo, useEffect, Fragment, ReactNode } from 'react'
+import { useState, useMemo, useEffect, Fragment, ReactNode, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useInventory, PROJECTS as INV_PROJECTS, toolingRatesFor } from '../../../lib/inventory-store'
 import {
   CostingProvider, useCosting,
@@ -20,6 +21,7 @@ import {
   type HoleResult, type Invoice, type InvoiceLine, type RateRow, type RateAdjustment,
   type InvoiceStatus, type RateStructure,
 } from '../../../lib/costing-store'
+import { computeRigMonth, type RigMonthView } from '../../../lib/costing-view'
 
 /* ==========================================================================
  * XPLORIX COSTING — one screen.
@@ -288,105 +290,9 @@ function Section({ title, note, children }: { title: string; note?: string; chil
  * in two tabs it came from the same call.
  * ========================================================================== */
 
-interface RigMonthView {
-  hasLogs: boolean
-  ownership?: RigOwnership
-  ob: OwnershipBreakdown
-  operating?: OperatingRate
-  clientRate?: ClientRate
-  days: DayCostMTD[]
-  roll: Rollup
-  holes: HoleResult[]
-  unallocated: number
-  unallocatedDays: number
-  budgetOwnershipCPU: number
-  productionVariancePct: number
-  // The committee assigns one rock category for the whole project. If the logs
-  // disagree, every metre is underpriced and there is no line item to recover
-  // it — so the mismatch is surfaced rather than left to final billing.
-  loggedFormation: string
-}
-
-const EMPTY_OB: OwnershipBreakdown = {
-  landedPrice: 0, depPerYear: 0, depPerMonth: 0, emi: 0,
-  emiActive: false, emiMonthsLeft: 0, insurancePerMonth: 0, otherFixedPerMonth: 0,
-  perMonth: 0, perDay: 0, perUnit: 0, basisLabel: '',
-}
-
-type CostingState = ReturnType<typeof useCosting>['state']
-type InvState = ReturnType<typeof useInventory>['state']
-
-/* A plain function rather than a hook, because the month strip needs the same
- * calculation for several months at once and a hook cannot be called in a loop. */
-function computeRigMonth(state: CostingState, inv: InvState, project: string, rig: string, month: string): RigMonthView {
-  const logs = state.shiftLogs.filter(l => l.rig === rig && l.project === project && monthOf(l.date) === month)
-  if (logs.length === 0) {
-    return {
-      hasLogs: false, ob: EMPTY_OB, days: [], roll: rollup([]),
-      holes: [], unallocated: 0, unallocatedDays: 0,
-      budgetOwnershipCPU: 0, productionVariancePct: 0, loggedFormation: '',
-    }
-  }
-
-  const ownVersions = state.ownership.filter(o => o.rig === rig)
-  const opVersions = state.operating.filter(o => o.rig === rig && o.project === project)
-  const crVersions = state.clientRates.filter(c => c.project === project)
-
-  const monthEnd = `${month}-${String(daysInMonth(month)).padStart(2, '0')}`
-  const lastLogged = logs.map(l => l.date).sort()[logs.length - 1]
-  const lastDay = Math.min(Number(lastLogged.slice(8)), Number(monthEnd.slice(8)))
-
-  const ownership = versionOn(ownVersions, monthEnd)
-  const ob = ownership ? ownershipBreakdown(ownership, month) : EMPTY_OB
-  const operating = versionOn(opVersions, monthEnd)
-  const clientRate = versionOn(crVersions, monthEnd)
-
-  const raw: DayCost[] = []
-  const depthByHole: Record<string, number> = {}
-
-  for (let n = 1; n <= lastDay; n++) {
-    const date = `${month}-${String(n).padStart(2, '0')}`
-    const shifts = logs.filter(l => l.date === date)
-    const maint = state.maintenance.filter(m => m.rig === rig && m.project === project && m.date === date)
-    const op = versionOn(opVersions, date) ?? blankOperating(rig, project, date)
-    const own = versionOn(ownVersions, date) ?? blankOwnership(rig, date)
-    const obDay = versionOn(ownVersions, date) ? ownershipBreakdown(own, month) : EMPTY_OB
-    const cr = versionOn(crVersions, date)
-
-    /* The tooling rate as it stood on this date — the rig's starting kit plus
-     * everything issued up to it. Parts issued later do not reach back and
-     * change a day that was already costed. */
-    const tooling = toolingRatesFor(inv.pos, inv.rigKit, inv.catalogue, rig, project, date)
-
-    const hole = shifts.find(s => s.holeNumber)?.holeNumber ?? null
-    const depthSoFar = hole ? (depthByHole[hole] ?? 0) : 0
-
-    const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, tooling, depthSoFar)
-    if (hole) depthByHole[hole] = depthSoFar + d.units
-    raw.push(d)
-  }
-
-  const days = withCumulative(raw)
-  const roll = rollup(raw)
-  const holes = holesFromDays(raw, state.holeStatus).map(h => holeResult(h, raw))
-  const orphan = raw.filter(d => !d.holeNumber)
-
-  // Most common lithology in the logs, for the category check.
-  const counts: Record<string, number> = {}
-  logs.forEach(l => { if (l.formationType) counts[l.formationType] = (counts[l.formationType] || 0) + l.metresDrilled })
-  const loggedFormation = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
-
-  return {
-    hasLogs: true, ownership, ob, operating, clientRate, days, roll, holes,
-    unallocated: orphan.reduce((s, d) => s + d.total, 0),
-    unallocatedDays: orphan.length,
-    budgetOwnershipCPU: ownership && ownership.expectedUnitsPerMonth > 0 ? ob.perMonth / ownership.expectedUnitsPerMonth : 0,
-    productionVariancePct: ownership && ownership.expectedUnitsPerMonth > 0
-      ? ((roll.units - ownership.expectedUnitsPerMonth) / ownership.expectedUnitsPerMonth) * 100 : 0,
-    loggedFormation,
-  }
-}
-
+/* computeRigMonth and its result type live in lib/costing-view.ts, so the
+ * Dashboard can show this month's cost, revenue and margin from the very same
+ * calculation instead of a second one that could drift from it. */
 function useRigMonthView(project: string, rig: string, month: string): RigMonthView {
   const { state } = useCosting()
   const { state: inv } = useInventory()
@@ -2235,6 +2141,21 @@ function CostingScreen() {
   const [showHistory, setShowHistory] = useState(false)
   const [quickInvoice, setQuickInvoice] = useState<HoleResult | null>(null)
 
+  /* A link from the Dashboard or from search can name where to open: project,
+   * rig, month and tab. All four are set together so the two effects above
+   * find the rig and month already valid and leave them. Re-read whenever the
+   * address changes, so jumping from one hole to another while already on
+   * this screen works too. */
+  const params = useSearchParams()
+  useEffect(() => {
+    const p = params.get('project'), r = params.get('rig'), m = params.get('month'), t = params.get('tab')
+    if (p && projects.includes(p)) setProject(p)
+    if (r) setRig(r)
+    if (m && /^\d{4}-\d{2}$/.test(m)) setMonth(m)
+    if (t && (TABS as readonly string[]).includes(t)) setTab(t as Tab)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params])
+
   const v = useRigMonthView(project, rig, month)
   const invoices = state.invoices.filter(i => i.project === project)
 
@@ -2359,7 +2280,10 @@ function Arrow({ dir, onClick }: { dir: string; onClick: () => void }) {
 export default function CostingRoute() {
   return (
     <CostingProvider>
-      <CostingScreen />
+      {/* Reading the address needs a Suspense boundary above it. */}
+      <Suspense fallback={null}>
+        <CostingScreen />
+      </Suspense>
     </CostingProvider>
   )
 }

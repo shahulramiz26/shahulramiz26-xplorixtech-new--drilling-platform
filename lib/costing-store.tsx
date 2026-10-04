@@ -1215,7 +1215,17 @@ interface CtxValue {
 const CostingContext = createContext<CtxValue | null>(null)
 const KEY = 'xplorix_costing_v2'
 
+/* One store per browser tab. A layout mounts the provider once; a screen that
+ * also wraps itself in <CostingProvider> (Finance, Inventory, Projects do, so
+ * each still works on its own) joins the one already above it instead of
+ * starting a second copy that would drift from the first. */
 export function CostingProvider({ children }: { children: ReactNode }) {
+  const parent = useContext(CostingContext)
+  if (parent) return <>{children}</>
+  return <CostingRoot>{children}</CostingRoot>
+}
+
+function CostingRoot({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
   const [loaded, setLoaded] = useState(false)
 
