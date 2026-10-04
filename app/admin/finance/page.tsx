@@ -14,6 +14,7 @@ import {
   INVOICE_STATUSES, INVOICE_STATUS_LABEL, isOverdue, outstanding,
   blankOwnership, blankOperating, blankClientRate,
   PROJECT_CLIENTS, ROCK_CATEGORIES, HOLE_SIZES, DAY_STATUS_LABEL,
+  isOwnerLinked, HOLE_STATUS_LABEL, OWNER_INVOICE_LABEL, OWNER_NAME, disputedAmount,
   type DayCost, type DayCostMTD, type Rollup, type OwnershipBreakdown,
   type RigOwnership, type OperatingRate, type ClientRate, type HoleStatus,
   type HoleResult, type Invoice, type InvoiceLine, type RateRow, type RateAdjustment,
@@ -1556,9 +1557,14 @@ function Legend({ color, label, line }: { color: string; label: string; line?: b
  * The list is derived from the log, so there is nothing to add here: a hole
  * appears the moment a shift is logged against its number, and the only thing
  * stored is the decision to close, approve or invoice it. */
-function DrillholesTab({ v, onStatus, onInvoice }: {
+function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }: {
   v: RigMonthView
+  // True when this project's mine owner is on XPLORIX: the owner approves the
+  // hole, not the contractor.
+  linked: boolean
   onStatus: (holeNumber: string, s: HoleStatus) => void
+  onSubmit: (holeNumber: string) => void
+  onWithdraw: (holeNumber: string) => void
   onInvoice: (h: HoleResult) => void
 }) {
   const [open, setOpen] = useState<string | null>(null)
@@ -1615,7 +1621,10 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
                         {h.rates.length > 1 && <span style={{ color: C.blue, marginLeft: 5 }}>●</span>}
                       </td>
                       <td style={td}>{dayLabel(hole.startDate)} → {hole.endDate ? dayLabel(hole.endDate) : 'open'}</td>
-                      <td style={td}><Tag tone={holeStatusColor(hole.status)}>{hole.status}</Tag></td>
+                      <td style={td}>
+                        <Tag tone={holeStatusColor(hole.status)}>{HOLE_STATUS_LABEL[hole.status]}</Tag>
+                        {hole.status === 'closed' && hole.returnReason && <span style={{ color: C.red, marginLeft: 7, fontSize: 11 }}>returned</span>}
+                      </td>
                       <td style={tdN}>{h.roll.days}</td>
                       <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{h.roll.units}</td>
                       <td style={{ ...tdN, color: C.faint }}>{pct(h.coreRecoveryPct)}</td>
@@ -1736,13 +1745,43 @@ function DrillholesTab({ v, onStatus, onInvoice }: {
                             </div>
                           )}
 
+                          {linked && hole.status === 'closed' && hole.returnReason && (
+                            <div style={{ marginTop: 16 }}>
+                              <Note tone={C.red}>
+                                {OWNER_NAME} returned this hole{hole.decidedAt ? ` on ${fullDate(hole.decidedAt)}` : ''}: {hole.returnReason}
+                              </Note>
+                            </div>
+                          )}
+
+                          {/* On a project whose mine owner is on XPLORIX the
+                              contractor cannot approve his own hole: he sends it
+                              across and the owner decides. Elsewhere nothing has
+                              changed. */}
                           <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                            {hole.status === 'closed' &&
+                            {!linked && hole.status === 'closed' &&
                               <Btn size="sm" tone="primary" onClick={() => onStatus(hole.holeNumber, 'approved')}>Approve for billing</Btn>}
-                            {hole.status === 'approved' && <>
+                            {!linked && hole.status === 'approved' && <>
                               <Btn size="sm" onClick={() => onStatus(hole.holeNumber, 'closed')}>Withdraw approval</Btn>
                               <Btn size="sm" tone="primary" onClick={() => onInvoice(h)}>Create invoice</Btn>
                             </>}
+
+                            {linked && hole.status === 'closed' &&
+                              <Btn size="sm" tone="primary" onClick={() => onSubmit(hole.holeNumber)}>
+                                {hole.returnReason ? 'Send again for approval' : 'Send hole for approval'}
+                              </Btn>}
+                            {linked && hole.status === 'submitted' && <>
+                              <span style={{ fontSize: 12, color: C.teal }}>
+                                Waiting for {OWNER_NAME} to approve{hole.submittedAt ? ` · sent ${fullDate(hole.submittedAt)}` : ''}
+                              </span>
+                              <Btn size="sm" onClick={() => onWithdraw(hole.holeNumber)}>Withdraw</Btn>
+                            </>}
+                            {linked && hole.status === 'approved' && <>
+                              <span style={{ fontSize: 12, color: C.green }}>
+                                Approved by {OWNER_NAME}{hole.decidedAt ? ` on ${fullDate(hole.decidedAt)}` : ''}
+                              </span>
+                              <Btn size="sm" tone="primary" onClick={() => onInvoice(h)}>Create invoice</Btn>
+                            </>}
+
                             {hole.status === 'invoiced' && <span style={{ fontSize: 12, color: C.purple }}>Invoiced</span>}
                           </div>
                         </td>
@@ -1826,7 +1865,7 @@ function TrackerTab({ invoices, onUpdate }: {
             <thead>
               <tr><th style={th}>Number</th><th style={th}>Date</th><th style={th}>Due</th><th style={th}>Holes</th>
                 <th style={thR}>Total</th><th style={thR}>Received</th><th style={thR}>Outstanding</th>
-                <th style={th}>Status</th><th style={th} /></tr>
+                <th style={th}>Mine owner</th><th style={th}>Status</th><th style={th} /></tr>
             </thead>
             <tbody>
               {invoices.map(inv => {
@@ -1846,6 +1885,7 @@ function TrackerTab({ invoices, onUpdate }: {
                     <td style={{ ...tdN, color: LAYER.revenue, fontWeight: 800 }}>{money(inv.total)}</td>
                     <td style={{ ...tdN, color: inv.paidAmount ? C.green : C.dim }}>{inv.paidAmount ? money(inv.paidAmount) : '—'}</td>
                     <td style={{ ...tdN, color: out > 0 ? C.amber : C.dim }}>{out > 0 ? money(out) : '—'}</td>
+                    <td style={td}><OwnerAnswer inv={inv} /></td>
                     <td style={td}>
                       <StatusPill inv={inv} overdue={over} onChange={st => onUpdate({
                         ...inv, status: st,
@@ -1870,6 +1910,18 @@ function TrackerTab({ invoices, onUpdate }: {
       {viewing && <InvoiceView inv={viewing} onClose={() => setViewing(null)} />}
     </div>
   )
+}
+
+/* What the mine owner has said about this invoice. Blank on a project whose
+ * owner is not on XPLORIX — there is nobody on the other side to answer. */
+function OwnerAnswer({ inv }: { inv: Invoice }) {
+  if (!inv.ownerStatus) return <span style={{ color: C.dim }}>—</span>
+  const n = (inv.lineReviews ?? []).filter(r => r?.status === 'disputed').length
+  const tone = inv.ownerStatus === 'approved' ? C.green : inv.ownerStatus === 'disputed' ? C.red : C.teal
+  const text = inv.ownerStatus === 'disputed'
+    ? `${n} ${n === 1 ? 'line' : 'lines'} disputed · ${money(disputedAmount(inv))}`
+    : inv.ownerStatus === 'approved' ? 'Approved' : 'Waiting'
+  return <Tag tone={tone}>{text}</Tag>
 }
 
 /* A status you can read at a glance and change in one click. A dropdown here
@@ -1941,28 +1993,51 @@ function InvoiceView({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
     <Modal title={inv.number} subtitle={`${inv.project} · ${fullDate(inv.date)}${inv.dueDate ? ` · due ${fullDate(inv.dueDate)}` : ''}`}
       width={820} onClose={onClose}
       footer={<><Btn onClick={onClose}>Close</Btn><Btn tone="primary" onClick={() => downloadInvoice(inv)}>Download</Btn></>}>
+      {inv.ownerStatus && (
+        <div style={{ marginBottom: 14 }}>
+          <Note tone={inv.ownerStatus === 'approved' ? C.green : inv.ownerStatus === 'disputed' ? C.red : C.teal}>
+            {OWNER_INVOICE_LABEL[inv.ownerStatus]}
+            {inv.sentAt ? ` · sent ${fullDate(inv.sentAt)}` : ''}
+            {inv.reviewedAt ? ` · last reviewed ${fullDate(inv.reviewedAt)}` : ''}
+            {inv.ownerStatus === 'disputed' ? ` · ${money(disputedAmount(inv))} in dispute before tax` : ''}
+          </Note>
+        </div>
+      )}
       <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
         <table style={tableStyle}>
-          <thead><tr><th style={th}>Description</th><th style={th}>Depth</th><th style={thR}>Quantity</th><th style={thR}>Rate</th><th style={thR}>Amount</th></tr></thead>
+          <thead><tr><th style={th}>Description</th><th style={th}>Depth</th><th style={thR}>Quantity</th><th style={thR}>Rate</th><th style={thR}>Amount</th>
+            {inv.ownerStatus && <th style={th}>Mine owner</th>}</tr></thead>
           <tbody>
-            {inv.lines.map((l, i) => (
-              <tr key={i} style={{ borderBottom: rowBorder }}>
-                <td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{l.label}</td>
-                <td style={{ ...td, fontFamily: 'ui-monospace, monospace', color: C.faint }}>{l.depth ?? '—'}</td>
-                <td style={tdN}>{l.qty}</td><td style={tdN}>{l.rate}</td>
-                <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{money(l.amount)}</td>
-              </tr>
-            ))}
+            {inv.lines.map((l, i) => {
+              const r = inv.lineReviews?.[i]
+              return (
+                <tr key={i} style={{ borderBottom: rowBorder, background: r?.status === 'disputed' ? 'rgba(239,68,68,0.05)' : undefined }}>
+                  <td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{l.label}</td>
+                  <td style={{ ...td, fontFamily: 'ui-monospace, monospace', color: C.faint }}>{l.depth ?? '—'}</td>
+                  <td style={tdN}>{l.qty}</td><td style={tdN}>{l.rate}</td>
+                  <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{money(l.amount)}</td>
+                  {inv.ownerStatus && (
+                    <td style={{ ...td, whiteSpace: 'normal', maxWidth: 220 }}>
+                      {!r ? <span style={{ color: C.dim }}>Not reviewed yet</span>
+                        : r.status === 'approved' ? <span style={{ color: C.green }}>Approved</span>
+                        : <span style={{ color: C.red }}>Disputed{r.reason ? `: ${r.reason}` : ''}</span>}
+                    </td>
+                  )}
+                </tr>
+              )
+            })}
           </tbody>
           <tfoot>
             <tr style={{ borderTop: `2px solid ${C.border}` }}>
               <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={4}>Subtotal</td>
               <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{money(inv.subtotal)}</td>
+              {inv.ownerStatus && <td />}
             </tr>
-            <tr><td style={td} colSpan={4}>Tax at {inv.taxPercent}%</td><td style={tdN}>{money(inv.subtotal * inv.taxPercent / 100)}</td></tr>
+            <tr><td style={td} colSpan={4}>Tax at {inv.taxPercent}%</td><td style={tdN}>{money(inv.subtotal * inv.taxPercent / 100)}</td>{inv.ownerStatus && <td />}</tr>
             <tr style={{ background: 'rgba(59,130,246,0.06)' }}>
               <td style={{ ...td, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }} colSpan={4}>Total</td>
               <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }}>{money(inv.total)}</td>
+              {inv.ownerStatus && <td />}
             </tr>
           </tfoot>
         </table>
@@ -1971,8 +2046,8 @@ function InvoiceView({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
   )
 }
 
-function ReviewModal({ project, clientRate, holes, nextNumber, onClose, onCreate }: {
-  project: string; clientRate?: ClientRate; holes: HoleResult[]
+function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, onCreate }: {
+  project: string; linked: boolean; clientRate?: ClientRate; holes: HoleResult[]
   nextNumber: string; onClose: () => void; onCreate: (i: Invoice) => void
 }) {
   const [number, setNumber] = useState(nextNumber)
@@ -2019,10 +2094,14 @@ function ReviewModal({ project, clientRate, holes, nextNumber, onClose, onCreate
     <Modal title="Review invoice" subtitle={project} width={840} onClose={onClose}
       footer={<><Btn onClick={onClose}>Cancel</Btn>
         <Btn tone="primary" onClick={() => onCreate({
-          id: uid('inv'), number, project, client: '', date,
+          id: uid('inv'), number, project, client: PROJECT_CLIENTS[project] ?? '', date,
           holeNumbers: holes.map(h => h.hole.holeNumber), lines, subtotal, taxPercent, total,
           status: 'pending', dueDate,
-        })}>Create invoice</Btn></>}>
+          // On a linked project the invoice goes to the mine owner, who checks
+          // it line by line in the Client Portal. Only the lines travel — cost
+          // and margin are worked out on this screen and never stored on it.
+          ...(linked ? { ownerStatus: 'awaiting' as const, lineReviews: lines.map(() => null), sentAt: date } : {}),
+        })}>{linked ? 'Send to mine owner' : 'Create invoice'}</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <Grid cols={4}>
           <TextField label="Invoice number" value={number} onChange={setNumber} />
@@ -2093,6 +2172,7 @@ function ReviewModal({ project, clientRate, holes, nextNumber, onClose, onCreate
         <Note tone={C.amber}>
           Cost and margin are for your own records and never appear on the client&apos;s copy. Once created, these holes are
           stamped as invoiced and cannot be billed again.
+          {linked && <> {OWNER_NAME} will see this invoice in the Client Portal straight away and can approve or dispute each line.</>}
         </Note>
       </div>
     </Modal>
@@ -2136,7 +2216,7 @@ const TABS = ['Performance', 'Drillholes', 'Tracker'] as const
 type Tab = typeof TABS[number]
 
 function CostingScreen() {
-  const { state, setHoleStatus, addInvoice, updateInvoice } = useCosting()
+  const { state, setHoleStatus, addInvoice, updateInvoice, submitHole, withdrawHole } = useCosting()
 
   const projects: string[] = INV_PROJECTS
   const [project, setProject] = useState(projects[0] ?? '')
@@ -2213,7 +2293,8 @@ function CostingScreen() {
       </div>
 
       {tab === 'Performance' && <PerformanceTab v={v} rig={rig} project={project} month={month} />}
-      {tab === 'Drillholes' && <DrillholesTab v={v} onStatus={setHoleStatus} onInvoice={h => setQuickInvoice(h)} />}
+      {tab === 'Drillholes' && <DrillholesTab v={v} linked={isOwnerLinked(project)} onStatus={setHoleStatus}
+        onSubmit={submitHole} onWithdraw={withdrawHole} onInvoice={h => setQuickInvoice(h)} />}
       {tab === 'Tracker' && <TrackerTab invoices={invoices} onUpdate={updateInvoice} />}
 
       {showRates && (
@@ -2222,7 +2303,7 @@ function CostingScreen() {
           onClose={() => setShowRates(false)} />
       )}
       {quickInvoice && (
-        <ReviewModal project={project} clientRate={v.clientRate} holes={[quickInvoice]}
+        <ReviewModal project={project} linked={isOwnerLinked(project)} clientRate={v.clientRate} holes={[quickInvoice]}
           nextNumber={`INV-${String(invoices.length + 1).padStart(4, '0')}`}
           onClose={() => setQuickInvoice(null)}
           onCreate={inv => { addInvoice(inv); setQuickInvoice(null); setTab('Tracker') }} />
@@ -2282,3 +2363,4 @@ export default function CostingRoute() {
     </CostingProvider>
   )
 }
+
