@@ -1,7 +1,10 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { normFormation as groundOf } from './inventory-store'
+import {
+  normFormation as groundOf, TODAY,
+  PROJECTS as INV_PROJECTS, COMPLETED_PROJECTS as INV_COMPLETED, RIGS as INV_RIGS, PROJECT_CODES as INV_CODES,
+} from './inventory-store'
 import type { ToolingRates, Formation } from './inventory-store'
 
 /* ==========================================================================
@@ -334,15 +337,82 @@ export interface Hole {
 
 /* What was planned for a hole before the first metre. Planned depth is the one
  * number the mine owner needs to read progress: "planned 400 m, drilled 388 m". */
-export interface HolePlan { plannedDepth: number; project?: string }
+export interface HolePlan {
+  plannedDepth: number
+  project?: string
+  holeSize?: string
+  note?: string                       // what the hole is for, in the planner's words
+  by?: 'contractor' | 'owner'         // who put it on the plan
+  addedAt?: string
+}
+
+// ── PROJECT ───────────────────────────────────────────────────────────────
+/* One record per project, and the only one. Finance, Inventory, the drill log,
+ * the Dashboard and the Client Portal all read it, so a project created on the
+ * Projects screen exists everywhere at once.
+ *
+ * `name` is what every shift log, rate and invoice is filed under. `shared`
+ * means the client is on XPLORIX: the project, its contract rates, its planned
+ * holes and the rigs and crew on site appear in the Client Portal, a closed
+ * hole goes to the client for approval, and an invoice goes to him for
+ * line-by-line checking. Costs and margin are never part of what is shared. */
+export type ProjectStatus = 'active' | 'on-hold' | 'completed'
+export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+  active: 'Active', 'on-hold': 'On hold', completed: 'Completed',
+}
+export interface ProjectRecord {
+  id: string              // the project code: stable, used in links
+  name: string
+  code: string
+  location: string
+  client: string
+  status: ProjectStatus
+  startDate: string
+  plannedMetres?: number
+  holeSize: string
+  shared: boolean
+  rigs: string[]
+  supervisors: string[]
+  drillers: string[]
+  createdAt: string
+}
+
+/* Everything that changes on a project leaves a line here: who changed what
+ * and when. It is the contractor's activity list and the client's "what
+ * changed" list — the same lines — and the unseen ones are the notifications. */
+export type ProjectEventKind = 'created' | 'shared' | 'details' | 'status' | 'rig' | 'crew' | 'hole' | 'rates'
+export interface ProjectEvent {
+  id: string
+  project: string
+  at: string              // YYYY-MM-DDTHH:MM
+  kind: ProjectEventKind
+  by: 'contractor' | 'owner'
+  title: string
+  detail?: string
+  seenByOwner?: boolean
+  seenByContractor?: boolean
+}
+
+/* A rate is a contract, so on a shared project the contractor cannot change it
+ * alone. A new set of rates is a proposal; it becomes a client rate — and
+ * starts pricing metres — only when the client accepts it. */
+export type ProposalStatus = 'waiting' | 'accepted' | 'returned' | 'withdrawn'
+export interface RateProposal {
+  id: string
+  project: string
+  rate: ClientRate
+  proposedAt: string
+  status: ProposalStatus
+  answeredAt?: string
+  ownerNote?: string
+}
 
 // ── MINE OWNER LINK ───────────────────────────────────────────────────────
-/* Projects whose mine owner logs in to the Client Portal. On these, a closed
- * hole is sent to the owner for approval and an invoice is sent to the owner
- * for line-by-line verification. Everything the owner reads comes out of this
- * same store, so the two sides can never be looking at different numbers. */
+/* Mirrors of the project list for the plain functions in this file and others
+ * that are not components and cannot read the store. The store keeps them in
+ * step with its own list (see syncRegistry), so they are never typed by hand. */
 export const OWNER_NAME = 'Demo Mining Co.'
-export const OWNER_LINKED_PROJECTS = ['Site A - North Field']
+export const OWNER_LINKED_PROJECTS: string[] = []
 export function isOwnerLinked(project: string) { return OWNER_LINKED_PROJECTS.includes(project) }
 
 // ── INVOICE ───────────────────────────────────────────────────────────────
@@ -780,11 +850,7 @@ export function isFinished(h: Hole) { return h.status !== 'drilling' }
  * SEED DATA
  * ========================================================================== */
 
-export const PROJECT_CODES: Record<string, string> = {
-  'Site A - North Field': 'PRJ-001',
-  'Site B - South Ridge': 'PRJ-002',
-  'Site C - East Basin': 'PRJ-003',
-}
+export const PROJECT_CODES: Record<string, string> = {}
 export function projectCode(name: string) {
   return PROJECT_CODES[name] ?? name.match(/^([A-Za-z]+-\d+)/)?.[1] ?? name
 }
@@ -792,11 +858,56 @@ export function rigCode(name: string) {
   return name.match(/^([A-Za-z]+-\d+)/)?.[1] ?? name
 }
 
-export const PROJECT_CLIENTS: Record<string, string> = {
-  'Site A - North Field': OWNER_NAME,
-  'Site B - South Ridge': 'DGML',
-  'Site C - East Basin': 'MECL',
+export const PROJECT_CLIENTS: Record<string, string> = {}
+
+/* The company's rigs and people, to pick from when a project is staffed. */
+export const FLEET = [
+  { rig: 'RIG-001', type: 'Core' }, { rig: 'RIG-002', type: 'Core' }, { rig: 'RIG-003', type: 'Core' },
+  { rig: 'RIG-004', type: 'Core' }, { rig: 'RIG-005', type: 'Core' },
+]
+export const PEOPLE = {
+  supervisors: ['Arun Verma', 'Imran Shaikh', 'Pradeep Rao', 'Kiran Joshi', 'Suresh Nair'],
+  drillers: ['Mahesh Yadav', 'Ravi Kumar', 'Santosh Patil', 'Dinesh Sahu', 'Farid Khan', 'Gopal Das', 'Naveen Reddy', 'Lokesh Meena'],
 }
+
+export const SEED_PROJECTS: ProjectRecord[] = [
+  {
+    id: 'PRJ-001', code: 'PRJ-001', name: 'Site A - North Field', location: 'North Field block', client: OWNER_NAME,
+    status: 'active', startDate: '2026-06-01', plannedMetres: 2400, holeSize: 'HQ', shared: true,
+    rigs: ['RIG-001', 'RIG-002'], supervisors: ['Arun Verma', 'Imran Shaikh'],
+    drillers: ['Mahesh Yadav', 'Ravi Kumar', 'Santosh Patil', 'Dinesh Sahu'], createdAt: '2026-05-25',
+  },
+  {
+    id: 'PRJ-002', code: 'PRJ-002', name: 'Site B - South Ridge', location: 'South Ridge block', client: 'South Ridge Minerals',
+    status: 'active', startDate: '2026-01-01', plannedMetres: 1500, holeSize: 'HQ', shared: false,
+    rigs: ['RIG-003'], supervisors: ['Pradeep Rao'], drillers: ['Farid Khan', 'Gopal Das'], createdAt: '2025-12-15',
+  },
+  {
+    id: 'PRJ-003', code: 'PRJ-003', name: 'Site C - East Basin', location: 'East Basin block', client: 'East Basin Resources',
+    status: 'completed', startDate: '2026-02-01', plannedMetres: 900, holeSize: 'HQ', shared: false,
+    rigs: [], supervisors: [], drillers: [], createdAt: '2026-01-20',
+  },
+]
+
+/* Brings the mirrors into step with the store's project list. Called by the
+ * store before anything below it renders, and once here so a screen that is
+ * outside the store still sees the seed projects. */
+export function syncRegistry(projects: ProjectRecord[]) {
+  const fill = (target: string[], values: string[]) => { target.length = 0; target.push(...values) }
+  const refill = (target: Record<string, string>, pairs: [string, string][]) => {
+    Object.keys(target).forEach(k => { delete target[k] })
+    pairs.forEach(([k, v]) => { target[k] = v })
+  }
+  fill(OWNER_LINKED_PROJECTS, projects.filter(p => p.shared).map(p => p.name))
+  fill(INV_PROJECTS, projects.map(p => p.name))
+  fill(INV_COMPLETED, projects.filter(p => p.status === 'completed').map(p => p.name))
+  fill(INV_RIGS, Array.from(new Set([...FLEET.slice(0, 3).map(f => f.rig), ...projects.flatMap(p => p.rigs)])).sort())
+  const codes = projects.map(p => [p.name, p.code] as [string, string])
+  refill(PROJECT_CODES, codes)
+  refill(INV_CODES, codes)
+  refill(PROJECT_CLIENTS, projects.map(p => [p.name, p.client] as [string, string]))
+}
+syncRegistry(SEED_PROJECTS)
 
 export const ROCK_CATEGORIES = ['Soft rock', 'Medium rock', 'Hard rock', 'Very hard rock']
 export const HOLE_SIZES = ['NQ', 'HQ', 'PQ', 'BQ', 'AQ']
@@ -1179,6 +1290,37 @@ export const SEED_MAINTENANCE: MaintenanceLog[] = [
  * STORE
  * ========================================================================== */
 
+/* What has already happened on the seeded projects. Two lines are left unseen
+ * by the client, and one rate proposal is waiting for him, so the Client
+ * Portal opens with something to read and something to decide. */
+export const SEED_PROJECT_EVENTS: ProjectEvent[] = [
+  { id: 'pe_1', project: 'Site A - North Field', at: '2026-05-25T10:20', kind: 'created', by: 'contractor', title: 'Project created', detail: 'Site A - North Field · North Field block', seenByOwner: true, seenByContractor: true },
+  { id: 'pe_2', project: 'Site A - North Field', at: '2026-05-25T10:24', kind: 'shared', by: 'contractor', title: `Shared with ${OWNER_NAME}`, detail: 'Contract rates, planned holes, rigs and crew are now visible in the Client Portal.', seenByOwner: true, seenByContractor: true },
+  { id: 'pe_3', project: 'Site A - North Field', at: '2026-05-25T10:31', kind: 'rates', by: 'contractor', title: 'Contract rates set, from 1 Jun 2026', detail: 'Tender schedule 2.2.1.1c\u2013e', seenByOwner: true, seenByContractor: true },
+  { id: 'pe_4', project: 'Site A - North Field', at: '2026-05-28T09:05', kind: 'rig', by: 'contractor', title: 'RIG-001 and RIG-002 assigned', seenByOwner: true, seenByContractor: true },
+  { id: 'pe_5', project: 'Site A - North Field', at: '2026-05-28T09:12', kind: 'crew', by: 'contractor', title: 'Crew assigned', detail: '2 supervisors, 4 drillers', seenByOwner: true, seenByContractor: true },
+  { id: 'pe_6', project: 'Site A - North Field', at: '2026-09-11T16:40', kind: 'hole', by: 'contractor', title: '4 holes added to the plan', detail: 'DH-005 (200 m), DH-006 (180 m), DH-014 (220 m), DH-015 (240 m)', seenByOwner: false, seenByContractor: true },
+  { id: 'pe_7', project: 'Site A - North Field', at: '2026-09-12T11:15', kind: 'rates', by: 'contractor', title: 'New rates proposed, from 1 Oct 2026', detail: 'Diesel price escalation, contract clause 14.2', seenByOwner: false, seenByContractor: true },
+  { id: 'pe_8', project: 'Site B - South Ridge', at: '2025-12-15T12:00', kind: 'created', by: 'contractor', title: 'Project created', detail: 'Site B - South Ridge · South Ridge block', seenByContractor: true },
+  { id: 'pe_9', project: 'Site C - East Basin', at: '2026-01-20T12:00', kind: 'created', by: 'contractor', title: 'Project created', detail: 'Site C - East Basin · East Basin block', seenByContractor: true },
+  { id: 'pe_10', project: 'Site C - East Basin', at: '2026-08-30T17:30', kind: 'status', by: 'contractor', title: 'Project completed', seenByContractor: true },
+]
+export const SEED_RATE_PROPOSALS: RateProposal[] = [
+  {
+    id: 'rp_1', project: 'Site A - North Field', proposedAt: '2026-09-12T11:15', status: 'waiting',
+    rate: {
+      id: 'cr_a_2', project: 'Site A - North Field', effectiveFrom: '2026-10-01', structure: 'flat',
+      rateRows: [
+        { id: 'r1', holeSize: 'HQ', formation: 'Soft rock', rate: 6200, adjustments: [] },
+        { id: 'r2', holeSize: 'HQ', formation: 'Hard rock', rate: 11650, adjustments: [] },
+        { id: 'r3', holeSize: 'HQ', formation: 'Very hard rock', rate: 14650, adjustments: [] },
+      ],
+      standbyPerDay: 19000, mobilisation: 175000, demobilisation: 140000,
+      note: 'Diesel price escalation, contract clause 14.2',
+    },
+  },
+]
+
 interface State {
   shiftLogs: ShiftLog[]
   maintenance: MaintenanceLog[]
@@ -1188,6 +1330,9 @@ interface State {
   holeStatus: Record<string, HoleState>
   invoices: Invoice[]
   holePlans: Record<string, HolePlan>
+  projects: ProjectRecord[]
+  projectEvents: ProjectEvent[]
+  rateProposals: RateProposal[]
 }
 
 function initial(): State {
@@ -1196,6 +1341,7 @@ function initial(): State {
     ownership: SEED_OWNERSHIP, operating: SEED_OPERATING,
     clientRates: SEED_CLIENT_RATES, holeStatus: SEED_HOLE_STATUS, invoices: [],
     holePlans: SEED_HOLE_PLANS,
+    projects: SEED_PROJECTS, projectEvents: SEED_PROJECT_EVENTS, rateProposals: SEED_RATE_PROPOSALS,
   }
 }
 
@@ -1206,6 +1352,21 @@ function withSeedPlans(s: State): State {
 }
 
 export const uid = (p: string) => `${p}_${Date.now()}_${Math.floor(Math.random() * 9999)}`
+
+/* The system's date with the clock's time: every seeded record sits on the
+ * system date, so a change made now has to sit on it too or the change list
+ * would jump a month. */
+export function nowStamp() {
+  const d = new Date()
+  return `${TODAY}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+export function listOf(items: string[]) {
+  return items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
+}
+export function crewLine(p: { supervisors: string[]; drillers: string[] }) {
+  const n = (k: number, one: string) => `${k} ${one}${k === 1 ? '' : 's'}`
+  return `${n(p.supervisors.length, 'supervisor')}, ${n(p.drillers.length, 'driller')}`
+}
 
 export type VersionKind = 'ownership' | 'operating' | 'clientRate'
 
@@ -1227,8 +1388,19 @@ interface CtxValue {
   ownerReviewInvoice: (id: string, reviews: (LineReview | null)[]) => void
   ownerMarkPaid: (id: string) => void
   setHolePlan: (holeNumber: string, plan: HolePlan | null) => void
+  // Projects
+  createProject: (p: ProjectRecord, opening?: { rate?: ClientRate; holes?: { id: string; plan: HolePlan }[] }) => void
+  updateProject: (id: string, patch: Partial<ProjectRecord>, log?: ProjectLog | ProjectLog[]) => void
+  planHoles: (project: string, holes: { id: string; plan: HolePlan | null }[], by: 'contractor' | 'owner', log: ProjectLog) => void
+  proposeRates: (project: string, rate: ClientRate) => void
+  withdrawProposal: (id: string) => void
+  ownerAnswerRates: (id: string, accept: boolean, note?: string) => void
+  markProjectSeen: (project: string, who: 'contractor' | 'owner') => void
   resetAll: () => void
 }
+
+/* What a change is called in the project's change list. */
+export interface ProjectLog { kind: ProjectEventKind; title: string; detail?: string }
 
 const CostingContext = createContext<CtxValue | null>(null)
 const KEY = 'xplorix_costing_v2'
@@ -1344,11 +1516,110 @@ function CostingRoot({ children }: { children: ReactNode }) {
     return { ...s, holePlans: next }
   })
 
+  // ── projects ─────────────────────────────────────────────────────────────
+  /* Every project change goes through one of these, and every one of them
+   * writes its own line in the change list. The side that made the change has
+   * seen it; the other side has not, and that is its notification. */
+  const event = (project: string, by: 'contractor' | 'owner', l: ProjectLog): ProjectEvent => ({
+    id: uid('pe'), project, at: nowStamp(), by, kind: l.kind, title: l.title, detail: l.detail,
+    seenByContractor: by === 'contractor', seenByOwner: by === 'owner',
+  })
+
+  const createProject: CtxValue['createProject'] = (p, opening) => setState(s => {
+    const events: ProjectEvent[] = [event(p.name, 'contractor', { kind: 'created', title: 'Project created', detail: `${p.name} · ${p.location}` })]
+    if (p.shared) events.push(event(p.name, 'contractor', { kind: 'shared', title: `Shared with ${p.client}`, detail: 'Contract rates, planned holes, rigs and crew are now visible in the Client Portal.' }))
+    if (opening?.rate) events.push(event(p.name, 'contractor', { kind: 'rates', title: `Contract rates set, from ${fullDate(opening.rate.effectiveFrom)}`, detail: opening.rate.note }))
+    if (p.rigs.length) events.push(event(p.name, 'contractor', { kind: 'rig', title: `${listOf(p.rigs)} assigned` }))
+    if (p.supervisors.length + p.drillers.length) events.push(event(p.name, 'contractor', { kind: 'crew', title: 'Crew assigned', detail: crewLine(p) }))
+    const plans = { ...s.holePlans }
+    const holes = opening?.holes ?? []
+    holes.forEach(h => { plans[h.id] = { ...h.plan, project: p.name, by: 'contractor', addedAt: nowStamp() } })
+    if (holes.length) events.push(event(p.name, 'contractor', {
+      kind: 'hole', title: `${holes.length} ${holes.length === 1 ? 'hole' : 'holes'} added to the plan`,
+      detail: holes.map(h => `${h.id} (${h.plan.plannedDepth} m)`).join(', '),
+    }))
+    return {
+      ...s, projects: [...s.projects, p], holePlans: plans,
+      clientRates: opening?.rate ? [...s.clientRates, opening.rate] : s.clientRates,
+      projectEvents: [...s.projectEvents, ...events],
+    }
+  })
+
+  const updateProject: CtxValue['updateProject'] = (id, patch, log) => setState(s => {
+    const before = s.projects.find(p => p.id === id)
+    if (!before) return s
+    const logs = log ? (Array.isArray(log) ? log : [log]) : []
+    return {
+      ...s, projects: s.projects.map(p => p.id === id ? { ...p, ...patch } : p),
+      projectEvents: [...s.projectEvents, ...logs.map(l => event(before.name, 'contractor', l))],
+    }
+  })
+
+  const planHoles: CtxValue['planHoles'] = (project, holes, by, log) => setState(s => {
+    const plans = { ...s.holePlans }
+    holes.forEach(h => {
+      if (h.plan) plans[h.id] = { by, addedAt: nowStamp(), ...plans[h.id], ...h.plan, project }
+      else delete plans[h.id]
+    })
+    return { ...s, holePlans: plans, projectEvents: [...s.projectEvents, event(project, by, log)] }
+  })
+
+  const proposeRates: CtxValue['proposeRates'] = (project, rate) => setState(s => {
+    const shared = s.projects.find(p => p.name === project)?.shared
+    if (!shared) {
+      return {
+        ...s, clientRates: upsert(s.clientRates, rate),
+        projectEvents: [...s.projectEvents, event(project, 'contractor', { kind: 'rates', title: `Contract rates changed, from ${fullDate(rate.effectiveFrom)}`, detail: rate.note })],
+      }
+    }
+    // One proposal at a time: a new one replaces the one still waiting.
+    const open = s.rateProposals.map(r => r.project === project && r.status === 'waiting' ? { ...r, status: 'withdrawn' as ProposalStatus } : r)
+    return {
+      ...s,
+      rateProposals: [...open, { id: uid('rp'), project, rate, proposedAt: nowStamp(), status: 'waiting' }],
+      projectEvents: [...s.projectEvents, event(project, 'contractor', { kind: 'rates', title: `New rates proposed, from ${fullDate(rate.effectiveFrom)}`, detail: rate.note })],
+    }
+  })
+
+  const withdrawProposal: CtxValue['withdrawProposal'] = id => setState(s => {
+    const r = s.rateProposals.find(x => x.id === id)
+    if (!r || r.status !== 'waiting') return s
+    return {
+      ...s, rateProposals: s.rateProposals.map(x => x.id === id ? { ...x, status: 'withdrawn' } : x),
+      projectEvents: [...s.projectEvents, event(r.project, 'contractor', { kind: 'rates', title: 'Rate proposal withdrawn', detail: 'The agreed rates stay in force.' })],
+    }
+  })
+
+  const ownerAnswerRates: CtxValue['ownerAnswerRates'] = (id, accept, note) => setState(s => {
+    const r = s.rateProposals.find(x => x.id === id)
+    if (!r || r.status !== 'waiting') return s
+    const answered: RateProposal = { ...r, status: accept ? 'accepted' : 'returned', answeredAt: nowStamp(), ownerNote: note?.trim() || undefined }
+    return {
+      ...s,
+      rateProposals: s.rateProposals.map(x => x.id === id ? answered : x),
+      clientRates: accept ? upsert(s.clientRates, r.rate) : s.clientRates,
+      projectEvents: [...s.projectEvents, event(r.project, 'owner', accept
+        ? { kind: 'rates', title: `New rates accepted, in force from ${fullDate(r.rate.effectiveFrom)}`, detail: note?.trim() || undefined }
+        : { kind: 'rates', title: 'New rates sent back', detail: note?.trim() || 'No reason given' })],
+    }
+  })
+
+  const markProjectSeen: CtxValue['markProjectSeen'] = (project, who) => setState(s => {
+    const key = who === 'owner' ? 'seenByOwner' : 'seenByContractor'
+    if (!s.projectEvents.some(e => e.project === project && !e[key])) return s
+    return { ...s, projectEvents: s.projectEvents.map(e => e.project === project && !e[key] ? { ...e, [key]: true } : e) }
+  })
+
+  // Plain helper functions elsewhere read the project list through mirrors;
+  // bring them into step before anything below renders.
+  syncRegistry(state.projects ?? SEED_PROJECTS)
+
   return (
     <CostingContext.Provider value={{
       state, saveOwnership, saveOperating, saveClientRate, deleteVersion,
       setHoleStatus, addInvoice, updateInvoice, deleteInvoice,
       submitHole, withdrawHole, ownerDecideHole, ownerReviewInvoice, ownerMarkPaid, setHolePlan,
+      createProject, updateProject, planHoles, proposeRates, withdrawProposal, ownerAnswerRates, markProjectSeen,
       resetAll: () => setState(initial()),
     }}>{children}</CostingContext.Provider>
   )

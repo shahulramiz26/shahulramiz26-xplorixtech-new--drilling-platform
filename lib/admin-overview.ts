@@ -11,6 +11,7 @@ import {
 } from './costing-store'
 import { computeRigMonth } from './costing-view'
 import { holesFromLogs, type LiveHole } from './owner-portal'
+import { contractorInbox, projectByName } from './projects'
 
 /* ==========================================================================
  * THE CONTRACTOR'S DASHBOARD — what it reads
@@ -201,7 +202,26 @@ export function useAdminOverview() {
       const h = holeById.get(i.holeNumbers[0])
       return h ? linkFor(h, 'Tracker') : '/admin/finance'
     }
+    // ── projects: what the client did, and rates he sent back ──────────────
+    const inbox = contractorInbox(costing)
+    const idOf = (name: string) => projectByName(costing, name)?.id ?? ''
+    const projectItems: Attention[] = [
+      ...inbox.returned.map(r => ({
+        key: `rr_${r.id}`, tone: 'bad' as Tone, action: 'Open contract rates', href: `/admin/projects/${idOf(r.project)}?tab=rates`,
+        title: `${projectByName(costing, r.project)?.client ?? 'The client'} sent the new rates back`, detail: `${r.project} · ${r.ownerNote ?? 'No reason given'}`,
+      })),
+      ...Array.from(new Set(inbox.unseen.map(e => e.project))).map(name => {
+        const mine = inbox.unseen.filter(e => e.project === name)
+        return {
+          key: `pn_${name}`, tone: 'info' as Tone, action: 'Open project', href: `/admin/projects/${idOf(name)}`,
+          title: mine.length === 1 ? `${projectByName(costing, name)?.client ?? 'The client'}: ${mine[0].title.toLowerCase()}` : `${mine.length} changes from ${projectByName(costing, name)?.client ?? 'the client'}`,
+          detail: `${name} · ${mine.map(e => e.detail ?? e.title).slice(0, 2).join(' · ')}`,
+        }
+      }),
+    ]
+
     const attention: Attention[] = [
+      ...projectItems,
       ...rigs.filter(r => r.status === 'breakdown').map(r => ({
         key: `bd_${r.rig}`, tone: 'bad' as Tone, action: 'Open rig', href: '/admin/rigs',
         title: `${r.rig} is broken down today`, detail: `${r.project ?? ''} · ${r.note}`,
@@ -244,6 +264,9 @@ export function useAdminOverview() {
       }] : []),
     ]
 
-    return { today, month, dayOfMonth, rigs, now, prev, daily, lost, money: money_, alerts, urgentAlerts, attention, holes }
+    return {
+      today, month, dayOfMonth, rigs, now, prev, daily, lost, money: money_, alerts, urgentAlerts, attention, holes,
+      projects: costing.projects ?? [], projectNews: inbox.count + inbox.returned.length,
+    }
   }, [costing, inv])
 }

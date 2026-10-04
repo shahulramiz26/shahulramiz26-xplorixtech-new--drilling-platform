@@ -10,6 +10,7 @@ import {
   Bell, X, HardHat, Wrench
 } from 'lucide-react'
 import { ThemeScope, ThemeToggle } from '../components/theme'
+import { CostingProvider } from '../../lib/costing-store'
 
 const navItems = [
   { href: '/supervisor/dashboard',       label: 'Dashboard',        icon: LayoutDashboard },
@@ -19,7 +20,14 @@ const navItems = [
   { href: '/supervisor/logs',            label: 'Log History',      icon: ClipboardList   },
 ]
 
+/* The supervisor's screens read the same store as the office: the projects he
+ * can log against, the rigs on each, and the holes on the plan all come from
+ * the project record. */
 export default function SupervisorLayout({ children }: { children: React.ReactNode }) {
+  return <CostingProvider><SupervisorShell>{children}</SupervisorShell></CostingProvider>
+}
+
+function SupervisorShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
 

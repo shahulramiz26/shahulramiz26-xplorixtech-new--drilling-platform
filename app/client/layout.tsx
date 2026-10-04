@@ -5,9 +5,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Activity, Target, ClipboardList, Clock, BarChart3, ShieldCheck,
-  ListChecks, Scale, FileText, TrendingUp, Compass, LogOut, Menu, X, ChevronRight,
+  ListChecks, Scale, FileText, TrendingUp, Compass, LogOut, Menu, X, ChevronRight, FolderOpen,
 } from 'lucide-react'
-import { CostingProvider, OWNER_NAME } from '../../lib/costing-store'
+import { CostingProvider, OWNER_NAME, useCosting } from '../../lib/costing-store'
+import { ownerInbox } from '../../lib/projects'
 import { OwnerPortalProvider, usePortal, PORTAL_TODAY, shortDate } from '../../lib/owner-portal'
 import { T, display } from './ui'
 import { ThemeScope, ThemeToggle } from '../components/theme'
@@ -23,12 +24,13 @@ import { ThemeScope, ThemeToggle } from '../components/theme'
  * the programme, how each contractor is doing, what am I being asked to pay.
  * ========================================================================== */
 
-type Item = { href: string; label: string; icon: React.ElementType; badge?: 'holes' | 'invoices' | 'today'; dev?: boolean }
+type Item = { href: string; label: string; icon: React.ElementType; badge?: 'holes' | 'invoices' | 'today' | 'projects'; dev?: boolean }
 const GROUPS: { title: string; items: Item[] }[] = [
   {
     title: 'Programme',
     items: [
       { href: '/client', label: 'Today', icon: LayoutDashboard, badge: 'today' },
+      { href: '/client/projects', label: 'Projects', icon: FolderOpen, badge: 'projects' },
       { href: '/client/operations', label: 'Operations', icon: Activity },
       { href: '/client/holes', label: 'Holes', icon: Target },
       { href: '/client/shifts', label: 'Daily shift record', icon: ClipboardList },
@@ -62,7 +64,7 @@ const ALL = GROUPS.flatMap(g => g.items)
 
 const PORTAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap');
-  @media (max-width: 900px) { .xpl-split { grid-template-columns: minmax(0,1fr) !important; } }
+  @media (max-width: 900px) { .xpl-split { grid-template-columns: minmax(0,1fr) !important; } .xpl-prow { grid-template-columns: minmax(0,1fr) !important; gap: 10px !important; } }
   .xpl-row:hover { background: rgba(var(--x-ov),0.025); }
   .xpl-nav:hover { background: rgba(var(--x-ov),0.04); color: var(--x-text) !important; }
 `
@@ -71,13 +73,15 @@ function Shell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
   const p = usePortal()
+  const inbox = ownerInbox(useCosting().state)
 
   const current = [...ALL].sort((a, b) => b.href.length - a.href.length)
     .find(n => pathname === n.href || pathname.startsWith(n.href + '/'))
   const badge = (b?: Item['badge']) =>
     b === 'holes' ? p.holesWaiting
     : b === 'invoices' ? p.toVerify.length
-    : b === 'today' ? p.holesWaiting + p.toVerify.length + p.claimsWaiting.length + p.missingShifts.length
+    : b === 'projects' ? inbox.count
+    : b === 'today' ? p.holesWaiting + p.toVerify.length + p.claimsWaiting.length + p.missingShifts.length + inbox.waiting.length
     : 0
 
   return (

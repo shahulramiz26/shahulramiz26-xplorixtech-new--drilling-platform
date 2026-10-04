@@ -1012,7 +1012,7 @@ function PickPartsModal({ title, subtitle, tone, note, qtyLabel, withRig, confir
             </Field>
           )}
           <Field label="Date recorded" hint={withRig ? 'Tooling costs start from this date' : undefined}>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} />
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle }} />
           </Field>
           <Field label="Recorded by"><input value={by} onChange={e => setBy(e.target.value)} style={iStyle} /></Field>
         </Grid>
@@ -1103,7 +1103,7 @@ function IssueModal({ project, prefill, onSave, onClose }: {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Grid cols={3}>
           <Field label="Rig"><select value={rig} onChange={e => setRig(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}>{RIGS.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
-          <Field label="Issued on" hint="This date changes the rig's tooling cost from here on"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field>
+          <Field label="Issued on" hint="This date changes the rig's tooling cost from here on"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle }} /></Field>
           <Field label="Issued by"><input value={by} onChange={e => setBy(e.target.value)} style={iStyle} /></Field>
         </Grid>
         {stock.length === 0 ? <Empty>Nothing on the shelf from purchase orders for {projectCode(project)}.</Empty> : (
@@ -1592,7 +1592,7 @@ function ReceiveModal({ po, onSave, onClose }: { po: PurchaseOrder; onSave: (dat
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Note tone={C.dim}>Accepted parts go onto the store shelf. Damaged and wrong stock becomes a reorder.</Note>
         <Grid cols={2}>
-          <Field label="Delivered on"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field>
+          <Field label="Delivered on"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle }} /></Field>
           <Field label="Note"><input value={note} onChange={e => setNote(e.target.value)} placeholder="Optional" style={iStyle} /></Field>
         </Grid>
         {delay != null && <Note tone={late ? C.red : C.green}>{po.promisedDate && `Promised ${fullDate(po.promisedDate)}. `}{late ? `${delay} days late.` : delay === 0 ? 'On time.' : `${Math.abs(delay)} days early.`}</Note>}
@@ -1624,7 +1624,7 @@ function RaiseReorderModal({ po, onSave, onClose }: { po: PurchaseOrder; onSave:
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn tone="primary" disabled={picked.length === 0} onClick={() => { onSave(picked.map(r => ({ itemId: r.itemId, qty: r.qty, reason: r.reason.trim() || 'Arrived unusable', raisedDate: TODAY, round: 1, status: promisedDate ? 'promised' : 'raised', promisedDate: promisedDate || undefined }))); onClose() }}>Raise {picked.length} reorder{picked.length === 1 ? '' : 's'}</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Note tone={C.dim}>Each part gets its own line in the Reorders table. Set quantity to zero to skip a part.</Note>
-        <Grid cols={2}><Field label="Replacement promised" hint="Optional — applies to all parts on this reorder"><input type="date" value={promisedDate} onChange={e => setPromisedDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field></Grid>
+        <Grid cols={2}><Field label="Replacement promised" hint="Optional — applies to all parts on this reorder"><input type="date" value={promisedDate} onChange={e => setPromisedDate(e.target.value)} style={{ ...iStyle }} /></Field></Grid>
         <table style={tableStyle}>
           <thead><tr><th style={th}>Part</th><th style={thR}>Faulty</th><th style={thR}>Reordering</th><th style={th}>What was wrong</th><th style={thR}>Value</th></tr></thead>
           <tbody>{candidates.map(l => { const max = qtyToReorder(po, l.itemId); const r = rows[l.itemId]; const on = r.qty > 0; return (<tr key={l.itemId} style={{ borderBottom: rowBorder, opacity: on ? 1 : 0.5 }}><td style={{ ...td, color: C.text, whiteSpace: 'normal', maxWidth: 220 }}>{nameOf(l.itemId)}</td><td style={{ ...tdN, color: C.red }}>{max}</td><td style={{ padding: '5px 8px', width: 104 }}><input type="number" min={0} max={max} value={r.qty} onChange={e => set(l.itemId, { qty: Math.min(max, Math.max(0, parseFloat(e.target.value) || 0)) })} style={{ ...numStyle, color: on ? C.orange : C.muted }} /></td><td style={{ padding: '5px 8px', minWidth: 220 }}><input value={r.reason} disabled={!on} onChange={e => set(l.itemId, { reason: e.target.value })} placeholder="e.g. cases cracked in transit" style={{ ...iStyle, opacity: on ? 1 : 0.45 }} /></td><td style={{ ...tdN, color: on ? C.text : C.dim, fontWeight: on ? 700 : 400 }}>{on ? money(r.qty * rateOfLine(po, l.itemId)) : '—'}</td></tr>) })}</tbody>
@@ -1654,7 +1654,7 @@ function ReceiveReorderModal({ po, reorder, onSave, onClose }: { po: PurchaseOrd
     <Modal title={`Receive replacement — round ${reorder.round}`} subtitle={`${name} · ${po.number} · ${po.supplier}`} width={640} onClose={onClose}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn tone="primary" disabled={accepted + damaged + rejected === 0} onClick={() => { onSave({ date, accepted, damaged, rejected, note: note || undefined }); onClose() }}>{faulty > 0 ? `Record and reorder ${faulty}` : 'Record replacement'}</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <Grid cols={2}><Field label="Arrived on"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field><Field label="Note"><input value={note} onChange={e => setNote(e.target.value)} placeholder="Optional" style={iStyle} /></Field></Grid>
+        <Grid cols={2}><Field label="Arrived on"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle }} /></Field><Field label="Note"><input value={note} onChange={e => setNote(e.target.value)} placeholder="Optional" style={iStyle} /></Field></Grid>
         <Grid cols={3}>
           <Field label="Accepted" hint="goes onto the shelf"><input type="number" min={0} max={reorder.qty} value={accepted} onChange={e => set('accepted', parseFloat(e.target.value) || 0)} style={{ ...numStyle, color: C.green }} /></Field>
           <Field label="Damaged" hint="faulty again"><input type="number" min={0} max={reorder.qty} value={damaged} onChange={e => set('damaged', parseFloat(e.target.value) || 0)} style={{ ...numStyle, color: C.red }} /></Field>
@@ -1686,7 +1686,7 @@ function POModal({ po, onSave, onPlace, onClose }: { po: PurchaseOrder; onSave: 
     <Modal title={`Place ${f.number}`} subtitle={`${f.supplier} — ${money(value)}`} width={520} onClose={() => setPlacing(false)}
       footer={<><Btn onClick={() => setPlacing(false)}>Back</Btn><Btn tone="primary" onClick={() => { onSave(f); onPlace(f.id, ordered, promised); onClose() }}>Place order</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <Grid cols={2}><Field label="Ordered on"><input type="date" value={ordered} onChange={e => { setOrdered(e.target.value); setPromised(addDays(e.target.value, quoted)) }} style={{ ...iStyle, colorScheme: 'dark' }} /></Field><Field label="Promised delivery" hint={`${f.supplier} quotes ${quoted} days`}><input type="date" value={promised} onChange={e => setPromised(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field></Grid>
+        <Grid cols={2}><Field label="Ordered on"><input type="date" value={ordered} onChange={e => { setOrdered(e.target.value); setPromised(addDays(e.target.value, quoted)) }} style={{ ...iStyle }} /></Field><Field label="Promised delivery" hint={`${f.supplier} quotes ${quoted} days`}><input type="date" value={promised} onChange={e => setPromised(e.target.value)} style={{ ...iStyle }} /></Field></Grid>
         <Note tone={C.dim}>Once placed, lines are fixed — receipts are recorded against them.</Note>
       </div>
     </Modal>

@@ -152,7 +152,7 @@ function Sel<T extends string>({ label, value, options, onChange, hint, labels }
 }
 
 function DateF({ label, value, onChange, hint }: { label: string; value: string; onChange: (v: string) => void; hint?: string }) {
-  return <Field label={label} hint={hint}><input type="date" value={value} onChange={e => onChange(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field>
+  return <Field label={label} hint={hint}><input type="date" value={value} onChange={e => onChange(e.target.value)} style={{ ...iStyle }} /></Field>
 }
 
 function Switch({ on, onChange, label, hint }: { on: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {

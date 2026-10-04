@@ -28,13 +28,13 @@ import { ThemeScope, ThemeToggle } from '../components/theme'
  * copy and the badges stay true as work is done.
  * ========================================================================== */
 
-type NavItem = { href: string; label: string; icon: React.ElementType; badge?: 'finance' | 'inventory' | number }
+type NavItem = { href: string; label: string; icon: React.ElementType; badge?: 'finance' | 'inventory' | 'projects' | number }
 const NAV: { title: string | null; items: NavItem[] }[] = [
   { title: null, items: [{ href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
   {
     title: 'Operations',
     items: [
-      { href: '/admin/projects', label: 'Projects', icon: FolderOpen },
+      { href: '/admin/projects', label: 'Projects', icon: FolderOpen, badge: 'projects' },
       { href: '/admin/rigs', label: 'Rigs & equipment', icon: Truck },
       { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
       { href: '/admin/reports', label: 'Performance reports', icon: FileText },
@@ -75,7 +75,7 @@ const ALL = NAV.flatMap(g => g.items)
 
 const SHELL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap');
-  @media (max-width: 900px) { .xpl-split { grid-template-columns: minmax(0,1fr) !important; } }
+  @media (max-width: 900px) { .xpl-split { grid-template-columns: minmax(0,1fr) !important; } .xpl-prow { grid-template-columns: minmax(0,1fr) !important; gap: 10px !important; } }
   .xpl-row:hover { background: rgba(var(--x-ov),0.025); }
   .xpl-nav:hover { background: rgba(var(--x-ov),0.04); color: var(--x-text) !important; }
   .xpl-hit:hover { background: rgba(var(--x-ov),0.05); }
@@ -99,7 +99,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     .find(n => pathname === n.href || pathname.startsWith(n.href + '/'))
 
   const financeCount = o.money.returned.length + o.money.disputed.length
-  const badge = (b: NavItem['badge']) => b === 'finance' ? financeCount : b === 'inventory' ? o.urgentAlerts.length : b ?? 0
+  const badge = (b: NavItem['badge']) => b === 'finance' ? financeCount : b === 'inventory' ? o.urgentAlerts.length : b === 'projects' ? o.projectNews : b ?? 0
   const badgeTone = (b: NavItem['badge']) => (b === 'finance' && financeCount) || (b === 'inventory' && o.urgentAlerts.length) ? T.red : T.orange
 
   // Ctrl K or ⌘ K opens search from anywhere; so does "/" when not typing.
@@ -266,16 +266,13 @@ function Palette({ onClose }: { onClose: () => void }) {
   const items = useMemo(() => {
     const pages = ALL.map(n => ({ kind: 'Page', label: n.label, sub: '', href: n.href }))
     const rigs = o.rigs.map(r => ({ kind: 'Rig', label: r.rig, sub: [r.project, r.hole ? `on ${r.hole}` : ''].filter(Boolean).join(' · '), href: '/admin/rigs' }))
-    const projects = Array.from(new Set(o.holes.map(h => h.project))).map(p => {
-      const last = o.holes.filter(h => h.project === p)[0]
-      return { kind: 'Project', label: p, sub: projectCode(p), href: financeLink({ project: p, rig: last.rig, month: monthOf(last.end ?? last.start) }) }
-    })
+    const projects = o.projects.map(p => ({ kind: 'Project', label: p.name, sub: `${p.code} · ${p.client}`, href: `/admin/projects/${p.id}` }))
     const holes = o.holes.map(h => ({
       kind: 'Hole', label: h.id, sub: `${h.project} · ${h.rig} · ${Math.round(h.drilled)} m`,
       href: financeLink({ project: h.project, rig: h.rig, month: monthOf(h.end ?? h.start), tab: h.status === 'drilling' ? 'Performance' : 'Drillholes' }),
     }))
     return [...pages, ...rigs, ...projects, ...holes]
-  }, [o.rigs, o.holes])
+  }, [o.rigs, o.holes, o.projects])
 
   const hits = useMemo(() => {
     const s = q.trim().toLowerCase()

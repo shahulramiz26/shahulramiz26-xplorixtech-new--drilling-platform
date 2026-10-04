@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { moneyL, money } from '../../lib/costing-store'
+import { moneyL, money, useCosting, fullDate } from '../../lib/costing-store'
+import { ownerInbox, projectByName } from '../../lib/projects'
 import {
   usePortal, PROGRAMME, PROGRAMME_NOW, DEMO_HOLES, CONTRACTORS, HSE_INCIDENTS, AI_ALERTS, LIVE_CONTRACTOR,
   spendSummary, invoiceState, isInvoiceOverdue, payable, recoveryFlag, offPlanFlag, shortDate, num,
@@ -20,8 +21,18 @@ interface Item { key: string; tone: Tone; title: string; detail: string; href: s
 
 export default function TodayPage() {
   const p = usePortal()
+  const { state } = useCosting()
+  const inbox = ownerInbox(state)
+  const idOf = (name: string) => projectByName(state, name)?.id ?? ''
+  const changed = Array.from(new Set(inbox.unseen.filter(e => e.kind !== 'rates').map(e => e.project)))
 
   const decide: Item[] = [
+    ...inbox.waiting.map(r => ({
+      key: `rp_${r.id}`, tone: 'warn' as Tone, live: true, action: 'Review rates',
+      title: `New contract rates proposed on ${r.project}`,
+      detail: `${CONTRACTORS[LIVE_CONTRACTOR].name} · would start ${fullDate(r.rate.effectiveFrom)} · ${r.rate.note ?? 'no reason given'}`,
+      href: `/client/projects/${idOf(r.project)}?tab=rates`,
+    })),
     ...p.liveWaiting.map(h => ({
       key: `lh_${h.id}`, tone: 'info' as Tone, live: true, action: 'Review hole',
       title: `Hole ${h.id} is closed and waiting for your approval`,
@@ -57,6 +68,15 @@ export default function TodayPage() {
 
   const overdue = p.invoices.filter(isInvoiceOverdue)
   const look: Item[] = [
+    ...changed.map(name => {
+      const mine = inbox.unseen.filter(e => e.project === name && e.kind !== 'rates')
+      return {
+        key: `pc_${name}`, tone: 'info' as Tone, live: true, action: 'Open project',
+        title: mine.length === 1 ? `${name}: ${mine[0].title.toLowerCase()}` : `${mine.length} changes on ${name}`,
+        detail: `${CONTRACTORS[LIVE_CONTRACTOR].name} · ${mine.map(e => e.detail ?? e.title).slice(0, 2).join(' · ')}`,
+        href: `/client/projects/${idOf(name)}?tab=changes`,
+      }
+    }),
     ...p.missingShifts.map(s => ({
       key: `ms_${s.id}`, tone: 'warn' as Tone, action: 'Open shifts',
       title: `Shift not submitted: ${s.rig}, ${shortDate(s.date)} ${s.shift.toLowerCase()} shift`,

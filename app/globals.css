@@ -64,6 +64,7 @@
   --x-shadow: 0,0,0;
   --x-card-shadow: none;
   --x-on-accent: #FFFFFF;
+  color-scheme: dark;      /* native date pickers and scrollbars follow the theme */
 }
 
 html[data-theme="light"] {

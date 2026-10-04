@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, ReactNode } from 'react'
+import { useState, useMemo, useEffect, ReactNode } from 'react'
 import { Plus, Trash2, Search, X, Drill, Wrench } from 'lucide-react'
 import {
   useInventory, rigHoldings, formationUse, FORMATION_USE_LABEL,
@@ -8,6 +8,7 @@ import {
   type RigHoldingLine, type PartCategory,
 } from '../../../lib/inventory-store'
 import { useCostingOptional } from '../../../lib/costing-store'
+import { projectHoles } from '../../../lib/projects'
 import { hexA } from '../../../lib/theme'
 
 /* ==========================================================================
@@ -543,6 +544,13 @@ export default function DrillingLogPage() {
 
   const [standby, setStandby] = useState(false)
   const [holeNumber, setHoleNumber] = useState('')
+  const record = costing?.state.projects?.find(p => p.name === project)
+  // Rigs assigned to the project come first; with none assigned, every rig is offered.
+  const rigChoices = record?.rigs.length ? record.rigs : RIGS
+  useEffect(() => { if (!rigChoices.includes(rig)) setRig(rigChoices[0]) }, [rigChoices, rig])
+  const openHoles = useMemo(
+    () => costing ? projectHoles(costing.state, project).filter(h => h.status === 'planned' || h.status === 'drilling') : [],
+    [costing, project])
   const [holeSize, setHoleSize] = useState<string>('HQ')
   const [formation, setFormation] = useState<string>('Hard Formation')
   const [crewCount, setCrewCount] = useState(4)
@@ -669,11 +677,11 @@ export default function DrillingLogPage() {
             </Field>
             <Field label="Rig">
               <select value={rig} onChange={e => setRig(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}>
-                {RIGS.map(x => <option key={x} value={x}>{x}</option>)}
+                {rigChoices.map(x => <option key={x} value={x}>{x}</option>)}
               </select>
             </Field>
             <Field label="Date">
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} />
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle }} />
             </Field>
             <Field label="Shift">
               <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: 4 }}>
@@ -717,7 +725,13 @@ export default function DrillingLogPage() {
         <>
           <Card title="The hole" accent={C.orange}>
             <Grid cols={4}>
-              <Field label="Hole number"><input value={holeNumber} onChange={e => setHoleNumber(e.target.value)} placeholder="e.g. DH-004" style={{ ...iStyle, fontFamily: 'ui-monospace, monospace' }} /></Field>
+              <Field label="Hole number">
+                <input value={holeNumber} onChange={e => setHoleNumber(e.target.value)} placeholder={openHoles[0] ? `e.g. ${openHoles[0].id}` : 'e.g. DH-004'} list="holes-on-project" style={{ ...iStyle, fontFamily: 'ui-monospace, monospace' }} />
+                {/* The holes on this project's plan that are not finished: pick one instead of typing it. */}
+                <datalist id="holes-on-project">
+                  {openHoles.map(h => <option key={h.id} value={h.id}>{h.status === 'planned' ? `planned, ${h.planned} m` : `${Math.round(h.drilled)} m of ${h.planned ?? '?'} m`}</option>)}
+                </datalist>
+              </Field>
               <Field label="Hole size">
                 <select value={holeSize} onChange={e => setHoleSize(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}>
                   {HOLE_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
