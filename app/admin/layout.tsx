@@ -1,259 +1,341 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
-
+import { usePathname, useRouter } from 'next/navigation'
 import {
-  LayoutDashboard, Users, FolderOpen, Settings,
-  Truck, CreditCard, BarChart3, LogOut, Menu,
-  ChevronRight, Search, DollarSign, X, Boxes, FileText, Brain,
-  Store, MessageSquareQuote, Bookmark, HardHat, Target,
+  LayoutDashboard, Users, FolderOpen, Settings, Truck, CreditCard, BarChart3, LogOut, Menu, Search,
+  DollarSign, X, Boxes, FileText, Brain, Store, HardHat, Target, Bell, CornerDownLeft,
 } from 'lucide-react'
-import NotificationCenter from '../components/NotificationCenter'
 import { CurrencyProvider } from '../components/currency-context'
-import CurrencySwitcher from '../components/CurrencySwitcher'
+import { CostingProvider, monthOf, projectCode } from '../../lib/costing-store'
+import { useAdminOverview, financeLink, type Tone } from '../../lib/admin-overview'
+import { T, display, toneColor } from '../components/kit'
+import { ThemeScope, ThemeToggle } from '../components/theme'
 
-/* ------------------------------------------------------------------ *
- * Nav is now grouped. Operations and Exchange are different mental
- * modes — a flat 14-item list buries both.
+/* ==========================================================================
+ * COMPANY ADMIN — the shell around every screen
  *
- * Bid Intelligence sits directly above Finance & Costing because that
- * is the order the work happens in: you price a tender, you win it, it
- * becomes a project, and then it costs out. The two screens share an
- * engine, so they belong next to each other in the eye as well.
- * ------------------------------------------------------------------ */
-type NavItem = {
-  href: string
-  label: string
-  icon: React.ElementType
-  badge?: number
-}
+ * The menu is grouped by the job in hand rather than listed flat: run the
+ * rigs, win and bill the work, keep the stock, then the account itself.
+ *
+ * Three things here used to be decoration and now do something:
+ *   - search opens a jump list of every page, rig, project and hole (Ctrl K);
+ *   - the bell lists what actually needs the admin, from the live stores;
+ *   - the badges on Finance and Inventory are real counts.
+ *
+ * The costing store is mounted here once, so every admin screen reads the same
+ * copy and the badges stay true as work is done.
+ * ========================================================================== */
 
-const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
+type NavItem = { href: string; label: string; icon: React.ElementType; badge?: 'finance' | 'inventory' | 'projects' | number }
+const NAV: { title: string | null; items: NavItem[] }[] = [
+  { title: null, items: [{ href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
   {
-    title: 'Main Menu',
+    title: 'Operations',
     items: [
-      { href: '/admin/dashboard',            label: 'Dashboard',            icon: LayoutDashboard },
-      { href: '/admin/bid-intelligence',     label: 'Bid Intelligence',     icon: Target          },
-      { href: '/admin/finance',              label: 'Finance & Costing',    icon: DollarSign      },
-      { href: '/admin/inventory',            label: 'Inventory',            icon: Boxes           },
-      { href: '/admin/users',                label: 'User Management',      icon: Users           },
-      { href: '/admin/projects',             label: 'Projects',             icon: FolderOpen      },
-      { href: '/admin/rigs',                 label: 'Rigs & Equipment',     icon: Truck           },
-      { href: '/admin/billing',              label: 'Billing',              icon: CreditCard      },
-      { href: '/admin/analytics',            label: 'Analytics',            icon: BarChart3       },
-      { href: '/admin/xplorix-intelligence', label: 'XPLORIX Intelligence', icon: Brain           },
-      { href: '/admin/reports',              label: 'Performance Reports',  icon: FileText        },
-      { href: '/admin/settings',             label: 'Settings',             icon: Settings        },
+      { href: '/admin/projects', label: 'Projects', icon: FolderOpen, badge: 'projects' },
+      { href: '/admin/rigs', label: 'Rigs & equipment', icon: Truck },
+      { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+      { href: '/admin/reports', label: 'Performance reports', icon: FileText },
     ],
+  },
+  {
+    title: 'Commercial',
+    items: [
+      { href: '/admin/bid-intelligence', label: 'Bid Intelligence', icon: Target },
+      { href: '/admin/finance', label: 'Finance & costing', icon: DollarSign, badge: 'finance' },
+    ],
+  },
+  {
+    title: 'Stock',
+    items: [{ href: '/admin/inventory', label: 'Parts & inventory', icon: Boxes, badge: 'inventory' }],
+  },
+  {
+    title: 'Insight',
+    items: [{ href: '/admin/xplorix-intelligence', label: 'XPLORIX Intelligence', icon: Brain }],
   },
   {
     title: 'Exchange',
     items: [
-      { href: '/admin/marketplace',            label: 'Marketplace',   icon: Store              },
-      { href: '/admin/crew',                   label: 'Crew & Jobs',   icon: HardHat, badge: 8  },
-      { href: '/admin/marketplace/inquiries',  label: 'My Inquiries',  icon: MessageSquareQuote, badge: 3 },
-      { href: '/admin/marketplace/saved',      label: 'Saved',         icon: Bookmark           },
+      { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
+      { href: '/admin/crew', label: 'Crew & jobs', icon: HardHat, badge: 8 },
+    ],
+  },
+  {
+    title: 'Account',
+    items: [
+      { href: '/admin/users', label: 'Users', icon: Users },
+      { href: '/admin/billing', label: 'Billing', icon: CreditCard },
+      { href: '/admin/settings', label: 'Settings', icon: Settings },
     ],
   },
 ]
+const ALL = NAV.flatMap(g => g.items)
 
-const ALL_ITEMS = NAV_GROUPS.flatMap((g) => g.items)
+const SHELL_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap');
+  @media (max-width: 900px) { .xpl-split { grid-template-columns: minmax(0,1fr) !important; } .xpl-prow { grid-template-columns: minmax(0,1fr) !important; gap: 10px !important; } }
+  .xpl-row:hover { background: rgba(var(--x-ov),0.025); }
+  .xpl-nav:hover { background: rgba(var(--x-ov),0.04); color: var(--x-text) !important; }
+  .xpl-hit:hover { background: rgba(var(--x-ov),0.05); }
+`
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+function longDate(d: string) {
+  const [y, m, dd] = d.split('-').map(Number)
+  return `${DAY[new Date(Date.UTC(y, m - 1, dd)).getUTCDay()]} ${dd} ${MON[m - 1]} ${y}`
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const [palette, setPalette] = useState(false)
+  const [bell, setBell] = useState(false)
   const pathname = usePathname()
+  const o = useAdminOverview()
 
-  // Longest match wins, so /admin/marketplace/saved doesn't light up Marketplace.
-  const currentPage = [...ALL_ITEMS]
-    .sort((a, b) => b.href.length - a.href.length)
-    .find((n) => pathname === n.href || pathname.startsWith(n.href + '/'))
+  const current = [...ALL].sort((a, b) => b.href.length - a.href.length)
+    .find(n => pathname === n.href || pathname.startsWith(n.href + '/'))
 
-  const pageLabel = currentPage?.label || pathname.split('/')[2] || 'Dashboard'
+  const financeCount = o.money.returned.length + o.money.disputed.length
+  const badge = (b: NavItem['badge']) => b === 'finance' ? financeCount : b === 'inventory' ? o.urgentAlerts.length : b === 'projects' ? o.projectNews : b ?? 0
+  const badgeTone = (b: NavItem['badge']) => (b === 'finance' && financeCount) || (b === 'inventory' && o.urgentAlerts.length) ? T.red : T.orange
 
-  const isActive = (href: string) => currentPage?.href === href
+  // Ctrl K or ⌘ K opens search from anywhere; so does "/" when not typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target as HTMLElement)?.tagName ?? '')
+      if ((e.key === 'k' && (e.ctrlKey || e.metaKey)) || (e.key === '/' && !typing)) { e.preventDefault(); setPalette(true) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+  useEffect(() => { setOpen(false); setBell(false) }, [pathname])
 
   return (
-    <CurrencyProvider>
-      <div className="min-h-screen flex" style={{ background: '#080B10', color: '#F8FAFC' }}>
+    <div className="min-h-screen flex" style={{ background: T.bg, color: T.text }}>
+      <style dangerouslySetInnerHTML={{ __html: SHELL_CSS }} />
 
-        <AnimatePresence>
-          {sidebarOpen && (
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="lg:hidden fixed inset-0 z-40"
-              style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
-              onClick={() => setSidebarOpen(false)}
-            />
-          )}
-        </AnimatePresence>
+      {open && <div className="lg:hidden fixed inset-0 z-40" style={{ background: 'rgba(var(--x-shadow),0.7)' }} onClick={() => setOpen(false)} />}
 
-        {/* SIDEBAR */}
-        <aside
-          className={`fixed lg:static inset-y-0 left-0 z-50 flex flex-col w-72 transition-transform duration-300 ease-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
-          style={{ background: 'linear-gradient(180deg, #0D1117 0%, #080B10 100%)', borderRight: '1px solid #1E293B' }}
-        >
-          {/* Logo */}
-          <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid #1E293B' }}>
-            <Link href="/admin/dashboard" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
-              <svg width="40" height="40" viewBox="0 0 100 100" fill="none" style={{ flexShrink: 0, filter: 'drop-shadow(0 0 8px rgba(249,115,22,0.3))' }}>
-                <polygon points="50,50 5,5 5,95" fill="#1a1a1a"/>
-                <polygon points="50,50 5,5 30,5" fill="#2a2a2a"/>
-                <polygon points="50,50 5,95 30,95" fill="#2a2a2a"/>
-                <polygon points="50,50 95,5 95,95" fill="#F97316"/>
-                <polygon points="50,50 95,5 70,5" fill="#EA580C"/>
-                <polygon points="50,50 95,95 70,95" fill="#EA580C"/>
-              </svg>
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#F8FAFC', letterSpacing: '0.05em', fontFamily: "'Space Grotesk', sans-serif" }}>XPLORIX</div>
-                <div style={{ fontSize: 9, color: '#64748B', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 1 }}>Admin Console</div>
-              </div>
-            </Link>
-            <button className="lg:hidden" onClick={() => setSidebarOpen(false)}
-              style={{ color: '#64748B', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-              <X size={18} />
-            </button>
-          </div>
-
-          {/* Nav */}
-          <nav className="flex-1 p-4 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
-            {NAV_GROUPS.map((group, gi) => (
-              <div key={group.title} style={{ marginTop: gi === 0 ? 0 : 20 }}>
-                <div style={{
-                  fontSize: 10, fontWeight: 700, color: '#334155',
-                  letterSpacing: '0.15em', textTransform: 'uppercase',
-                  padding: '8px 16px 12px',
-                  display: 'flex', alignItems: 'center', gap: 10,
-                }}>
-                  {group.title}
-                  {gi > 0 && <span style={{ flex: 1, height: 1, background: '#1E293B' }} />}
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  {group.items.map((item) => {
-                    const active = isActive(item.href)
-                    return (
-                      <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 12,
-                          padding: '11px 14px', borderRadius: 12,
-                          textDecoration: 'none', transition: 'all 0.2s',
-                          background: active ? 'linear-gradient(90deg, rgba(249,115,22,0.12), transparent)' : 'transparent',
-                          borderLeft: active ? '2px solid #F97316' : '2px solid transparent',
-                          color: active ? '#F8FAFC' : '#64748B',
-                        }}
-                        onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLElement).style.color = '#F8FAFC' } }}
-                        onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#64748B' } }}
-                      >
-                        <div style={{
-                          width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: active ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.04)',
-                          border: active ? '1px solid rgba(249,115,22,0.25)' : '1px solid transparent',
-                        }}>
-                          <item.icon size={16} style={{ color: active ? '#F97316' : 'inherit' }} />
-                        </div>
-                        <span style={{ fontSize: 14, fontWeight: 500, flex: 1 }}>{item.label}</span>
-
-                        {item.badge && !active ? (
-                          <span style={{
-                            minWidth: 20, height: 20, padding: '0 6px', borderRadius: 10,
-                            background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.25)',
-                            color: '#F97316', fontSize: 11, fontWeight: 700,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            {item.badge}
-                          </span>
-                        ) : active ? (
-                          <ChevronRight size={14} style={{ color: '#F97316', opacity: 0.7 }} />
-                        ) : null}
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </nav>
-
-          {/* Live status */}
-          <div className="px-4 pb-2">
-            <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 6px #10B981', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#F8FAFC' }}>System Live</div>
-                <div style={{ fontSize: 10, color: '#64748B', marginTop: 1 }}>All rigs reporting</div>
-              </div>
+      {/* SIDEBAR */}
+      <aside
+        className={`fixed lg:sticky lg:top-0 inset-y-0 left-0 z-50 flex flex-col w-60 lg:h-screen transition-transform duration-200 ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        style={{ background: 'var(--x-side)', borderRight: `1px solid ${T.border}` }}
+      >
+        <div className="flex items-center justify-between" style={{ padding: '16px 16px 14px', borderBottom: `1px solid ${T.border}` }}>
+          <Link href="/admin/dashboard" className="flex items-center gap-3" style={{ textDecoration: 'none', minWidth: 0 }}>
+            <svg width="32" height="32" viewBox="0 0 100 100" fill="none" style={{ flexShrink: 0 }}>
+              <polygon points="50,50 5,5 5,95" fill="#1a1a1a" /><polygon points="50,50 5,5 30,5" fill="#2a2a2a" />
+              <polygon points="50,50 5,95 30,95" fill="#2a2a2a" /><polygon points="50,50 95,5 95,95" fill="#F97316" />
+              <polygon points="50,50 95,5 70,5" fill="#EA580C" /><polygon points="50,50 95,95 70,95" fill="#EA580C" />
+            </svg>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: T.text, letterSpacing: '0.05em', fontFamily: display }}>XPLORIX</div>
+              <div style={{ fontSize: 11.5, color: T.faint, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Apex Drilling Solutions</div>
             </div>
-          </div>
+          </Link>
+          <button className="lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu"
+            style={{ color: T.faint, background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+        </div>
 
-          {/* User */}
-          <div className="p-4" style={{ borderTop: '1px solid #1E293B' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid #1E293B' }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #F97316, #F59E0B)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, color: '#fff', boxShadow: '0 0 12px rgba(249,115,22,0.3)' }}>A</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#F8FAFC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Admin User</div>
-                <div style={{ fontSize: 11, color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>Apex Drilling Solutions</div>
-              </div>
-              <Link href="/auth/login" style={{ padding: 6, color: '#64748B', borderRadius: 8, display: 'flex' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#EF4444'; (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#64748B'; (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
-                <LogOut size={16} />
-              </Link>
+        <nav className="flex-1 overflow-y-auto" style={{ padding: '8px 10px 14px', scrollbarWidth: 'none' }}>
+          {NAV.map((g, gi) => (
+            <div key={g.title ?? 'top'} style={{ marginTop: gi === 0 ? 4 : 11 }}>
+              {g.title && <div style={{ fontSize: 11.5, fontWeight: 600, color: T.dim, padding: '0 10px 5px' }}>{g.title}</div>}
+              {g.items.map(item => {
+                const active = current?.href === item.href
+                const n = badge(item.badge)
+                return (
+                  <Link key={item.href} href={item.href} className={active ? '' : 'xpl-nav'} aria-current={active ? 'page' : undefined} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '6.5px 10px', borderRadius: 8, marginBottom: 1,
+                    textDecoration: 'none', fontSize: 13.5, fontWeight: active ? 600 : 500,
+                    background: active ? 'color-mix(in srgb, var(--x-orange) 12%, transparent)' : 'transparent', color: active ? T.text : T.muted,
+                  }}>
+                    <item.icon size={16} style={{ color: active ? T.orange : T.faint, flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                    {n > 0 && (
+                      <span aria-label={`${n} need attention`} style={{
+                        minWidth: 20, height: 20, padding: '0 6px', borderRadius: 10, fontSize: 11, fontWeight: 700,
+                        background: badgeTone(item.badge), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>{n}</span>
+                    )}
+                  </Link>
+                )
+              })}
             </div>
+          ))}
+        </nav>
+
+        <div style={{ padding: 12, borderTop: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Link href="/admin/billing" className="xpl-hit" style={{
+            display: 'block', padding: '9px 11px', borderRadius: 9, textDecoration: 'none',
+            border: '1px solid color-mix(in srgb, var(--x-orange) 28%, transparent)', background: 'color-mix(in srgb, var(--x-orange) 6%, transparent)',
+          }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text }}>Free trial: 12 days left</div>
+            <div style={{ fontSize: 11.5, color: T.muted, marginTop: 2 }}>See plans and upgrade</div>
+          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 2px 2px 4px' }}>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: 'var(--x-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12.5, color: T.text }}>A</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text }}>Admin User</div>
+              <div style={{ fontSize: 11.5, color: T.faint }}>Company admin</div>
+            </div>
+            <Link href="/auth/login" aria-label="Sign out" title="Sign out" className="xpl-hit" style={{ padding: 7, color: T.faint, borderRadius: 8, display: 'flex' }}><LogOut size={15} /></Link>
           </div>
-        </aside>
+        </div>
+      </aside>
 
-        {/* MAIN */}
-        <main className="flex-1 flex flex-col min-w-0">
-
-          {/* HEADER */}
-          <header style={{ position: 'sticky', top: 0, zIndex: 30, background: 'rgba(8,11,16,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(30,41,59,0.6)', padding: '0 28px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <button onClick={() => setSidebarOpen(true)} className="lg:hidden"
-                  style={{ padding: 8, color: '#64748B', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 8, display: 'flex' }}>
-                  <Menu size={22} />
-                </button>
-                <div className="hidden md:flex items-center gap-2" style={{ fontSize: 13 }}>
-                  <span style={{ color: '#334155', fontWeight: 500 }}>XPLORIX</span>
-                  <ChevronRight size={14} style={{ color: '#334155' }} />
-                  <span style={{ color: '#94A3B8', fontWeight: 600 }}>{pageLabel}</span>
-                  {pathname.split('/').length > 3 && !currentPage?.href.endsWith(pathname.split('/')[3]) && (
-                    <>
-                      <ChevronRight size={14} style={{ color: '#334155' }} />
-                      <span style={{ color: '#F97316', fontWeight: 600, fontSize: 12 }}>
-                        {pathname.split('/')[3]?.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
-                      </span>
-                    </>
+      {/* MAIN */}
+      <main className="flex-1 flex flex-col min-w-0">
+        <header style={{ position: 'sticky', top: 0, zIndex: 30, background: 'color-mix(in srgb, var(--x-bg) 92%, transparent)', backdropFilter: 'blur(14px)', borderBottom: `1px solid ${T.line}`, padding: '0 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56, gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
+              {/* No inline display here: it would beat the class that hides this on a wide screen. */}
+              <button onClick={() => setOpen(true)} className="lg:hidden flex" aria-label="Open menu"
+                style={{ padding: 6, color: T.faint, background: 'none', border: 'none', cursor: 'pointer' }}><Menu size={20} /></button>
+              <button onClick={() => setPalette(true)} className="xpl-hit" style={{
+                display: 'flex', alignItems: 'center', gap: 9, padding: '7px 11px', borderRadius: 9, cursor: 'pointer',
+                background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${T.border}`, color: T.faint, fontSize: 13,
+                fontFamily: 'inherit', width: '100%', maxWidth: 380, textAlign: 'left',
+              }}>
+                <Search size={14} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Search pages, rigs, projects, holes</span>
+                <kbd className="hidden sm:inline" style={{ fontSize: 11, padding: '1px 6px', borderRadius: 5, border: `1px solid ${T.border}`, color: T.faint, fontFamily: 'inherit' }}>Ctrl K</kbd>
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span className="hidden md:inline" style={{ fontSize: 12.5, color: T.faint, whiteSpace: 'nowrap' }}>{longDate(o.today)}</span>
+              <ThemeToggle />
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => setBell(b => !b)} aria-label={`${o.attention.length} things need attention`} aria-expanded={bell} className="xpl-hit"
+                  style={{ position: 'relative', padding: 8, borderRadius: 9, background: 'none', border: `1px solid ${T.border}`, color: T.muted, cursor: 'pointer', display: 'flex' }}>
+                  <Bell size={16} />
+                  {o.attention.length > 0 && (
+                    <span style={{ position: 'absolute', top: -6, right: -6, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: T.orange, color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{o.attention.length}</span>
                   )}
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div className="hidden md:flex items-center gap-2"
-                  style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid #1E293B' }}>
-                  <Search size={14} style={{ color: '#64748B', flexShrink: 0 }} />
-                  <input type="text" placeholder="Search..."
-                    style={{ background: 'none', border: 'none', outline: 'none', color: '#F8FAFC', fontSize: 13, width: 160, fontFamily: 'inherit' }} />
-                </div>
-                <CurrencySwitcher />
-                <NotificationCenter />
-                <Link href="/admin/projects" className="hidden sm:flex items-center gap-2"
-                  style={{ padding: '8px 18px', borderRadius: 10, background: 'linear-gradient(135deg, #F97316, #EA580C)', color: '#fff', fontWeight: 700, fontSize: 13, textDecoration: 'none', boxShadow: '0 4px 20px rgba(249,115,22,0.3)', whiteSpace: 'nowrap' }}>
-                  New Project
-                </Link>
+                </button>
+                {bell && (
+                  <>
+                    <div className="fixed inset-0" style={{ zIndex: 40 }} onClick={() => setBell(false)} />
+                    <div role="dialog" aria-label="Needs attention" style={{
+                      position: 'absolute', right: 0, top: 44, zIndex: 50, width: 'min(400px, calc(100vw - 32px))',
+                      background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 20px 50px rgba(var(--x-shadow),0.55)',
+                    }}>
+                      <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.line}`, fontSize: 13, fontWeight: 700, color: T.text }}>
+                        Needs attention{o.attention.length ? ` · ${o.attention.length}` : ''}
+                      </div>
+                      {o.attention.length === 0
+                        ? <div style={{ padding: 16, fontSize: 13, color: T.faint }}>Nothing needs you right now.</div>
+                        : o.attention.map((a, i) => (
+                          <Link key={a.key} href={a.href} className="xpl-row" style={{ display: 'flex', gap: 11, padding: '11px 14px', textDecoration: 'none', borderTop: i ? `1px solid ${T.line}` : 'none' }}>
+                            <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: toneColor[a.tone as Tone], flexShrink: 0, marginTop: 5 }} />
+                            <span style={{ minWidth: 0 }}>
+                              <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, lineHeight: 1.4 }}>{a.title}</span>
+                              <span style={{ display: 'block', fontSize: 12, color: T.faint, marginTop: 2, lineHeight: 1.4 }}>{a.detail}</span>
+                            </span>
+                          </Link>
+                        ))}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-          </header>
-
-          {/* PAGE CONTENT */}
-          <div className="flex-1 overflow-auto" style={{ padding: '28px 32px' }}>
-            {children}
           </div>
+        </header>
 
-        </main>
+        <div className="flex-1" style={{ padding: '26px 28px' }}>{children}</div>
+      </main>
+
+      {palette && <Palette onClose={() => setPalette(false)} />}
+    </div>
+  )
+}
+
+/* Jump list. Type a few letters of a page, rig, project or hole and press
+ * Enter. Holes and projects open Finance already on the right rig and month. */
+function Palette({ onClose }: { onClose: () => void }) {
+  const o = useAdminOverview()
+  const router = useRouter()
+  const [q, setQ] = useState('')
+  const [at, setAt] = useState(0)
+  const input = useRef<HTMLInputElement>(null)
+  useEffect(() => { input.current?.focus() }, [])
+
+  const items = useMemo(() => {
+    const pages = ALL.map(n => ({ kind: 'Page', label: n.label, sub: '', href: n.href }))
+    const rigs = o.rigs.map(r => ({ kind: 'Rig', label: r.rig, sub: [r.project, r.hole ? `on ${r.hole}` : ''].filter(Boolean).join(' · '), href: '/admin/rigs' }))
+    const projects = o.projects.map(p => ({ kind: 'Project', label: p.name, sub: `${p.code} · ${p.client}`, href: `/admin/projects/${p.id}` }))
+    const holes = o.holes.map(h => ({
+      kind: 'Hole', label: h.id, sub: `${h.project} · ${h.rig} · ${Math.round(h.drilled)} m`,
+      href: financeLink({ project: h.project, rig: h.rig, month: monthOf(h.end ?? h.start), tab: h.status === 'drilling' ? 'Performance' : 'Drillholes' }),
+    }))
+    return [...pages, ...rigs, ...projects, ...holes]
+  }, [o.rigs, o.holes, o.projects])
+
+  const hits = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    if (!s) return items.filter(i => i.kind === 'Page').slice(0, 9)
+    // A match in the name itself comes before a match in the small print, so
+    // typing a hole number finds the hole before the rig that is drilling it.
+    const rank = (i: typeof items[number]) => {
+      const label = i.label.toLowerCase()
+      return label.startsWith(s) ? 0 : label.includes(s) ? 1 : 2
+    }
+    return items
+      .filter(i => `${i.label} ${i.sub} ${i.kind}`.toLowerCase().includes(s))
+      .sort((a, b) => rank(a) - rank(b))
+      .slice(0, 9)
+  }, [q, items])
+  useEffect(() => { setAt(0) }, [q])
+
+  const go = (href: string) => { onClose(); router.push(href) }
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') onClose()
+    else if (e.key === 'ArrowDown') { e.preventDefault(); setAt(a => Math.min(hits.length - 1, a + 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setAt(a => Math.max(0, a - 1)) }
+    else if (e.key === 'Enter' && hits[at]) go(hits[at].href)
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(var(--x-shadow),0.7)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '12vh 16px 0' }}>
+      <div role="dialog" aria-label="Search" onClick={e => e.stopPropagation()} onKeyDown={onKey}
+        style={{ width: '100%', maxWidth: 560, background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 30px 80px rgba(var(--x-shadow),0.6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', borderBottom: `1px solid ${T.line}` }}>
+          <Search size={16} style={{ color: T.faint }} />
+          <input ref={input} value={q} onChange={e => setQ(e.target.value)} placeholder="Type a page, rig, project or hole number"
+            aria-label="Search" style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: T.text, fontSize: 15, fontFamily: 'inherit' }} />
+          <kbd style={{ fontSize: 11, padding: '1px 6px', borderRadius: 5, border: `1px solid ${T.border}`, color: T.faint, fontFamily: 'inherit' }}>Esc</kbd>
+        </div>
+        <div style={{ maxHeight: '52vh', overflowY: 'auto', padding: 6 }}>
+          {hits.length === 0 && <div style={{ padding: '18px 12px', fontSize: 13.5, color: T.faint }}>Nothing matches &ldquo;{q}&rdquo;. Try a rig number like RIG-001 or a hole like DH-004.</div>}
+          {hits.map((h, i) => (
+            <button key={`${h.kind}_${h.label}`} onClick={() => go(h.href)} onMouseEnter={() => setAt(i)} style={{
+              display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '9px 11px', borderRadius: 9, cursor: 'pointer',
+              border: 'none', textAlign: 'left', fontFamily: 'inherit', background: i === at ? 'color-mix(in srgb, var(--x-orange) 12%, transparent)' : 'transparent',
+            }}>
+              <span style={{ width: 58, fontSize: 11.5, color: T.faint, flexShrink: 0 }}>{h.kind}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontSize: 14, color: T.text, fontWeight: 600 }}>{h.label}</span>
+                {h.sub && <span style={{ fontSize: 12.5, color: T.faint, marginLeft: 9 }}>{h.sub}</span>}
+              </span>
+              {i === at && <CornerDownLeft size={14} style={{ color: T.faint }} />}
+            </button>
+          ))}
+        </div>
       </div>
+    </div>
+  )
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <CurrencyProvider>
+      <CostingProvider>
+        <ThemeScope />
+        <Shell>{children}</Shell>
+      </CostingProvider>
     </CurrencyProvider>
   )
 }

@@ -14,6 +14,7 @@ import {
 } from '../../../lib/bid-store'
 import { useInventory, stockInStore, TODAY } from '../../../lib/inventory-store'
 import { useCosting } from '../../../lib/costing-store'
+import { hexA } from '../../../lib/theme'
 
 /* ==========================================================================
  * XPLORIX BID INTELLIGENCE
@@ -35,14 +36,14 @@ const numStyle: React.CSSProperties = { ...iStyle, textAlign: 'right', fontFamil
 const th: React.CSSProperties = {
   padding: '7px 12px', textAlign: 'left', fontSize: 10, color: C.faint, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap',
-  borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)',
+  borderBottom: `1px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)',
 }
 const thR: React.CSSProperties = { ...th, textAlign: 'right' }
 const td: React.CSSProperties = { padding: '7px 12px', fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }
 const tdN: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }
 const tdMono: React.CSSProperties = { ...td, fontFamily: 'ui-monospace, monospace' }
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse' }
-const rowBorder = '1px solid rgba(30,41,59,0.5)'
+const rowBorder = '1px solid color-mix(in srgb, var(--x-border) 50%, transparent)'
 
 /* ── primitives ─────────────────────────────────────────────────────────── */
 
@@ -77,7 +78,7 @@ function Stat({ label, value, note, color = C.text, big }: { label: string; valu
 
 function Tag({ children, tone = C.faint }: { children: ReactNode; tone?: string }) {
   return (
-    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 5, color: tone, background: `${tone}1A`, border: `1px solid ${tone}33`, whiteSpace: 'nowrap' }}>
+    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 5, color: tone, background: `${hexA(tone, 0x1A)}`, border: `1px solid ${hexA(tone, 0x33)}`, whiteSpace: 'nowrap' }}>
       {children}
     </span>
   )
@@ -86,8 +87,8 @@ function Tag({ children, tone = C.faint }: { children: ReactNode; tone?: string 
 function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md' }: { children: ReactNode; onClick?: () => void; tone?: 'primary' | 'ghost' | 'danger'; disabled?: boolean; size?: 'sm' | 'md' }) {
   const tones: Record<string, React.CSSProperties> = {
     primary: { background: `linear-gradient(135deg, ${C.orange}, ${C.orangeD})`, color: '#fff', border: 'none' },
-    ghost: { background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted },
-    danger: { background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', color: C.red },
+    ghost: { background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.muted },
+    danger: { background: 'color-mix(in srgb, var(--x-red) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--x-red) 22%, transparent)', color: C.red },
   }
   return (
     <button onClick={onClick} disabled={disabled} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: disabled ? 'not-allowed' : 'pointer', borderRadius: 8, fontWeight: 700, fontFamily: 'inherit', opacity: disabled ? 0.45 : 1, padding: size === 'sm' ? '5px 11px' : '8px 15px', fontSize: size === 'sm' ? 11.5 : 12.5, whiteSpace: 'nowrap', ...tones[tone] }}>
@@ -97,7 +98,7 @@ function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md' }: { chi
 }
 
 function Note({ tone = C.blue, children }: { tone?: string; children: ReactNode }) {
-  return <div style={{ padding: '9px 13px', borderRadius: 9, background: `${tone}0F`, border: `1px solid ${tone}33`, fontSize: 11.5, color: tone, lineHeight: 1.6 }}>{children}</div>
+  return <div style={{ padding: '9px 13px', borderRadius: 9, background: `${hexA(tone, 0x0F)}`, border: `1px solid ${hexA(tone, 0x33)}`, fontSize: 11.5, color: tone, lineHeight: 1.6 }}>{children}</div>
 }
 
 function Empty({ children }: { children: ReactNode }) {
@@ -151,7 +152,7 @@ function Sel<T extends string>({ label, value, options, onChange, hint, labels }
 }
 
 function DateF({ label, value, onChange, hint }: { label: string; value: string; onChange: (v: string) => void; hint?: string }) {
-  return <Field label={label} hint={hint}><input type="date" value={value} onChange={e => onChange(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} /></Field>
+  return <Field label={label} hint={hint}><input type="date" value={value} onChange={e => onChange(e.target.value)} style={{ ...iStyle }} /></Field>
 }
 
 function Switch({ on, onChange, label, hint }: { on: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
@@ -159,7 +160,7 @@ function Switch({ on, onChange, label, hint }: { on: boolean; onChange: (v: bool
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '9px 0' }}>
       <button onClick={() => onChange(!on)} role="switch" aria-checked={on} style={{
         width: 38, height: 22, borderRadius: 11, flexShrink: 0, marginTop: 1, cursor: 'pointer',
-        border: 'none', padding: 0, position: 'relative', background: on ? C.orange : '#2A3444', transition: 'background .18s',
+        border: 'none', padding: 0, position: 'relative', background: on ? C.orange : 'var(--x-border3)', transition: 'background .18s',
       }}>
         <span style={{ position: 'absolute', top: 3, left: on ? 19 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .18s' }} />
       </button>
@@ -180,7 +181,7 @@ function SourceTag({ source }: { source: Source }) {
 function Bar({ value, max, tone, height = 6 }: { value: number; max: number; tone: string; height?: number }) {
   const w = max > 0 ? Math.max(1.5, (value / max) * 100) : 0
   return (
-    <div style={{ height, background: 'rgba(255,255,255,0.045)', borderRadius: height / 2, overflow: 'hidden', minWidth: 50 }}>
+    <div style={{ height, background: 'rgba(var(--x-ov),0.045)', borderRadius: height / 2, overflow: 'hidden', minWidth: 50 }}>
       <div style={{ width: `${w}%`, height: '100%', background: tone, borderRadius: height / 2 }} />
     </div>
   )
@@ -367,7 +368,7 @@ function Workspace({ bid, onChange, onBack }: { bid: Bid; onChange: (b: Bid) => 
             }}>
               <span style={{ fontSize: 9.5, opacity: 0.7, fontFamily: 'ui-monospace, monospace' }}>{sec.n}</span>
               {sec.label}
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: on ? 'rgba(255,255,255,0.85)' : STATE_TONE[st] }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: on ? 'rgba(var(--x-ov),0.85)' : STATE_TONE[st] }} />
             </button>
           )
         })}
@@ -543,7 +544,7 @@ function GeologySection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => void;
               })}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                 <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={6}>Whole hole</td>
                 <td style={{ ...tdN, fontWeight: 900, color: off ? C.red : C.green }}>{total.toFixed(1)}%</td>
                 <td style={{ ...tdN, fontWeight: 900, color: C.text }}>{bid.scope.totalMetres.toLocaleString('en-IN')}</td>
@@ -565,7 +566,7 @@ function GeologySection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => void;
             const share = mine.reduce((a, b) => a + b.sharePct, 0)
             if (!mine.length) return null
             return (
-              <div key={s} style={{ flex: '1 1 180px', padding: '10px 12px', borderRadius: 10, background: `${SOURCE_TONE[s]}0F`, border: `1px solid ${SOURCE_TONE[s]}33` }}>
+              <div key={s} style={{ flex: '1 1 180px', padding: '10px 12px', borderRadius: 10, background: `${hexA(SOURCE_TONE[s], 0x0F)}`, border: `1px solid ${hexA(SOURCE_TONE[s], 0x33)}` }}>
                 <div style={{ fontSize: 10.5, fontWeight: 700, color: SOURCE_TONE[s] }}>{SOURCE_LABEL[s]}</div>
                 <div style={{ fontSize: 17, fontWeight: 900, color: C.text, fontFamily: 'ui-monospace, monospace', marginTop: 3 }}>{share.toFixed(0)}%</div>
                 <div style={{ fontSize: 10.5, color: C.faint, marginTop: 2 }}>of the hole, across {mine.length} band{mine.length === 1 ? '' : 's'}</div>
@@ -630,7 +631,7 @@ function RigsSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => void; r:
               {r.scores.map(s => {
                 const on = bid.rigIds.includes(s.rig.id)
                 return (
-                  <tr key={s.rig.id} style={{ borderBottom: rowBorder, background: on ? 'rgba(249,115,22,0.06)' : undefined, opacity: s.eligible ? 1 : 0.5 }}>
+                  <tr key={s.rig.id} style={{ borderBottom: rowBorder, background: on ? 'color-mix(in srgb, var(--x-orange) 6%, transparent)' : undefined, opacity: s.eligible ? 1 : 0.5 }}>
                     <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{s.rig.name}</td>
                     <td style={td}>
                       <input type="checkbox" checked={on} disabled={!s.eligible} onChange={() => toggle(s.rig.id)} style={{ cursor: s.eligible ? 'pointer' : 'not-allowed' }} />
@@ -656,7 +657,7 @@ function RigsSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => void; r:
             </tbody>
           </table>
         </div>
-        <div style={{ padding: '10px 16px', fontSize: 11, color: C.faint, background: 'rgba(255,255,255,0.02)', lineHeight: 1.6 }}>
+        <div style={{ padding: '10px 16px', fontSize: 11, color: C.faint, background: 'rgba(var(--x-ov),0.02)', lineHeight: 1.6 }}>
           Weighted {RIG_WEIGHTS.technical}% technical fit, {RIG_WEIGHTS.productivity}% measured output, {RIG_WEIGHTS.operatingCost}% running cost,
           {' '}{RIG_WEIGHTS.availability}% availability, {RIG_WEIGHTS.mobilisation}% distance to site. Under maintenance is not the same as unavailable —
           a rig with a return date is a scheduling question, not a dead end.
@@ -678,7 +679,7 @@ function RigsSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => void; r:
                 const cheapest = best?.n === f.n
                 const late = bid.scope.requiredDays ? f.plan.calendarDays > bid.scope.requiredDays : false
                 return (
-                  <tr key={f.n} style={{ borderBottom: rowBorder, background: on ? 'rgba(249,115,22,0.06)' : undefined }}>
+                  <tr key={f.n} style={{ borderBottom: rowBorder, background: on ? 'color-mix(in srgb, var(--x-orange) 6%, transparent)' : undefined }}>
                     <td style={{ ...td, color: C.text, fontWeight: 700 }}>
                       {f.n} rig{f.n === 1 ? '' : 's'}
                       {cheapest && <span style={{ marginLeft: 7 }}><Tag tone={C.green}>lowest cost / m</Tag></span>}
@@ -724,7 +725,7 @@ function RigsSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => void; r:
             })}
           </tbody>
           <tfoot>
-            <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+            <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
               <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={3}>Total</td>
               <td style={{ ...tdN, fontWeight: 900, color: C.text }}>{r.crew.reduce((s, c) => s + c.heads, 0)}</td>
               <td style={td} colSpan={2} />
@@ -800,7 +801,7 @@ function ProductionSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => vo
                       {x.factors.length === 0 && <span style={{ color: C.dim }}>none</span>}
                       {x.factors.map((f, i) => (
                         <span key={i} style={{ fontSize: 10.5, padding: '1.5px 6px', borderRadius: 5, fontFamily: 'ui-monospace, monospace',
-                          color: f.pct < 0 ? C.red : C.green, background: f.pct < 0 ? 'rgba(239,68,68,.08)' : 'rgba(16,185,129,.08)' }}>
+                          color: f.pct < 0 ? C.red : C.green, background: f.pct < 0 ? 'color-mix(in srgb, var(--x-red) 8%, transparent)' : 'color-mix(in srgb, var(--x-green) 8%, transparent)' }}>
                           {f.label} {signed(f.pct)}
                         </span>
                       ))}
@@ -812,7 +813,7 @@ function ProductionSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => vo
               ))}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                 <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={2}>Blended across the job</td>
                 <td style={{ ...tdN, fontWeight: 900, color: C.text }}>{bid.scope.totalMetres.toLocaleString('en-IN')}</td>
                 <td style={td} colSpan={2} />
@@ -824,7 +825,7 @@ function ProductionSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => vo
             </tfoot>
           </table>
         </div>
-        <div style={{ padding: '10px 16px', fontSize: 11, color: C.faint, background: 'rgba(255,255,255,0.02)', lineHeight: 1.6 }}>
+        <div style={{ padding: '10px 16px', fontSize: 11, color: C.faint, background: 'rgba(var(--x-ov),0.02)', lineHeight: 1.6 }}>
           Blended by metres, not by band count — a 5% seam of extremely hard rock should not drag the average as hard as a 60% one.
         </div>
       </Card>
@@ -884,7 +885,7 @@ function ConsumablesSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => v
               {r.consumables.map(c => {
                 const worse = c.effectiveLife < c.catalogueLife
                 return (
-                  <tr key={c.itemId} style={{ borderBottom: rowBorder, background: c.shortfall > 0 ? 'rgba(245,158,11,0.045)' : undefined }}>
+                  <tr key={c.itemId} style={{ borderBottom: rowBorder, background: c.shortfall > 0 ? 'color-mix(in srgb, var(--x-amber) 4.5%, transparent)' : undefined }}>
                     <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{c.partNumber || '—'}</td>
                     <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 210 }}>{c.name}</td>
                     <td style={{ ...tdN, color: C.faint }}>{c.catalogueLife.toLocaleString('en-IN')} m</td>
@@ -904,7 +905,7 @@ function ConsumablesSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => v
               })}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                 <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={8}>Tooling and consumables</td>
                 <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{moneyL(total)}</td>
               </tr>
@@ -972,7 +973,7 @@ function CostsSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => void; r
                   <td style={{ ...td, color: C.faint, whiteSpace: 'normal', maxWidth: 260 }}>{l.note ?? '—'}</td>
                 </tr>
               ))}
-              <tr style={{ borderBottom: rowBorder, background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ borderBottom: rowBorder, background: 'rgba(var(--x-ov),0.02)' }}>
                 <td style={{ ...td, color: C.text, fontWeight: 700 }}>Risk contingency</td>
                 <td style={td}><Tag tone={C.red}>priced risk</Tag></td>
                 <td style={{ ...td, width: 130 }}><Bar value={r.costs.contingency} max={max} tone={C.red} /></td>
@@ -982,7 +983,7 @@ function CostsSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => void; r
               </tr>
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                 <td style={{ ...td, fontWeight: 900, color: C.text, fontSize: 13 }} colSpan={3}>Total project cost</td>
                 <td style={{ ...tdN, fontWeight: 900, color: C.orange, fontSize: 13 }}>{moneyL(r.costs.total)}</td>
                 <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{perMetre(r.costs.perDrilledMetre)}</td>
@@ -1095,7 +1096,7 @@ function PricingSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => void;
             })}
           </tbody>
         </table>
-        <div style={{ padding: '10px 16px', fontSize: 11, color: C.faint, background: 'rgba(255,255,255,0.02)', lineHeight: 1.6 }}>
+        <div style={{ padding: '10px 16px', fontSize: 11, color: C.faint, background: 'rgba(var(--x-ov),0.02)', lineHeight: 1.6 }}>
           Cost is shared out by drilling hours rather than metres, because a slow band consumes crew, fuel and ownership
           in proportion to the time it takes — not the distance it covers.
         </div>
@@ -1160,7 +1161,7 @@ function RiskSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => void; r:
             </tr></thead>
             <tbody>
               {risks.map(k => (
-                <tr key={k.id} style={{ borderBottom: rowBorder, background: k.active ? 'rgba(239,68,68,0.045)' : undefined, opacity: k.active ? 1 : 0.62 }}>
+                <tr key={k.id} style={{ borderBottom: rowBorder, background: k.active ? 'color-mix(in srgb, var(--x-red) 4.5%, transparent)' : undefined, opacity: k.active ? 1 : 0.62 }}>
                   <td style={td}>
                     <input type="checkbox" checked={k.active} onChange={() => toggle(k.id)} style={{ cursor: 'pointer' }} />
                   </td>
@@ -1183,7 +1184,7 @@ function RiskSection({ bid, u, r }: { bid: Bid; u: (p: Partial<Bid>) => void; r:
               ))}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                 <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={4}>Carried on this bid</td>
                 <td style={{ ...tdN, fontWeight: 800, color: C.faint }}>{r.risk.score}</td>
                 <td style={{ ...tdN, fontWeight: 900, color: C.red }}>{perMetre(r.risk.contingencyPerMetre)}</td>
@@ -1277,8 +1278,8 @@ function ReviewSection({ bid, r, states, onGo }: {
           {conditions.map((c, i) => (
             <div key={i} onClick={() => c.go && onGo(c.go)} style={{
               display: 'flex', gap: 11, alignItems: 'flex-start', padding: '9px 12px', borderRadius: 9,
-              background: c.ok ? 'rgba(16,185,129,0.05)' : 'rgba(245,158,11,0.07)',
-              border: `1px solid ${c.ok ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.28)'}`,
+              background: c.ok ? 'color-mix(in srgb, var(--x-green) 5%, transparent)' : 'color-mix(in srgb, var(--x-amber) 7%, transparent)',
+              border: `1px solid ${c.ok ? 'color-mix(in srgb, var(--x-green) 20%, transparent)' : 'color-mix(in srgb, var(--x-amber) 28%, transparent)'}`,
               cursor: c.go ? 'pointer' : 'default',
             }}>
               <span style={{ fontSize: 13, color: c.ok ? C.green : C.amber, lineHeight: 1.3 }}>{c.ok ? '✓' : '!'}</span>

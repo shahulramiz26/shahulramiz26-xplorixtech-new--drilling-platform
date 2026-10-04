@@ -8,6 +8,7 @@ import {
 } from 'recharts'
 import { ShieldAlert, CheckCircle2, AlertTriangle, TrendingUp, Filter, Clock, Users } from 'lucide-react'
 import AIInsights from '../../../components/AIInsights'
+import { hexA } from '../../../../lib/theme'
 
 // ── KPI CARD ───────────────────────────────────────────────────────────────
 function KpiCard({ label, value, unit, icon: Icon, color, badge }: {
@@ -15,30 +16,30 @@ function KpiCard({ label, value, unit, icon: Icon, color, badge }: {
   color: string; badge?: string
 }) {
   return (
-    <div style={{ padding:20, borderRadius:16, background:'#0D1117', border:'1px solid #1E293B', transition:'border-color 0.2s' }}
-      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${color}40`}
-      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+    <div style={{ padding:20, borderRadius:16, background:'var(--x-card)', border:'1px solid var(--x-border)', transition:'border-color 0.2s' }}
+      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${hexA(color, 0x40)}`}
+      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-        <div style={{ width:40, height:40, borderRadius:10, background:`${color}18`, border:`1px solid ${color}30`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ width:40, height:40, borderRadius:10, background:`${hexA(color, 0x18)}`, border:`1px solid ${hexA(color, 0x30)}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
           <Icon style={{ width:18, height:18, color }} />
         </div>
-        {badge && <span style={{ fontSize:11, color:'#64748B' }}>{badge}</span>}
+        {badge && <span style={{ fontSize:11, color:'var(--x-faint)' }}>{badge}</span>}
       </div>
-      <div style={{ fontSize:28, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>
-        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'#64748B', marginLeft:4 }}>{unit}</span>}
+      <div style={{ fontSize:28, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>
+        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'var(--x-faint)', marginLeft:4 }}>{unit}</span>}
       </div>
-      <div style={{ fontSize:13, color:'#94A3B8', marginTop:4 }}>{label}</div>
+      <div style={{ fontSize:13, color:'var(--x-muted)', marginTop:4 }}>{label}</div>
     </div>
   )
 }
 
 const tooltipStyle = {
-  contentStyle: { background:'#0D1117', border:'1px solid #1E293B', borderRadius:12, color:'#F8FAFC' },
-  labelStyle: { color:'#94A3B8' },
+  contentStyle: { background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:12, color:'var(--x-text)' },
+  labelStyle: { color:'var(--x-muted)' },
 }
 
-const cardStyle = { background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }
-const titleStyle = { fontSize:15, fontWeight:700, color:'#F8FAFC', marginBottom:20 }
+const cardStyle = { background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }
+const titleStyle = { fontSize:15, fontWeight:700, color:'var(--x-text)', marginBottom:20 }
 
 // ── DATA ───────────────────────────────────────────────────────────────────
 const incidentSummary = [
@@ -114,24 +115,24 @@ export default function AdminHSCDashboard() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-[#F8FAFC]">HSC Dashboard</h2>
-          <p style={{ color:'#64748B', marginTop:4 }}>Health, Safety & Compliance metrics</p>
+          <h2 className="text-3xl font-bold text-[color:var(--x-text)]">HSC Dashboard</h2>
+          <p style={{ color:'var(--x-faint)', marginTop:4 }}>Health, Safety & Compliance metrics</p>
         </div>
-        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', background:'#0D1117', border:'1px solid #1E293B', borderRadius:10 }}>
-          <Filter style={{ width:14, height:14, color:'#64748B' }} />
-          <select style={{ background:'transparent', color:'#F8FAFC', fontSize:13, outline:'none', border:'none', cursor:'pointer' }}>
-            <option style={{ background:'#0D1117' }}>Last 30 Days</option>
-            <option style={{ background:'#0D1117' }}>Last 90 Days</option>
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:10 }}>
+          <Filter style={{ width:14, height:14, color:'var(--x-faint)' }} />
+          <select style={{ background:'transparent', color:'var(--x-text)', fontSize:13, outline:'none', border:'none', cursor:'pointer' }}>
+            <option style={{ background:'var(--x-card)' }}>Last 30 Days</option>
+            <option style={{ background:'var(--x-card)' }}>Last 90 Days</option>
           </select>
         </div>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Days Without Incident" value="5"   icon={CheckCircle2} color="#10B981" badge="Current Streak" />
-        <KpiCard label="Total Incidents"        value="12"  icon={ShieldAlert}  color="#EF4444" badge="Last 30 days"   />
-        <KpiCard label="PPE Compliance"         value="98%" icon={Users}        color="#3B82F6" badge="+2%"            />
-        <KpiCard label="Safety Score"           value="94"  icon={TrendingUp}   color="#F97316" badge="Excellent"      />
+        <KpiCard label="Days Without Incident" value="5"   icon={CheckCircle2} color="var(--x-green)" badge="Current Streak" />
+        <KpiCard label="Total Incidents"        value="12"  icon={ShieldAlert}  color="var(--x-red)" badge="Last 30 days"   />
+        <KpiCard label="PPE Compliance"         value="98%" icon={Users}        color="var(--x-blue)" badge="+2%"            />
+        <KpiCard label="Safety Score"           value="94"  icon={TrendingUp}   color="var(--x-orange)" badge="Excellent"      />
       </div>
 
       {/* Charts Grid */}
@@ -139,20 +140,20 @@ export default function AdminHSCDashboard() {
 
         {/* Incident Type Trend */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} style={cardStyle}
-          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.2)'}
-          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='color-mix(in srgb, var(--x-orange) 20%, transparent)'}
+          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
           <div style={titleStyle}>Incident Type Trend</div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={incidentTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip {...tooltipStyle} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar dataKey="injury"    name="Injury"           stackId="a" fill="#EF4444" radius={[4,4,0,0]} />
-                <Bar dataKey="equipment" name="Equipment Damage" stackId="a" fill="#F59E0B" radius={[4,4,0,0]} />
-                <Bar dataKey="safety"    name="Safety Violation" stackId="a" fill="#3B82F6" radius={[4,4,0,0]} />
+                <Bar dataKey="injury"    name="Injury"           stackId="a" fill="var(--x-red)" radius={[4,4,0,0]} />
+                <Bar dataKey="equipment" name="Equipment Damage" stackId="a" fill="var(--x-amber)" radius={[4,4,0,0]} />
+                <Bar dataKey="safety"    name="Safety Violation" stackId="a" fill="var(--x-blue)" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -160,20 +161,20 @@ export default function AdminHSCDashboard() {
 
         {/* Severity Distribution */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1 }} style={cardStyle}
-          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.2)'}
-          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='color-mix(in srgb, var(--x-orange) 20%, transparent)'}
+          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
           <div style={titleStyle}>Severity Distribution</div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={severityTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip {...tooltipStyle} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar dataKey="minor"    name="Minor"    stackId="a" fill="#10B981" radius={[4,4,0,0]} />
-                <Bar dataKey="major"    name="Major"    stackId="a" fill="#F59E0B" radius={[4,4,0,0]} />
-                <Bar dataKey="critical" name="Critical" stackId="a" fill="#EF4444" radius={[4,4,0,0]} />
+                <Bar dataKey="minor"    name="Minor"    stackId="a" fill="var(--x-green)" radius={[4,4,0,0]} />
+                <Bar dataKey="major"    name="Major"    stackId="a" fill="var(--x-amber)" radius={[4,4,0,0]} />
+                <Bar dataKey="critical" name="Critical" stackId="a" fill="var(--x-red)" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -181,24 +182,24 @@ export default function AdminHSCDashboard() {
 
         {/* Incident Summary & Cost */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2 }} style={cardStyle}
-          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.2)'}
-          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='color-mix(in srgb, var(--x-orange) 20%, transparent)'}
+          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
           <div style={titleStyle}>Incident Summary & Impact</div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={incidentSummary}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="type" stroke="#94A3B8" tick={{ fill:'#94A3B8', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="left"  stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="right" orientation="right" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="type" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="left"  stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip {...tooltipStyle} formatter={(value: any, name: any) => name==='cost' ? [`$${Number(value).toLocaleString()}`, 'Cost'] : [value, name]} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
                 <Bar yAxisId="left" dataKey="count" name="Count" radius={[4,4,0,0]}>
                   {incidentSummary.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={['#10B981','#F59E0B','#EF4444'][index]} />
+                    <Cell key={`cell-${index}`} fill={['var(--x-green)','var(--x-amber)','var(--x-red)'][index]} />
                   ))}
                 </Bar>
-                <Line yAxisId="right" type="monotone" dataKey="cost" name="Cost ($)" stroke="#F97316" strokeWidth={3} dot={{ fill:'#F97316', r:6 }} />
+                <Line yAxisId="right" type="monotone" dataKey="cost" name="Cost ($)" stroke="var(--x-orange)" strokeWidth={3} dot={{ fill:'var(--x-orange)', r:6 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -206,20 +207,20 @@ export default function AdminHSCDashboard() {
 
         {/* PPE Compliance */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.3 }} style={cardStyle}
-          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.2)'}
-          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='color-mix(in srgb, var(--x-orange) 20%, transparent)'}
+          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
           <div style={titleStyle}>PPE Compliance by Item</div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={ppeCompliance} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" horizontal={false} />
-                <XAxis type="number" domain={[0,100]} stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis dataKey="item" type="category" stroke="#94A3B8" tick={{ fill:'#94A3B8', fontSize:11 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} width={130} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" horizontal={false} />
+                <XAxis type="number" domain={[0,100]} stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis dataKey="item" type="category" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:11 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} width={130} />
                 <Tooltip {...tooltipStyle} />
-                <ReferenceLine x={100} stroke="#10B981" strokeDasharray="5 5" />
+                <ReferenceLine x={100} stroke="var(--x-green)" strokeDasharray="5 5" />
                 <Bar dataKey="compliance" name="Compliance %" radius={[0,4,4,0]}>
                   {ppeCompliance.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.compliance >= 95 ? '#10B981' : entry.compliance >= 90 ? '#F59E0B' : '#EF4444'} />
+                    <Cell key={`cell-${index}`} fill={entry.compliance >= 95 ? 'var(--x-green)' : entry.compliance >= 90 ? 'var(--x-amber)' : 'var(--x-red)'} />
                   ))}
                 </Bar>
               </ComposedChart>
@@ -229,20 +230,20 @@ export default function AdminHSCDashboard() {
 
         {/* Safety Training */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.4 }} style={cardStyle}
-          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.2)'}
-          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='color-mix(in srgb, var(--x-orange) 20%, transparent)'}
+          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
           <div style={titleStyle}>Safety Training Progress</div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={safetyTraining} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" horizontal={false} />
-                <XAxis type="number" domain={[0,24]} stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis dataKey="topic" type="category" stroke="#94A3B8" tick={{ fill:'#94A3B8', fontSize:11 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} width={130} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" horizontal={false} />
+                <XAxis type="number" domain={[0,24]} stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis dataKey="topic" type="category" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:11 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} width={130} />
                 <Tooltip {...tooltipStyle} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar dataKey="completed" name="Completed"      fill="#F97316" radius={[0,4,4,0]} stackId="a" />
-                <Bar dataKey="total"     name="Total Required" fill="#1E293B" radius={[0,4,4,0]} stackId="a" />
-                <Line type="monotone" dataKey="score" name="Avg Score %" stroke="#10B981" strokeWidth={3} dot={{ fill:'#10B981', r:4 }} />
+                <Bar dataKey="completed" name="Completed"      fill="var(--x-orange)" radius={[0,4,4,0]} stackId="a" />
+                <Bar dataKey="total"     name="Total Required" fill="var(--x-border)" radius={[0,4,4,0]} stackId="a" />
+                <Line type="monotone" dataKey="score" name="Avg Score %" stroke="var(--x-green)" strokeWidth={3} dot={{ fill:'var(--x-green)', r:4 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -250,25 +251,25 @@ export default function AdminHSCDashboard() {
 
         {/* Near Miss Trend */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.5 }} style={cardStyle}
-          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.2)'}
-          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='color-mix(in srgb, var(--x-orange) 20%, transparent)'}
+          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
           <div style={titleStyle}>Near Miss Reports & Resolution</div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={nearMissData}>
                 <defs>
                   <linearGradient id="nearMissGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#F97316" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#F97316" stopOpacity={0}/>
+                    <stop offset="5%"  stopColor="var(--x-orange)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--x-orange)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip {...tooltipStyle} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Area type="monotone" dataKey="count"    name="Near Misses" stroke="#F97316" strokeWidth={3} fill="url(#nearMissGrad)" />
-                <Bar               dataKey="resolved" name="Resolved"    fill="#10B981" radius={[4,4,0,0]} />
+                <Area type="monotone" dataKey="count"    name="Near Misses" stroke="var(--x-orange)" strokeWidth={3} fill="url(#nearMissGrad)" />
+                <Bar               dataKey="resolved" name="Resolved"    fill="var(--x-green)" radius={[4,4,0,0]} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -277,16 +278,16 @@ export default function AdminHSCDashboard() {
         {/* Safety Metrics Overview */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.6 }}
           style={{ ...cardStyle }} className="lg:col-span-2"
-          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.2)'}
-          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+          onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='color-mix(in srgb, var(--x-orange) 20%, transparent)'}
+          onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
           <div style={titleStyle}>Safety Metrics Overview</div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {safetyMetrics.map((metric, i) => (
-              <div key={i} style={{ padding:16, borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid #1E293B' }}>
-                <p style={{ fontSize:11, color:'#64748B', marginBottom:8, fontWeight:600, letterSpacing:'0.04em' }}>{metric.label}</p>
-                <p style={{ fontSize:24, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>{metric.value}</p>
+              <div key={i} style={{ padding:16, borderRadius:12, background:'rgba(var(--x-ov),0.03)', border:'1px solid var(--x-border)' }}>
+                <p style={{ fontSize:11, color:'var(--x-faint)', marginBottom:8, fontWeight:600, letterSpacing:'0.04em' }}>{metric.label}</p>
+                <p style={{ fontSize:24, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>{metric.value}</p>
                 <p style={{ fontSize:11, marginTop:4, fontWeight:600,
-                  color: metric.status==='good' ? '#10B981' : metric.status==='warning' ? '#F59E0B' : '#EF4444'
+                  color: metric.status==='good' ? 'var(--x-green)' : metric.status==='warning' ? 'var(--x-amber)' : 'var(--x-red)'
                 }}>{metric.unit}</p>
               </div>
             ))}

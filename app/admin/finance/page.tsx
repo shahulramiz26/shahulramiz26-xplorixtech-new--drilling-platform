@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo, useEffect, Fragment, ReactNode } from 'react'
-import { useInventory, PROJECTS as INV_PROJECTS, toolingRatesFor } from '../../../lib/inventory-store'
+import { useState, useMemo, useEffect, Fragment, ReactNode, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useInventory, toolingRatesFor } from '../../../lib/inventory-store'
 import {
   CostingProvider, useCosting,
   C, LAYER, iStyle, derivedStyle, money, perUnit, pct,
@@ -20,17 +21,20 @@ import {
   type HoleResult, type Invoice, type InvoiceLine, type RateRow, type RateAdjustment,
   type InvoiceStatus, type RateStructure,
 } from '../../../lib/costing-store'
+import { computeRigMonth, type RigMonthView } from '../../../lib/costing-view'
+import { hexA } from '../../../lib/theme'
 
 /* ==========================================================================
  * XPLORIX COSTING — one screen.
  *
  * Project -> rig -> month, then three views of the same costed data. Two
- * buttons top right: Set rates (three tabs) and Rates history.
+ * buttons top right: Set costs (two tabs) and Rates history.
  *
  * Sections below, in order:
  *   1  UI primitives
  *   2  The costing view (turns logs + dated rates into days)
- *   3  Set rates      — Rig cost / Operating cost / Client cost
+ *   3  Set costs      — Rig cost / Operating cost. What the client pays is
+ *                       the project's contract rates, set on the Projects screen.
  *   4  Rates history
  *   5  Performance / Drillholes / Tracker
  *   6  The screen
@@ -109,7 +113,7 @@ function TextField({ label, value, onChange, placeholder, hint }: {
 function DateField({ label, value, onChange, hint }: { label: string; value: string; onChange: (v: string) => void; hint?: string }) {
   return (
     <Field label={label} hint={hint}>
-      <input type="date" value={value} onChange={e => onChange(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} />
+      <input type="date" value={value} onChange={e => onChange(e.target.value)} style={{ ...iStyle }} />
     </Field>
   )
 }
@@ -133,7 +137,7 @@ function Derived({ label, value, hint, color = C.text, overridden, onOverride, o
           <input type="number" value={overridden} onChange={e => onOverride(parseFloat(e.target.value) || 0)}
             style={{ ...iStyle, color: C.amber, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }} />
           <button onClick={onClear} title="Back to the calculated value"
-            style={{ padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>Reset</button>
+            style={{ padding: '0 12px', borderRadius: 8, background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.faint, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>Reset</button>
         </div>
       ) : (
         <div style={{ ...derivedStyle, color, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -154,7 +158,7 @@ function Tag({ children, tone = C.faint }: { children: ReactNode; tone?: string 
     <span style={{
       fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
       padding: '2px 7px', borderRadius: 5, color: tone,
-      background: `${tone}1A`, border: `1px solid ${tone}33`, whiteSpace: 'nowrap',
+      background: `${hexA(tone, 0x1A)}`, border: `1px solid ${hexA(tone, 0x33)}`, whiteSpace: 'nowrap',
     }}>{children}</span>
   )
 }
@@ -169,12 +173,12 @@ function Switch({ on, onChange, label, hint }: {
       <button onClick={() => onChange(!on)} role="switch" aria-checked={on} style={{
         width: 38, height: 22, borderRadius: 11, flexShrink: 0, marginTop: 1, cursor: 'pointer',
         border: 'none', padding: 0, position: 'relative',
-        background: on ? C.orange : '#2A3444', transition: 'background 0.18s',
+        background: on ? C.orange : 'var(--x-border3)', transition: 'background 0.18s',
       }}>
         <span style={{
           position: 'absolute', top: 3, left: on ? 19 : 3, width: 16, height: 16,
           borderRadius: '50%', background: '#fff', transition: 'left 0.18s',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+          boxShadow: '0 1px 3px rgba(var(--x-shadow),0.4)',
         }} />
       </button>
       <div style={{ flex: 1 }}>
@@ -208,8 +212,8 @@ function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md' }: {
 }) {
   const tones: Record<string, React.CSSProperties> = {
     primary: { background: `linear-gradient(135deg, ${C.orange}, ${C.orangeD})`, color: '#fff', border: 'none' },
-    ghost: { background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted },
-    danger: { background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', color: C.red },
+    ghost: { background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.muted },
+    danger: { background: 'color-mix(in srgb, var(--x-red) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--x-red) 22%, transparent)', color: C.red },
   }
   return (
     <button onClick={onClick} disabled={disabled} style={{
@@ -223,7 +227,7 @@ function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md' }: {
 
 function Note({ tone = C.blue, children }: { tone?: string; children: ReactNode }) {
   return (
-    <div style={{ padding: '9px 13px', borderRadius: 9, background: `${tone}0F`, border: `1px solid ${tone}33`, fontSize: 11.5, color: tone, lineHeight: 1.55 }}>{children}</div>
+    <div style={{ padding: '9px 13px', borderRadius: 9, background: `${hexA(tone, 0x0F)}`, border: `1px solid ${hexA(tone, 0x33)}`, fontSize: 11.5, color: tone, lineHeight: 1.55 }}>{children}</div>
   )
 }
 
@@ -236,26 +240,26 @@ function Empty({ children }: { children: ReactNode }) {
 const th: React.CSSProperties = {
   padding: '7px 12px', textAlign: 'left', fontSize: 10, color: C.faint, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap',
-  borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)',
+  borderBottom: `1px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)',
 }
 const thR: React.CSSProperties = { ...th, textAlign: 'right' }
 const td: React.CSSProperties = { padding: '7px 12px', fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }
 const tdN: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse' }
-const rowBorder = '1px solid rgba(30,41,59,0.5)'
+const rowBorder = '1px solid color-mix(in srgb, var(--x-border) 50%, transparent)'
 
 function Modal({ title, subtitle, width = 760, onClose, children, footer }: {
   title: string; subtitle?: string; width?: number; onClose: () => void; children: ReactNode; footer?: ReactNode
 }) {
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(var(--x-shadow),0.82)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, width, maxWidth: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 20px 13px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{title}</div>
             {subtitle && <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>{subtitle}</div>}
           </div>
-          <button onClick={onClose} style={{ padding: 7, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0, fontFamily: 'inherit' }}>✕</button>
+          <button onClick={onClose} style={{ padding: 7, borderRadius: 8, background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0, fontFamily: 'inherit' }}>✕</button>
         </div>
         <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>{children}</div>
         {footer && <div style={{ padding: '13px 20px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>{footer}</div>}
@@ -288,105 +292,9 @@ function Section({ title, note, children }: { title: string; note?: string; chil
  * in two tabs it came from the same call.
  * ========================================================================== */
 
-interface RigMonthView {
-  hasLogs: boolean
-  ownership?: RigOwnership
-  ob: OwnershipBreakdown
-  operating?: OperatingRate
-  clientRate?: ClientRate
-  days: DayCostMTD[]
-  roll: Rollup
-  holes: HoleResult[]
-  unallocated: number
-  unallocatedDays: number
-  budgetOwnershipCPU: number
-  productionVariancePct: number
-  // The committee assigns one rock category for the whole project. If the logs
-  // disagree, every metre is underpriced and there is no line item to recover
-  // it — so the mismatch is surfaced rather than left to final billing.
-  loggedFormation: string
-}
-
-const EMPTY_OB: OwnershipBreakdown = {
-  landedPrice: 0, depPerYear: 0, depPerMonth: 0, emi: 0,
-  emiActive: false, emiMonthsLeft: 0, insurancePerMonth: 0, otherFixedPerMonth: 0,
-  perMonth: 0, perDay: 0, perUnit: 0, basisLabel: '',
-}
-
-type CostingState = ReturnType<typeof useCosting>['state']
-type InvState = ReturnType<typeof useInventory>['state']
-
-/* A plain function rather than a hook, because the month strip needs the same
- * calculation for several months at once and a hook cannot be called in a loop. */
-function computeRigMonth(state: CostingState, inv: InvState, project: string, rig: string, month: string): RigMonthView {
-  const logs = state.shiftLogs.filter(l => l.rig === rig && l.project === project && monthOf(l.date) === month)
-  if (logs.length === 0) {
-    return {
-      hasLogs: false, ob: EMPTY_OB, days: [], roll: rollup([]),
-      holes: [], unallocated: 0, unallocatedDays: 0,
-      budgetOwnershipCPU: 0, productionVariancePct: 0, loggedFormation: '',
-    }
-  }
-
-  const ownVersions = state.ownership.filter(o => o.rig === rig)
-  const opVersions = state.operating.filter(o => o.rig === rig && o.project === project)
-  const crVersions = state.clientRates.filter(c => c.project === project)
-
-  const monthEnd = `${month}-${String(daysInMonth(month)).padStart(2, '0')}`
-  const lastLogged = logs.map(l => l.date).sort()[logs.length - 1]
-  const lastDay = Math.min(Number(lastLogged.slice(8)), Number(monthEnd.slice(8)))
-
-  const ownership = versionOn(ownVersions, monthEnd)
-  const ob = ownership ? ownershipBreakdown(ownership, month) : EMPTY_OB
-  const operating = versionOn(opVersions, monthEnd)
-  const clientRate = versionOn(crVersions, monthEnd)
-
-  const raw: DayCost[] = []
-  const depthByHole: Record<string, number> = {}
-
-  for (let n = 1; n <= lastDay; n++) {
-    const date = `${month}-${String(n).padStart(2, '0')}`
-    const shifts = logs.filter(l => l.date === date)
-    const maint = state.maintenance.filter(m => m.rig === rig && m.project === project && m.date === date)
-    const op = versionOn(opVersions, date) ?? blankOperating(rig, project, date)
-    const own = versionOn(ownVersions, date) ?? blankOwnership(rig, date)
-    const obDay = versionOn(ownVersions, date) ? ownershipBreakdown(own, month) : EMPTY_OB
-    const cr = versionOn(crVersions, date)
-
-    /* The tooling rate as it stood on this date — the rig's starting kit plus
-     * everything issued up to it. Parts issued later do not reach back and
-     * change a day that was already costed. */
-    const tooling = toolingRatesFor(inv.pos, inv.rigKit, inv.catalogue, rig, project, date)
-
-    const hole = shifts.find(s => s.holeNumber)?.holeNumber ?? null
-    const depthSoFar = hole ? (depthByHole[hole] ?? 0) : 0
-
-    const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, tooling, depthSoFar)
-    if (hole) depthByHole[hole] = depthSoFar + d.units
-    raw.push(d)
-  }
-
-  const days = withCumulative(raw)
-  const roll = rollup(raw)
-  const holes = holesFromDays(raw, state.holeStatus).map(h => holeResult(h, raw))
-  const orphan = raw.filter(d => !d.holeNumber)
-
-  // Most common lithology in the logs, for the category check.
-  const counts: Record<string, number> = {}
-  logs.forEach(l => { if (l.formationType) counts[l.formationType] = (counts[l.formationType] || 0) + l.metresDrilled })
-  const loggedFormation = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
-
-  return {
-    hasLogs: true, ownership, ob, operating, clientRate, days, roll, holes,
-    unallocated: orphan.reduce((s, d) => s + d.total, 0),
-    unallocatedDays: orphan.length,
-    budgetOwnershipCPU: ownership && ownership.expectedUnitsPerMonth > 0 ? ob.perMonth / ownership.expectedUnitsPerMonth : 0,
-    productionVariancePct: ownership && ownership.expectedUnitsPerMonth > 0
-      ? ((roll.units - ownership.expectedUnitsPerMonth) / ownership.expectedUnitsPerMonth) * 100 : 0,
-    loggedFormation,
-  }
-}
-
+/* computeRigMonth and its result type live in lib/costing-view.ts, so the
+ * Dashboard can show this month's cost, revenue and margin from the very same
+ * calculation instead of a second one that could drift from it. */
 function useRigMonthView(project: string, rig: string, month: string): RigMonthView {
   const { state } = useCosting()
   const { state: inv } = useInventory()
@@ -415,7 +323,7 @@ function useMonthTrend(project: string, rig: string): MonthPoint[] {
  * 3  Set rates
  * ========================================================================== */
 
-type Section = 'rig' | 'operating' | 'client'
+type Section = 'rig' | 'operating'
 
 /* Effective dates are forward-only: a new set of rates can start today or
  * later, never before the last one. That is what makes history trustworthy —
@@ -437,7 +345,7 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
   month: string
   onClose: () => void
 }) {
-  const { state, saveOwnership, saveOperating, saveClientRate } = useCosting()
+  const { state, saveOwnership, saveOperating } = useCosting()
   const [project, setProject] = useState(initialProject)
   const [rig, setRig] = useState(initialRig)
   const [confirmed, setConfirmed] = useState(false)
@@ -450,7 +358,7 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
   // the history can say exactly what was changed and where.
   if (!confirmed) {
     return (
-      <Modal title="Set rates" subtitle="Which rig and project are these rates for?" width={620} onClose={onClose}
+      <Modal title="Set your costs" subtitle="Which rig and project are these costs for?" width={620} onClose={onClose}
         footer={<><Btn onClick={onClose}>Cancel</Btn>
           <Btn tone="primary" disabled={!project || !rig} onClick={() => setConfirmed(true)}>Continue</Btn></>}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -469,8 +377,8 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
           </Field>
           <Note tone={C.dim}>
             Rig cost applies to this rig on every project. Operating cost applies to this rig on this project.
-            Client cost applies to the whole project, whichever rig drills it. Tooling is not set here — it comes from
-            what the rig is carrying, in Parts &amp; inventory.
+            What the client pays is not set here: contract rates belong to the project, where the client can see and accept them.
+            Tooling is not set here either — it comes from what the rig is carrying, in Parts &amp; inventory.
           </Note>
         </div>
       </Modal>
@@ -479,21 +387,19 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
 
   const ownVersions = newestFirst(state.ownership.filter(o => o.rig === rig))
   const opVersions = newestFirst(state.operating.filter(o => o.rig === rig && o.project === project))
-  const crVersions = newestFirst(state.clientRates.filter(c => c.project === project))
+  const contract = versionOn(state.clientRates.filter(c => c.project === project), new Date().toISOString().slice(0, 10))
+  const projectId = (state.projects ?? []).find(p => p.name === project)?.id
 
-  const scope = section === 'rig' ? `${rig} · every project`
-    : section === 'operating' ? `${rig} · ${project}`
-    : `${project} · every rig`
+  const scope = section === 'rig' ? `${rig} · every project` : `${rig} · ${project}`
 
   return (
-    <Modal title="Set rates" subtitle={scope} width={980} onClose={onClose}>
+    <Modal title="Set your costs" subtitle={scope} width={980} onClose={onClose}>
       <div style={{ display: 'flex', gap: 22, alignItems: 'flex-start' }}>
 
         {/* Sidebar */}
         <div style={{ width: 210, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <SideItem on={section === 'rig'} onClick={() => setSection('rig')} label="Rig cost" />
           <SideItem on={section === 'operating'} onClick={() => setSection('operating')} label="Operating cost" />
-          <SideItem on={section === 'client'} onClick={() => setSection('client')} label="Client cost" />
 
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
             <div style={{ fontSize: 10, color: C.dim, lineHeight: 1.6 }}>
@@ -504,6 +410,16 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
               Change
             </button>
           </div>
+
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: C.muted }}>Contract rates</div>
+            <div style={{ fontSize: 11.5, color: C.faint, lineHeight: 1.55, marginTop: 4 }}>
+              {contract ? `${structureLabel(contract)}, since ${fullDate(contract.effectiveFrom)}.` : 'Not set for this project yet.'} What the client pays is set on the project.
+            </div>
+            {projectId && (
+              <a href={`/admin/projects/${projectId}?tab=rates`} style={{ display: 'inline-block', marginTop: 6, fontSize: 12, fontWeight: 600, color: C.orange, textDecoration: 'none' }}>Open the project</a>
+            )}
+          </div>
         </div>
 
         {/* Panel */}
@@ -512,8 +428,6 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
             onSave={(o, from, why) => saveOwnership({ ...o, effectiveFrom: from, note: why })} />}
           {section === 'operating' && <OperatingPanel rig={rig} project={project} versions={opVersions}
             onSave={(o, from, why) => saveOperating({ ...o, effectiveFrom: from, note: why })} />}
-          {section === 'client' && <ClientPanel project={project} versions={crVersions}
-            onSave={(c, from, why) => saveClientRate({ ...c, effectiveFrom: from, note: why })} />}
         </div>
       </div>
     </Modal>
@@ -525,7 +439,7 @@ function SideItem({ on, onClick, label }: { on: boolean; onClick: () => void; la
     <button onClick={onClick} style={{
       textAlign: 'left', padding: '8px 12px', borderRadius: 8,
       fontSize: 13, fontWeight: on ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit',
-      background: on ? 'rgba(249,115,22,0.12)' : 'transparent',
+      background: on ? 'color-mix(in srgb, var(--x-orange) 12%, transparent)' : 'transparent',
       border: 'none', borderLeft: `2px solid ${on ? C.orange : 'transparent'}`,
       color: on ? C.orange : C.muted, width: '100%',
     }}>{label}</button>
@@ -585,7 +499,7 @@ function RigCostPanel({ rig, month, versions, onSave }: {
             <NumField label="EMI per month" value={f.emiPerMonth} onChange={n => u({ emiPerMonth: n })} suffix="₹" color={C.blue} />
             <Field label="EMI ends" hint="Optional. Without it a closed loan keeps charging forever.">
               <input type="month" value={f.emiEndsMonth ?? ''} onChange={e => u({ emiEndsMonth: e.target.value || undefined })}
-                style={{ ...iStyle, colorScheme: 'dark' }} />
+                style={{ ...iStyle }} />
             </Field>
             <NumField label="Insurance per year" value={f.insurancePerYear} onChange={n => u({ insurancePerYear: n })} suffix="₹" />
             <NumField label="Other fixed / month" value={f.otherFixedPerMonth} onChange={n => u({ otherFixedPerMonth: n })} suffix="₹" />
@@ -755,136 +669,6 @@ function OperatingPanel({ rig, project, versions, onSave }: {
 
 /* One row per tender line: a size, a formation, a rate. Adjustments hang off
  * their own row because that is how the tender writes them. */
-function ClientPanel({ project, versions, onSave }: {
-  project: string; versions: ClientRate[]; onSave: (c: ClientRate, from: string, why: string) => void
-}) {
-  const latest = versions[0]
-  const minDate = nextAllowedDate(latest?.effectiveFrom)
-  const [f, setF] = useState<ClientRate>(() => latest ? { ...latest, id: uid('cr') } : blankClientRate(project, minDate))
-  const [confirm, setConfirm] = useState(false)
-  const u = (p: Partial<ClientRate>) => setF(x => ({ ...x, ...p }))
-  const updRow = (i: number, p: Partial<RateRow>) => u({ rateRows: f.rateRows.map((r, j) => j === i ? { ...r, ...p } : r) })
-  const updAdj = (i: number, j: number, p: Partial<RateAdjustment>) =>
-    updRow(i, { adjustments: f.rateRows[i].adjustments.map((a, k) => k === j ? { ...a, ...p } : a) })
-
-  const inForce = latest ? `${structureLabel(latest)} since ${fullDate(latest.effectiveFrom)}` : 'nothing set yet'
-
-  return (
-    <div>
-      <InForce text={inForce} />
-
-      <div style={{ marginTop: 18 }}>
-        <Field label="Rate structure" hint={f.structure === 'flat'
-          ? 'Priced by formation. Soft, hard and very hard each have a rate, and depth makes no difference.'
-          : 'Priced by depth band. The rate rises as the hole gets deeper, whatever rock it passes through.'}>
-          <Toggle options={['flat', 'slab'] as const} value={f.structure}
-            onChange={(v: RateStructure) => u({ structure: v })}
-            labels={{ flat: 'Flat rate', slab: 'Depth slab rate' }} />
-        </Field>
-      </div>
-
-      <div style={{ marginTop: 20 }}>
-        <Section title="Rates" note={f.structure === 'flat'
-          ? "One line per size and formation, straight off the tender schedule. The driller's log records both, so XPLORIX prices every stretch of hole at the line that matches."
-          : "One line per size and depth band. Each band runs from its depth up to the next; leave the last one open-ended."}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {f.rateRows.map((r, i) => (
-              <div key={r.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '12px 14px' }}>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                  <div style={{ width: 88 }}>
-                    <Field label="Size">
-                      <select value={r.holeSize} onChange={e => updRow(i, { holeSize: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}>
-                        {HOLE_SIZES.map(h => <option key={h} value={h}>{h}</option>)}
-                      </select>
-                    </Field>
-                  </div>
-
-                  {f.structure === 'flat' ? (
-                    <div style={{ width: 170 }}>
-                      <Field label="Formation">
-                        <select value={r.formation} onChange={e => updRow(i, { formation: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}>
-                          {ROCK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                          {r.formation && r.formation !== ANY_FORMATION && !ROCK_CATEGORIES.includes(r.formation) && <option value={r.formation}>{r.formation}</option>}
-                        </select>
-                      </Field>
-                    </div>
-                  ) : (
-                    <>
-                      <div style={{ width: 96 }}>
-                        <Field label="Depth from">
-                          <input type="number" value={r.fromDepth ?? ''} placeholder="0"
-                            onChange={e => updRow(i, { fromDepth: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
-                            style={{ ...iStyle, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }} />
-                        </Field>
-                      </div>
-                      <div style={{ width: 96 }}>
-                        <Field label="Depth to">
-                          <input type="number" value={r.toDepth ?? ''} placeholder="no limit"
-                            onChange={e => updRow(i, { toDepth: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
-                            style={{ ...iStyle, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }} />
-                        </Field>
-                      </div>
-                    </>
-                  )}
-
-                  <div style={{ width: 132 }}>
-                    <NumField label="Rate" value={r.rate} onChange={n => updRow(i, { rate: n })} suffix="₹/m" color={C.orange} />
-                  </div>
-                  <div style={{ flex: 1 }} />
-                  <Btn size="sm" onClick={() => updRow(i, { adjustments: [...r.adjustments, { id: uid('a'), condition: 'above', depth: 400, adjustPct: -20 }] })}>
-                    Add adjustment
-                  </Btn>
-                  {f.rateRows.length > 1 && <Btn size="sm" tone="danger" onClick={() => u({ rateRows: f.rateRows.filter((_, j) => j !== i) })}>Remove</Btn>}
-                </div>
-
-                {r.adjustments.map((a, j) => (
-                  <div key={a.id} style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                    <span style={{ fontSize: 12, color: C.faint }}>When drilled</span>
-                    <select value={a.condition} onChange={e => updAdj(i, j, { condition: e.target.value as 'above' | 'below' })} style={{ ...iStyle, width: 92, cursor: 'pointer' }}>
-                      <option value="above">above</option><option value="below">below</option>
-                    </select>
-                    <input type="number" value={a.depth} onChange={e => updAdj(i, j, { depth: parseFloat(e.target.value) || 0 })}
-                      style={{ ...iStyle, width: 80, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }} />
-                    <span style={{ fontSize: 12, color: C.faint }}>m, adjust rate by</span>
-                    <input type="number" value={a.adjustPct} onChange={e => updAdj(i, j, { adjustPct: parseFloat(e.target.value) || 0 })}
-                      style={{ ...iStyle, width: 72, textAlign: 'right', color: a.adjustPct < 0 ? C.red : C.green, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }} />
-                    <span style={{ fontSize: 12, color: C.faint }}>%</span>
-                    <span style={{ fontSize: 11, color: C.dim, fontFamily: 'ui-monospace, monospace' }}>→ {perUnit(r.rate * (1 + a.adjustPct / 100))}</span>
-                    <Btn size="sm" tone="danger" onClick={() => updRow(i, { adjustments: r.adjustments.filter((_, k) => k !== j) })}>Remove</Btn>
-                  </div>
-                ))}
-              </div>
-            ))}
-            <div>
-              <Btn size="sm" onClick={() => {
-                const last = f.rateRows[f.rateRows.length - 1]
-                u({ rateRows: [...f.rateRows, f.structure === 'flat'
-                  ? { id: uid('r'), holeSize: 'HQ', formation: 'Hard rock', rate: 0, adjustments: [] }
-                  : { id: uid('r'), holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: last?.toDepth ?? 0, rate: 0, adjustments: [] }] })
-              }}>{f.structure === 'flat' ? 'Add formation' : 'Add band'}</Btn>
-            </div>
-          </div>
-        </Section>
-      </div>
-
-      <div style={{ marginTop: 20 }}>
-        <Section title="Other billable lines">
-          <Grid cols={3}>
-            <NumField label="Standby" value={f.standbyPerDay} onChange={n => u({ standbyPerDay: n })} suffix="₹/day" color={C.amber}
-              hint="Billed when the client stops work" />
-            <NumField label="Mobilisation" value={f.mobilisation} onChange={n => u({ mobilisation: n })} suffix="₹" />
-            <NumField label="Demobilisation" value={f.demobilisation} onChange={n => u({ demobilisation: n })} suffix="₹" />
-          </Grid>
-        </Section>
-      </div>
-
-      <SaveRow label="Save client cost" onSave={() => setConfirm(true)} />
-      {confirm && <SaveDialog minDate={minDate} replacing={inForce}
-        onCancel={() => setConfirm(false)} onSave={(from, why) => { onSave(f, from, why); setConfirm(false) }} />}
-    </div>
-  )
-}
-
 /* ==========================================================================
  * 4  Rates history
  * ========================================================================== */
@@ -958,7 +742,7 @@ function RatesHistoryModal({ project, rig, onClose }: { project: string; rig: st
     rows.push({
       id: c.id, from: c.effectiveFrom,
       rigs: projectRigs.length ? projectRigs.slice(0, 3).join(', ') + (projectRigs.length > 3 ? ` +${projectRigs.length - 3}` : '') : '—',
-      what: 'Client cost', tone: LAYER.revenue, changed, why: c.note || '—',
+      what: 'Contract rates', tone: LAYER.revenue, changed, why: c.note || '—',
     })
   })
 
@@ -1082,8 +866,8 @@ function PerformanceTab({ v, rig, project, month }: {
             return (
               <div key={t.month} style={{
                 padding: '7px 12px', borderRadius: 9, minWidth: 104,
-                background: on ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${on ? `${C.orange}66` : C.border}`,
+                background: on ? 'color-mix(in srgb, var(--x-orange) 12%, transparent)' : 'rgba(var(--x-ov),0.03)',
+                border: `1px solid ${on ? `${hexA(C.orange, 0x66)}` : C.border}`,
               }}>
                 <div style={{ fontSize: 10, color: on ? C.orange : C.faint, fontWeight: 700 }}>
                   {monthShort(t.month)}
@@ -1151,10 +935,10 @@ function PerformanceTab({ v, rig, project, month }: {
                   <Fragment key={d.date}>
                     <tr onClick={() => setOpen(isOpen ? null : d.date)} style={{
                       borderBottom: rowBorder, cursor: 'pointer',
-                      background: isOpen ? 'rgba(249,115,22,0.05)'
-                        : !d.submitted ? 'rgba(239,68,68,0.06)'
-                        : d.status === 'breakdown' ? 'rgba(239,68,68,0.05)'
-                        : d.status === 'standby' ? 'rgba(245,158,11,0.045)'
+                      background: isOpen ? 'color-mix(in srgb, var(--x-orange) 5%, transparent)'
+                        : !d.submitted ? 'color-mix(in srgb, var(--x-red) 6%, transparent)'
+                        : d.status === 'breakdown' ? 'color-mix(in srgb, var(--x-red) 5%, transparent)'
+                        : d.status === 'standby' ? 'color-mix(in srgb, var(--x-amber) 4.5%, transparent)'
                         : undefined,
                       borderLeft: d.status === 'breakdown' ? `2px solid ${C.red}`
                         : d.status === 'standby' ? `2px solid ${C.amber}` : '2px solid transparent',
@@ -1187,7 +971,7 @@ function PerformanceTab({ v, rig, project, month }: {
                       <td style={{ ...tdN, color: d.revenue > 0 ? LAYER.revenue : C.dim }}>{d.revenue > 0 ? money(d.revenue) : '—'}</td>
                     </tr>
                     {isOpen && (
-                      <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
+                      <tr style={{ borderBottom: rowBorder, background: 'color-mix(in srgb, var(--x-orange) 3%, transparent)' }}>
                         <td colSpan={19} style={{ padding: '16px 18px' }}>
                           <div style={{ display: 'flex', gap: 44, flexWrap: 'wrap' }}>
                             <Detail title="From the log" tone={C.blue} rows={[
@@ -1272,7 +1056,7 @@ function PerformanceTab({ v, rig, project, month }: {
                           )}
                           {d.unmatched && (
                             <div style={{ marginTop: 12 }}><Note tone={C.red}>
-                              No rate line for {d.shifts[0]?.holeSize} + {d.shifts[0]?.formationType}, so these metres bill at zero. Add it in Set rates.
+                              No rate line for {d.shifts[0]?.holeSize} + {d.shifts[0]?.formationType}, so these metres bill at zero. Add it to the project's contract rates.
                             </Note></div>
                           )}
                         </td>
@@ -1283,7 +1067,7 @@ function PerformanceTab({ v, rig, project, month }: {
               })}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                 <td style={{ ...td, color: C.text, fontWeight: 800 }} colSpan={4}>
                   {monthLabel(month)}, all {r.days} days
                   {hidden > 0 && <span style={{ fontWeight: 400, color: C.faint, marginLeft: 8 }}>{hidden} not shown above</span>}
@@ -1464,7 +1248,7 @@ function CPUChart({ days, rate, clientRate, month }: {
             return (
               <circle key={i} cx={x(i)} cy={y(d.cpu)} r={on ? 6.5 : 4.5}
                 fill={tone} fillOpacity={on ? 1 : 0.9}
-                stroke={on ? '#fff' : C.bg} strokeWidth={on ? 1.5 : 1} />
+                stroke={on ? C.text : C.bg} strokeWidth={on ? 1.5 : 1} />
             )
           })}
 
@@ -1523,7 +1307,7 @@ function ChartTip({ d, rate, left }: { d: DayCostMTD; rate: number; left: number
       left: flip ? undefined : `${9.5 + left * 0.88}%`,
       right: flip ? `${9.5 + (100 - left) * 0.88}%` : undefined,
       background: C.card, border: `1px solid ${C.border}`, borderRadius: 10,
-      padding: '11px 14px', minWidth: 196, boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+      padding: '11px 14px', minWidth: 196, boxShadow: '0 10px 30px rgba(var(--x-shadow),0.6)',
     }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 9, paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: C.text }}>{dayLabel(d.date)}</span>
@@ -1593,7 +1377,7 @@ function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }:
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {finished.some(h => h.unmatchedDays > 0) && (
         <Note tone={C.red}>
-          A hole has metres with no matching rate line, so those metres bill at zero. Add the missing size and formation in Set rates.
+          A hole has metres with no matching rate line, so those metres bill at zero. Add the missing size and ground to the project's contract rates.
         </Note>
       )}
 
@@ -1614,7 +1398,7 @@ function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }:
                 const isOpen = open === hole.holeNumber
                 return (
                   <Fragment key={hole.holeNumber}>
-                    <tr onClick={() => setOpen(isOpen ? null : hole.holeNumber)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'rgba(249,115,22,0.05)' : undefined }}>
+                    <tr onClick={() => setOpen(isOpen ? null : hole.holeNumber)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'color-mix(in srgb, var(--x-orange) 5%, transparent)' : undefined }}>
                       <td style={{ ...td, color: C.text, fontWeight: 700 }}>
                         {hole.holeNumber}
                         {h.unmatchedDays > 0 && <span style={{ color: C.red, marginLeft: 7 }}>●</span>}
@@ -1636,7 +1420,7 @@ function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }:
                       <td style={{ ...tdN, color: marginColor(h.roll.margin), fontWeight: 800 }}>{h.roll.revenue > 0 ? pct(h.roll.marginPct) : '—'}</td>
                     </tr>
                     {isOpen && (
-                      <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
+                      <tr style={{ borderBottom: rowBorder, background: 'color-mix(in srgb, var(--x-orange) 3%, transparent)' }}>
                         <td colSpan={12} style={{ padding: '20px 22px' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 26 }}>
                             <div>
@@ -1792,7 +1576,7 @@ function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }:
               })}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                 <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={4}>{finished.length} holes</td>
                 <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{t.units}</td>
                 <td style={tdN} />
@@ -1875,7 +1659,7 @@ function TrackerTab({ invoices, onUpdate }: {
                 return (
                   <tr key={inv.id} style={{
                     borderBottom: rowBorder,
-                    background: over ? 'rgba(239,68,68,0.05)' : undefined,
+                    background: over ? 'color-mix(in srgb, var(--x-red) 5%, transparent)' : undefined,
                     opacity: cancelled ? 0.5 : 1,
                   }}>
                     <td style={{ ...td, color: C.text, fontWeight: 700, textDecoration: cancelled ? 'line-through' : undefined }}>{inv.number}</td>
@@ -1953,7 +1737,7 @@ function StatusPill({ inv, overdue, onChange }: {
         display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit',
         padding: '4px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
         textTransform: 'uppercase', letterSpacing: '0.06em',
-        color: tone, background: `${tone}1A`, border: `1px solid ${tone}44`,
+        color: tone, background: `${hexA(tone, 0x1A)}`, border: `1px solid ${hexA(tone, 0x44)}`,
       }}>
         {overdue ? 'Overdue' : INVOICE_STATUS_LABEL[inv.status]}
         <span style={{ fontSize: 8, opacity: 0.7 }}>▾</span>
@@ -1965,14 +1749,14 @@ function StatusPill({ inv, overdue, onChange }: {
           <div style={{
             position: 'fixed', left: anchor.left, top: anchor.top, zIndex: 1201,
             background: C.card, border: `1px solid ${C.border}`, borderRadius: 9,
-            padding: 4, minWidth: 140, boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            padding: 4, minWidth: 140, boxShadow: '0 8px 24px rgba(var(--x-shadow),0.6)',
           }}>
             {INVOICE_STATUSES.map(st => (
               <button key={st} onClick={() => { onChange(st); setAnchor(null) }} style={{
                 display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
                 padding: '7px 10px', borderRadius: 6, border: 'none', fontSize: 12, height: 32,
                 fontWeight: inv.status === st ? 700 : 500,
-                background: inv.status === st ? 'rgba(255,255,255,0.05)' : 'transparent',
+                background: inv.status === st ? 'rgba(var(--x-ov),0.05)' : 'transparent',
                 color: st === 'paid' ? C.green : st === 'pending' ? C.blue : st === 'cancelled' ? C.faint : C.muted,
               }}>{INVOICE_STATUS_LABEL[st]}</button>
             ))}
@@ -2011,7 +1795,7 @@ function InvoiceView({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
             {inv.lines.map((l, i) => {
               const r = inv.lineReviews?.[i]
               return (
-                <tr key={i} style={{ borderBottom: rowBorder, background: r?.status === 'disputed' ? 'rgba(239,68,68,0.05)' : undefined }}>
+                <tr key={i} style={{ borderBottom: rowBorder, background: r?.status === 'disputed' ? 'color-mix(in srgb, var(--x-red) 5%, transparent)' : undefined }}>
                   <td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{l.label}</td>
                   <td style={{ ...td, fontFamily: 'ui-monospace, monospace', color: C.faint }}>{l.depth ?? '—'}</td>
                   <td style={tdN}>{l.qty}</td><td style={tdN}>{l.rate}</td>
@@ -2034,7 +1818,7 @@ function InvoiceView({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
               {inv.ownerStatus && <td />}
             </tr>
             <tr><td style={td} colSpan={4}>Tax at {inv.taxPercent}%</td><td style={tdN}>{money(inv.subtotal * inv.taxPercent / 100)}</td>{inv.ownerStatus && <td />}</tr>
-            <tr style={{ background: 'rgba(59,130,246,0.06)' }}>
+            <tr style={{ background: 'color-mix(in srgb, var(--x-blue) 6%, transparent)' }}>
               <td style={{ ...td, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }} colSpan={4}>Total</td>
               <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }}>{money(inv.total)}</td>
               {inv.ownerStatus && <td />}
@@ -2129,7 +1913,7 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
                 <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{money(subtotal)}</td>
               </tr>
               <tr><td style={td} colSpan={4}>Tax at {taxPercent}%</td><td style={tdN}>{money(subtotal * taxPercent / 100)}</td></tr>
-              <tr style={{ background: 'rgba(59,130,246,0.06)' }}>
+              <tr style={{ background: 'color-mix(in srgb, var(--x-blue) 6%, transparent)' }}>
                 <td style={{ ...td, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }} colSpan={4}>Total</td>
                 <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }}>{money(total)}</td>
               </tr>
@@ -2184,8 +1968,8 @@ function downloadInvoice(inv: Invoice) {
     `<tr><td>${l.label}</td><td>${l.depth ?? ''}</td><td class="r">${l.qty}</td><td class="r">${l.rate}</td><td class="r">${money(l.amount)}</td></tr>`).join('')
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${inv.number}</title><style>
 body{font-family:system-ui,Arial,sans-serif;padding:44px;color:#111;max-width:840px;margin:0 auto}
-.head{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;border-bottom:3px solid #F97316;margin-bottom:26px}
-.t{font-size:26px;font-weight:800;color:#F97316}.s{font-size:12px;color:#666;margin-top:6px;line-height:1.6}
+.head{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;border-bottom:3px solid var(--x-orange);margin-bottom:26px}
+.t{font-size:26px;font-weight:800;color:var(--x-orange)}.s{font-size:12px;color:#666;margin-top:6px;line-height:1.6}
 table{width:100%;border-collapse:collapse;margin:18px 0}
 th{background:#111;color:#fff;padding:10px 12px;text-align:left;font-size:11px}
 td{padding:10px 12px;border-bottom:1px solid #eee;font-size:13px}
@@ -2218,7 +2002,7 @@ type Tab = typeof TABS[number]
 function CostingScreen() {
   const { state, setHoleStatus, addInvoice, updateInvoice, submitHole, withdrawHole } = useCosting()
 
-  const projects: string[] = INV_PROJECTS
+  const projects: string[] = useMemo(() => (state.projects ?? []).map(p => p.name), [state.projects])
   const [project, setProject] = useState(projects[0] ?? '')
 
   const rigs = useMemo(() => rigsFor(state.shiftLogs, project), [state.shiftLogs, project])
@@ -2234,6 +2018,21 @@ function CostingScreen() {
   const [showRates, setShowRates] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [quickInvoice, setQuickInvoice] = useState<HoleResult | null>(null)
+
+  /* A link from the Dashboard or from search can name where to open: project,
+   * rig, month and tab. All four are set together so the two effects above
+   * find the rig and month already valid and leave them. Re-read whenever the
+   * address changes, so jumping from one hole to another while already on
+   * this screen works too. */
+  const params = useSearchParams()
+  useEffect(() => {
+    const p = params.get('project'), r = params.get('rig'), m = params.get('month'), t = params.get('tab')
+    if (p && projects.includes(p)) setProject(p)
+    if (r) setRig(r)
+    if (m && /^\d{4}-\d{2}$/.test(m)) setMonth(m)
+    if (t && (TABS as readonly string[]).includes(t)) setTab(t as Tab)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params])
 
   const v = useRigMonthView(project, rig, month)
   const invoices = state.invoices.filter(i => i.project === project)
@@ -2254,7 +2053,7 @@ function CostingScreen() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Btn size="sm" onClick={() => setShowRates(true)}>⚙ Set rates</Btn>
+          <Btn size="sm" onClick={() => setShowRates(true)}>⚙ Set costs</Btn>
           <Btn size="sm" onClick={() => setShowHistory(true)}>↺ Rates history</Btn>
         </div>
       </div>
@@ -2317,7 +2116,7 @@ function Pick({ on, onClick, title, sub }: { on: boolean; onClick: () => void; t
   return (
     <button onClick={onClick} style={{
       padding: '7px 14px', borderRadius: 9, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
-      background: on ? `linear-gradient(135deg, ${C.orange}, ${C.orangeD})` : 'rgba(255,255,255,0.03)',
+      background: on ? `linear-gradient(135deg, ${C.orange}, ${C.orangeD})` : 'rgba(var(--x-ov),0.03)',
       border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted,
     }}>
       <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{title}</div>
@@ -2340,7 +2139,7 @@ function Chip({ on, onClick, label }: { on: boolean; onClick: () => void; label:
     <button onClick={onClick} style={{
       padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'ui-monospace, monospace',
       fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
-      background: on ? C.orange : 'rgba(255,255,255,0.03)',
+      background: on ? C.orange : 'rgba(var(--x-ov),0.03)',
       border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted,
     }}>{label}</button>
   )
@@ -2350,7 +2149,7 @@ function Arrow({ dir, onClick }: { dir: string; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{
       padding: '5px 9px', borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit', fontSize: 11,
-      background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, color: C.muted,
+      background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${C.border}`, color: C.muted,
     }}>{dir}</button>
   )
 }
@@ -2359,8 +2158,10 @@ function Arrow({ dir, onClick }: { dir: string; onClick: () => void }) {
 export default function CostingRoute() {
   return (
     <CostingProvider>
-      <CostingScreen />
+      {/* Reading the address needs a Suspense boundary above it. */}
+      <Suspense fallback={null}>
+        <CostingScreen />
+      </Suspense>
     </CostingProvider>
   )
 }
-

@@ -76,8 +76,8 @@ export default function MaintenanceLogPage() {
   }
 
   // ── Shared input/select styles ───────────────────────────────
-  const inputCls = "w-full px-4 py-3 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] placeholder:text-[#475569] focus:border-[#3B82F6] focus:outline-none focus:ring-1 focus:ring-[#3B82F6]/30 transition-all"
-  const labelCls = "block text-sm font-medium text-[#94A3B8] mb-2"
+  const inputCls = "w-full px-4 py-3 bg-[var(--x-card)] border border-[color:var(--x-border)] rounded-xl text-[color:var(--x-text)] placeholder:text-[color:var(--x-dim2)] focus:border-[color:var(--x-blue)] focus:outline-none focus:ring-1 focus:ring-[color:color-mix(in_srgb,var(--x-blue)_30%,transparent)] transition-all"
+  const labelCls = "block text-sm font-medium text-[color:var(--x-muted)] mb-2"
 
   return (
     <div className="space-y-6 pb-12">
@@ -85,16 +85,16 @@ export default function MaintenanceLogPage() {
       {/* ── Page Header ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[#F8FAFC]">Record Rig Maintenance</h1>
-          <p className="text-[#94A3B8] mt-1">Log maintenance activities, repairs, and service details</p>
+          <h1 className="text-3xl font-bold text-[color:var(--x-text)]">Record Rig Maintenance</h1>
+          <p className="text-[color:var(--x-muted)] mt-1">Log maintenance activities, repairs, and service details</p>
         </div>
         <button
           onClick={handleSubmit}
           className="flex items-center gap-2 px-6 py-3 font-semibold rounded-xl transition-all"
           style={{
-            background: 'linear-gradient(135deg, #F97316, #EA580C)',
+            background: 'linear-gradient(135deg, var(--x-orange), var(--x-orange-d))',
             color: '#fff',
-            boxShadow: '0 4px 20px rgba(249,115,22,0.35)',
+            boxShadow: '0 4px 20px color-mix(in srgb, var(--x-orange) 35%, transparent)',
           }}
         >
           <Save className="w-5 h-5" />
@@ -106,10 +106,10 @@ export default function MaintenanceLogPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         className="rounded-2xl p-6"
-        style={{ background: '#111827', border: '1px solid #1E293B' }}
+        style={{ background: 'var(--x-raised)', border: '1px solid var(--x-border)' }}
       >
-        <h2 className="text-lg font-semibold text-[#F8FAFC] mb-6 flex items-center gap-2">
-          <Wrench className="w-5 h-5 text-[#F59E0B]" />
+        <h2 className="text-lg font-semibold text-[color:var(--x-text)] mb-6 flex items-center gap-2">
+          <Wrench className="w-5 h-5 text-[color:var(--x-amber)]" />
           Basic Details
         </h2>
 
@@ -162,10 +162,10 @@ export default function MaintenanceLogPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
         className="rounded-2xl p-6"
-        style={{ background: '#111827', border: '1px solid #1E293B' }}
+        style={{ background: 'var(--x-raised)', border: '1px solid var(--x-border)' }}
       >
-        <h2 className="text-lg font-semibold text-[#F8FAFC] mb-6 flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-[#EF4444]" />
+        <h2 className="text-lg font-semibold text-[color:var(--x-text)] mb-6 flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-[color:var(--x-red)]" />
           Service Details
         </h2>
 
@@ -229,17 +229,17 @@ export default function MaintenanceLogPage() {
         </div>
 
         {/* ── Parts Used ── */}
-        <div style={{ borderTop: '1px solid #1E293B', paddingTop: 20 }}>
+        <div style={{ borderTop: '1px solid var(--x-border)', paddingTop: 20 }}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-[#F8FAFC]">Parts Used</span>
+            <span className="text-sm font-semibold text-[color:var(--x-text)]">Parts Used</span>
             <button onClick={addPart}
-              style={{ color: '#60A5FA', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
+              style={{ color: 'var(--x-blue-b)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
               <Plus size={14} /> Add
             </button>
           </div>
 
           {parts.length === 0 ? (
-            <p className="text-sm text-[#475569]">No parts added.</p>
+            <p className="text-sm text-[color:var(--x-dim2)]">No parts added.</p>
           ) : (
             <div className="space-y-3">
               {parts.map(part => (
@@ -264,7 +264,7 @@ export default function MaintenanceLogPage() {
                   </div>
                   <div className="col-span-1 flex justify-center">
                     <button onClick={() => removePart(part.id)}
-                      style={{ color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                      style={{ color: 'var(--x-red)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -279,10 +279,10 @@ export default function MaintenanceLogPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
         className="rounded-2xl p-6"
-        style={{ background: '#111827', border: '1px solid #1E293B' }}
+        style={{ background: 'var(--x-raised)', border: '1px solid var(--x-border)' }}
       >
-        <h2 className="text-lg font-semibold text-[#F8FAFC] mb-6 flex items-center gap-2">
-          <CheckCircle className="w-5 h-5 text-[#10B981]" />
+        <h2 className="text-lg font-semibold text-[color:var(--x-text)] mb-6 flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-[color:var(--x-green)]" />
           Fluid Consumables
         </h2>
 
@@ -312,11 +312,11 @@ export default function MaintenanceLogPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
         className="rounded-2xl p-6"
-        style={{ background: '#111827', border: '1px solid #1E293B' }}
+        style={{ background: 'var(--x-raised)', border: '1px solid var(--x-border)' }}
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-[#F8FAFC] flex items-center gap-2">
-            <Paperclip className="w-5 h-5 text-[#94A3B8]" />
+          <h2 className="text-lg font-semibold text-[color:var(--x-text)] flex items-center gap-2">
+            <Paperclip className="w-5 h-5 text-[color:var(--x-muted)]" />
             Maintenance Attachments
           </h2>
           <button
@@ -324,8 +324,8 @@ export default function MaintenanceLogPage() {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 16px', borderRadius: 10,
-              background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)',
-              color: '#60A5FA', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: 'color-mix(in srgb, var(--x-blue) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--x-blue) 25%, transparent)',
+              color: 'var(--x-blue-b)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
             }}
           >
             <Upload size={14} /> Add Files
@@ -336,19 +336,19 @@ export default function MaintenanceLogPage() {
         </div>
 
         {attachments.length === 0 ? (
-          <p className="text-sm text-[#475569]">No attachments added.</p>
+          <p className="text-sm text-[color:var(--x-dim2)]">No attachments added.</p>
         ) : (
           <div className="space-y-2">
             {attachments.map(att => (
               <div key={att.id} className="flex items-center justify-between px-4 py-3 rounded-xl"
-                style={{ background: '#0D1117', border: '1px solid #1E293B' }}>
+                style={{ background: 'var(--x-card)', border: '1px solid var(--x-border)' }}>
                 <div className="flex items-center gap-3">
-                  <Paperclip size={14} style={{ color: '#60A5FA' }} />
-                  <span className="text-sm text-[#F8FAFC]">{att.name}</span>
-                  <span className="text-xs text-[#475569]">{att.size}</span>
+                  <Paperclip size={14} style={{ color: 'var(--x-blue-b)' }} />
+                  <span className="text-sm text-[color:var(--x-text)]">{att.name}</span>
+                  <span className="text-xs text-[color:var(--x-dim2)]">{att.size}</span>
                 </div>
                 <button onClick={() => removeAttachment(att.id)}
-                  style={{ color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                  style={{ color: 'var(--x-red)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -361,9 +361,9 @@ export default function MaintenanceLogPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
         className="rounded-2xl p-6"
-        style={{ background: '#111827', border: '1px solid #1E293B' }}
+        style={{ background: 'var(--x-raised)', border: '1px solid var(--x-border)' }}
       >
-        <h2 className="text-lg font-semibold text-[#F8FAFC] mb-4">Notes</h2>
+        <h2 className="text-lg font-semibold text-[color:var(--x-text)] mb-4">Notes</h2>
         <textarea
           rows={4}
           className={inputCls}
