@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { ArrowLeft, Users, Truck, Circle, Search, Trash2, Plus, X, Target } from 'lucide-react'
+import { useCostingOptional } from '../../../lib/costing-store'
 
 type Personnel = { id: string; name: string; email: string; type: string; status: string }
 type Rig = { id: string; name: string; type: string; status: string }
 type Bit = { id: string; code: string; name: string; type: string; holeSize: string; status: string }
-type Hole = { id: string; holeNumber: string; status: 'OPEN' | 'CLOSED' }
+type Hole = { id: string; holeNumber: string; status: 'OPEN' | 'CLOSED'; plannedDepth?: number }
 type Project = {
   id: number; name: string; code: string; location: string; client: string; status: string
   rigs: Rig[]; supervisors: Personnel[]; drillers: Personnel[]; bits: Bit[]; holes: Hole[]
@@ -35,7 +36,23 @@ export default function ManageResources({ project, availableSupervisors, availab
   const [newDrillerForm, setNewDrillerForm] = useState({ name:'' })
   const [newRigForm, setNewRigForm] = useState({ code:'', type:'CORE' })
   const [newBitForm, setNewBitForm] = useState({ code:'', name:'', type:'SURFACE_SET', holeSize:'NQ' })
-  const [newHoleForm, setNewHoleForm] = useState({ holeNumber:'' })
+  const [newHoleForm, setNewHoleForm] = useState({ holeNumber:'', plannedDepth:'' })
+
+  /* Hole plans live in the shared costing store, not in this page's memory, so
+   * a hole added here survives a refresh and is the same hole Finance and the
+   * Client Portal read. Planned depth is the only thing the plan carries: it is
+   * what lets the mine owner read "planned 400 m, drilled 388 m". */
+  const costing = useCostingOptional()
+  const plans = costing?.state.holePlans ?? {}
+  const savedHoles: Hole[] = Object.entries(plans)
+    .filter(([n, pl]) => pl.project === project.name && !(project.holes||[]).some(h => h.holeNumber === n))
+    .map(([n]) => ({ id: `plan_${n}`, holeNumber: n, status: 'OPEN' as const }))
+  const allHoles: Hole[] = [...(project.holes||[]), ...savedHoles]
+  const plannedFor = (h: Hole) => plans[h.holeNumber]?.plannedDepth ?? h.plannedDepth
+  const setPlanned = (h: Hole, value: string) => {
+    const n = parseFloat(value)
+    costing?.setHolePlan(h.holeNumber, n > 0 ? { plannedDepth: n, project: project.name } : null)
+  }
 
   const update = (changes: Partial<Project>) => onUpdate({ ...project, ...changes })
 
@@ -52,8 +69,17 @@ export default function ManageResources({ project, availableSupervisors, availab
   const removeRig = (id:string) => update({ rigs:project.rigs.filter(r=>r.id!==id) })
   const assignBit = (b:typeof availableBits[0]) => update({ bits:[...project.bits,{...b,status:'ACTIVE'}] })
   const removeBit = (id:string) => update({ bits:project.bits.filter(b=>b.id!==id) })
-  const toggleHoleStatus = (id:string) => update({ holes:project.holes.map(h=>h.id===id?{...h,status:h.status==='OPEN'?'CLOSED':'OPEN' as const}:h) })
-  const removeHole = (id:string) => update({ holes:project.holes.filter(h=>h.id!==id) })
+  const toggleHoleStatus = (id:string) => {
+    const h = allHoles.find(x=>x.id===id)
+    if(!h) return
+    const next: Hole = { ...h, status: h.status==='OPEN'?'CLOSED':'OPEN' }
+    update({ holes: project.holes.some(x=>x.id===id) ? project.holes.map(x=>x.id===id?next:x) : [...project.holes, next] })
+  }
+  const removeHole = (id:string) => {
+    const h = allHoles.find(x => x.id === id)
+    if (h) costing?.setHolePlan(h.holeNumber, null)
+    update({ holes:project.holes.filter(x=>x.id!==id) })
+  }
 
   const addNewSupervisor = () => {
     if(!newSupForm.name.trim()) return
@@ -76,10 +102,13 @@ export default function ManageResources({ project, availableSupervisors, availab
     setNewBitForm({code:'',name:'',type:'SURFACE_SET',holeSize:'NQ'}); setShowNewBitModal(false)
   }
   const addNewHole = () => {
-    if(!newHoleForm.holeNumber.trim()) return
-    if(project.holes.find(h=>h.holeNumber===newHoleForm.holeNumber)) return
-    update({ holes:[...(project.holes||[]),{id:Date.now().toString(),holeNumber:newHoleForm.holeNumber.toUpperCase(),status:'OPEN'}] })
-    setNewHoleForm({holeNumber:''}); setShowNewHoleModal(false)
+    const holeNumber = newHoleForm.holeNumber.trim().toUpperCase()
+    const plannedDepth = parseFloat(newHoleForm.plannedDepth)
+    if(!holeNumber || !(plannedDepth > 0)) return
+    if(allHoles.find(h=>h.holeNumber===holeNumber)) return
+    costing?.setHolePlan(holeNumber, { plannedDepth, project: project.name })
+    update({ holes:[...(project.holes||[]),{id:Date.now().toString(),holeNumber,status:'OPEN',plannedDepth}] })
+    setNewHoleForm({holeNumber:'',plannedDepth:''}); setShowNewHoleModal(false)
   }
 
   // ── STYLES ──
@@ -348,16 +377,16 @@ export default function ManageResources({ project, availableSupervisors, availab
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
             <div>
               <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>Hole Numbers</div>
-              <div style={{ fontSize:11, color:'#64748B', marginTop:3 }}>Assigned holes appear in the Drilling Log dropdown</div>
+              <div style={{ fontSize:11, color:'#64748B', marginTop:3 }}>Hole number and planned depth. The mine owner reads progress against the planned depth.</div>
             </div>
             <button onClick={()=>setShowNewHoleModal(true)}
               style={{ display:'flex', alignItems:'center', gap:5, color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
               <Plus size={13}/> Add Hole
             </button>
           </div>
-          {(project.holes||[]).length===0
+          {allHoles.length===0
             ? <div style={{ textAlign:'center', padding:'24px', color:'#64748B', fontSize:13 }}>No holes added yet</div>
-            : (project.holes||[]).map(h=>(
+            : allHoles.map(h=>(
               <div key={h.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid rgba(30,41,59,0.5)' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                   <span style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>{h.holeNumber}</span>
@@ -368,7 +397,14 @@ export default function ManageResources({ project, availableSupervisors, availab
                     ● {h.status}
                   </span>
                 </div>
-                <div style={{ display:'flex', gap:8 }}>
+                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                  <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#64748B' }}>
+                    Planned depth
+                    <input type="number" min={0} value={plannedFor(h) ?? ''} placeholder="—"
+                      onChange={e=>setPlanned(h, e.target.value)}
+                      style={{ width:76, padding:'5px 8px', borderRadius:7, background:'#080B10', border:'1px solid #1E293B', color:'#F8FAFC', fontSize:12, textAlign:'right', outline:'none', fontFamily:'inherit' }} />
+                    m
+                  </label>
                   <button onClick={()=>toggleHoleStatus(h.id)}
                     style={{ padding:'5px 12px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:11, cursor:'pointer' }}>
                     {h.status==='OPEN'?'Mark Closed':'Reopen'}
@@ -426,12 +462,15 @@ export default function ManageResources({ project, availableSupervisors, availab
       <Modal show={showNewHoleModal} title="Add Hole Number" onClose={()=>setShowNewHoleModal(false)} onSave={addNewHole}>
         <div>
           <div style={label11}>Hole Number *</div>
-          <input style={iStyle} placeholder="e.g. H1, BH-001" value={newHoleForm.holeNumber} onChange={e=>setNewHoleForm({holeNumber:e.target.value})} />
-          <div style={{ fontSize:11, color:'#64748B', marginTop:6 }}>This hole will appear in the Drilling Log dropdown for this project</div>
+          <input style={iStyle} placeholder="e.g. H1, BH-001" value={newHoleForm.holeNumber} onChange={e=>setNewHoleForm({...newHoleForm,holeNumber:e.target.value})} />
+          <div style={{ ...label11, marginTop:14 }}>Planned Depth (m) *</div>
+          <input style={iStyle} type="number" min={0} placeholder="e.g. 350" value={newHoleForm.plannedDepth} onChange={e=>setNewHoleForm({...newHoleForm,plannedDepth:e.target.value})} />
+          <div style={{ fontSize:11, color:'#64748B', marginTop:6 }}>How deep this hole is planned to go. The mine owner sees drilled metres against this number.</div>
         </div>
       </Modal>
 
     </div>
   )
 }
+
 
