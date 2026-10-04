@@ -61,10 +61,10 @@ const downtimeData = [
 ]
 
 const formationData = [
-  { name: 'Soft', value: 35, color: '#10B981' },
-  { name: 'Medium', value: 28, color: '#3B82F6' },
-  { name: 'Hard', value: 22, color: '#F59E0B' },
-  { name: 'Mixed', value: 15, color: '#8B5CF6' },
+  { name: 'Soft', value: 35, color: 'var(--x-green)' },
+  { name: 'Medium', value: 28, color: 'var(--x-blue)' },
+  { name: 'Hard', value: 22, color: 'var(--x-amber)' },
+  { name: 'Mixed', value: 15, color: 'var(--x-purple)' },
 ]
 
 const quickActions = [
@@ -76,13 +76,13 @@ const quickActions = [
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#1A2234] border border-[#1E293B] rounded-xl p-3 shadow-lg">
-        <p className="text-[#94A3B8] text-sm mb-1">{label}</p>
+      <div className="bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl p-3 shadow-lg">
+        <p className="text-[color:var(--x-muted)] text-sm mb-1">{label}</p>
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-            <span className="text-[#94A3B8] text-xs">{entry.name}:</span>
-            <span className="text-[#F8FAFC] font-semibold text-sm">{entry.value}</span>
+            <span className="text-[color:var(--x-muted)] text-xs">{entry.name}:</span>
+            <span className="text-[color:var(--x-text)] font-semibold text-sm">{entry.value}</span>
           </div>
         ))}
       </div>
@@ -101,9 +101,9 @@ export default function SupervisorDashboard() {
         className="flex flex-col md:flex-row md:items-center justify-between gap-4"
       >
         <div>
-          <h1 className="text-3xl font-bold text-[#F8FAFC]">Supervisor Dashboard</h1>
-          <p className="text-[#94A3B8] mt-1">
-            Welcome back, {supervisorData.name} <span className="text-[#64748B]">({supervisorData.rigId})</span>
+          <h1 className="text-3xl font-bold text-[color:var(--x-text)]">Supervisor Dashboard</h1>
+          <p className="text-[color:var(--x-muted)] mt-1">
+            Welcome back, {supervisorData.name} <span className="text-[color:var(--x-faint)]">({supervisorData.rigId})</span>
           </p>
         </div>
       </motion.div>
@@ -113,11 +113,11 @@ export default function SupervisorDashboard() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="p-4 rounded-2xl bg-gradient-to-r from-[#3B82F6]/20 to-[#8B5CF6]/20 border border-[#3B82F6]/30"
+        className="p-4 rounded-2xl bg-gradient-to-r from-[color-mix(in_srgb,var(--x-blue)_20%,transparent)] to-[color-mix(in_srgb,var(--x-purple)_20%,transparent)] border border-[color:color-mix(in_srgb,var(--x-blue)_30%,transparent)]"
       >
-        <p className="text-[#F8FAFC]">
-          <span className="font-semibold text-[#3B82F6]">Assigned Projects:</span>{' '}
-          <span className="text-[#94A3B8]">{supervisorData.assignedProjects.join(', ')}</span>
+        <p className="text-[color:var(--x-text)]">
+          <span className="font-semibold text-[color:var(--x-blue)]">Assigned Projects:</span>{' '}
+          <span className="text-[color:var(--x-muted)]">{supervisorData.assignedProjects.join(', ')}</span>
         </p>
       </motion.div>
 
@@ -127,8 +127,8 @@ export default function SupervisorDashboard() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <h2 className="text-xl font-semibold text-[#F8FAFC] mb-4 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-[#3B82F6]" />
+        <h2 className="text-xl font-semibold text-[color:var(--x-text)] mb-4 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-[color:var(--x-blue)]" />
           Production Snapshot
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -145,14 +145,14 @@ export default function SupervisorDashboard() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.3 + i * 0.05 }}
-              className="p-4 rounded-2xl bg-[#111827] border border-[#1E293B] hover:border-[#3B82F6]/30 transition-all"
+              className="p-4 rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)] hover:border-[color:color-mix(in_srgb,var(--x-blue)_30%,transparent)] transition-all"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[#94A3B8] text-xs">{stat.label}</span>
+                <span className="text-[color:var(--x-muted)] text-xs">{stat.label}</span>
                 <stat.icon className={`w-4 h-4 text-${stat.color}-400`} />
               </div>
-              <p className="text-xl font-bold text-[#F8FAFC]">
-                {stat.value}<span className="text-xs font-normal text-[#64748B] ml-1">{stat.unit}</span>
+              <p className="text-xl font-bold text-[color:var(--x-text)]">
+                {stat.value}<span className="text-xs font-normal text-[color:var(--x-faint)] ml-1">{stat.unit}</span>
               </p>
               <div className={`flex items-center gap-1 mt-1 text-xs ${stat.up ? 'text-emerald-400' : 'text-red-400'}`}>
                 {stat.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -170,22 +170,22 @@ export default function SupervisorDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]"
+          className="p-6 rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)]"
         >
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-4 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-[#3B82F6]" />
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-4 flex items-center gap-2">
+            <Activity className="w-5 h-5 text-[color:var(--x-blue)]" />
             ROP Trend (Last 7 Days)
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={ropData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
-                <XAxis dataKey="date" stroke="#64748B" fontSize={12} />
-                <YAxis stroke="#64748B" fontSize={12} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" />
+                <XAxis dataKey="date" stroke="var(--x-faint)" fontSize={12} />
+                <YAxis stroke="var(--x-faint)" fontSize={12} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <Line type="monotone" dataKey="rop" name="ROP (m/hr)" stroke="#3B82F6" strokeWidth={3} dot={{ fill: '#3B82F6', strokeWidth: 2 }} />
-                <Line type="monotone" dataKey="target" name="Target" stroke="#10B981" strokeWidth={2} strokeDasharray="5 5" />
+                <Line type="monotone" dataKey="rop" name="ROP (m/hr)" stroke="var(--x-blue)" strokeWidth={3} dot={{ fill: 'var(--x-blue)', strokeWidth: 2 }} />
+                <Line type="monotone" dataKey="target" name="Target" stroke="var(--x-green)" strokeWidth={2} strokeDasharray="5 5" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -196,22 +196,22 @@ export default function SupervisorDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]"
+          className="p-6 rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)]"
         >
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-[#10B981]" />
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-4 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-[color:var(--x-green)]" />
             Weekly Meters Drilled
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={metersData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
-                <XAxis dataKey="date" stroke="#64748B" fontSize={12} />
-                <YAxis stroke="#64748B" fontSize={12} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" />
+                <XAxis dataKey="date" stroke="var(--x-faint)" fontSize={12} />
+                <YAxis stroke="var(--x-faint)" fontSize={12} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <Bar dataKey="meters" name="Meters Drilled" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="target" name="Target" fill="#10B981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="meters" name="Meters Drilled" fill="var(--x-blue)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="target" name="Target" fill="var(--x-green)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -222,20 +222,20 @@ export default function SupervisorDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
-          className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]"
+          className="p-6 rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)]"
         >
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-4 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-[#EF4444]" />
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-4 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-[color:var(--x-red)]" />
             Downtime Analysis
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={downtimeData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
-                <XAxis type="number" stroke="#64748B" fontSize={12} />
-                <YAxis dataKey="reason" type="category" stroke="#64748B" fontSize={12} width={100} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" />
+                <XAxis type="number" stroke="var(--x-faint)" fontSize={12} />
+                <YAxis dataKey="reason" type="category" stroke="var(--x-faint)" fontSize={12} width={100} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="hours" name="Hours Lost" fill="#EF4444" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="hours" name="Hours Lost" fill="var(--x-red)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -246,10 +246,10 @@ export default function SupervisorDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="p-6 rounded-2xl bg-[#111827] border border-[#1E293B]"
+          className="p-6 rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)]"
         >
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-4 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-[#F59E0B]" />
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-4 flex items-center gap-2">
+            <Zap className="w-5 h-5 text-[color:var(--x-amber)]" />
             Formation Distribution
           </h3>
           <div className="h-64">
@@ -282,7 +282,7 @@ export default function SupervisorDashboard() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.8 }}
       >
-        <h2 className="text-xl font-semibold text-[#F8FAFC] mb-4">Quick Actions</h2>
+        <h2 className="text-xl font-semibold text-[color:var(--x-text)] mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {quickActions.map((action, i) => (
             <Link key={i} href={action.href}>
@@ -290,13 +290,13 @@ export default function SupervisorDashboard() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.9 + i * 0.1 }}
-                className="p-5 rounded-2xl bg-[#111827] border border-[#1E293B] hover:border-[#3B82F6]/30 transition-all group"
+                className="p-5 rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)] hover:border-[color:color-mix(in_srgb,var(--x-blue)_30%,transparent)] transition-all group"
               >
                 <div className={`w-12 h-12 rounded-xl bg-${action.color}-500/20 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                   <action.icon className={`w-6 h-6 text-${action.color}-400`} />
                 </div>
-                <p className="font-medium text-[#F8FAFC]">{action.label}</p>
-                <p className="text-sm text-[#64748B] mt-1">Click to access</p>
+                <p className="font-medium text-[color:var(--x-text)]">{action.label}</p>
+                <p className="text-sm text-[color:var(--x-faint)] mt-1">Click to access</p>
               </motion.div>
             </Link>
           ))}

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo, useEffect, Fragment, ReactNode } from 'react'
+import { useState, useMemo, useEffect, Fragment, ReactNode, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useInventory, PROJECTS as INV_PROJECTS, toolingRatesFor } from '../../../lib/inventory-store'
 import {
   CostingProvider, useCosting,
@@ -20,6 +21,8 @@ import {
   type HoleResult, type Invoice, type InvoiceLine, type RateRow, type RateAdjustment,
   type InvoiceStatus, type RateStructure,
 } from '../../../lib/costing-store'
+import { computeRigMonth, type RigMonthView } from '../../../lib/costing-view'
+import { hexA } from '../../../lib/theme'
 
 /* ==========================================================================
  * XPLORIX COSTING — one screen.
@@ -133,7 +136,7 @@ function Derived({ label, value, hint, color = C.text, overridden, onOverride, o
           <input type="number" value={overridden} onChange={e => onOverride(parseFloat(e.target.value) || 0)}
             style={{ ...iStyle, color: C.amber, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }} />
           <button onClick={onClear} title="Back to the calculated value"
-            style={{ padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>Reset</button>
+            style={{ padding: '0 12px', borderRadius: 8, background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.faint, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>Reset</button>
         </div>
       ) : (
         <div style={{ ...derivedStyle, color, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -154,7 +157,7 @@ function Tag({ children, tone = C.faint }: { children: ReactNode; tone?: string 
     <span style={{
       fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
       padding: '2px 7px', borderRadius: 5, color: tone,
-      background: `${tone}1A`, border: `1px solid ${tone}33`, whiteSpace: 'nowrap',
+      background: `${hexA(tone, 0x1A)}`, border: `1px solid ${hexA(tone, 0x33)}`, whiteSpace: 'nowrap',
     }}>{children}</span>
   )
 }
@@ -169,12 +172,12 @@ function Switch({ on, onChange, label, hint }: {
       <button onClick={() => onChange(!on)} role="switch" aria-checked={on} style={{
         width: 38, height: 22, borderRadius: 11, flexShrink: 0, marginTop: 1, cursor: 'pointer',
         border: 'none', padding: 0, position: 'relative',
-        background: on ? C.orange : '#2A3444', transition: 'background 0.18s',
+        background: on ? C.orange : 'var(--x-border3)', transition: 'background 0.18s',
       }}>
         <span style={{
           position: 'absolute', top: 3, left: on ? 19 : 3, width: 16, height: 16,
           borderRadius: '50%', background: '#fff', transition: 'left 0.18s',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+          boxShadow: '0 1px 3px rgba(var(--x-shadow),0.4)',
         }} />
       </button>
       <div style={{ flex: 1 }}>
@@ -208,8 +211,8 @@ function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md' }: {
 }) {
   const tones: Record<string, React.CSSProperties> = {
     primary: { background: `linear-gradient(135deg, ${C.orange}, ${C.orangeD})`, color: '#fff', border: 'none' },
-    ghost: { background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted },
-    danger: { background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', color: C.red },
+    ghost: { background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.muted },
+    danger: { background: 'color-mix(in srgb, var(--x-red) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--x-red) 22%, transparent)', color: C.red },
   }
   return (
     <button onClick={onClick} disabled={disabled} style={{
@@ -223,7 +226,7 @@ function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md' }: {
 
 function Note({ tone = C.blue, children }: { tone?: string; children: ReactNode }) {
   return (
-    <div style={{ padding: '9px 13px', borderRadius: 9, background: `${tone}0F`, border: `1px solid ${tone}33`, fontSize: 11.5, color: tone, lineHeight: 1.55 }}>{children}</div>
+    <div style={{ padding: '9px 13px', borderRadius: 9, background: `${hexA(tone, 0x0F)}`, border: `1px solid ${hexA(tone, 0x33)}`, fontSize: 11.5, color: tone, lineHeight: 1.55 }}>{children}</div>
   )
 }
 
@@ -236,26 +239,26 @@ function Empty({ children }: { children: ReactNode }) {
 const th: React.CSSProperties = {
   padding: '7px 12px', textAlign: 'left', fontSize: 10, color: C.faint, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap',
-  borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)',
+  borderBottom: `1px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)',
 }
 const thR: React.CSSProperties = { ...th, textAlign: 'right' }
 const td: React.CSSProperties = { padding: '7px 12px', fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }
 const tdN: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse' }
-const rowBorder = '1px solid rgba(30,41,59,0.5)'
+const rowBorder = '1px solid color-mix(in srgb, var(--x-border) 50%, transparent)'
 
 function Modal({ title, subtitle, width = 760, onClose, children, footer }: {
   title: string; subtitle?: string; width?: number; onClose: () => void; children: ReactNode; footer?: ReactNode
 }) {
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(var(--x-shadow),0.82)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, width, maxWidth: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 20px 13px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{title}</div>
             {subtitle && <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>{subtitle}</div>}
           </div>
-          <button onClick={onClose} style={{ padding: 7, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0, fontFamily: 'inherit' }}>✕</button>
+          <button onClick={onClose} style={{ padding: 7, borderRadius: 8, background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0, fontFamily: 'inherit' }}>✕</button>
         </div>
         <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>{children}</div>
         {footer && <div style={{ padding: '13px 20px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>{footer}</div>}
@@ -288,105 +291,9 @@ function Section({ title, note, children }: { title: string; note?: string; chil
  * in two tabs it came from the same call.
  * ========================================================================== */
 
-interface RigMonthView {
-  hasLogs: boolean
-  ownership?: RigOwnership
-  ob: OwnershipBreakdown
-  operating?: OperatingRate
-  clientRate?: ClientRate
-  days: DayCostMTD[]
-  roll: Rollup
-  holes: HoleResult[]
-  unallocated: number
-  unallocatedDays: number
-  budgetOwnershipCPU: number
-  productionVariancePct: number
-  // The committee assigns one rock category for the whole project. If the logs
-  // disagree, every metre is underpriced and there is no line item to recover
-  // it — so the mismatch is surfaced rather than left to final billing.
-  loggedFormation: string
-}
-
-const EMPTY_OB: OwnershipBreakdown = {
-  landedPrice: 0, depPerYear: 0, depPerMonth: 0, emi: 0,
-  emiActive: false, emiMonthsLeft: 0, insurancePerMonth: 0, otherFixedPerMonth: 0,
-  perMonth: 0, perDay: 0, perUnit: 0, basisLabel: '',
-}
-
-type CostingState = ReturnType<typeof useCosting>['state']
-type InvState = ReturnType<typeof useInventory>['state']
-
-/* A plain function rather than a hook, because the month strip needs the same
- * calculation for several months at once and a hook cannot be called in a loop. */
-function computeRigMonth(state: CostingState, inv: InvState, project: string, rig: string, month: string): RigMonthView {
-  const logs = state.shiftLogs.filter(l => l.rig === rig && l.project === project && monthOf(l.date) === month)
-  if (logs.length === 0) {
-    return {
-      hasLogs: false, ob: EMPTY_OB, days: [], roll: rollup([]),
-      holes: [], unallocated: 0, unallocatedDays: 0,
-      budgetOwnershipCPU: 0, productionVariancePct: 0, loggedFormation: '',
-    }
-  }
-
-  const ownVersions = state.ownership.filter(o => o.rig === rig)
-  const opVersions = state.operating.filter(o => o.rig === rig && o.project === project)
-  const crVersions = state.clientRates.filter(c => c.project === project)
-
-  const monthEnd = `${month}-${String(daysInMonth(month)).padStart(2, '0')}`
-  const lastLogged = logs.map(l => l.date).sort()[logs.length - 1]
-  const lastDay = Math.min(Number(lastLogged.slice(8)), Number(monthEnd.slice(8)))
-
-  const ownership = versionOn(ownVersions, monthEnd)
-  const ob = ownership ? ownershipBreakdown(ownership, month) : EMPTY_OB
-  const operating = versionOn(opVersions, monthEnd)
-  const clientRate = versionOn(crVersions, monthEnd)
-
-  const raw: DayCost[] = []
-  const depthByHole: Record<string, number> = {}
-
-  for (let n = 1; n <= lastDay; n++) {
-    const date = `${month}-${String(n).padStart(2, '0')}`
-    const shifts = logs.filter(l => l.date === date)
-    const maint = state.maintenance.filter(m => m.rig === rig && m.project === project && m.date === date)
-    const op = versionOn(opVersions, date) ?? blankOperating(rig, project, date)
-    const own = versionOn(ownVersions, date) ?? blankOwnership(rig, date)
-    const obDay = versionOn(ownVersions, date) ? ownershipBreakdown(own, month) : EMPTY_OB
-    const cr = versionOn(crVersions, date)
-
-    /* The tooling rate as it stood on this date — the rig's starting kit plus
-     * everything issued up to it. Parts issued later do not reach back and
-     * change a day that was already costed. */
-    const tooling = toolingRatesFor(inv.pos, inv.rigKit, inv.catalogue, rig, project, date)
-
-    const hole = shifts.find(s => s.holeNumber)?.holeNumber ?? null
-    const depthSoFar = hole ? (depthByHole[hole] ?? 0) : 0
-
-    const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, tooling, depthSoFar)
-    if (hole) depthByHole[hole] = depthSoFar + d.units
-    raw.push(d)
-  }
-
-  const days = withCumulative(raw)
-  const roll = rollup(raw)
-  const holes = holesFromDays(raw, state.holeStatus).map(h => holeResult(h, raw))
-  const orphan = raw.filter(d => !d.holeNumber)
-
-  // Most common lithology in the logs, for the category check.
-  const counts: Record<string, number> = {}
-  logs.forEach(l => { if (l.formationType) counts[l.formationType] = (counts[l.formationType] || 0) + l.metresDrilled })
-  const loggedFormation = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
-
-  return {
-    hasLogs: true, ownership, ob, operating, clientRate, days, roll, holes,
-    unallocated: orphan.reduce((s, d) => s + d.total, 0),
-    unallocatedDays: orphan.length,
-    budgetOwnershipCPU: ownership && ownership.expectedUnitsPerMonth > 0 ? ob.perMonth / ownership.expectedUnitsPerMonth : 0,
-    productionVariancePct: ownership && ownership.expectedUnitsPerMonth > 0
-      ? ((roll.units - ownership.expectedUnitsPerMonth) / ownership.expectedUnitsPerMonth) * 100 : 0,
-    loggedFormation,
-  }
-}
-
+/* computeRigMonth and its result type live in lib/costing-view.ts, so the
+ * Dashboard can show this month's cost, revenue and margin from the very same
+ * calculation instead of a second one that could drift from it. */
 function useRigMonthView(project: string, rig: string, month: string): RigMonthView {
   const { state } = useCosting()
   const { state: inv } = useInventory()
@@ -525,7 +432,7 @@ function SideItem({ on, onClick, label }: { on: boolean; onClick: () => void; la
     <button onClick={onClick} style={{
       textAlign: 'left', padding: '8px 12px', borderRadius: 8,
       fontSize: 13, fontWeight: on ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit',
-      background: on ? 'rgba(249,115,22,0.12)' : 'transparent',
+      background: on ? 'color-mix(in srgb, var(--x-orange) 12%, transparent)' : 'transparent',
       border: 'none', borderLeft: `2px solid ${on ? C.orange : 'transparent'}`,
       color: on ? C.orange : C.muted, width: '100%',
     }}>{label}</button>
@@ -1082,8 +989,8 @@ function PerformanceTab({ v, rig, project, month }: {
             return (
               <div key={t.month} style={{
                 padding: '7px 12px', borderRadius: 9, minWidth: 104,
-                background: on ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${on ? `${C.orange}66` : C.border}`,
+                background: on ? 'color-mix(in srgb, var(--x-orange) 12%, transparent)' : 'rgba(var(--x-ov),0.03)',
+                border: `1px solid ${on ? `${hexA(C.orange, 0x66)}` : C.border}`,
               }}>
                 <div style={{ fontSize: 10, color: on ? C.orange : C.faint, fontWeight: 700 }}>
                   {monthShort(t.month)}
@@ -1151,10 +1058,10 @@ function PerformanceTab({ v, rig, project, month }: {
                   <Fragment key={d.date}>
                     <tr onClick={() => setOpen(isOpen ? null : d.date)} style={{
                       borderBottom: rowBorder, cursor: 'pointer',
-                      background: isOpen ? 'rgba(249,115,22,0.05)'
-                        : !d.submitted ? 'rgba(239,68,68,0.06)'
-                        : d.status === 'breakdown' ? 'rgba(239,68,68,0.05)'
-                        : d.status === 'standby' ? 'rgba(245,158,11,0.045)'
+                      background: isOpen ? 'color-mix(in srgb, var(--x-orange) 5%, transparent)'
+                        : !d.submitted ? 'color-mix(in srgb, var(--x-red) 6%, transparent)'
+                        : d.status === 'breakdown' ? 'color-mix(in srgb, var(--x-red) 5%, transparent)'
+                        : d.status === 'standby' ? 'color-mix(in srgb, var(--x-amber) 4.5%, transparent)'
                         : undefined,
                       borderLeft: d.status === 'breakdown' ? `2px solid ${C.red}`
                         : d.status === 'standby' ? `2px solid ${C.amber}` : '2px solid transparent',
@@ -1187,7 +1094,7 @@ function PerformanceTab({ v, rig, project, month }: {
                       <td style={{ ...tdN, color: d.revenue > 0 ? LAYER.revenue : C.dim }}>{d.revenue > 0 ? money(d.revenue) : '—'}</td>
                     </tr>
                     {isOpen && (
-                      <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
+                      <tr style={{ borderBottom: rowBorder, background: 'color-mix(in srgb, var(--x-orange) 3%, transparent)' }}>
                         <td colSpan={19} style={{ padding: '16px 18px' }}>
                           <div style={{ display: 'flex', gap: 44, flexWrap: 'wrap' }}>
                             <Detail title="From the log" tone={C.blue} rows={[
@@ -1283,7 +1190,7 @@ function PerformanceTab({ v, rig, project, month }: {
               })}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                 <td style={{ ...td, color: C.text, fontWeight: 800 }} colSpan={4}>
                   {monthLabel(month)}, all {r.days} days
                   {hidden > 0 && <span style={{ fontWeight: 400, color: C.faint, marginLeft: 8 }}>{hidden} not shown above</span>}
@@ -1464,7 +1371,7 @@ function CPUChart({ days, rate, clientRate, month }: {
             return (
               <circle key={i} cx={x(i)} cy={y(d.cpu)} r={on ? 6.5 : 4.5}
                 fill={tone} fillOpacity={on ? 1 : 0.9}
-                stroke={on ? '#fff' : C.bg} strokeWidth={on ? 1.5 : 1} />
+                stroke={on ? C.text : C.bg} strokeWidth={on ? 1.5 : 1} />
             )
           })}
 
@@ -1523,7 +1430,7 @@ function ChartTip({ d, rate, left }: { d: DayCostMTD; rate: number; left: number
       left: flip ? undefined : `${9.5 + left * 0.88}%`,
       right: flip ? `${9.5 + (100 - left) * 0.88}%` : undefined,
       background: C.card, border: `1px solid ${C.border}`, borderRadius: 10,
-      padding: '11px 14px', minWidth: 196, boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+      padding: '11px 14px', minWidth: 196, boxShadow: '0 10px 30px rgba(var(--x-shadow),0.6)',
     }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 9, paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: C.text }}>{dayLabel(d.date)}</span>
@@ -1614,7 +1521,7 @@ function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }:
                 const isOpen = open === hole.holeNumber
                 return (
                   <Fragment key={hole.holeNumber}>
-                    <tr onClick={() => setOpen(isOpen ? null : hole.holeNumber)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'rgba(249,115,22,0.05)' : undefined }}>
+                    <tr onClick={() => setOpen(isOpen ? null : hole.holeNumber)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'color-mix(in srgb, var(--x-orange) 5%, transparent)' : undefined }}>
                       <td style={{ ...td, color: C.text, fontWeight: 700 }}>
                         {hole.holeNumber}
                         {h.unmatchedDays > 0 && <span style={{ color: C.red, marginLeft: 7 }}>●</span>}
@@ -1636,7 +1543,7 @@ function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }:
                       <td style={{ ...tdN, color: marginColor(h.roll.margin), fontWeight: 800 }}>{h.roll.revenue > 0 ? pct(h.roll.marginPct) : '—'}</td>
                     </tr>
                     {isOpen && (
-                      <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
+                      <tr style={{ borderBottom: rowBorder, background: 'color-mix(in srgb, var(--x-orange) 3%, transparent)' }}>
                         <td colSpan={12} style={{ padding: '20px 22px' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 26 }}>
                             <div>
@@ -1792,7 +1699,7 @@ function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }:
               })}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                 <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={4}>{finished.length} holes</td>
                 <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{t.units}</td>
                 <td style={tdN} />
@@ -1875,7 +1782,7 @@ function TrackerTab({ invoices, onUpdate }: {
                 return (
                   <tr key={inv.id} style={{
                     borderBottom: rowBorder,
-                    background: over ? 'rgba(239,68,68,0.05)' : undefined,
+                    background: over ? 'color-mix(in srgb, var(--x-red) 5%, transparent)' : undefined,
                     opacity: cancelled ? 0.5 : 1,
                   }}>
                     <td style={{ ...td, color: C.text, fontWeight: 700, textDecoration: cancelled ? 'line-through' : undefined }}>{inv.number}</td>
@@ -1953,7 +1860,7 @@ function StatusPill({ inv, overdue, onChange }: {
         display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit',
         padding: '4px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
         textTransform: 'uppercase', letterSpacing: '0.06em',
-        color: tone, background: `${tone}1A`, border: `1px solid ${tone}44`,
+        color: tone, background: `${hexA(tone, 0x1A)}`, border: `1px solid ${hexA(tone, 0x44)}`,
       }}>
         {overdue ? 'Overdue' : INVOICE_STATUS_LABEL[inv.status]}
         <span style={{ fontSize: 8, opacity: 0.7 }}>▾</span>
@@ -1965,14 +1872,14 @@ function StatusPill({ inv, overdue, onChange }: {
           <div style={{
             position: 'fixed', left: anchor.left, top: anchor.top, zIndex: 1201,
             background: C.card, border: `1px solid ${C.border}`, borderRadius: 9,
-            padding: 4, minWidth: 140, boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            padding: 4, minWidth: 140, boxShadow: '0 8px 24px rgba(var(--x-shadow),0.6)',
           }}>
             {INVOICE_STATUSES.map(st => (
               <button key={st} onClick={() => { onChange(st); setAnchor(null) }} style={{
                 display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
                 padding: '7px 10px', borderRadius: 6, border: 'none', fontSize: 12, height: 32,
                 fontWeight: inv.status === st ? 700 : 500,
-                background: inv.status === st ? 'rgba(255,255,255,0.05)' : 'transparent',
+                background: inv.status === st ? 'rgba(var(--x-ov),0.05)' : 'transparent',
                 color: st === 'paid' ? C.green : st === 'pending' ? C.blue : st === 'cancelled' ? C.faint : C.muted,
               }}>{INVOICE_STATUS_LABEL[st]}</button>
             ))}
@@ -2011,7 +1918,7 @@ function InvoiceView({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
             {inv.lines.map((l, i) => {
               const r = inv.lineReviews?.[i]
               return (
-                <tr key={i} style={{ borderBottom: rowBorder, background: r?.status === 'disputed' ? 'rgba(239,68,68,0.05)' : undefined }}>
+                <tr key={i} style={{ borderBottom: rowBorder, background: r?.status === 'disputed' ? 'color-mix(in srgb, var(--x-red) 5%, transparent)' : undefined }}>
                   <td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{l.label}</td>
                   <td style={{ ...td, fontFamily: 'ui-monospace, monospace', color: C.faint }}>{l.depth ?? '—'}</td>
                   <td style={tdN}>{l.qty}</td><td style={tdN}>{l.rate}</td>
@@ -2034,7 +1941,7 @@ function InvoiceView({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
               {inv.ownerStatus && <td />}
             </tr>
             <tr><td style={td} colSpan={4}>Tax at {inv.taxPercent}%</td><td style={tdN}>{money(inv.subtotal * inv.taxPercent / 100)}</td>{inv.ownerStatus && <td />}</tr>
-            <tr style={{ background: 'rgba(59,130,246,0.06)' }}>
+            <tr style={{ background: 'color-mix(in srgb, var(--x-blue) 6%, transparent)' }}>
               <td style={{ ...td, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }} colSpan={4}>Total</td>
               <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }}>{money(inv.total)}</td>
               {inv.ownerStatus && <td />}
@@ -2129,7 +2036,7 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
                 <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{money(subtotal)}</td>
               </tr>
               <tr><td style={td} colSpan={4}>Tax at {taxPercent}%</td><td style={tdN}>{money(subtotal * taxPercent / 100)}</td></tr>
-              <tr style={{ background: 'rgba(59,130,246,0.06)' }}>
+              <tr style={{ background: 'color-mix(in srgb, var(--x-blue) 6%, transparent)' }}>
                 <td style={{ ...td, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }} colSpan={4}>Total</td>
                 <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }}>{money(total)}</td>
               </tr>
@@ -2184,8 +2091,8 @@ function downloadInvoice(inv: Invoice) {
     `<tr><td>${l.label}</td><td>${l.depth ?? ''}</td><td class="r">${l.qty}</td><td class="r">${l.rate}</td><td class="r">${money(l.amount)}</td></tr>`).join('')
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${inv.number}</title><style>
 body{font-family:system-ui,Arial,sans-serif;padding:44px;color:#111;max-width:840px;margin:0 auto}
-.head{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;border-bottom:3px solid #F97316;margin-bottom:26px}
-.t{font-size:26px;font-weight:800;color:#F97316}.s{font-size:12px;color:#666;margin-top:6px;line-height:1.6}
+.head{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;border-bottom:3px solid var(--x-orange);margin-bottom:26px}
+.t{font-size:26px;font-weight:800;color:var(--x-orange)}.s{font-size:12px;color:#666;margin-top:6px;line-height:1.6}
 table{width:100%;border-collapse:collapse;margin:18px 0}
 th{background:#111;color:#fff;padding:10px 12px;text-align:left;font-size:11px}
 td{padding:10px 12px;border-bottom:1px solid #eee;font-size:13px}
@@ -2234,6 +2141,21 @@ function CostingScreen() {
   const [showRates, setShowRates] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [quickInvoice, setQuickInvoice] = useState<HoleResult | null>(null)
+
+  /* A link from the Dashboard or from search can name where to open: project,
+   * rig, month and tab. All four are set together so the two effects above
+   * find the rig and month already valid and leave them. Re-read whenever the
+   * address changes, so jumping from one hole to another while already on
+   * this screen works too. */
+  const params = useSearchParams()
+  useEffect(() => {
+    const p = params.get('project'), r = params.get('rig'), m = params.get('month'), t = params.get('tab')
+    if (p && projects.includes(p)) setProject(p)
+    if (r) setRig(r)
+    if (m && /^\d{4}-\d{2}$/.test(m)) setMonth(m)
+    if (t && (TABS as readonly string[]).includes(t)) setTab(t as Tab)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params])
 
   const v = useRigMonthView(project, rig, month)
   const invoices = state.invoices.filter(i => i.project === project)
@@ -2317,7 +2239,7 @@ function Pick({ on, onClick, title, sub }: { on: boolean; onClick: () => void; t
   return (
     <button onClick={onClick} style={{
       padding: '7px 14px', borderRadius: 9, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
-      background: on ? `linear-gradient(135deg, ${C.orange}, ${C.orangeD})` : 'rgba(255,255,255,0.03)',
+      background: on ? `linear-gradient(135deg, ${C.orange}, ${C.orangeD})` : 'rgba(var(--x-ov),0.03)',
       border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted,
     }}>
       <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{title}</div>
@@ -2340,7 +2262,7 @@ function Chip({ on, onClick, label }: { on: boolean; onClick: () => void; label:
     <button onClick={onClick} style={{
       padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'ui-monospace, monospace',
       fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
-      background: on ? C.orange : 'rgba(255,255,255,0.03)',
+      background: on ? C.orange : 'rgba(var(--x-ov),0.03)',
       border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted,
     }}>{label}</button>
   )
@@ -2350,7 +2272,7 @@ function Arrow({ dir, onClick }: { dir: string; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{
       padding: '5px 9px', borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit', fontSize: 11,
-      background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, color: C.muted,
+      background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${C.border}`, color: C.muted,
     }}>{dir}</button>
   )
 }
@@ -2359,8 +2281,10 @@ function Arrow({ dir, onClick }: { dir: string; onClick: () => void }) {
 export default function CostingRoute() {
   return (
     <CostingProvider>
-      <CostingScreen />
+      {/* Reading the address needs a Suspense boundary above it. */}
+      <Suspense fallback={null}>
+        <CostingScreen />
+      </Suspense>
     </CostingProvider>
   )
 }
-

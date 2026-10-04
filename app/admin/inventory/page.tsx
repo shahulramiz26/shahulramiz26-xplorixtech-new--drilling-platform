@@ -20,13 +20,14 @@ import {
   type ShiftFact, type TerrainRow, type ToolingRates,
 } from '../../../lib/inventory-store'
 import { useCosting, monthOf } from '../../../lib/costing-store'
+import { hexA } from '../../../lib/theme'
 
 const C = {
-  bg: '#080B10', card: '#0D1117', border: '#1E293B',
-  orange: '#F97316', orangeD: '#EA580C',
-  green: '#10B981', red: '#EF4444', amber: '#F59E0B',
-  blue: '#3B82F6', purple: '#8B5CF6', teal: '#14B8A6',
-  text: '#F8FAFC', muted: '#94A3B8', faint: '#64748B', dim: '#334155',
+  bg: 'var(--x-bg)', card: 'var(--x-card)', border: 'var(--x-border)',
+  orange: 'var(--x-orange)', orangeD: 'var(--x-orange-d)',
+  green: 'var(--x-green)', red: 'var(--x-red)', amber: 'var(--x-amber)',
+  blue: 'var(--x-blue)', purple: 'var(--x-purple)', teal: 'var(--x-teal)',
+  text: 'var(--x-text)', muted: 'var(--x-muted)', faint: 'var(--x-faint)', dim: 'var(--x-dim)',
 }
 
 const iStyle: React.CSSProperties = {
@@ -37,14 +38,14 @@ const numStyle: React.CSSProperties = { ...iStyle, textAlign: 'right', fontFamil
 const th: React.CSSProperties = {
   padding: '7px 12px', textAlign: 'left', fontSize: 10, color: C.faint, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap',
-  borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)',
+  borderBottom: `1px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)',
 }
 const thR: React.CSSProperties = { ...th, textAlign: 'right' }
 const td: React.CSSProperties = { padding: '7px 12px', fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }
 const tdN: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }
 const tdMono: React.CSSProperties = { ...td, fontFamily: 'ui-monospace, monospace' }
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse' }
-const rowBorder = '1px solid rgba(30,41,59,0.5)'
+const rowBorder = '1px solid color-mix(in srgb, var(--x-border) 50%, transparent)'
 
 /* ── primitives ─────────────────────────────────────────────────────────── */
 
@@ -79,7 +80,7 @@ function Stat({ label, value, note, color = C.text, big }: { label: string; valu
 
 function Tag({ children, tone = C.faint }: { children: ReactNode; tone?: string }) {
   return (
-    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 5, color: tone, background: `${tone}1A`, border: `1px solid ${tone}33`, whiteSpace: 'nowrap' }}>
+    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 5, color: tone, background: `${hexA(tone, 0x1A)}`, border: `1px solid ${hexA(tone, 0x33)}`, whiteSpace: 'nowrap' }}>
       {children}
     </span>
   )
@@ -88,8 +89,8 @@ function Tag({ children, tone = C.faint }: { children: ReactNode; tone?: string 
 function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md' }: { children: ReactNode; onClick?: () => void; tone?: 'primary' | 'ghost' | 'danger'; disabled?: boolean; size?: 'sm' | 'md' }) {
   const tones: Record<string, React.CSSProperties> = {
     primary: { background: `linear-gradient(135deg, ${C.orange}, ${C.orangeD})`, color: '#fff', border: 'none' },
-    ghost: { background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted },
-    danger: { background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', color: C.red },
+    ghost: { background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.muted },
+    danger: { background: 'color-mix(in srgb, var(--x-red) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--x-red) 22%, transparent)', color: C.red },
   }
   return (
     <button onClick={onClick} disabled={disabled} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: disabled ? 'not-allowed' : 'pointer', borderRadius: 8, fontWeight: 700, fontFamily: 'inherit', opacity: disabled ? 0.45 : 1, padding: size === 'sm' ? '5px 11px' : '8px 15px', fontSize: size === 'sm' ? 11.5 : 12.5, whiteSpace: 'nowrap', ...tones[tone] }}>
@@ -99,7 +100,7 @@ function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md' }: { chi
 }
 
 function Note({ tone = C.blue, children }: { tone?: string; children: ReactNode }) {
-  return <div style={{ padding: '9px 13px', borderRadius: 9, background: `${tone}0F`, border: `1px solid ${tone}33`, fontSize: 11.5, color: tone, lineHeight: 1.55 }}>{children}</div>
+  return <div style={{ padding: '9px 13px', borderRadius: 9, background: `${hexA(tone, 0x0F)}`, border: `1px solid ${hexA(tone, 0x33)}`, fontSize: 11.5, color: tone, lineHeight: 1.55 }}>{children}</div>
 }
 
 function Empty({ children }: { children: ReactNode }) {
@@ -118,14 +119,14 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 function Modal({ title, subtitle, width = 760, onClose, children, footer }: { title: string; subtitle?: string; width?: number; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(var(--x-shadow),0.82)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, width, maxWidth: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 20px 13px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{title}</div>
             {subtitle && <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>{subtitle}</div>}
           </div>
-          <button onClick={onClose} style={{ padding: 7, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0, fontFamily: 'inherit' }}>✕</button>
+          <button onClick={onClose} style={{ padding: 7, borderRadius: 8, background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0, fontFamily: 'inherit' }}>✕</button>
         </div>
         <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>{children}</div>
         {footer && <div style={{ padding: '13px 20px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>{footer}</div>}
@@ -152,7 +153,7 @@ function Chain({ label, children }: { label: string; children: ReactNode }) {
 
 function Chip({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
-    <button onClick={onClick} style={{ padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'ui-monospace, monospace', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', background: on ? C.orange : 'rgba(255,255,255,0.03)', border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted }}>
+    <button onClick={onClick} style={{ padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'ui-monospace, monospace', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', background: on ? C.orange : 'rgba(var(--x-ov),0.03)', border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted }}>
       {label}
     </button>
   )
@@ -162,7 +163,7 @@ function Chip({ on, onClick, label }: { on: boolean; onClick: () => void; label:
 function Bar({ value, max, tone, height = 6 }: { value: number; max: number; tone: string; height?: number }) {
   const w = max > 0 ? Math.max(1.5, (value / max) * 100) : 0
   return (
-    <div style={{ height, background: 'rgba(255,255,255,0.045)', borderRadius: height / 2, overflow: 'hidden', minWidth: 60 }}>
+    <div style={{ height, background: 'rgba(var(--x-ov),0.045)', borderRadius: height / 2, overflow: 'hidden', minWidth: 60 }}>
       <div style={{ width: `${w}%`, height: '100%', background: tone, borderRadius: height / 2 }} />
     </div>
   )
@@ -199,7 +200,7 @@ function AlertsPanel({ alerts }: { alerts: Alert[] }) {
   const shownValue = shown.reduce((s, a) => s + (a.value ?? 0), 0)
 
   const chip = (label: string, count: number, value: number, on: boolean, tone: string, onClick: () => void) => (
-    <button key={label} onClick={onClick} style={{ display: 'flex', alignItems: 'baseline', gap: 7, padding: '5px 11px', borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', background: on ? `${tone}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${on ? `${tone}66` : C.border}`, color: on ? tone : C.faint }}>
+    <button key={label} onClick={onClick} style={{ display: 'flex', alignItems: 'baseline', gap: 7, padding: '5px 11px', borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', background: on ? `${hexA(tone, 0x22)}` : 'rgba(var(--x-ov),0.03)', border: `1px solid ${on ? `${hexA(tone, 0x66)}` : C.border}`, color: on ? tone : C.faint }}>
       <span style={{ fontSize: 11.5, fontWeight: 700 }}>{label}</span>
       <span style={{ fontSize: 11, fontWeight: 800, fontFamily: 'ui-monospace, monospace' }}>{count}</span>
       {value > 0 && <span style={{ fontSize: 10, opacity: 0.7, fontFamily: 'ui-monospace, monospace' }}>{moneyL(value)}</span>}
@@ -229,7 +230,7 @@ function AlertsPanel({ alerts }: { alerts: Alert[] }) {
         ))}
       </div>
       {shown.length > 1 && (
-        <div style={{ padding: '9px 16px', display: 'flex', justifyContent: 'space-between', gap: 12, background: 'rgba(255,255,255,0.02)' }}>
+        <div style={{ padding: '9px 16px', display: 'flex', justifyContent: 'space-between', gap: 12, background: 'rgba(var(--x-ov),0.02)' }}>
           <span style={{ fontSize: 11, color: C.faint }}>{shown.length} shown{active !== 'all' ? ` of ${alerts.length}` : ''}</span>
           <span style={{ fontSize: 12, fontWeight: 800, color: C.text, fontFamily: 'ui-monospace, monospace' }}>{money(shownValue)}</span>
         </div>
@@ -333,7 +334,7 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
               ))}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                 <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>
                   Whole catalogue, every active part
                   <span style={{ fontWeight: 400, color: C.faint, marginLeft: 8 }}>
@@ -523,7 +524,7 @@ function OrdersTab({ onReceive, onCreate, onEdit, onRaiseReorder, onReceiveReord
                 const owed = openReorders(po)
                 return (
                   <Fragment key={po.id}>
-                    <tr onClick={() => setOpen(isOpen ? null : po.id)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'rgba(249,115,22,0.05)' : late ? 'rgba(239,68,68,0.05)' : undefined }}>
+                    <tr onClick={() => setOpen(isOpen ? null : po.id)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'color-mix(in srgb, var(--x-orange) 5%, transparent)' : late ? 'color-mix(in srgb, var(--x-red) 5%, transparent)' : undefined }}>
                       <td style={{ ...td, color: C.text, fontWeight: 700 }}>{po.number}{owed.length > 0 && <span style={{ marginLeft: 7 }}><Tag tone={C.red}>{owed.length} on reorder</Tag></span>}</td>
                       <td style={td}>{po.supplier}</td><td style={tdMono}>{projectCode(po.project)}</td>
                       <td style={td}><Tag tone={PO_TONE[st]}>{st}</Tag></td>
@@ -542,7 +543,7 @@ function OrdersTab({ onReceive, onCreate, onEdit, onRaiseReorder, onReceiveReord
                       </td>
                     </tr>
                     {isOpen && (
-                      <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
+                      <tr style={{ borderBottom: rowBorder, background: 'color-mix(in srgb, var(--x-orange) 3%, transparent)' }}>
                         <td colSpan={11} style={{ padding: '16px 18px' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: 24 }}>
                             <div>
@@ -598,7 +599,7 @@ function ReordersTable({ onReceiveReorder }: { onReceiveReorder: (po: PurchaseOr
                 const overdue = isOpen && !!r.promisedDate && r.promisedDate < TODAY
                 const failedAgain = r.receipt && (r.receipt.damaged + r.receipt.rejected) > 0
                 return (
-                  <tr key={r.id} style={{ borderBottom: rowBorder, background: overdue ? 'rgba(239,68,68,0.06)' : failedAgain ? 'rgba(245,158,11,0.05)' : undefined, opacity: isOpen ? 1 : 0.75 }}>
+                  <tr key={r.id} style={{ borderBottom: rowBorder, background: overdue ? 'color-mix(in srgb, var(--x-red) 6%, transparent)' : failedAgain ? 'color-mix(in srgb, var(--x-amber) 5%, transparent)' : undefined, opacity: isOpen ? 1 : 0.75 }}>
                     <td style={{ ...td, color: C.text }}>{dayLabel(r.raisedDate)}</td>
                     <td style={{ ...td, color: C.text, fontWeight: 700 }}>{po.number}</td>
                     <td style={{ ...td, color: C.text, whiteSpace: 'normal', maxWidth: 200 }}>{nameOf(r.itemId)}</td>
@@ -784,7 +785,7 @@ function StoreTab() {
                   const part = state.catalogue.find(p => p.id === r.itemId)
                   const old  = r.ageDays >= state.alerts.idleDays
                   return (
-                    <tr key={r.key} style={{ borderBottom: rowBorder, background: old ? 'rgba(245,158,11,0.04)' : undefined }}>
+                    <tr key={r.key} style={{ borderBottom: rowBorder, background: old ? 'color-mix(in srgb, var(--x-amber) 4%, transparent)' : undefined }}>
                       <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{part?.partNumber || '—'}</td>
                       <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 200 }}>{nameOf(r.itemId)}</td>
                       <td style={td}>{part ? <Tag tone={C.dim}>{part.category}</Tag> : '—'}</td>
@@ -809,7 +810,7 @@ function StoreTab() {
                 })}
               </tbody>
               <tfoot>
-                <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+                <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                   <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>Total on the shelf</td>
                   <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(shelfValue)}</td>
                   <td style={td} colSpan={2} />
@@ -857,7 +858,7 @@ function StoreTab() {
                 <div style={{ display: 'flex', gap: 8, padding: '11px 16px', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Per metre of</span>
                   {FORMATIONS.map(f => (
-                    <span key={f} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7, padding: '4px 10px', borderRadius: 7, background: `${FORMATION_TONE[f]}14`, border: `1px solid ${FORMATION_TONE[f]}33` }}>
+                    <span key={f} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7, padding: '4px 10px', borderRadius: 7, background: `${hexA(FORMATION_TONE[f], 0x14)}`, border: `1px solid ${hexA(FORMATION_TONE[f], 0x33)}` }}>
                       <span style={{ fontSize: 11, color: FORMATION_TONE[f], fontWeight: 700 }}>{f}</span>
                       <span style={{ fontSize: 12, fontWeight: 800, color: C.text, fontFamily: 'ui-monospace, monospace' }}>{perMetre(tooling.byFormation[f])}</span>
                     </span>
@@ -901,7 +902,7 @@ function StoreTab() {
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+                      <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                         <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={9}>
                           Every part on this rig
                           <span style={{ fontWeight: 400, color: C.faint, marginLeft: 8 }}>
@@ -1032,7 +1033,7 @@ function PickPartsModal({ title, subtitle, tone, note, qtyLabel, withRig, confir
             <tbody>
               {byCategory.map(({ cat, parts }) => (
                 <Fragment key={cat}>
-                  <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  <tr style={{ background: 'rgba(var(--x-ov),0.03)' }}>
                     <td colSpan={8} style={{ ...td, fontSize: 10, fontWeight: 800, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '6px 12px' }}>{cat}</td>
                   </tr>
                   {parts.map(p => {
@@ -1041,7 +1042,7 @@ function PickPartsModal({ title, subtitle, tone, note, qtyLabel, withRig, confir
                     const rate = parseFloat(row?.rate || '0') || p.rate
                     const on   = qty > 0
                     return (
-                      <tr key={p.id} style={{ borderBottom: rowBorder, background: on ? `${tone}12` : undefined }}>
+                      <tr key={p.id} style={{ borderBottom: rowBorder, background: on ? `${hexA(tone, 0x12)}` : undefined }}>
                         <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber}</td>
                         <td style={{ ...td, color: on ? C.text : C.muted, fontWeight: on ? 700 : 400, whiteSpace: 'normal', maxWidth: 190 }}>{p.name}</td>
                         <td style={{ ...td, color: C.muted }}>{FORMATION_USE_LABEL[formationUse(p)]}</td>
@@ -1112,7 +1113,7 @@ function IssueModal({ project, prefill, onSave, onClose }: {
               <th style={thR}>On shelf</th><th style={thR}>Issuing</th><th style={thR}>Value</th>
             </tr></thead>
             <tbody>{stock.map(l => { const n = qty[l.key] ?? 0; return (
-              <tr key={l.key} style={{ borderBottom: rowBorder, background: n > 0 ? 'rgba(249,115,22,0.06)' : undefined }}>
+              <tr key={l.key} style={{ borderBottom: rowBorder, background: n > 0 ? 'color-mix(in srgb, var(--x-orange) 6%, transparent)' : undefined }}>
                 <td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{nameOf(l.itemId)}</td>
                 <td style={td}>{l.poNumber}</td>
                 <td style={{ ...tdN, color: C.amber }}>{l.qty}</td>
@@ -1124,7 +1125,7 @@ function IssueModal({ project, prefill, onSave, onClose }: {
                 <td style={{ ...tdN, color: n > 0 ? C.text : C.dim }}>{n > 0 ? money(n * l.rate) : '—'}</td>
               </tr>
             )})}</tbody>
-            <tfoot><tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+            <tfoot><tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
               <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={4}>Total leaving the shelf</td>
               <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{money(value)}</td>
             </tr></tfoot>
@@ -1302,7 +1303,7 @@ function TerrainPanel({ rows, metres }: { rows: TerrainRow[]; metres: number }) 
             {/* On a rig, nothing scrapped yet. Either it is outlasting its
                 catalogue life, or the driller is not recording it. */}
             {unworn.length > 0 && (
-              <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+              <tr style={{ background: 'rgba(var(--x-ov),0.03)' }}>
                 <td colSpan={9} style={{ ...td, fontSize: 10, fontWeight: 800, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '6px 12px' }}>
                   On a rig, no wear recorded yet
                 </td>
@@ -1328,7 +1329,7 @@ function TerrainPanel({ rows, metres }: { rows: TerrainRow[]; metres: number }) 
           </tbody>
         </table>
       </div>
-      <div style={{ padding: '10px 16px', fontSize: 11, color: C.faint, lineHeight: 1.6, background: 'rgba(255,255,255,0.02)' }}>
+      <div style={{ padding: '10px 16px', fontSize: 11, color: C.faint, lineHeight: 1.6, background: 'rgba(var(--x-ov),0.02)' }}>
         A formation needs {TERRAIN_MIN_SAMPLE} scrapped units before its figure is worth acting on — below that it is one unlucky part, not a pattern.
         Where the gap is real and holding, change the life on the catalogue and every cost per metre follows.
       </div>
@@ -1367,7 +1368,7 @@ function GroundPanel({ bands, tooling, rig }: { bands: ReturnType<typeof groundM
             ))}
           </tbody>
           <tfoot>
-            <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(255,255,255,0.02)' }}>
+            <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
               <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={2}>Whole project</td>
               <td style={{ ...tdN, fontWeight: 900, color: C.text }}>{total.toLocaleString('en-IN')}</td>
               <td style={tdN} />
@@ -1457,7 +1458,7 @@ function SupplierInsightPanel() {
               const spreadTone = r.leadSpread == null ? C.dim : r.leadSpread > 14 ? C.red : r.leadSpread > 7 ? C.amber : C.green
               return (
                 <Fragment key={r.supplier}>
-                  <tr onClick={() => setOpen(isOpen ? null : r.supplier)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'rgba(249,115,22,0.05)' : undefined }}>
+                  <tr onClick={() => setOpen(isOpen ? null : r.supplier)} style={{ borderBottom: rowBorder, cursor: 'pointer', background: isOpen ? 'color-mix(in srgb, var(--x-orange) 5%, transparent)' : undefined }}>
                     <td style={{ ...td, color: C.text, fontWeight: 700 }}>{r.supplier}</td>
                     <td style={tdN}>{money(r.value)}</td>
                     <td style={{ ...tdN, color: r.faultyPct ? C.red : C.dim, fontWeight: 700 }}>
@@ -1484,7 +1485,7 @@ function SupplierInsightPanel() {
                     </td>
                   </tr>
                   {isOpen && (
-                    <tr style={{ borderBottom: rowBorder, background: 'rgba(249,115,22,0.03)' }}>
+                    <tr style={{ borderBottom: rowBorder, background: 'color-mix(in srgb, var(--x-orange) 3%, transparent)' }}>
                       <td colSpan={9} style={{ padding: '16px 18px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 26 }}>
                           <div>
@@ -1550,7 +1551,7 @@ function SupplierInsightPanel() {
           </tbody>
         </table>
       </div>
-      <div style={{ padding: '10px 16px', fontSize: 11, color: C.faint, lineHeight: 1.6, background: 'rgba(255,255,255,0.02)' }}>
+      <div style={{ padding: '10px 16px', fontSize: 11, color: C.faint, lineHeight: 1.6, background: 'rgba(var(--x-ov),0.02)' }}>
         Price loading is the share of units that had to be sent back — the amount by which the quoted price understates what you paid.
         Lead time is shown as every delivery seen rather than an average, because a supplier reliably at 25 days is easier to plan around than one averaging 18 between 8 and 40.
       </div>
@@ -1706,7 +1707,7 @@ function POModal({ po, onSave, onPlace, onClose }: { po: PurchaseOrder; onSave: 
               <thead><tr><th style={th}>Part number</th><th style={th}>Item</th><th style={th}>Category</th><th style={thR}>Life</th><th style={thR}>Cost/m</th><th style={thR}>Rate</th><th style={thR}>Quantity</th><th style={thR}>Line value</th></tr></thead>
               <tbody>
                 {catalogue.length === 0 && <tr><td colSpan={8}><Empty>No parts match. Tick &quot;All suppliers&quot; to buy from another supplier.</Empty></td></tr>}
-                {catalogue.map(p => { const qty = qtyOf(p.id); const on = qty > 0; return (<tr key={p.id} style={{ borderBottom: rowBorder, background: on ? 'rgba(249,115,22,0.06)' : undefined }}><td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber || '—'}</td><td style={{ ...td, color: C.text, whiteSpace: 'normal', maxWidth: 220 }}>{p.name}</td><td style={td}><Tag tone={C.dim}>{p.category}</Tag></td><td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td><td style={{ ...tdN, color: C.orange }}>{perMetre(costPerMetre(p))}</td><td style={{ padding: '5px 8px', width: 120 }}><input type="number" min={0} value={rateOf(p.id)} disabled={!on} onChange={e => setRate(p.id, parseFloat(e.target.value) || 0)} style={{ ...numStyle, opacity: on ? 1 : 0.45 }} /></td><td style={{ padding: '5px 8px', width: 100 }}><input type="number" min={0} value={qty} onChange={e => setQty(p.id, Math.max(0, parseFloat(e.target.value) || 0))} style={{ ...numStyle, color: on ? C.orange : C.muted }} /></td><td style={{ ...tdN, color: on ? C.text : C.dim, fontWeight: on ? 700 : 400 }}>{on ? money(qty * rateOf(p.id)) : '—'}</td></tr>) })}
+                {catalogue.map(p => { const qty = qtyOf(p.id); const on = qty > 0; return (<tr key={p.id} style={{ borderBottom: rowBorder, background: on ? 'color-mix(in srgb, var(--x-orange) 6%, transparent)' : undefined }}><td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber || '—'}</td><td style={{ ...td, color: C.text, whiteSpace: 'normal', maxWidth: 220 }}>{p.name}</td><td style={td}><Tag tone={C.dim}>{p.category}</Tag></td><td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td><td style={{ ...tdN, color: C.orange }}>{perMetre(costPerMetre(p))}</td><td style={{ padding: '5px 8px', width: 120 }}><input type="number" min={0} value={rateOf(p.id)} disabled={!on} onChange={e => setRate(p.id, parseFloat(e.target.value) || 0)} style={{ ...numStyle, opacity: on ? 1 : 0.45 }} /></td><td style={{ padding: '5px 8px', width: 100 }}><input type="number" min={0} value={qty} onChange={e => setQty(p.id, Math.max(0, parseFloat(e.target.value) || 0))} style={{ ...numStyle, color: on ? C.orange : C.muted }} /></td><td style={{ ...tdN, color: on ? C.text : C.dim, fontWeight: on ? 700 : 400 }}>{on ? money(qty * rateOf(p.id)) : '—'}</td></tr>) })}
               </tbody>
             </table>
           </div>
@@ -1779,7 +1780,7 @@ export default function InventoryPage() {
           </p>
         </div>
         {alerts.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px', borderRadius: 9, background: urgent ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)', border: `1px solid ${urgent ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px', borderRadius: 9, background: urgent ? 'color-mix(in srgb, var(--x-red) 10%, transparent)' : 'color-mix(in srgb, var(--x-amber) 10%, transparent)', border: `1px solid ${urgent ? 'color-mix(in srgb, var(--x-red) 30%, transparent)' : 'color-mix(in srgb, var(--x-amber) 30%, transparent)'}` }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: urgent ? C.red : C.amber }} />
             <span style={{ fontSize: 12.5, fontWeight: 700, color: urgent ? C.red : C.amber }}>{alerts.length} need{alerts.length === 1 ? 's' : ''} attention</span>
           </div>

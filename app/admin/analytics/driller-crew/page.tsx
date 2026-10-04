@@ -10,48 +10,49 @@ import {
 import { Users, Clock, TrendingUp, Award, Filter, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import AIInsights from '../../../components/AIInsights'
 import LeaderboardTable from '../../../components/LeaderboardTable'
+import { hexA } from '../../../../lib/theme'
 
 function KpiCard({ label, value, unit, icon: Icon, color, trend, trendUp }: {
   label: string; value: string; unit?: string; icon: any
   color: string; trend?: string; trendUp?: boolean
 }) {
   return (
-    <div style={{ padding:20, borderRadius:16, background:'#0D1117', border:'1px solid #1E293B', transition:'border-color 0.2s' }}
-      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${color}40`}
-      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+    <div style={{ padding:20, borderRadius:16, background:'var(--x-card)', border:'1px solid var(--x-border)', transition:'border-color 0.2s' }}
+      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${hexA(color, 0x40)}`}
+      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-        <div style={{ width:40, height:40, borderRadius:10, background:`${color}18`, border:`1px solid ${color}30`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ width:40, height:40, borderRadius:10, background:`${hexA(color, 0x18)}`, border:`1px solid ${hexA(color, 0x30)}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
           <Icon style={{ width:18, height:18, color }} />
         </div>
         {trend && (
-          <span style={{ fontSize:11, fontWeight:700, color: trendUp ? '#10B981' : '#EF4444' }}>
+          <span style={{ fontSize:11, fontWeight:700, color: trendUp ? 'var(--x-green)' : 'var(--x-red)' }}>
             {trendUp ? '↑' : '↓'} {trend}
           </span>
         )}
       </div>
-      <div style={{ fontSize:26, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>
-        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'#64748B', marginLeft:4 }}>{unit}</span>}
+      <div style={{ fontSize:26, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>
+        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'var(--x-faint)', marginLeft:4 }}>{unit}</span>}
       </div>
-      <div style={{ fontSize:13, color:'#94A3B8', marginTop:4 }}>{label}</div>
+      <div style={{ fontSize:13, color:'var(--x-muted)', marginTop:4 }}>{label}</div>
     </div>
   )
 }
 
 const COLORS = {
-  primary: '#3B82F6', accent: '#10B981', purple: '#8B5CF6',
-  warning: '#F59E0B', danger: '#EF4444', cyan: '#06B6D4', pink: '#EC4899'
+  primary: 'var(--x-blue)', accent: 'var(--x-green)', purple: 'var(--x-purple)',
+  warning: 'var(--x-amber)', danger: 'var(--x-red)', cyan: 'var(--x-cyan)', pink: 'var(--x-pink)'
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#1A2234] border border-[#1E293B] rounded-xl p-4 shadow-[0_16px_64px_rgba(0,0,0,0.8)]">
-        <p className="text-[#94A3B8] text-sm mb-2">{label}</p>
+      <div className="bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl p-4 shadow-[0_16px_64px_rgba(var(--x-shadow),0.8)]">
+        <p className="text-[color:var(--x-muted)] text-sm mb-2">{label}</p>
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center gap-2 mb-1 last:mb-0">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
-            <span className="text-[#94A3B8] text-sm">{entry.name}:</span>
-            <span className="text-[#F8FAFC] font-bold">{entry.value}</span>
+            <span className="text-[color:var(--x-muted)] text-sm">{entry.name}:</span>
+            <span className="text-[color:var(--x-text)] font-bold">{entry.value}</span>
           </div>
         ))}
       </div>
@@ -131,16 +132,16 @@ export default function AdminDrillerCrewDashboard() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-[#F8FAFC]">Driller & Crew Dashboard</h2>
-          <p className="text-[#94A3B8] mt-1">Personnel performance and workforce analytics</p>
+          <h2 className="text-3xl font-bold text-[color:var(--x-text)]">Driller & Crew Dashboard</h2>
+          <p className="text-[color:var(--x-muted)] mt-1">Personnel performance and workforce analytics</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 bg-[#1A2234] border border-[#1E293B] rounded-xl">
-            <Filter className="w-4 h-4 text-[#64748B]" />
-            <select className="bg-transparent text-[#F8FAFC] text-sm outline-none">
-              <option className="bg-[#1A2234]">All Projects</option>
-              <option className="bg-[#1A2234]">Gold Mine Project A</option>
-              <option className="bg-[#1A2234]">Copper Exploration</option>
+          <div className="flex items-center gap-2 px-4 py-2 bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl">
+            <Filter className="w-4 h-4 text-[color:var(--x-faint)]" />
+            <select className="bg-transparent text-[color:var(--x-text)] text-sm outline-none">
+              <option className="bg-[var(--x-raised2)]">All Projects</option>
+              <option className="bg-[var(--x-raised2)]">Gold Mine Project A</option>
+              <option className="bg-[var(--x-raised2)]">Copper Exploration</option>
             </select>
           </div>
         </div>
@@ -148,24 +149,24 @@ export default function AdminDrillerCrewDashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Total Drillers" value="12"       icon={Users}     color="#3B82F6" trend="+2"   trendUp={true}  />
-        <KpiCard label="Avg ROP"        value="50.6"     unit="m/hr" icon={TrendingUp} color="#10B981" trend="+5%" trendUp={true} />
-        <KpiCard label="Total Hours"    value="2,448"    unit="hrs"  icon={Clock}     color="#06B6D4" trend="+12%" trendUp={true} />
-        <KpiCard label="Top Performer"  value="Chris W." icon={Award}     color="#F97316" trend="96%"  trendUp={true}  />
+        <KpiCard label="Total Drillers" value="12"       icon={Users}     color="var(--x-blue)" trend="+2"   trendUp={true}  />
+        <KpiCard label="Avg ROP"        value="50.6"     unit="m/hr" icon={TrendingUp} color="var(--x-green)" trend="+5%" trendUp={true} />
+        <KpiCard label="Total Hours"    value="2,448"    unit="hrs"  icon={Clock}     color="var(--x-cyan)" trend="+12%" trendUp={true} />
+        <KpiCard label="Top Performer"  value="Chris W." icon={Award}     color="var(--x-orange)" trend="96%"  trendUp={true}  />
       </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* ── DRILLER PERFORMANCE — REPLACED WITH LeaderboardTable ── */}
-        <motion.div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }} className="lg:col-span-2">
+        <motion.div style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }} className="lg:col-span-2">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold text-[#F8FAFC]">Driller Performance Leaderboard</h3>
-            <span className="text-xs text-[#64748B] bg-[#1A2234] px-3 py-1 rounded-full border border-[#1E293B]">
+            <h3 className="text-lg font-semibold text-[color:var(--x-text)]">Driller Performance Leaderboard</h3>
+            <span className="text-xs text-[color:var(--x-faint)] bg-[var(--x-raised2)] px-3 py-1 rounded-full border border-[color:var(--x-border)]">
               Search · Sort · Paginate — handles 70+ drillers
             </span>
           </div>
-          <p className="text-xs text-[#64748B] mb-4">Click any column header to sort · 🥇🥈🥉 for top 3 · 🔴 alert for high downtime</p>
+          <p className="text-xs text-[color:var(--x-faint)] mb-4">Click any column header to sort · 🥇🥈🥉 for top 3 · 🔴 alert for high downtime</p>
           <LeaderboardTable
             rows={drillerLeaderboardRows}
             columns={drillerLeaderboardColumns}
@@ -180,19 +181,19 @@ export default function AdminDrillerCrewDashboard() {
         </motion.div>
 
         {/* ROP vs Meters Scatter */}
-        <motion.div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">ROP vs Meters (Bubble = Downtime)</h3>
+        <motion.div style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">ROP vs Meters (Bubble = Downtime)</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
-                <XAxis type="number" dataKey="x" name="ROP"    stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis type="number" dataKey="y" name="Meters" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" />
+                <XAxis type="number" dataKey="x" name="ROP"    stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis type="number" dataKey="y" name="Meters" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <ZAxis type="number" dataKey="z" range={[100, 500]} />
                 <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray:'3 3' }} />
-                <Scatter name="Drillers" data={productivityScatter} fill="#8B5CF6">
+                <Scatter name="Drillers" data={productivityScatter} fill="var(--x-purple)">
                   {productivityScatter.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.z > 25 ? '#EF4444' : entry.z > 15 ? '#F59E0B' : '#10B981'} />
+                    <Cell key={`cell-${index}`} fill={entry.z > 25 ? 'var(--x-red)' : entry.z > 15 ? 'var(--x-amber)' : 'var(--x-green)'} />
                   ))}
                 </Scatter>
               </ScatterChart>
@@ -201,78 +202,78 @@ export default function AdminDrillerCrewDashboard() {
         </motion.div>
 
         {/* Crew Hours Trend */}
-        <motion.div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Crew Hours & Utilization</h3>
+        <motion.div style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Crew Hours & Utilization</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={crewHoursData}>
                 <defs>
                   <linearGradient id="hoursGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.3}/><stop offset="95%" stopColor="#06B6D4" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--x-cyan)" stopOpacity={0.3}/><stop offset="95%" stopColor="var(--x-cyan)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date"   stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="left"  stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="right" orientation="right" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date"   stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="left"  stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Area  yAxisId="left"  type="monotone" dataKey="hours"       name="Hours Worked"  stroke="#06B6D4" strokeWidth={3} fill="url(#hoursGradient)" />
-                <Line  yAxisId="left"  type="monotone" dataKey="target"      name="Target"        stroke="#64748B" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                <Line  yAxisId="right" type="monotone" dataKey="utilization" name="Utilization %" stroke="#EC4899" strokeWidth={3} dot={{ fill:'#EC4899', r:4 }} />
+                <Area  yAxisId="left"  type="monotone" dataKey="hours"       name="Hours Worked"  stroke="var(--x-cyan)" strokeWidth={3} fill="url(#hoursGradient)" />
+                <Line  yAxisId="left"  type="monotone" dataKey="target"      name="Target"        stroke="var(--x-faint)" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                <Line  yAxisId="right" type="monotone" dataKey="utilization" name="Utilization %" stroke="var(--x-pink)" strokeWidth={3} dot={{ fill:'var(--x-pink)', r:4 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
 
         {/* Shift Distribution */}
-        <motion.div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Shift Distribution</h3>
+        <motion.div style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Shift Distribution</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={shiftDistribution}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="shift" stroke="#94A3B8" tick={{ fill:'#94A3B8', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="shift" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar dataKey="drillers"    name="Drillers"     fill="#3B82F6" radius={[4,4,0,0]} />
-                <Bar dataKey="supervisors" name="Supervisors"  fill="#10B981" radius={[4,4,0,0]} />
+                <Bar dataKey="drillers"    name="Drillers"     fill="var(--x-blue)" radius={[4,4,0,0]} />
+                <Bar dataKey="supervisors" name="Supervisors"  fill="var(--x-green)" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
 
         {/* Experience vs ROP */}
-        <motion.div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Experience vs Average ROP</h3>
+        <motion.div style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Experience vs Average ROP</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={experienceData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="experience" stroke="#94A3B8" tick={{ fill:'#94A3B8', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="left"  stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="right" orientation="right" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="experience" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="left"  stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar  yAxisId="left"  dataKey="count"  name="Driller Count" fill="#8B5CF6" radius={[4,4,0,0]} />
-                <Line yAxisId="right" type="monotone" dataKey="avgROP" name="Avg ROP" stroke="#F59E0B" strokeWidth={3} dot={{ fill:'#F59E0B', r:6 }} />
+                <Bar  yAxisId="left"  dataKey="count"  name="Driller Count" fill="var(--x-purple)" radius={[4,4,0,0]} />
+                <Line yAxisId="right" type="monotone" dataKey="avgROP" name="Avg ROP" stroke="var(--x-amber)" strokeWidth={3} dot={{ fill:'var(--x-amber)', r:6 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
 
         {/* Performance Radar */}
-        <motion.div style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Performance Comparison (Top 2)</h3>
+        <motion.div style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Performance Comparison (Top 2)</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart cx="50%" cy="50%" outerRadius="80%" data={performanceRadar}>
-                <PolarGrid stroke="#1E293B" />
-                <PolarAngleAxis dataKey="subject" stroke="#94A3B8" tick={{ fill:'#94A3B8', fontSize:12 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="#64748B" tick={{ fill:'#64748B', fontSize:10 }} />
-                <Radar name="Chris W." dataKey="A" stroke="#10B981" strokeWidth={3} fill="#10B981" fillOpacity={0.3} />
-                <Radar name="Mike J."  dataKey="B" stroke="#3B82F6" strokeWidth={3} fill="#3B82F6" fillOpacity={0.3} />
+                <PolarGrid stroke="var(--x-border)" />
+                <PolarAngleAxis dataKey="subject" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:10 }} />
+                <Radar name="Chris W." dataKey="A" stroke="var(--x-green)" strokeWidth={3} fill="var(--x-green)" fillOpacity={0.3} />
+                <Radar name="Mike J."  dataKey="B" stroke="var(--x-blue)" strokeWidth={3} fill="var(--x-blue)" fillOpacity={0.3} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
                 <Tooltip content={<CustomTooltip />} />
               </RadarChart>

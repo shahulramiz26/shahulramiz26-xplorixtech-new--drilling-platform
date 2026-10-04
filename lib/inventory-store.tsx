@@ -1275,7 +1275,16 @@ const InvCtx = createContext<Ctx | null>(null)
 const KEY = 'xplorix_inventory_v11'
 const LEGACY_KEY = 'xplorix_inventory_v10'
 
+/* One store per browser tab. The root layout mounts this once; the Finance and
+ * Inventory routes also wrap themselves in it, and when they do they join the
+ * one already above them rather than keeping a second copy of the stock. */
 export function InventoryProvider({ children }: { children: ReactNode }) {
+  const parent = useContext(InvCtx)
+  if (parent) return <>{children}</>
+  return <InventoryRoot>{children}</InventoryRoot>
+}
+
+function InventoryRoot({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
   const [loaded, setLoaded] = useState(false)
 
