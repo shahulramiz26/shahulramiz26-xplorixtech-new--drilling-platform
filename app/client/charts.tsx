@@ -42,7 +42,7 @@ export function ProgrammeChart({ forecast = false, height = 300 }: { forecast?: 
           { color: T.actual, label: 'Actual', line: true },
           ...(forecast ? [
             { color: T.forecast, label: 'Forecast', line: true, dash: true },
-            { color: 'rgba(253,186,116,0.35)', label: 'Likely range' },
+            { color: 'color-mix(in srgb, var(--x-orange-p) 35%, transparent)', label: 'Likely range' },
           ] : []),
         ]} />
       </div>
@@ -106,7 +106,7 @@ export function RecoveryChart({ height = 250 }: { height?: number }) {
           <XAxis dataKey="hole" tick={axisTick} tickLine={false} axisLine={false} interval={0} />
           <YAxis tick={axisTick} tickLine={false} axisLine={false} width={44} domain={[-5, 4]} ticks={[-4, -2, 0, 2, 4]}
             tickFormatter={(v: number) => `${min + v}%`} />
-          <Tooltip cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+          <Tooltip cursor={{ fill: 'rgba(var(--x-ov),0.03)' }}
             content={({ active, payload, label }) => active && payload?.length
               ? <Tip active label={label} payload={[{ dataKey: 'recovery', name: 'Core recovery', value: `${payload[0].payload.recovery}%`, color: payload[0].payload.delta < 0 ? T.actual : T.bar }]} />
               : null} />

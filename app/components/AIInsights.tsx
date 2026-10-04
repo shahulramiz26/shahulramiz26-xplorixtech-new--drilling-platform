@@ -39,7 +39,7 @@ export default function AIInsights({ insights }: AIInsightsProps) {
         position: 'fixed', right: 22, bottom: 22, zIndex: 40, display: 'flex', alignItems: 'center', gap: 9,
         padding: '10px 14px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
         background: T.card, border: `1px solid ${T.border}`, color: T.text, fontSize: 13, fontWeight: 600,
-        boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
+        boxShadow: '0 12px 32px rgba(var(--x-shadow),0.5)',
       }}>
         <Brain size={16} style={{ color: T.orange }} />
         AI insights
@@ -54,7 +54,7 @@ export default function AIInsights({ insights }: AIInsightsProps) {
     <aside aria-label="AI insights" style={{
       position: 'fixed', right: 22, bottom: 22, zIndex: 40, width: 'min(380px, calc(100vw - 32px))', maxHeight: 'min(70vh, 620px)',
       display: 'flex', flexDirection: 'column', background: T.card, border: `1px solid ${T.border}`, borderRadius: 14,
-      boxShadow: '0 24px 60px rgba(0,0,0,0.6)', overflow: 'hidden',
+      boxShadow: '0 24px 60px rgba(var(--x-shadow),0.6)', overflow: 'hidden',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '12px 14px', borderBottom: `1px solid ${T.line}` }}>
         <Brain size={16} style={{ color: T.orange }} />
@@ -81,7 +81,7 @@ export default function AIInsights({ insights }: AIInsightsProps) {
                 {i.recommendation && <ChevronDown size={15} style={{ color: T.faint, flexShrink: 0, marginTop: 3, transform: isOpen ? 'rotate(180deg)' : undefined }} />}
               </button>
               {isOpen && i.recommendation && (
-                <div style={{ margin: '0 14px 14px 33px', padding: '10px 12px', borderRadius: 9, background: 'rgba(249,115,22,0.07)', border: '1px solid rgba(249,115,22,0.25)' }}>
+                <div style={{ margin: '0 14px 14px 33px', padding: '10px 12px', borderRadius: 9, background: 'color-mix(in srgb, var(--x-orange) 7%, transparent)', border: '1px solid color-mix(in srgb, var(--x-orange) 25%, transparent)' }}>
                   <div style={{ fontSize: 11.5, color: T.faint, marginBottom: 3 }}>What to do</div>
                   <div style={{ fontSize: 13, color: T.text, lineHeight: 1.5 }}>{i.recommendation}</div>
                 </div>

@@ -14,8 +14,8 @@ import { Page, PageHead, Card, Btn, Table, Status, Who, Legend, Grid, th, thR, t
  * a comparison of two numbers, so each is shown as two bars. */
 
 interface Row { inv: PortalInvoice; line: PortalLine; k: number; diff: number; value: number }
-const CLAIMED = '#EA580C'
-const RECORD = '#3B82F6'
+const CLAIMED = 'var(--x-orange-d)'
+const RECORD = 'var(--x-blue)'
 const isDeep = (l: PortalLine) => l.label.includes('300 m+')
 
 export default function BillingCheckPage() {
@@ -151,7 +151,7 @@ function Compare({ title, unit, claimed, verified }: { title: string; unit: stri
         {bar('Claimed', claimed, CLAIMED)}
         {bar('Shift record', verified, RECORD)}
       </div>
-      <div style={{ fontSize: 12.5, color: gap > 0 ? '#FDBA74' : T.faint, marginTop: 10, fontWeight: gap > 0 ? 600 : 400 }}>
+      <div style={{ fontSize: 12.5, color: gap > 0 ? 'var(--x-orange-p)' : T.faint, marginTop: 10, fontWeight: gap > 0 ? 600 : 400 }}>
         {gap > 0 ? <><span aria-hidden>▲ </span>{num(gap)} {unit} claimed above the record</> : 'Claimed and recorded agree'}
       </div>
     </div>

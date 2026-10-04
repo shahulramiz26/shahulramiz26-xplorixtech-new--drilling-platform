@@ -112,31 +112,31 @@ export default function ManageResources({ project, availableSupervisors, availab
   }
 
   // ── STYLES ──
-  const card: React.CSSProperties = { background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:20 }
-  const iStyle: React.CSSProperties = { width:'100%', padding:'10px 14px', background:'#080B10', border:'1px solid #1E293B', borderRadius:9, color:'#F8FAFC', fontSize:13, outline:'none', fontFamily:'inherit' }
+  const card: React.CSSProperties = { background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:20 }
+  const iStyle: React.CSSProperties = { width:'100%', padding:'10px 14px', background:'var(--x-bg)', border:'1px solid var(--x-border)', borderRadius:9, color:'var(--x-text)', fontSize:13, outline:'none', fontFamily:'inherit' }
   const selStyle: React.CSSProperties = { ...iStyle, cursor:'pointer', appearance:'none' as any }
-  const label11: React.CSSProperties = { fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }
-  const thStyle: React.CSSProperties = { padding:'10px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:'#64748B', letterSpacing:'0.08em', textTransform:'uppercase' }
+  const label11: React.CSSProperties = { fontSize:11, fontWeight:700, color:'var(--x-faint)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }
+  const thStyle: React.CSSProperties = { padding:'10px 14px', textAlign:'left', fontSize:10, fontWeight:700, color:'var(--x-faint)', letterSpacing:'0.08em', textTransform:'uppercase' }
   const tdStyle: React.CSSProperties = { padding:'10px 14px', fontSize:13 }
 
-  const tabBtn = (active:boolean, color='#F97316'): React.CSSProperties => ({
+  const tabBtn = (active:boolean, color='var(--x-orange)'): React.CSSProperties => ({
     display:'flex', alignItems:'center', gap:6, padding:'8px 18px', borderRadius:10,
     fontSize:13, fontWeight:600, cursor:'pointer', transition:'all 0.2s', border:'none',
     background: active ? color : 'transparent',
-    color: active ? '#fff' : '#94A3B8',
+    color: active ? '#fff' : 'var(--x-muted)',
   })
 
   const Modal = ({ show, title, onClose, onSave, children }: any) => !show ? null : (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(10px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20, zIndex:1000 }}>
-      <div style={{ width:'100%', maxWidth:460, padding:26, borderRadius:18, background:'#0D1117', border:'1px solid #1E293B', boxShadow:'0 24px 80px rgba(0,0,0,0.8)' }}>
+    <div style={{ position:'fixed', inset:0, background:'rgba(var(--x-shadow),0.75)', backdropFilter:'blur(10px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20, zIndex:1000 }}>
+      <div style={{ width:'100%', maxWidth:460, padding:26, borderRadius:18, background:'var(--x-card)', border:'1px solid var(--x-border)', boxShadow:'0 24px 80px rgba(var(--x-shadow),0.8)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-          <div style={{ fontSize:16, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>{title}</div>
-          <button onClick={onClose} style={{ padding:6, borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#64748B', cursor:'pointer' }}><X size={15}/></button>
+          <div style={{ fontSize:16, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>{title}</div>
+          <button onClick={onClose} style={{ padding:6, borderRadius:7, background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)', color:'var(--x-faint)', cursor:'pointer' }}><X size={15}/></button>
         </div>
         {children}
         <div style={{ display:'flex', gap:10, marginTop:20 }}>
-          <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:13, fontWeight:600, cursor:'pointer' }}>Cancel</button>
-          <button onClick={onSave} style={{ flex:2, padding:'10px', borderRadius:9, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none' }}>Save →</button>
+          <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:9, background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)', color:'var(--x-muted)', fontSize:13, fontWeight:600, cursor:'pointer' }}>Cancel</button>
+          <button onClick={onSave} style={{ flex:2, padding:'10px', borderRadius:9, background:'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none' }}>Save →</button>
         </div>
       </div>
     </div>
@@ -147,15 +147,15 @@ export default function ManageResources({ project, availableSupervisors, availab
 
       {/* Back + Title */}
       <div>
-        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, color:'#94A3B8', background:'none', border:'none', cursor:'pointer', fontSize:13, marginBottom:12, padding:0 }}>
+        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, color:'var(--x-muted)', background:'none', border:'none', cursor:'pointer', fontSize:13, marginBottom:12, padding:0 }}>
           <ArrowLeft size={15}/> Back to Projects
         </button>
-        <div style={{ fontSize:24, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>{project.name}</div>
-        <div style={{ fontSize:12, color:'#64748B', marginTop:4 }}>{project.code} · {project.location} · {project.client}</div>
+        <div style={{ fontSize:24, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>{project.name}</div>
+        <div style={{ fontSize:12, color:'var(--x-faint)', marginTop:4 }}>{project.code} · {project.location} · {project.client}</div>
       </div>
 
       {/* Tabs */}
-      <div style={{ display:'flex', gap:4, background:'#080B10', border:'1px solid #1E293B', borderRadius:12, padding:4, width:'fit-content' }}>
+      <div style={{ display:'flex', gap:4, background:'var(--x-bg)', border:'1px solid var(--x-border)', borderRadius:12, padding:4, width:'fit-content' }}>
         {([
           { key:'personnel', icon:<Users size={14}/>,  label:'Personnel' },
           { key:'rigs',      icon:<Truck size={14}/>,  label:'Rigs'      },
@@ -174,9 +174,9 @@ export default function ManageResources({ project, availableSupervisors, availab
           {/* Assign panel */}
           <div style={card}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#94A3B8' }}>Assign Personnel</div>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--x-muted)' }}>Assign Personnel</div>
               <button onClick={()=>personnelTab==='supervisors'?setShowNewSupervisorModal(true):setShowNewDrillerModal(true)}
-                style={{ display:'flex', alignItems:'center', gap:5, color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+                style={{ display:'flex', alignItems:'center', gap:5, color:'var(--x-orange)', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
                 <Plus size={13}/> New {personnelTab==='supervisors'?'Supervisor':'Driller'}
               </button>
             </div>
@@ -185,27 +185,27 @@ export default function ManageResources({ project, availableSupervisors, availab
               {(['supervisors','drillers'] as const).map(pt=>(
                 <button key={pt} onClick={()=>{setPersonnelTab(pt);setSearch('')}}
                   style={{ padding:'6px 16px', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', border:'none', transition:'all 0.2s',
-                    background: personnelTab===pt?(pt==='supervisors'?'#F97316':'#F59E0B'):'rgba(255,255,255,0.04)',
-                    color: personnelTab===pt?'#fff':'#94A3B8' }}>
+                    background: personnelTab===pt?(pt==='supervisors'?'var(--x-orange)':'var(--x-amber)'):'rgba(var(--x-ov),0.04)',
+                    color: personnelTab===pt?'#fff':'var(--x-muted)' }}>
                   {pt==='supervisors'?'Supervisors':'Drillers'}
                 </button>
               ))}
             </div>
             {/* Search */}
             <div style={{ position:'relative', marginBottom:12 }}>
-              <Search size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#64748B' }}/>
+              <Search size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--x-faint)' }}/>
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name..."
                 style={{...iStyle, paddingLeft:30}} />
             </div>
             {/* Pool */}
             <div style={{ maxHeight:180, overflowY:'auto' }}>
               {(personnelTab==='supervisors'?poolSups:poolDrillers).length===0
-                ? <div style={{ textAlign:'center', padding:'16px', color:'#64748B', fontSize:12 }}>No available {personnelTab}</div>
+                ? <div style={{ textAlign:'center', padding:'16px', color:'var(--x-faint)', fontSize:12 }}>No available {personnelTab}</div>
                 : (personnelTab==='supervisors'?poolSups:poolDrillers).map(p=>(
-                  <div key={p.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 4px', borderBottom:'1px solid rgba(30,41,59,0.5)' }}>
-                    <span style={{ fontSize:13, fontWeight:600, color:'#F8FAFC' }}>{p.name}</span>
+                  <div key={p.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 4px', borderBottom:'1px solid color-mix(in srgb, var(--x-border) 50%, transparent)' }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:'var(--x-text)' }}>{p.name}</span>
                     <button onClick={()=>personnelTab==='supervisors'?assignSupervisor(p):assignDriller(p)}
-                      style={{ color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:700 }}>Assign</button>
+                      style={{ color:'var(--x-orange)', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:700 }}>Assign</button>
                   </div>
                 ))
               }
@@ -216,35 +216,35 @@ export default function ManageResources({ project, availableSupervisors, availab
           <div style={{ ...card, padding:0, overflow:'hidden' }}>
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
-                <tr style={{ borderBottom:'1px solid #1E293B', background:'rgba(255,255,255,0.02)' }}>
+                <tr style={{ borderBottom:'1px solid var(--x-border)', background:'rgba(var(--x-ov),0.02)' }}>
                   {['Name','Type','Email','Status',''].map(h=><th key={h} style={thStyle}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {[...project.supervisors,...project.drillers].length===0
-                  ? <tr><td colSpan={5} style={{ ...tdStyle, textAlign:'center', color:'#64748B', padding:'32px' }}>No personnel assigned yet</td></tr>
+                  ? <tr><td colSpan={5} style={{ ...tdStyle, textAlign:'center', color:'var(--x-faint)', padding:'32px' }}>No personnel assigned yet</td></tr>
                   : [...project.supervisors,...project.drillers].map(p=>(
-                    <tr key={p.id} style={{ borderBottom:'1px solid rgba(30,41,59,0.5)' }}
-                      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.02)'}
+                    <tr key={p.id} style={{ borderBottom:'1px solid color-mix(in srgb, var(--x-border) 50%, transparent)' }}
+                      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(var(--x-ov),0.02)'}
                       onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
-                      <td style={{ ...tdStyle, fontWeight:700, color:'#F8FAFC' }}>{p.name}</td>
+                      <td style={{ ...tdStyle, fontWeight:700, color:'var(--x-text)' }}>{p.name}</td>
                       <td style={tdStyle}>
                         <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20,
-                          background: p.type==='SUPERVISOR'?'rgba(249,115,22,0.1)':'rgba(245,158,11,0.1)',
-                          color: p.type==='SUPERVISOR'?'#F97316':'#F59E0B',
-                          border: `1px solid ${p.type==='SUPERVISOR'?'rgba(249,115,22,0.2)':'rgba(245,158,11,0.2)'}` }}>
+                          background: p.type==='SUPERVISOR'?'color-mix(in srgb, var(--x-orange) 10%, transparent)':'color-mix(in srgb, var(--x-amber) 10%, transparent)',
+                          color: p.type==='SUPERVISOR'?'var(--x-orange)':'var(--x-amber)',
+                          border: `1px solid ${p.type==='SUPERVISOR'?'color-mix(in srgb, var(--x-orange) 20%, transparent)':'color-mix(in srgb, var(--x-amber) 20%, transparent)'}` }}>
                           {p.type==='SUPERVISOR'?'👤':'⛏️'} {p.type}
                         </span>
                       </td>
-                      <td style={{ ...tdStyle, color:'#94A3B8' }}>{p.email}</td>
+                      <td style={{ ...tdStyle, color:'var(--x-muted)' }}>{p.email}</td>
                       <td style={tdStyle}>
-                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, background:'rgba(16,185,129,0.1)', color:'#10B981', border:'1px solid rgba(16,185,129,0.2)' }}>
+                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, background:'color-mix(in srgb, var(--x-green) 10%, transparent)', color:'var(--x-green)', border:'1px solid color-mix(in srgb, var(--x-green) 20%, transparent)' }}>
                           ● ACTIVE
                         </span>
                       </td>
                       <td style={tdStyle}>
                         <button onClick={()=>p.type==='SUPERVISOR'?removeSupervisor(p.id):removeDriller(p.id)}
-                          style={{ padding:6, borderRadius:7, background:'rgba(239,68,68,0.05)', border:'none', color:'rgba(239,68,68,0.4)', cursor:'pointer' }}><Trash2 size={13}/></button>
+                          style={{ padding:6, borderRadius:7, background:'color-mix(in srgb, var(--x-red) 5%, transparent)', border:'none', color:'color-mix(in srgb, var(--x-red) 40%, transparent)', cursor:'pointer' }}><Trash2 size={13}/></button>
                       </td>
                     </tr>
                   ))
@@ -260,22 +260,22 @@ export default function ManageResources({ project, availableSupervisors, availab
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={card}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#94A3B8' }}>Assign Rig</div>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--x-muted)' }}>Assign Rig</div>
               <button onClick={()=>setShowNewRigModal(true)}
-                style={{ display:'flex', alignItems:'center', gap:5, color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+                style={{ display:'flex', alignItems:'center', gap:5, color:'var(--x-orange)', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
                 <Plus size={13}/> New Rig
               </button>
             </div>
             <div style={{ maxHeight:180, overflowY:'auto' }}>
               {poolRigs.length===0
-                ? <div style={{ textAlign:'center', padding:'16px', color:'#64748B', fontSize:12 }}>No available rigs</div>
+                ? <div style={{ textAlign:'center', padding:'16px', color:'var(--x-faint)', fontSize:12 }}>No available rigs</div>
                 : poolRigs.map(r=>(
-                  <div key={r.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 4px', borderBottom:'1px solid rgba(30,41,59,0.5)' }}>
+                  <div key={r.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 4px', borderBottom:'1px solid color-mix(in srgb, var(--x-border) 50%, transparent)' }}>
                     <div>
-                      <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC', fontFamily:'monospace' }}>{r.code}</span>
-                      <span style={{ fontSize:11, color:'#64748B', marginLeft:8 }}>{r.type}</span>
+                      <span style={{ fontSize:13, fontWeight:700, color:'var(--x-text)', fontFamily:'monospace' }}>{r.code}</span>
+                      <span style={{ fontSize:11, color:'var(--x-faint)', marginLeft:8 }}>{r.type}</span>
                     </div>
-                    <button onClick={()=>assignRig(r)} style={{ color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:700 }}>Assign</button>
+                    <button onClick={()=>assignRig(r)} style={{ color:'var(--x-orange)', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:700 }}>Assign</button>
                   </div>
                 ))
               }
@@ -284,24 +284,24 @@ export default function ManageResources({ project, availableSupervisors, availab
           <div style={{ ...card, padding:0, overflow:'hidden' }}>
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
-                <tr style={{ borderBottom:'1px solid #1E293B', background:'rgba(255,255,255,0.02)' }}>
+                <tr style={{ borderBottom:'1px solid var(--x-border)', background:'rgba(var(--x-ov),0.02)' }}>
                   {['Rig Name','Type','Status',''].map(h=><th key={h} style={thStyle}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {project.rigs.length===0
-                  ? <tr><td colSpan={4} style={{ ...tdStyle, textAlign:'center', color:'#64748B', padding:'32px' }}>No rigs assigned yet</td></tr>
+                  ? <tr><td colSpan={4} style={{ ...tdStyle, textAlign:'center', color:'var(--x-faint)', padding:'32px' }}>No rigs assigned yet</td></tr>
                   : project.rigs.map(r=>(
-                    <tr key={r.id} style={{ borderBottom:'1px solid rgba(30,41,59,0.5)' }}
-                      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.02)'}
+                    <tr key={r.id} style={{ borderBottom:'1px solid color-mix(in srgb, var(--x-border) 50%, transparent)' }}
+                      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(var(--x-ov),0.02)'}
                       onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
-                      <td style={{ ...tdStyle, fontWeight:700, color:'#F8FAFC', fontFamily:'monospace' }}>{r.name}</td>
-                      <td style={{ ...tdStyle, color:'#94A3B8' }}>{r.type}</td>
+                      <td style={{ ...tdStyle, fontWeight:700, color:'var(--x-text)', fontFamily:'monospace' }}>{r.name}</td>
+                      <td style={{ ...tdStyle, color:'var(--x-muted)' }}>{r.type}</td>
                       <td style={tdStyle}>
-                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, background:'rgba(16,185,129,0.1)', color:'#10B981', border:'1px solid rgba(16,185,129,0.2)' }}>● ACTIVE</span>
+                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, background:'color-mix(in srgb, var(--x-green) 10%, transparent)', color:'var(--x-green)', border:'1px solid color-mix(in srgb, var(--x-green) 20%, transparent)' }}>● ACTIVE</span>
                       </td>
                       <td style={tdStyle}>
-                        <button onClick={()=>removeRig(r.id)} style={{ padding:6, borderRadius:7, background:'rgba(239,68,68,0.05)', border:'none', color:'rgba(239,68,68,0.4)', cursor:'pointer' }}><Trash2 size={13}/></button>
+                        <button onClick={()=>removeRig(r.id)} style={{ padding:6, borderRadius:7, background:'color-mix(in srgb, var(--x-red) 5%, transparent)', border:'none', color:'color-mix(in srgb, var(--x-red) 40%, transparent)', cursor:'pointer' }}><Trash2 size={13}/></button>
                       </td>
                     </tr>
                   ))
@@ -317,22 +317,22 @@ export default function ManageResources({ project, availableSupervisors, availab
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={card}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#94A3B8' }}>Assign Bit</div>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--x-muted)' }}>Assign Bit</div>
               <button onClick={()=>setShowNewBitModal(true)}
-                style={{ display:'flex', alignItems:'center', gap:5, color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+                style={{ display:'flex', alignItems:'center', gap:5, color:'var(--x-orange)', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
                 <Plus size={13}/> New Bit
               </button>
             </div>
             <div style={{ maxHeight:160, overflowY:'auto' }}>
               {poolBits.length===0
-                ? <div style={{ textAlign:'center', padding:'16px', color:'#64748B', fontSize:12 }}>No available bits</div>
+                ? <div style={{ textAlign:'center', padding:'16px', color:'var(--x-faint)', fontSize:12 }}>No available bits</div>
                 : poolBits.map(b=>(
-                  <div key={b.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 4px', borderBottom:'1px solid rgba(30,41,59,0.5)' }}>
+                  <div key={b.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 4px', borderBottom:'1px solid color-mix(in srgb, var(--x-border) 50%, transparent)' }}>
                     <div>
-                      <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC' }}>{b.code}</span>
-                      <span style={{ fontSize:11, color:'#64748B', marginLeft:8 }}>{b.name} · {b.holeSize}</span>
+                      <span style={{ fontSize:13, fontWeight:700, color:'var(--x-text)' }}>{b.code}</span>
+                      <span style={{ fontSize:11, color:'var(--x-faint)', marginLeft:8 }}>{b.name} · {b.holeSize}</span>
                     </div>
-                    <button onClick={()=>assignBit(b)} style={{ color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:700 }}>Assign</button>
+                    <button onClick={()=>assignBit(b)} style={{ color:'var(--x-orange)', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:700 }}>Assign</button>
                   </div>
                 ))
               }
@@ -341,26 +341,26 @@ export default function ManageResources({ project, availableSupervisors, availab
           <div style={{ ...card, padding:0, overflow:'hidden' }}>
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
-                <tr style={{ borderBottom:'1px solid #1E293B', background:'rgba(255,255,255,0.02)' }}>
+                <tr style={{ borderBottom:'1px solid var(--x-border)', background:'rgba(var(--x-ov),0.02)' }}>
                   {['Code','Name','Type','Hole Size','Status',''].map(h=><th key={h} style={thStyle}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {project.bits.length===0
-                  ? <tr><td colSpan={6} style={{ ...tdStyle, textAlign:'center', color:'#64748B', padding:'32px' }}>No bits assigned yet</td></tr>
+                  ? <tr><td colSpan={6} style={{ ...tdStyle, textAlign:'center', color:'var(--x-faint)', padding:'32px' }}>No bits assigned yet</td></tr>
                   : project.bits.map(b=>(
-                    <tr key={b.id} style={{ borderBottom:'1px solid rgba(30,41,59,0.5)' }}
-                      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.02)'}
+                    <tr key={b.id} style={{ borderBottom:'1px solid color-mix(in srgb, var(--x-border) 50%, transparent)' }}
+                      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(var(--x-ov),0.02)'}
                       onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
-                      <td style={{ ...tdStyle, fontWeight:700, color:'#F8FAFC' }}>{b.code}</td>
-                      <td style={{ ...tdStyle, color:'#94A3B8' }}>{b.name}</td>
-                      <td style={{ ...tdStyle, color:'#94A3B8' }}>{b.type}</td>
-                      <td style={{ ...tdStyle, color:'#94A3B8' }}>{b.holeSize}</td>
+                      <td style={{ ...tdStyle, fontWeight:700, color:'var(--x-text)' }}>{b.code}</td>
+                      <td style={{ ...tdStyle, color:'var(--x-muted)' }}>{b.name}</td>
+                      <td style={{ ...tdStyle, color:'var(--x-muted)' }}>{b.type}</td>
+                      <td style={{ ...tdStyle, color:'var(--x-muted)' }}>{b.holeSize}</td>
                       <td style={tdStyle}>
-                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, background:'rgba(16,185,129,0.1)', color:'#10B981', border:'1px solid rgba(16,185,129,0.2)' }}>● ACTIVE</span>
+                        <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, background:'color-mix(in srgb, var(--x-green) 10%, transparent)', color:'var(--x-green)', border:'1px solid color-mix(in srgb, var(--x-green) 20%, transparent)' }}>● ACTIVE</span>
                       </td>
                       <td style={tdStyle}>
-                        <button onClick={()=>removeBit(b.id)} style={{ padding:6, borderRadius:7, background:'rgba(239,68,68,0.05)', border:'none', color:'rgba(239,68,68,0.4)', cursor:'pointer' }}><Trash2 size={13}/></button>
+                        <button onClick={()=>removeBit(b.id)} style={{ padding:6, borderRadius:7, background:'color-mix(in srgb, var(--x-red) 5%, transparent)', border:'none', color:'color-mix(in srgb, var(--x-red) 40%, transparent)', cursor:'pointer' }}><Trash2 size={13}/></button>
                       </td>
                     </tr>
                   ))
@@ -376,40 +376,40 @@ export default function ManageResources({ project, availableSupervisors, availab
         <div style={card}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
             <div>
-              <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>Hole Numbers</div>
-              <div style={{ fontSize:11, color:'#64748B', marginTop:3 }}>Hole number and planned depth. The mine owner reads progress against the planned depth.</div>
+              <div style={{ fontSize:14, fontWeight:700, color:'var(--x-text)' }}>Hole Numbers</div>
+              <div style={{ fontSize:11, color:'var(--x-faint)', marginTop:3 }}>Hole number and planned depth. The mine owner reads progress against the planned depth.</div>
             </div>
             <button onClick={()=>setShowNewHoleModal(true)}
-              style={{ display:'flex', alignItems:'center', gap:5, color:'#F97316', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
+              style={{ display:'flex', alignItems:'center', gap:5, color:'var(--x-orange)', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:600 }}>
               <Plus size={13}/> Add Hole
             </button>
           </div>
           {allHoles.length===0
-            ? <div style={{ textAlign:'center', padding:'24px', color:'#64748B', fontSize:13 }}>No holes added yet</div>
+            ? <div style={{ textAlign:'center', padding:'24px', color:'var(--x-faint)', fontSize:13 }}>No holes added yet</div>
             : allHoles.map(h=>(
-              <div key={h.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid rgba(30,41,59,0.5)' }}>
+              <div key={h.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid color-mix(in srgb, var(--x-border) 50%, transparent)' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  <span style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>{h.holeNumber}</span>
+                  <span style={{ fontSize:14, fontWeight:700, color:'var(--x-text)' }}>{h.holeNumber}</span>
                   <span style={{ fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20,
-                    background: h.status==='OPEN'?'rgba(16,185,129,0.1)':'rgba(100,116,139,0.1)',
-                    color: h.status==='OPEN'?'#10B981':'#64748B',
-                    border: `1px solid ${h.status==='OPEN'?'rgba(16,185,129,0.2)':'rgba(100,116,139,0.2)'}` }}>
+                    background: h.status==='OPEN'?'color-mix(in srgb, var(--x-green) 10%, transparent)':'color-mix(in srgb, var(--x-faint) 10%, transparent)',
+                    color: h.status==='OPEN'?'var(--x-green)':'var(--x-faint)',
+                    border: `1px solid ${h.status==='OPEN'?'color-mix(in srgb, var(--x-green) 20%, transparent)':'color-mix(in srgb, var(--x-faint) 20%, transparent)'}` }}>
                     ● {h.status}
                   </span>
                 </div>
                 <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                  <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#64748B' }}>
+                  <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'var(--x-faint)' }}>
                     Planned depth
                     <input type="number" min={0} value={plannedFor(h) ?? ''} placeholder="—"
                       onChange={e=>setPlanned(h, e.target.value)}
-                      style={{ width:76, padding:'5px 8px', borderRadius:7, background:'#080B10', border:'1px solid #1E293B', color:'#F8FAFC', fontSize:12, textAlign:'right', outline:'none', fontFamily:'inherit' }} />
+                      style={{ width:76, padding:'5px 8px', borderRadius:7, background:'var(--x-bg)', border:'1px solid var(--x-border)', color:'var(--x-text)', fontSize:12, textAlign:'right', outline:'none', fontFamily:'inherit' }} />
                     m
                   </label>
                   <button onClick={()=>toggleHoleStatus(h.id)}
-                    style={{ padding:'5px 12px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:11, cursor:'pointer' }}>
+                    style={{ padding:'5px 12px', borderRadius:7, background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)', color:'var(--x-muted)', fontSize:11, cursor:'pointer' }}>
                     {h.status==='OPEN'?'Mark Closed':'Reopen'}
                   </button>
-                  <button onClick={()=>removeHole(h.id)} style={{ padding:6, borderRadius:7, background:'rgba(239,68,68,0.05)', border:'none', color:'rgba(239,68,68,0.4)', cursor:'pointer' }}><Trash2 size={13}/></button>
+                  <button onClick={()=>removeHole(h.id)} style={{ padding:6, borderRadius:7, background:'color-mix(in srgb, var(--x-red) 5%, transparent)', border:'none', color:'color-mix(in srgb, var(--x-red) 40%, transparent)', cursor:'pointer' }}><Trash2 size={13}/></button>
                 </div>
               </div>
             ))
@@ -465,7 +465,7 @@ export default function ManageResources({ project, availableSupervisors, availab
           <input style={iStyle} placeholder="e.g. H1, BH-001" value={newHoleForm.holeNumber} onChange={e=>setNewHoleForm({...newHoleForm,holeNumber:e.target.value})} />
           <div style={{ ...label11, marginTop:14 }}>Planned Depth (m) *</div>
           <input style={iStyle} type="number" min={0} placeholder="e.g. 350" value={newHoleForm.plannedDepth} onChange={e=>setNewHoleForm({...newHoleForm,plannedDepth:e.target.value})} />
-          <div style={{ fontSize:11, color:'#64748B', marginTop:6 }}>How deep this hole is planned to go. The mine owner sees drilled metres against this number.</div>
+          <div style={{ fontSize:11, color:'var(--x-faint)', marginTop:6 }}>How deep this hole is planned to go. The mine owner sees drilled metres against this number.</div>
         </div>
       </Modal>
 

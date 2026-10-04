@@ -8,8 +8,8 @@ import { PROGRAMME } from '../../lib/owner-portal'
  * contractor's — the same two colours the downtime charts use — because that
  * split is what decides whether the hours are paid for. */
 export const HOUR_KEYS = [
-  { key: 'drilling', label: 'Drilling', color: '#0D9488' },
-  { key: 'trips', label: 'Trips', color: '#475569' },
+  { key: 'drilling', label: 'Drilling', color: 'var(--x-teal-d)' },
+  { key: 'trips', label: 'Trips', color: 'var(--x-dim2)' },
   { key: 'standby', label: 'Standby (owner-side)', color: T.ownerSide },
   { key: 'breakdown', label: 'Breakdown (contractor)', color: T.contractorSide },
 ] as const
@@ -50,7 +50,7 @@ export function ShiftTable({ shifts, showRig = true, showHole = true }: {
       </thead>
       <tbody>
         {shifts.map(s => (
-          <tr key={s.id} style={{ borderBottom: rowLine, background: s.submitted ? undefined : 'rgba(245,158,11,0.05)', verticalAlign: 'top' }}>
+          <tr key={s.id} style={{ borderBottom: rowLine, background: s.submitted ? undefined : 'color-mix(in srgb, var(--x-amber) 5%, transparent)', verticalAlign: 'top' }}>
             <td style={tdStrong}>{shortDate(s.date)}</td>
             <td style={td}>{s.shift}</td>
             {showRig && (

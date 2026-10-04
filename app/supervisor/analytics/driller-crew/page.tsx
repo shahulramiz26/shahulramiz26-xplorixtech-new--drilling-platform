@@ -34,24 +34,24 @@ const crewMembers = [
 
 function MetricCard({ title, value, unit, icon: Icon, trend, change }: any) {
   return (
-    <div className="p-6 bg-[#151A27] rounded-xl border border-[#2A3040]">
+    <div className="p-6 bg-[var(--x-panel)] rounded-xl border border-[color:var(--x-border2)]">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[#94A3B8] text-sm">{title}</p>
+          <p className="text-[color:var(--x-muted)] text-sm">{title}</p>
           <div className="flex items-baseline gap-1 mt-2">
-            <span className="text-2xl font-bold text-white">{value}</span>
-            <span className="text-[#94A3B8] text-sm">{unit}</span>
+            <span className="text-2xl font-bold text-[color:var(--x-text)]">{value}</span>
+            <span className="text-[color:var(--x-muted)] text-sm">{unit}</span>
           </div>
         </div>
-        <div className="p-2 bg-[#1E2535] rounded-lg">
-          <Icon className="w-5 h-5 text-[#94A3B8]" />
+        <div className="p-2 bg-[var(--x-raised2)] rounded-lg">
+          <Icon className="w-5 h-5 text-[color:var(--x-muted)]" />
         </div>
       </div>
       <div className="flex items-center gap-1 mt-4">
         <span className={`text-sm font-medium ${trend === "up" ? "text-emerald-400" : "text-emerald-400"}`}>
           {change}
         </span>
-        <span className="text-[#94A3B8] text-sm">vs last period</span>
+        <span className="text-[color:var(--x-muted)] text-sm">vs last period</span>
       </div>
     </div>
   );
@@ -69,13 +69,13 @@ export default function SupervisorDrillerCrewPage() {
       <motion.div variants={itemVariants} className="flex items-center gap-4">
         <Link
           href="/supervisor/analytics"
-          className="p-2 rounded-lg bg-[#151A27] border border-[#2A3040] hover:bg-[#1E2535] transition-colors"
+          className="p-2 rounded-lg bg-[var(--x-panel)] border border-[color:var(--x-border2)] hover:bg-[var(--x-raised2)] transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-white">Driller & Crew Analytics</h1>
-          <p className="text-[#94A3B8]">Performance metrics and personnel management</p>
+          <h1 className="text-2xl font-bold text-[color:var(--x-text)]">Driller & Crew Analytics</h1>
+          <p className="text-[color:var(--x-muted)]">Performance metrics and personnel management</p>
         </div>
       </motion.div>
 
@@ -87,25 +87,25 @@ export default function SupervisorDrillerCrewPage() {
       </motion.div>
 
       {/* Crew Members Table */}
-      <motion.div variants={itemVariants} className="bg-[#151A27] rounded-xl border border-[#2A3040] p-6">
+      <motion.div variants={itemVariants} className="bg-[var(--x-panel)] rounded-xl border border-[color:var(--x-border2)] p-6">
         <h3 className="text-lg font-semibold mb-4">Crew Members</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[#2A3040]">
-                <th className="text-left py-3 px-2 text-[#94A3B8] text-sm">Name</th>
-                <th className="text-left py-3 px-2 text-[#94A3B8] text-sm">Role</th>
-                <th className="text-left py-3 px-2 text-[#94A3B8] text-sm">Performance</th>
+              <tr className="border-b border-[color:var(--x-border2)]">
+                <th className="text-left py-3 px-2 text-[color:var(--x-muted)] text-sm">Name</th>
+                <th className="text-left py-3 px-2 text-[color:var(--x-muted)] text-sm">Role</th>
+                <th className="text-left py-3 px-2 text-[color:var(--x-muted)] text-sm">Performance</th>
               </tr>
             </thead>
             <tbody>
               {crewMembers.map((member) => (
-                <tr key={member.id} className="border-b border-[#2A3040]/50">
+                <tr key={member.id} className="border-b border-[color:color-mix(in_srgb,var(--x-border2)_50%,transparent)]">
                   <td className="py-3 px-2 text-sm">{member.name}</td>
-                  <td className="py-3 px-2 text-sm text-[#94A3B8]">{member.role}</td>
+                  <td className="py-3 px-2 text-sm text-[color:var(--x-muted)]">{member.role}</td>
                   <td className="py-3 px-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-20 h-2 bg-[#2A3040] rounded-full overflow-hidden">
+                      <div className="w-20 h-2 bg-[var(--x-border2)] rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-emerald-500 rounded-full"
                           style={{ width: `${member.performance}%` }}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Page, Head, Card, Btn, Field, Switch, Split, inputStyle, T } from '../../components/kit'
+import { ThemeChoice } from '../../components/theme'
 
 /* SETTINGS — company details and the few rules that apply everywhere.
  * One Save button for the whole screen, and it says so when it has saved. */
@@ -55,6 +56,10 @@ export default function SettingsPage() {
           </div>
         </Card>
       </Split>
+
+      <Card title="Appearance" subtitle="Dark for the rig office at night, light for a bright room or a projector. Saved on this device as soon as you pick; the button beside the bell does the same.">
+        <ThemeChoice />
+      </Card>
 
       <Split>
         <Card title="Notifications" subtitle="What XPLORIX emails you about">

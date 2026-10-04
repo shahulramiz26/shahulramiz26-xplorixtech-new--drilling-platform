@@ -51,9 +51,9 @@ export const CONTRACTOR_IDS: ContractorId[] = ['A', 'B', 'C']
  * band, colour-blind separation, contrast). Used for small identity marks
  * only — text always stays in the text colours. */
 export const CONTRACTORS: Record<ContractorId, { id: ContractorId; name: string; rig: string; color: string }> = {
-  A: { id: 'A', name: 'Contractor A', rig: 'Rig A-1', color: '#3B82F6' },
-  B: { id: 'B', name: 'Contractor B', rig: 'Rig B-1', color: '#0D9488' },
-  C: { id: 'C', name: 'Contractor C', rig: 'Rig C-1', color: '#B265E0' },
+  A: { id: 'A', name: 'Contractor A', rig: 'Rig A-1', color: 'var(--x-blue)' },
+  B: { id: 'B', name: 'Contractor B', rig: 'Rig B-1', color: 'var(--x-teal-d)' },
+  C: { id: 'C', name: 'Contractor C', rig: 'Rig C-1', color: 'var(--x-violet)' },
 }
 /* The contractor whose own XPLORIX account feeds the live approvals and
  * invoices. In the demo that is Contractor A. */

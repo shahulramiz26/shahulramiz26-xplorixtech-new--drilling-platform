@@ -101,9 +101,9 @@ export default function ProjectsPage() {
     )
   }
 
-  const iStyle: React.CSSProperties = { width:'100%', padding:'10px 14px', background:'#080B10', border:'1px solid #1E293B', borderRadius:9, color:'#F8FAFC', fontSize:13, outline:'none', fontFamily:'inherit' }
+  const iStyle: React.CSSProperties = { width:'100%', padding:'10px 14px', background:'var(--x-bg)', border:'1px solid var(--x-border)', borderRadius:9, color:'var(--x-text)', fontSize:13, outline:'none', fontFamily:'inherit' }
   const selStyle: React.CSSProperties = { ...iStyle, cursor:'pointer', appearance:'none' as any }
-  const label11: React.CSSProperties = { fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }
+  const label11: React.CSSProperties = { fontSize:11, fontWeight:700, color:'var(--x-faint)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }
 
   const activeCount = projects.filter(p=>p.status==='ACTIVE').length
   const totalRigs   = projects.reduce((s,p)=>s+p.rigs.length,0)
@@ -125,42 +125,42 @@ export default function ProjectsPage() {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:14 }}>
         {projects.map(project=>(
           <div key={project.id}
-            style={{ padding:22, borderRadius:16, background:'#0D1117', border:'1px solid #1E293B', transition:'border-color 0.2s' }}
-            onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.3)'}
-            onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+            style={{ padding:22, borderRadius:16, background:'var(--x-card)', border:'1px solid var(--x-border)', transition:'border-color 0.2s' }}
+            onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor='color-mix(in srgb, var(--x-orange) 30%, transparent)'}
+            onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
 
             {/* Card Header */}
             <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:16 }}>
-              <div style={{ width:44, height:44, borderRadius:12, background:'rgba(249,115,22,0.1)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                <FolderOpen size={22} style={{ color:'#F97316' }} />
+              <div style={{ width:44, height:44, borderRadius:12, background:'color-mix(in srgb, var(--x-orange) 10%, transparent)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <FolderOpen size={22} style={{ color:'var(--x-orange)' }} />
               </div>
               <span style={{
                 fontSize:10, fontWeight:700, padding:'4px 10px', borderRadius:20,
-                background: project.status==='ACTIVE'?'rgba(16,185,129,0.1)':'rgba(245,158,11,0.1)',
-                color: project.status==='ACTIVE'?'#10B981':'#F59E0B',
-                border: `1px solid ${project.status==='ACTIVE'?'rgba(16,185,129,0.25)':'rgba(245,158,11,0.25)'}`,
+                background: project.status==='ACTIVE'?'color-mix(in srgb, var(--x-green) 10%, transparent)':'color-mix(in srgb, var(--x-amber) 10%, transparent)',
+                color: project.status==='ACTIVE'?'var(--x-green)':'var(--x-amber)',
+                border: `1px solid ${project.status==='ACTIVE'?'color-mix(in srgb, var(--x-green) 25%, transparent)':'color-mix(in srgb, var(--x-amber) 25%, transparent)'}`,
               }}>{project.status==='ACTIVE'?'Active':'On Hold'}</span>
             </div>
 
-            <div style={{ fontSize:15, fontWeight:700, color:'#F8FAFC', marginBottom:4 }}>{project.name}</div>
-            <div style={{ fontSize:11, color:'#64748B', fontFamily:'monospace', marginBottom:10 }}>{project.code}</div>
+            <div style={{ fontSize:15, fontWeight:700, color:'var(--x-text)', marginBottom:4 }}>{project.name}</div>
+            <div style={{ fontSize:11, color:'var(--x-faint)', fontFamily:'monospace', marginBottom:10 }}>{project.code}</div>
 
-            <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'#94A3B8', marginBottom:6 }}>
-              <MapPin size={13} style={{ color:'#64748B' }}/> {project.location}
+            <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--x-muted)', marginBottom:6 }}>
+              <MapPin size={13} style={{ color:'var(--x-faint)' }}/> {project.location}
             </div>
-            <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'#94A3B8', marginBottom:16 }}>
-              <User size={13} style={{ color:'#64748B' }}/> Client: <span style={{ color:'#F97316', fontWeight:600 }}>{project.client}</span>
+            <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--x-muted)', marginBottom:16 }}>
+              <User size={13} style={{ color:'var(--x-faint)' }}/> Client: <span style={{ color:'var(--x-orange)', fontWeight:600 }}>{project.client}</span>
             </div>
 
             <button onClick={()=>setSelectedProject(project)}
-              style={{ width:'100%', padding:'9px', borderRadius:9, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.15)', color:'#F97316', fontSize:12, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginBottom:16, transition:'background 0.15s' }}
-              onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(249,115,22,0.15)'}
-              onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='rgba(249,115,22,0.08)'}>
+              style={{ width:'100%', padding:'9px', borderRadius:9, background:'color-mix(in srgb, var(--x-orange) 8%, transparent)', border:'1px solid color-mix(in srgb, var(--x-orange) 15%, transparent)', color:'var(--x-orange)', fontSize:12, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginBottom:16, transition:'background 0.15s' }}
+              onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='color-mix(in srgb, var(--x-orange) 15%, transparent)'}
+              onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='color-mix(in srgb, var(--x-orange) 8%, transparent)'}>
               <Settings size={13}/> Manage Resources
             </button>
 
             {/* Stats */}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, paddingTop:14, borderTop:'1px solid #1E293B' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, paddingTop:14, borderTop:'1px solid var(--x-border)' }}>
               {[
                 { label:'Rigs',        value:project.rigs.length        },
                 { label:'Drillers',    value:project.drillers.length    },
@@ -168,8 +168,8 @@ export default function ProjectsPage() {
                 { label:'Bits',        value:project.bits.length        },
               ].map((s,i)=>(
                 <div key={i} style={{ textAlign:'center' }}>
-                  <div style={{ fontSize:20, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>{s.value}</div>
-                  <div style={{ fontSize:9, color:'#64748B', marginTop:2, textTransform:'uppercase', letterSpacing:'0.05em' }}>{s.label}</div>
+                  <div style={{ fontSize:20, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>{s.value}</div>
+                  <div style={{ fontSize:9, color:'var(--x-faint)', marginTop:2, textTransform:'uppercase', letterSpacing:'0.05em' }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -179,14 +179,14 @@ export default function ProjectsPage() {
 
       {/* Create Project Modal */}
       {showModal && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(10px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20, zIndex:1000 }}>
-          <div style={{ width:'100%', maxWidth:500, padding:28, borderRadius:20, background:'#0D1117', border:'1px solid #1E293B', boxShadow:'0 24px 80px rgba(0,0,0,0.8)' }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(var(--x-shadow),0.75)', backdropFilter:'blur(10px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20, zIndex:1000 }}>
+          <div style={{ width:'100%', maxWidth:500, padding:28, borderRadius:20, background:'var(--x-card)', border:'1px solid var(--x-border)', boxShadow:'0 24px 80px rgba(var(--x-shadow),0.8)' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
               <div>
-                <div style={{ fontSize:18, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>Create New Project</div>
-                <div style={{ fontSize:12, color:'#64748B', marginTop:2 }}>Add a new drilling project to Xplorix</div>
+                <div style={{ fontSize:18, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>Create New Project</div>
+                <div style={{ fontSize:12, color:'var(--x-faint)', marginTop:2 }}>Add a new drilling project to Xplorix</div>
               </div>
-              <button onClick={()=>setShowModal(false)} style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#64748B', cursor:'pointer' }}><X size={16}/></button>
+              <button onClick={()=>setShowModal(false)} style={{ padding:8, borderRadius:8, background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)', color:'var(--x-faint)', cursor:'pointer' }}><X size={16}/></button>
             </div>
             <form onSubmit={handleSubmit}>
               <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
@@ -212,11 +212,11 @@ export default function ProjectsPage() {
                 </div>
                 <div style={{ display:'flex', gap:10, marginTop:8 }}>
                   <button type="button" onClick={()=>setShowModal(false)}
-                    style={{ flex:1, padding:'12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color:'#94A3B8', fontSize:13, fontWeight:600, cursor:'pointer' }}>
+                    style={{ flex:1, padding:'12px', borderRadius:10, background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)', color:'var(--x-muted)', fontSize:13, fontWeight:600, cursor:'pointer' }}>
                     Cancel
                   </button>
                   <button type="submit"
-                    style={{ flex:2, padding:'12px', borderRadius:10, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none', boxShadow:'0 4px 16px rgba(249,115,22,0.3)' }}>
+                    style={{ flex:2, padding:'12px', borderRadius:10, background:'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', border:'none', boxShadow:'0 4px 16px color-mix(in srgb, var(--x-orange) 30%, transparent)' }}>
                     Create Project →
                   </button>
                 </div>

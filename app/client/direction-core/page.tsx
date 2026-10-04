@@ -60,10 +60,10 @@ export default function DirectionCorePage() {
         <Card title="Core boxes and photos" subtitle="Each box tied to its hole and depth, with who handled it and when. Sample: 86 boxes, 85 photographed.">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
             {BOXES.map(b => (
-              <div key={b.n} style={{ border: `1px solid ${b.photo ? T.border : 'rgba(245,158,11,0.4)'}`, borderRadius: 10, overflow: 'hidden', background: T.bg }}>
+              <div key={b.n} style={{ border: `1px solid ${b.photo ? T.border : 'color-mix(in srgb, var(--x-amber) 40%, transparent)'}`, borderRadius: 10, overflow: 'hidden', background: T.bg }}>
                 <div style={{
                   height: 62, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11.5, color: T.faint,
-                  background: b.photo ? 'repeating-linear-gradient(0deg, #141B26 0 11px, #0F151E 11px 13px)' : 'transparent',
+                  background: b.photo ? 'repeating-linear-gradient(0deg, var(--x-raised2) 0 11px, var(--x-raised) 11px 13px)' : 'transparent',
                 }}>{b.photo ? 'Photo placeholder' : 'No photo yet'}</div>
                 <div style={{ padding: '8px 10px', borderTop: `1px solid ${T.line}` }}>
                   <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text }}>Box {b.n}</div>

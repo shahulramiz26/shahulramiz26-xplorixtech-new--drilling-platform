@@ -126,7 +126,7 @@ export default function AdminDashboard() {
               <CartesianGrid stroke={gridStroke} vertical={false} />
               <XAxis dataKey="day" tick={axisTick} tickLine={false} axisLine={{ stroke: T.border }} interval={0} />
               <YAxis tick={axisTick} tickLine={false} axisLine={false} width={44} tickFormatter={(v: number) => `${v} m`} />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+              <Tooltip cursor={{ fill: 'rgba(var(--x-ov),0.03)' }}
                 content={({ active, payload, label }) => active && payload?.length
                   ? <Tip active label={`${label} ${monthLabel(o.month).split(' ')[0]}`} unit=" m" payload={[{ dataKey: 'metres', name: 'Metres drilled', value: payload[0].value as number, color: T.bar }]} />
                   : null} />

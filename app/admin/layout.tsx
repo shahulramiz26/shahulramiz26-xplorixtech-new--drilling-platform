@@ -11,6 +11,7 @@ import { CurrencyProvider } from '../components/currency-context'
 import { CostingProvider, monthOf, projectCode } from '../../lib/costing-store'
 import { useAdminOverview, financeLink, type Tone } from '../../lib/admin-overview'
 import { T, display, toneColor } from '../components/kit'
+import { ThemeScope, ThemeToggle } from '../components/theme'
 
 /* ==========================================================================
  * COMPANY ADMIN — the shell around every screen
@@ -75,9 +76,9 @@ const ALL = NAV.flatMap(g => g.items)
 const SHELL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap');
   @media (max-width: 900px) { .xpl-split { grid-template-columns: minmax(0,1fr) !important; } }
-  .xpl-row:hover { background: rgba(255,255,255,0.025); }
-  .xpl-nav:hover { background: rgba(255,255,255,0.04); color: #F8FAFC !important; }
-  .xpl-hit:hover { background: rgba(255,255,255,0.05); }
+  .xpl-row:hover { background: rgba(var(--x-ov),0.025); }
+  .xpl-nav:hover { background: rgba(var(--x-ov),0.04); color: var(--x-text) !important; }
+  .xpl-hit:hover { background: rgba(var(--x-ov),0.05); }
 `
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -116,12 +117,12 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex" style={{ background: T.bg, color: T.text }}>
       <style dangerouslySetInnerHTML={{ __html: SHELL_CSS }} />
 
-      {open && <div className="lg:hidden fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setOpen(false)} />}
+      {open && <div className="lg:hidden fixed inset-0 z-40" style={{ background: 'rgba(var(--x-shadow),0.7)' }} onClick={() => setOpen(false)} />}
 
       {/* SIDEBAR */}
       <aside
         className={`fixed lg:sticky lg:top-0 inset-y-0 left-0 z-50 flex flex-col w-60 lg:h-screen transition-transform duration-200 ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
-        style={{ background: '#0B0F16', borderRight: `1px solid ${T.border}` }}
+        style={{ background: 'var(--x-side)', borderRight: `1px solid ${T.border}` }}
       >
         <div className="flex items-center justify-between" style={{ padding: '16px 16px 14px', borderBottom: `1px solid ${T.border}` }}>
           <Link href="/admin/dashboard" className="flex items-center gap-3" style={{ textDecoration: 'none', minWidth: 0 }}>
@@ -150,7 +151,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                   <Link key={item.href} href={item.href} className={active ? '' : 'xpl-nav'} aria-current={active ? 'page' : undefined} style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '6.5px 10px', borderRadius: 8, marginBottom: 1,
                     textDecoration: 'none', fontSize: 13.5, fontWeight: active ? 600 : 500,
-                    background: active ? 'rgba(249,115,22,0.12)' : 'transparent', color: active ? T.text : T.muted,
+                    background: active ? 'color-mix(in srgb, var(--x-orange) 12%, transparent)' : 'transparent', color: active ? T.text : T.muted,
                   }}>
                     <item.icon size={16} style={{ color: active ? T.orange : T.faint, flexShrink: 0 }} />
                     <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
@@ -170,13 +171,13 @@ function Shell({ children }: { children: React.ReactNode }) {
         <div style={{ padding: 12, borderTop: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Link href="/admin/billing" className="xpl-hit" style={{
             display: 'block', padding: '9px 11px', borderRadius: 9, textDecoration: 'none',
-            border: '1px solid rgba(249,115,22,0.28)', background: 'rgba(249,115,22,0.06)',
+            border: '1px solid color-mix(in srgb, var(--x-orange) 28%, transparent)', background: 'color-mix(in srgb, var(--x-orange) 6%, transparent)',
           }}>
             <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text }}>Free trial: 12 days left</div>
             <div style={{ fontSize: 11.5, color: T.muted, marginTop: 2 }}>See plans and upgrade</div>
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 2px 2px 4px' }}>
-            <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: '#1E293B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12.5, color: T.text }}>A</div>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: 'var(--x-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12.5, color: T.text }}>A</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text }}>Admin User</div>
               <div style={{ fontSize: 11.5, color: T.faint }}>Company admin</div>
@@ -188,7 +189,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
       {/* MAIN */}
       <main className="flex-1 flex flex-col min-w-0">
-        <header style={{ position: 'sticky', top: 0, zIndex: 30, background: 'rgba(8,11,16,0.92)', backdropFilter: 'blur(14px)', borderBottom: `1px solid ${T.line}`, padding: '0 24px' }}>
+        <header style={{ position: 'sticky', top: 0, zIndex: 30, background: 'color-mix(in srgb, var(--x-bg) 92%, transparent)', backdropFilter: 'blur(14px)', borderBottom: `1px solid ${T.line}`, padding: '0 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56, gap: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
               {/* No inline display here: it would beat the class that hides this on a wide screen. */}
@@ -196,7 +197,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 style={{ padding: 6, color: T.faint, background: 'none', border: 'none', cursor: 'pointer' }}><Menu size={20} /></button>
               <button onClick={() => setPalette(true)} className="xpl-hit" style={{
                 display: 'flex', alignItems: 'center', gap: 9, padding: '7px 11px', borderRadius: 9, cursor: 'pointer',
-                background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.border}`, color: T.faint, fontSize: 13,
+                background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${T.border}`, color: T.faint, fontSize: 13,
                 fontFamily: 'inherit', width: '100%', maxWidth: 380, textAlign: 'left',
               }}>
                 <Search size={14} style={{ flexShrink: 0 }} />
@@ -206,6 +207,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span className="hidden md:inline" style={{ fontSize: 12.5, color: T.faint, whiteSpace: 'nowrap' }}>{longDate(o.today)}</span>
+              <ThemeToggle />
               <div style={{ position: 'relative' }}>
                 <button onClick={() => setBell(b => !b)} aria-label={`${o.attention.length} things need attention`} aria-expanded={bell} className="xpl-hit"
                   style={{ position: 'relative', padding: 8, borderRadius: 9, background: 'none', border: `1px solid ${T.border}`, color: T.muted, cursor: 'pointer', display: 'flex' }}>
@@ -219,7 +221,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                     <div className="fixed inset-0" style={{ zIndex: 40 }} onClick={() => setBell(false)} />
                     <div role="dialog" aria-label="Needs attention" style={{
                       position: 'absolute', right: 0, top: 44, zIndex: 50, width: 'min(400px, calc(100vw - 32px))',
-                      background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.55)',
+                      background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 20px 50px rgba(var(--x-shadow),0.55)',
                     }}>
                       <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.line}`, fontSize: 13, fontWeight: 700, color: T.text }}>
                         Needs attention{o.attention.length ? ` · ${o.attention.length}` : ''}
@@ -300,9 +302,9 @@ function Palette({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '12vh 16px 0' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(var(--x-shadow),0.7)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '12vh 16px 0' }}>
       <div role="dialog" aria-label="Search" onClick={e => e.stopPropagation()} onKeyDown={onKey}
-        style={{ width: '100%', maxWidth: 560, background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}>
+        style={{ width: '100%', maxWidth: 560, background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 30px 80px rgba(var(--x-shadow),0.6)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', borderBottom: `1px solid ${T.line}` }}>
           <Search size={16} style={{ color: T.faint }} />
           <input ref={input} value={q} onChange={e => setQ(e.target.value)} placeholder="Type a page, rig, project or hole number"
@@ -314,7 +316,7 @@ function Palette({ onClose }: { onClose: () => void }) {
           {hits.map((h, i) => (
             <button key={`${h.kind}_${h.label}`} onClick={() => go(h.href)} onMouseEnter={() => setAt(i)} style={{
               display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '9px 11px', borderRadius: 9, cursor: 'pointer',
-              border: 'none', textAlign: 'left', fontFamily: 'inherit', background: i === at ? 'rgba(249,115,22,0.12)' : 'transparent',
+              border: 'none', textAlign: 'left', fontFamily: 'inherit', background: i === at ? 'color-mix(in srgb, var(--x-orange) 12%, transparent)' : 'transparent',
             }}>
               <span style={{ width: 58, fontSize: 11.5, color: T.faint, flexShrink: 0 }}>{h.kind}</span>
               <span style={{ flex: 1, minWidth: 0 }}>
@@ -334,6 +336,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <CurrencyProvider>
       <CostingProvider>
+        <ThemeScope />
         <Shell>{children}</Shell>
       </CostingProvider>
     </CurrencyProvider>

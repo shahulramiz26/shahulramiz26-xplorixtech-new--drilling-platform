@@ -4,6 +4,7 @@ import { ReactNode } from 'react'
 import Link from 'next/link'
 import { C } from '../../lib/costing-store'
 import { CONTRACTORS, type ContractorId } from '../../lib/owner-portal'
+import { hexA } from '../../lib/theme'
 
 /* ==========================================================================
  * CLIENT PORTAL — shared pieces
@@ -19,12 +20,12 @@ import { CONTRACTORS, type ContractorId } from '../../lib/owner-portal'
 
 export const T = {
   ...C,
-  raised: '#111827',
-  line: 'rgba(30,41,59,0.6)',
+  raised: 'var(--x-raised)',
+  line: 'color-mix(in srgb, var(--x-border) 60%, transparent)',
   // Series colours for charts (validated on the card surface).
-  actual: '#EA580C', plan: '#64748B', forecast: '#FDBA74',
-  contractorSide: '#3B82F6', ownerSide: '#EA580C',
-  bar: '#3B82F6',
+  actual: 'var(--x-actual)', plan: 'var(--x-plan)', forecast: 'var(--x-forecast)',
+  contractorSide: 'var(--x-blue)', ownerSide: 'var(--x-orange-d)',
+  bar: 'var(--x-blue)',
 }
 /* A colour at part strength, for tinted backgrounds and soft borders. Written
  * this way so it works on a token that is a CSS variable, in either theme. */
@@ -52,7 +53,7 @@ export function PageHead({ question, answer, tone = 'neutral', right }: {
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 10, maxWidth: 820 }}>
           <span aria-hidden style={{
             flexShrink: 0, width: 18, height: 18, borderRadius: '50%', marginTop: 1,
-            background: `${toneColor[tone]}22`, color: toneColor[tone], fontSize: 11, fontWeight: 800,
+            background: `${hexA(toneColor[tone], 0x22)}`, color: toneColor[tone], fontSize: 11, fontWeight: 800,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>{toneMark[tone]}</span>
           <p style={{ fontSize: 14.5, lineHeight: 1.55, color: T.muted, margin: 0 }}>{answer}</p>
@@ -73,7 +74,7 @@ export function Card({ title, subtitle, right, children, pad = true }: {
   title?: string; subtitle?: string; right?: ReactNode; children: ReactNode; pad?: boolean
 }) {
   return (
-    <section style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden', minWidth: 0 }}>
+    <section style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden', minWidth: 0, boxShadow: 'var(--x-card-shadow)' }}>
       {title && (
         <header style={{ padding: '13px 18px', borderBottom: `1px solid ${T.line}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
@@ -90,7 +91,7 @@ export function Card({ title, subtitle, right, children, pad = true }: {
 
 export function Tile({ label, value, note, tone }: { label: string; value: ReactNode; note?: ReactNode; tone?: Tone }) {
   return (
-    <div style={{ padding: '14px 16px', background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, minWidth: 0 }}>
+    <div style={{ padding: '14px 16px', background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, minWidth: 0, boxShadow: 'var(--x-card-shadow)' }}>
       <div style={{ fontSize: 11.5, fontWeight: 600, color: T.faint, marginBottom: 7 }}>{label}</div>
       <div style={{ fontSize: 23, fontWeight: 700, color: T.text, fontFamily: display, lineHeight: 1.1, letterSpacing: '-0.01em' }}>{value}</div>
       {note && (
@@ -122,7 +123,7 @@ export function Status({ tone, children }: { tone: Tone; children: ReactNode }) 
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999,
       fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
-      background: `${c}18`, border: `1px solid ${c}40`, color: T.text,
+      background: `${hexA(c, 0x18)}`, border: `1px solid ${hexA(c, 0x40)}`, color: T.text,
     }}>
       <span aria-hidden style={{ color: c, fontWeight: 800, fontSize: 10.5 }}>{toneMark[tone]}</span>
       {children}
@@ -144,8 +145,8 @@ export function DemoTag({ live }: { live?: boolean }) {
   return (
     <span title={live ? 'Read from the contractor’s XPLORIX account' : 'Sample data'} style={{
       fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 5, letterSpacing: '0.04em',
-      background: live ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.05)',
-      color: live ? T.green : T.faint, border: `1px solid ${live ? 'rgba(16,185,129,0.3)' : T.border}`,
+      background: live ? 'color-mix(in srgb, var(--x-green) 12%, transparent)' : 'rgba(var(--x-ov),0.05)',
+      color: live ? T.green : T.faint, border: `1px solid ${live ? 'color-mix(in srgb, var(--x-green) 30%, transparent)' : T.border}`,
     }}>{live ? 'LIVE' : 'DEMO'}</span>
   )
 }
@@ -154,13 +155,13 @@ export function DemoTag({ live }: { live?: boolean }) {
 export function InDevelopment({ phase, children }: { phase: string; children: ReactNode }) {
   return (
     <div style={{
-      padding: '13px 16px', borderRadius: 12, display: 'flex', gap: 12, alignItems: 'flex-start',
-      background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.28)',
+      padding: '13px 16px', borderRadius: 12, display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap',
+      background: 'color-mix(in srgb, var(--x-amber) 7%, transparent)', border: '1px solid color-mix(in srgb, var(--x-amber) 28%, transparent)',
     }}>
-      <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 5, background: 'rgba(245,158,11,0.18)', color: T.amber, whiteSpace: 'nowrap', letterSpacing: '0.05em' }}>
+      <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 5, background: 'color-mix(in srgb, var(--x-amber) 18%, transparent)', color: T.amber, whiteSpace: 'nowrap', letterSpacing: '0.05em' }}>
         IN DEVELOPMENT · {phase}
       </span>
-      <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.55 }}>{children}</div>
+      <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.55, flex: '1 1 260px', minWidth: 0 }}>{children}</div>
     </div>
   )
 }
@@ -168,7 +169,7 @@ export function InDevelopment({ phase, children }: { phase: string; children: Re
 export function Note({ tone = 'info', children }: { tone?: Tone; children: ReactNode }) {
   const c = toneColor[tone]
   return (
-    <div style={{ padding: '10px 14px', borderRadius: 10, fontSize: 12.5, lineHeight: 1.55, background: `${c}12`, border: `1px solid ${c}38`, color: T.muted }}>
+    <div style={{ padding: '10px 14px', borderRadius: 10, fontSize: 12.5, lineHeight: 1.55, background: `${hexA(c, 0x12)}`, border: `1px solid ${hexA(c, 0x38)}`, color: T.muted }}>
       {children}
     </div>
   )
@@ -182,9 +183,9 @@ export function Btn({ children, onClick, kind = 'ghost', size = 'md', disabled, 
 }) {
   const kinds: Record<string, React.CSSProperties> = {
     primary: { background: T.orange, color: '#fff', border: '1px solid transparent' },
-    ghost: { background: 'rgba(255,255,255,0.04)', border: `1px solid ${T.border}`, color: T.muted },
-    good: { background: 'rgba(16,185,129,0.14)', border: '1px solid rgba(16,185,129,0.4)', color: '#D1FAE5' },
-    danger: { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', color: '#FECACA' },
+    ghost: { background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${T.border}`, color: T.muted },
+    good: { background: 'color-mix(in srgb, var(--x-green) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--x-green) 40%, transparent)', color: 'var(--x-good-text)' },
+    danger: { background: 'color-mix(in srgb, var(--x-red) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--x-red) 35%, transparent)', color: 'var(--x-bad-text)' },
   }
   const style: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: disabled ? 'not-allowed' : 'pointer',
@@ -205,7 +206,7 @@ export function Seg<V extends string>({ options, value, onChange }: {
         <button key={o.value} role="tab" aria-selected={value === o.value} onClick={() => onChange(o.value)} style={{
           padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
           fontFamily: 'inherit', whiteSpace: 'nowrap',
-          background: value === o.value ? 'rgba(249,115,22,0.16)' : 'transparent',
+          background: value === o.value ? 'color-mix(in srgb, var(--x-orange) 16%, transparent)' : 'transparent',
           color: value === o.value ? T.text : T.faint,
         }}>{o.label}</button>
       ))}
@@ -244,7 +245,7 @@ export function Table({ children }: { children: ReactNode }) {
 export function Flag({ on, children }: { on: boolean; children: ReactNode }) {
   if (!on) return <>{children}</>
   return (
-    <span style={{ color: '#FDBA74', fontWeight: 700 }}>
+    <span style={{ color: 'var(--x-orange-p)', fontWeight: 700 }}>
       <span aria-hidden style={{ marginRight: 4 }}>▲</span>{children}
     </span>
   )
@@ -256,7 +257,7 @@ export function Modal({ title, subtitle, width = 860, onClose, children, footer 
   title: string; subtitle?: ReactNode; width?: number; onClose: () => void; children: ReactNode; footer?: ReactNode
 }) {
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 16px', overflowY: 'auto' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(var(--x-shadow),0.72)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5vh 16px', overflowY: 'auto' }}>
       <div role="dialog" aria-modal onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: width, background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.line}`, display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' }}>
           <div>
@@ -275,7 +276,7 @@ export function Modal({ title, subtitle, width = 860, onClose, children, footer 
 // ── CHART PIECES ──────────────────────────────────────────────────────────
 
 export const axisTick = { fill: T.faint, fontSize: 11 }
-export const gridStroke = 'rgba(30,41,59,0.9)'
+export const gridStroke = 'color-mix(in srgb, var(--x-border) 90%, transparent)'
 
 export function Legend({ items }: { items: { color: string; label: string; dash?: boolean; line?: boolean }[] }) {
   return (
@@ -302,7 +303,7 @@ export function Tip({ active, payload, label, unit = '', names }: {
   const rows = payload.filter(p => p.value != null)
   if (!rows.length) return null
   return (
-    <div style={{ background: '#0B0F16', border: `1px solid ${T.border}`, borderRadius: 9, padding: '9px 12px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
+    <div style={{ background: 'var(--x-side)', border: `1px solid ${T.border}`, borderRadius: 9, padding: '9px 12px', boxShadow: '0 10px 30px rgba(var(--x-shadow),0.5)' }}>
       <div style={{ fontSize: 11.5, color: T.faint, marginBottom: 6 }}>{label}</div>
       {rows.map(p => (
         <div key={String(p.dataKey)} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: T.text, padding: '1.5px 0' }}>
@@ -320,7 +321,7 @@ export function Tip({ active, payload, label, unit = '', names }: {
 /* Plain proportional bar for table rows and small comparisons. */
 export function Meter({ value, max, color = T.bar, height = 8 }: { value: number; max: number; color?: string; height?: number }) {
   return (
-    <div style={{ height, background: 'rgba(255,255,255,0.05)', borderRadius: height / 2, overflow: 'hidden', minWidth: 60 }}>
+    <div style={{ height, background: 'rgba(var(--x-ov),0.05)', borderRadius: height / 2, overflow: 'hidden', minWidth: 60 }}>
       <div style={{ width: `${Math.max(0, Math.min(100, (value / max) * 100))}%`, height: '100%', background: color, borderRadius: height / 2 }} />
     </div>
   )
@@ -369,7 +370,7 @@ export function Switch({ on, onChange, label, hint }: { on: boolean; onChange: (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '9px 0' }}>
       <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} style={{
         width: 36, height: 21, borderRadius: 11, flexShrink: 0, marginTop: 1, cursor: 'pointer', border: 'none', padding: 0,
-        position: 'relative', background: on ? T.orange : '#2A3444', transition: 'background 0.15s',
+        position: 'relative', background: on ? T.orange : 'var(--x-border3)', transition: 'background 0.15s',
       }}>
         <span style={{ position: 'absolute', top: 3, left: on ? 18 : 3, width: 15, height: 15, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
       </button>
@@ -388,7 +389,7 @@ export function DepthBar({ drilled, planned, width = 160 }: { drilled: number; p
   const pct = (drilled / max) * 100
   return (
     <div title={planned ? `${drilled} m drilled of ${planned} m planned` : `${drilled} m drilled`} style={{ width, minWidth: 90 }}>
-      <div style={{ position: 'relative', height: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 4 }}>
+      <div style={{ position: 'relative', height: 8, background: 'rgba(var(--x-ov),0.06)', borderRadius: 4 }}>
         <div style={{ width: `${pct}%`, height: '100%', background: T.bar, borderRadius: 4 }} />
         {planned != null && planned >= drilled && (
           <span aria-hidden style={{ position: 'absolute', right: 0, top: -3, width: 2, height: 14, background: T.muted, borderRadius: 1 }} />
@@ -409,7 +410,7 @@ export function Spark({ values, height = 26 }: { values: { date: string; metres:
       {values.map(v => (
         <div key={v.date} title={`${v.date}: ${v.metres} m`} style={{
           width: 5, height: v.metres > 0 ? Math.max(3, (v.metres / max) * height) : 2,
-          background: v.metres > 0 ? T.bar : 'rgba(255,255,255,0.12)', borderRadius: '2px 2px 0 0',
+          background: v.metres > 0 ? T.bar : 'rgba(var(--x-ov),0.12)', borderRadius: '2px 2px 0 0',
         }} />
       ))}
     </div>

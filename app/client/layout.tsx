@@ -10,6 +10,7 @@ import {
 import { CostingProvider, OWNER_NAME } from '../../lib/costing-store'
 import { OwnerPortalProvider, usePortal, PORTAL_TODAY, shortDate } from '../../lib/owner-portal'
 import { T, display } from './ui'
+import { ThemeScope, ThemeToggle } from '../components/theme'
 
 /* ==========================================================================
  * CLIENT PORTAL — the mine owner's side of XPLORIX
@@ -62,8 +63,8 @@ const ALL = GROUPS.flatMap(g => g.items)
 const PORTAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap');
   @media (max-width: 900px) { .xpl-split { grid-template-columns: minmax(0,1fr) !important; } }
-  .xpl-row:hover { background: rgba(255,255,255,0.025); }
-  .xpl-nav:hover { background: rgba(255,255,255,0.04); color: #F8FAFC !important; }
+  .xpl-row:hover { background: rgba(var(--x-ov),0.025); }
+  .xpl-nav:hover { background: rgba(var(--x-ov),0.04); color: var(--x-text) !important; }
 `
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -85,11 +86,11 @@ function Shell({ children }: { children: React.ReactNode }) {
           but not in the browser, and the two would not match. */}
       <style dangerouslySetInnerHTML={{ __html: PORTAL_CSS }} />
 
-      {open && <div className="lg:hidden fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setOpen(false)} />}
+      {open && <div className="lg:hidden fixed inset-0 z-40" style={{ background: 'rgba(var(--x-shadow),0.7)' }} onClick={() => setOpen(false)} />}
 
       <aside
         className={`fixed lg:sticky lg:top-0 inset-y-0 left-0 z-50 flex flex-col w-64 lg:h-screen transition-transform duration-200 ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
-        style={{ background: '#0B0F16', borderRight: `1px solid ${T.border}` }}
+        style={{ background: 'var(--x-side)', borderRight: `1px solid ${T.border}` }}
       >
         <div className="flex items-center justify-between" style={{ padding: '18px 18px 16px', borderBottom: `1px solid ${T.border}` }}>
           <Link href="/client" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
@@ -118,7 +119,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                   <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className={active ? '' : 'xpl-nav'} style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 9, marginBottom: 1,
                     textDecoration: 'none', fontSize: 13.5, fontWeight: active ? 600 : 500,
-                    background: active ? 'rgba(249,115,22,0.12)' : 'transparent',
+                    background: active ? 'color-mix(in srgb, var(--x-orange) 12%, transparent)' : 'transparent',
                     color: active ? T.text : T.muted,
                   }}>
                     <item.icon size={16} style={{ color: active ? T.orange : T.faint, flexShrink: 0 }} />
@@ -137,8 +138,8 @@ function Shell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div style={{ padding: 12, borderTop: `1px solid ${T.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.border}` }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, background: '#1E293B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, color: T.text }}>M</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 10, background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${T.border}` }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, background: 'var(--x-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, color: T.text }}>M</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Mine owner</div>
               <div style={{ fontSize: 11, color: T.faint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{OWNER_NAME}</div>
@@ -149,7 +150,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0">
-        <header style={{ position: 'sticky', top: 0, zIndex: 30, background: 'rgba(8,11,16,0.92)', backdropFilter: 'blur(14px)', borderBottom: `1px solid ${T.line}`, padding: '0 24px' }}>
+        <header style={{ position: 'sticky', top: 0, zIndex: 30, background: 'color-mix(in srgb, var(--x-bg) 92%, transparent)', backdropFilter: 'blur(14px)', borderBottom: `1px solid ${T.line}`, padding: '0 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56, gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
               <button onClick={() => setOpen(true)} className="lg:hidden flex" aria-label="Open menu"
@@ -161,10 +162,11 @@ function Shell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <ThemeToggle />
               <span className="hidden sm:inline" style={{ fontSize: 12, color: T.faint }}>Data up to {shortDate(PORTAL_TODAY)} 2026 · week 12 of 14</span>
               <span style={{
                 fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', padding: '4px 10px', borderRadius: 6,
-                background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', color: T.amber, whiteSpace: 'nowrap',
+                background: 'color-mix(in srgb, var(--x-amber) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--x-amber) 35%, transparent)', color: T.amber, whiteSpace: 'nowrap',
               }}>DEMO DATA</span>
             </div>
           </div>
@@ -179,6 +181,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
     <CostingProvider>
       <OwnerPortalProvider>
+        <ThemeScope />
         <Shell>{children}</Shell>
       </OwnerPortalProvider>
     </CostingProvider>

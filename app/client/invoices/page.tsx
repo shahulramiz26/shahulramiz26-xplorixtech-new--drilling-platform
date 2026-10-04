@@ -182,12 +182,12 @@ function Review({ inv, onClose, onReview, onPaid }: {
               const r = inv.reviews[k]
               const bad = mismatch(k)
               return (
-                <tr key={k} style={{ borderBottom: rowLine, verticalAlign: 'top', background: r?.status === 'disputed' ? 'rgba(245,158,11,0.05)' : undefined }}>
+                <tr key={k} style={{ borderBottom: rowLine, verticalAlign: 'top', background: r?.status === 'disputed' ? 'color-mix(in srgb, var(--x-amber) 5%, transparent)' : undefined }}>
                   <td style={{ ...td, whiteSpace: 'normal', minWidth: 230 }}>
                     <div style={{ color: T.text, fontWeight: 600 }}>{l.label}</div>
                     {l.check && (
-                      <div style={{ fontSize: 12, marginTop: 4, color: bad ? '#FDBA74' : T.faint }}>
-                        <span aria-hidden style={{ marginRight: 5, fontWeight: 800, color: bad ? '#FDBA74' : T.green }}>{bad ? '▲' : '✓'}</span>{l.check.note}
+                      <div style={{ fontSize: 12, marginTop: 4, color: bad ? 'var(--x-orange-p)' : T.faint }}>
+                        <span aria-hidden style={{ marginRight: 5, fontWeight: 800, color: bad ? 'var(--x-orange-p)' : T.green }}>{bad ? '▲' : '✓'}</span>{l.check.note}
                       </div>
                     )}
                     {!l.check && <div style={{ fontSize: 12, marginTop: 4, color: T.faint }}>Contract lump sum, nothing on the rig to compare</div>}
