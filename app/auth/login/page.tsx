@@ -29,6 +29,10 @@ export default function LoginPage() {
     await new Promise(r => setTimeout(r, 800))
     if (formData.role === 'admin') {
       window.location.href = '/admin/dashboard'
+    } else if (formData.role === 'owner') {
+      // The mine owner — the client the contractor drills for — lands in the
+      // Client Portal, not in the contractor's console.
+      window.location.href = '/client'
     } else {
       window.location.href = '/supervisor/dashboard'
     }
@@ -126,6 +130,7 @@ export default function LoginPage() {
                 <option value="" style={{ background:'#0D1117' }}>Select Role</option>
                 <option value="admin" style={{ background:'#0D1117' }}>Company Admin</option>
                 <option value="supervisor" style={{ background:'#0D1117' }}>Supervisor</option>
+                <option value="owner" style={{ background:'#0D1117' }}>Mine Owner (Client Portal)</option>
               </select>
             </div>
 
@@ -168,4 +173,5 @@ export default function LoginPage() {
     </div>
   )
 }
+
 
