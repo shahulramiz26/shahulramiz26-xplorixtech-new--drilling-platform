@@ -473,4 +473,3 @@ export default function ManageResources({ project, availableSupervisors, availab
   )
 }
 
-
