@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, FolderOpen, MapPin, User, X, Settings } from 'lucide-react'
+import { FolderOpen, MapPin, User, X, Settings } from 'lucide-react'
 import ManageResources from './manage-resources'
+import { Head, Grid, Tile, Btn } from '../../components/kit'
 
 type Hole = { id: string; holeNumber: string; status: 'OPEN' | 'CLOSED' }
 type Personnel = { id: string; name: string; email: string; type: string; status: string }
@@ -109,37 +110,19 @@ export default function ProjectsPage() {
   const totalStaff  = projects.reduce((s,p)=>s+p.supervisors.length+p.drillers.length,0)
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:28, paddingBottom:40 }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:20, paddingBottom:40, maxWidth:1280 }}>
 
-      {/* Header */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16 }}>
-        <div>
-          <h1 style={{ fontSize:26, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>Projects</h1>
-          <p style={{ fontSize:13, color:'#94A3B8', marginTop:4 }}>Manage your drilling projects and allocate resources</p>
-        </div>
-        <button onClick={()=>setShowModal(true)}
-          style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 22px', borderRadius:12, background:'linear-gradient(135deg,#F97316,#EA580C)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', border:'none', boxShadow:'0 4px 20px rgba(249,115,22,0.35)' }}>
-          <Plus size={18}/> New Project
-        </button>
-      </div>
+      <Head title="Projects" sub="Each drilling project with its rigs, crew, bits and holes."
+        right={<Btn kind="primary" onClick={()=>setShowModal(true)}>New project</Btn>} />
 
-      {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
-        {[
-          { label:'Active Projects', value:activeCount,  color:'#10B981', bg:'rgba(16,185,129,0.08)',  border:'rgba(16,185,129,0.15)',  icon:'🟢' },
-          { label:'Total Rigs',      value:totalRigs,    color:'#F97316', bg:'rgba(249,115,22,0.08)',  border:'rgba(249,115,22,0.15)',  icon:'⚙️' },
-          { label:'Total Personnel', value:totalStaff,   color:'#3B82F6', bg:'rgba(59,130,246,0.08)',  border:'rgba(59,130,246,0.15)',  icon:'👷' },
-        ].map((k,i)=>(
-          <div key={i} style={{ padding:'18px 20px', borderRadius:14, background:k.bg, border:`1px solid ${k.border}` }}>
-            <div style={{ fontSize:22, marginBottom:8 }}>{k.icon}</div>
-            <div style={{ fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:4 }}>{k.label}</div>
-            <div style={{ fontSize:28, fontWeight:800, color:k.color, fontFamily:"'Space Grotesk',sans-serif" }}>{k.value}</div>
-          </div>
-        ))}
-      </div>
+      <Grid>
+        <Tile label="Active projects" value={activeCount} note={`${projects.length - activeCount} on hold`} />
+        <Tile label="Rigs on projects" value={totalRigs} />
+        <Tile label="People on projects" value={totalStaff} note="Supervisors and drillers" />
+      </Grid>
 
       {/* Projects Grid */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:14 }}>
         {projects.map(project=>(
           <div key={project.id}
             style={{ padding:22, borderRadius:16, background:'#0D1117', border:'1px solid #1E293B', transition:'border-color 0.2s' }}

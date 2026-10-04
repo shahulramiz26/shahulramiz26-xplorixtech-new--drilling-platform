@@ -300,9 +300,24 @@ export function chargeShift(cr: ClientRate | undefined, log: ShiftLog, fromDepth
 
 // ── HOLE ──────────────────────────────────────────────────────────────────
 
-export type HoleStatus = 'drilling' | 'closed' | 'approved' | 'invoiced'
+/* 'submitted' only exists on a project whose mine owner is on XPLORIX: the
+ * contractor sends the closed hole across, and it is the owner who approves
+ * it. On every other project the contractor still approves his own hole and
+ * the status goes straight from closed to approved, exactly as before. */
+export type HoleStatus = 'drilling' | 'closed' | 'submitted' | 'approved' | 'invoiced'
 
-export interface HoleState { status: HoleStatus; invoiceId?: string }
+export const HOLE_STATUS_LABEL: Record<HoleStatus, string> = {
+  drilling: 'Drilling', closed: 'Closed', submitted: 'With mine owner',
+  approved: 'Approved', invoiced: 'Invoiced',
+}
+
+export interface HoleState {
+  status: HoleStatus
+  invoiceId?: string
+  submittedAt?: string      // when the contractor sent it to the mine owner
+  decidedAt?: string        // when the mine owner approved or returned it
+  returnReason?: string     // set when the owner sent it back; cleared on resend
+}
 
 export interface Hole {
   holeNumber: string
@@ -312,7 +327,23 @@ export interface Hole {
   endDate?: string
   status: HoleStatus
   invoiceId?: string
+  submittedAt?: string
+  decidedAt?: string
+  returnReason?: string
 }
+
+/* What was planned for a hole before the first metre. Planned depth is the one
+ * number the mine owner needs to read progress: "planned 400 m, drilled 388 m". */
+export interface HolePlan { plannedDepth: number; project?: string }
+
+// ── MINE OWNER LINK ───────────────────────────────────────────────────────
+/* Projects whose mine owner logs in to the Client Portal. On these, a closed
+ * hole is sent to the owner for approval and an invoice is sent to the owner
+ * for line-by-line verification. Everything the owner reads comes out of this
+ * same store, so the two sides can never be looking at different numbers. */
+export const OWNER_NAME = 'Demo Mining Co.'
+export const OWNER_LINKED_PROJECTS = ['Site A - North Field']
+export function isOwnerLinked(project: string) { return OWNER_LINKED_PROJECTS.includes(project) }
 
 // ── INVOICE ───────────────────────────────────────────────────────────────
 export interface InvoiceLine { label: string; qty: string; rate: string; amount: number; depth?: string }
@@ -331,6 +362,28 @@ export interface Invoice {
   dueDate?: string
   paidDate?: string
   paidAmount?: number
+  // Set only on a project whose mine owner is on XPLORIX.
+  ownerStatus?: OwnerInvoiceStatus
+  lineReviews?: (LineReview | null)[]   // same order as lines; null = not looked at yet
+  sentAt?: string
+  reviewedAt?: string
+}
+
+/* The mine owner's answer, kept apart from the contractor's own status so
+ * neither side can overwrite the other. */
+export type OwnerInvoiceStatus = 'awaiting' | 'approved' | 'disputed'
+export const OWNER_INVOICE_LABEL: Record<OwnerInvoiceStatus, string> = {
+  awaiting: 'Waiting for mine owner', approved: 'Approved by mine owner', disputed: 'Disputed by mine owner',
+}
+export interface LineReview { status: 'approved' | 'disputed'; reason?: string }
+
+export function ownerStatusFor(lines: InvoiceLine[], reviews: (LineReview | null)[]): OwnerInvoiceStatus {
+  if (reviews.some(r => r?.status === 'disputed')) return 'disputed'
+  if (lines.length > 0 && lines.every((_, i) => reviews[i]?.status === 'approved')) return 'approved'
+  return 'awaiting'
+}
+export function disputedAmount(i: Invoice) {
+  return i.lines.reduce((s, l, k) => s + (i.lineReviews?.[k]?.status === 'disputed' ? l.amount : 0), 0)
 }
 
 export type InvoiceStatus = 'draft' | 'pending' | 'paid' | 'cancelled'
@@ -701,6 +754,9 @@ export function holesFromDays(allDays: DayCost[], statuses: Record<string, HoleS
       startDate: sorted[0].date,
       endDate: closingDay?.date,
       status: st, invoiceId: statuses[holeNumber]?.invoiceId,
+      submittedAt: statuses[holeNumber]?.submittedAt,
+      decidedAt: statuses[holeNumber]?.decidedAt,
+      returnReason: statuses[holeNumber]?.returnReason,
     }
   }).sort((a, b) => a.startDate.localeCompare(b.startDate))
 }
@@ -737,7 +793,7 @@ export function rigCode(name: string) {
 }
 
 export const PROJECT_CLIENTS: Record<string, string> = {
-  'Site A - North Field': 'CMPDI',
+  'Site A - North Field': OWNER_NAME,
   'Site B - South Ridge': 'DGML',
   'Site C - East Basin': 'MECL',
 }
@@ -824,6 +880,8 @@ export const SEED_HOLE_STATUS: Record<string, HoleState> = {
   'DH-001': { status: 'approved' },
   'DH-011': { status: 'approved' },
   'DH-101': { status: 'approved' },
+  // Waiting with the mine owner, so the Client Portal has a live approval on first load.
+  'DH-002': { status: 'submitted', submittedAt: '2026-09-12' },
 }
 
 function markClosures(logs: ShiftLog[], holeNumbers: string[]): ShiftLog[] {
@@ -840,6 +898,15 @@ function markClosures(logs: ShiftLog[], holeNumbers: string[]): ShiftLog[] {
 }
 
 type DaySpec = [number, string, number, number, number?, number?, string?]
+
+/* Core recovery differs hole to hole — ground, bit and crew all move it — so
+ * the seed gives each hole its own figure instead of one flat percentage. */
+const RECOVERY_STEPS = [0.96, 0.975, 0.94, 0.985, 0.955, 0.93]
+function recoveryFor(hole: string) {
+  if (!hole) return 0.95
+  const n = hole.split('').reduce((a, ch) => a + ch.charCodeAt(0), 0)
+  return RECOVERY_STEPS[n % RECOVERY_STEPS.length]
+}
 
 function formationAt(depth: number, bands: [number, string][]): string {
   for (const [limit, name] of bands) if (depth < limit) return name
@@ -922,7 +989,7 @@ function expand(rig: string, project: string, ym: string, size: string, specs: D
         shiftHours: 12, drillingHours, downtimeHours: down,
         downtimeReason: down > 0 ? reason : '',
         metresDrilled: metres,
-        coreRecovery: +(metres * 0.94).toFixed(2),
+        coreRecovery: +(metres * recoveryFor(hole)).toFixed(2),
         holeSize: size,
         formationType: formationAt(startDepth, bands),
         fuelLitres: drillingHours * 10 + (down > 0 ? 6 : 0),
@@ -1062,6 +1129,25 @@ export const SEED_SHIFT_LOGS: ShiftLog[] =
     ['DH-901', 'DH-902', 'DH-911', 'DH-951', 'DH-952', 'DH-961',
      'DH-001', 'DH-002', 'DH-011', 'DH-101'])
 
+/* Planned depth for every seeded hole. A closed hole was planned at what it
+ * reached, rounded up to the next 5 m; a hole still drilling has further to go. */
+const OPEN_HOLE_PLANS: Record<string, number> = {
+  'DH-003': 120, 'DH-012': 150, 'DH-004': 200, 'DH-013': 220, 'DH-102': 300,
+}
+export const SEED_HOLE_PLANS: Record<string, HolePlan> = (() => {
+  const drilled: Record<string, { m: number; project: string }> = {}
+  SEED_SHIFT_LOGS.forEach(l => {
+    if (!l.holeNumber) return
+    const e = (drilled[l.holeNumber] ||= { m: 0, project: l.project })
+    e.m += l.metresDrilled
+  })
+  const out: Record<string, HolePlan> = {}
+  Object.entries(drilled).forEach(([hole, d]) => {
+    out[hole] = { plannedDepth: OPEN_HOLE_PLANS[hole] ?? Math.ceil(d.m / 5) * 5, project: d.project }
+  })
+  return out
+})()
+
 export const SEED_MAINTENANCE: MaintenanceLog[] = [
   { id: 'm1', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-03', maintenanceType: 'Preventive', hours: 3, component: 'Engine', action: 'Inspection', cost: 4500 },
   { id: 'm2', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-13', maintenanceType: 'Breakdown', hours: 22, component: 'Hydraulic System', action: 'Replace', cost: 68000 },
@@ -1089,6 +1175,7 @@ interface State {
   clientRates: ClientRate[]
   holeStatus: Record<string, HoleState>
   invoices: Invoice[]
+  holePlans: Record<string, HolePlan>
 }
 
 function initial(): State {
@@ -1096,6 +1183,7 @@ function initial(): State {
     shiftLogs: SEED_SHIFT_LOGS, maintenance: SEED_MAINTENANCE,
     ownership: SEED_OWNERSHIP, operating: SEED_OPERATING,
     clientRates: SEED_CLIENT_RATES, holeStatus: SEED_HOLE_STATUS, invoices: [],
+    holePlans: SEED_HOLE_PLANS,
   }
 }
 
@@ -1113,13 +1201,31 @@ interface CtxValue {
   addInvoice: (i: Invoice) => void
   updateInvoice: (i: Invoice) => void
   deleteInvoice: (id: string) => void
+  // Contractor → mine owner
+  submitHole: (holeNumber: string) => void
+  withdrawHole: (holeNumber: string) => void
+  // Mine owner → contractor
+  ownerDecideHole: (holeNumber: string, approve: boolean, reason?: string) => void
+  ownerReviewInvoice: (id: string, reviews: (LineReview | null)[]) => void
+  ownerMarkPaid: (id: string) => void
+  setHolePlan: (holeNumber: string, plan: HolePlan | null) => void
   resetAll: () => void
 }
 
 const CostingContext = createContext<CtxValue | null>(null)
 const KEY = 'xplorix_costing_v2'
 
+/* One store per browser tab. A layout mounts the provider once; a screen that
+ * also wraps itself in <CostingProvider> (Finance, Inventory, Projects do, so
+ * each still works on its own) joins the one already above it instead of
+ * starting a second copy that would drift from the first. */
 export function CostingProvider({ children }: { children: ReactNode }) {
+  const parent = useContext(CostingContext)
+  if (parent) return <>{children}</>
+  return <CostingRoot>{children}</CostingRoot>
+}
+
+function CostingRoot({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
   const [loaded, setLoaded] = useState(false)
 
@@ -1128,6 +1234,21 @@ export function CostingProvider({ children }: { children: ReactNode }) {
     setLoaded(true)
   }, [])
   useEffect(() => { if (loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }, [state, loaded])
+
+  /* The contractor and the mine owner are two tabs on the same store. When one
+   * tab saves, the browser tells every other tab; taking that value here is
+   * what makes an invoice raised in Finance appear in the Client Portal without
+   * a refresh — and stops a tab that loaded earlier from saving its older copy
+   * back over the newer one. Writing an identical value fires no event, so the
+   * two tabs settle instead of echoing. */
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== KEY || !e.newValue) return
+      try { setState({ ...initial(), ...JSON.parse(e.newValue) }) } catch {}
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   function upsert<T extends { id: string }>(list: T[], item: T): T[] {
     return list.some(x => x.id === item.id) ? list.map(x => x.id === item.id ? item : x) : [...list, item]
@@ -1167,10 +1288,49 @@ export function CostingProvider({ children }: { children: ReactNode }) {
     return { ...s, invoices: s.invoices.filter(i => i.id !== id), holeStatus: hs }
   })
 
+  const stamp = () => new Date().toISOString().slice(0, 10)
+
+  const submitHole: CtxValue['submitHole'] = holeNumber => setState(s => ({
+    ...s, holeStatus: { ...s.holeStatus, [holeNumber]: { status: 'submitted', submittedAt: stamp() } },
+  }))
+  const withdrawHole: CtxValue['withdrawHole'] = holeNumber => setState(s => ({
+    ...s, holeStatus: { ...s.holeStatus, [holeNumber]: { status: 'closed' } },
+  }))
+  /* Approve moves the hole on to where the contractor can invoice it. Return
+   * sends it back to closed and keeps the owner's reason beside it, so the
+   * contractor knows what to fix before sending it again. */
+  const ownerDecideHole: CtxValue['ownerDecideHole'] = (holeNumber, approve, reason) => setState(s => {
+    const prev = s.holeStatus[holeNumber]
+    return {
+      ...s, holeStatus: {
+        ...s.holeStatus,
+        [holeNumber]: approve
+          ? { status: 'approved', submittedAt: prev?.submittedAt, decidedAt: stamp() }
+          : { status: 'closed', submittedAt: prev?.submittedAt, decidedAt: stamp(), returnReason: reason?.trim() || 'Returned by the mine owner' },
+      },
+    }
+  })
+  const ownerReviewInvoice: CtxValue['ownerReviewInvoice'] = (id, reviews) => setState(s => ({
+    ...s, invoices: s.invoices.map(i => i.id !== id ? i : {
+      ...i, lineReviews: reviews, ownerStatus: ownerStatusFor(i.lines, reviews), reviewedAt: stamp(),
+    }),
+  }))
+  const ownerMarkPaid: CtxValue['ownerMarkPaid'] = id => setState(s => ({
+    ...s, invoices: s.invoices.map(i => i.id !== id ? i : {
+      ...i, status: 'paid', paidDate: stamp(), paidAmount: i.total - disputedAmount(i) * (1 + i.taxPercent / 100),
+    }),
+  }))
+  const setHolePlan: CtxValue['setHolePlan'] = (holeNumber, plan) => setState(s => {
+    const next = { ...s.holePlans }
+    if (plan) next[holeNumber] = plan; else delete next[holeNumber]
+    return { ...s, holePlans: next }
+  })
+
   return (
     <CostingContext.Provider value={{
       state, saveOwnership, saveOperating, saveClientRate, deleteVersion,
       setHoleStatus, addInvoice, updateInvoice, deleteInvoice,
+      submitHole, withdrawHole, ownerDecideHole, ownerReviewInvoice, ownerMarkPaid, setHolePlan,
       resetAll: () => setState(initial()),
     }}>{children}</CostingContext.Provider>
   )
@@ -1289,5 +1449,5 @@ export function statusColor(s: DayStatus) {
   return s === 'drilling' ? C.green : s === 'standby' ? C.amber : C.red
 }
 export function holeStatusColor(s: HoleStatus) {
-  return s === 'drilling' ? C.blue : s === 'closed' ? C.amber : s === 'approved' ? C.green : C.purple
+  return s === 'drilling' ? C.blue : s === 'closed' ? C.amber : s === 'submitted' ? C.teal : s === 'approved' ? C.green : C.purple
 }

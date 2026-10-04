@@ -322,3 +322,109 @@ export function Meter({ value, max, color = T.bar, height = 8 }: { value: number
     </div>
   )
 }
+
+/* ==========================================================================
+ * Pieces added for the Company Admin console
+ * ========================================================================== */
+
+/* Plain page header: what this screen is, one line on what it is for, and the
+ * screen's main action on the right. */
+export function Head({ title, sub, right }: { title: string; sub?: ReactNode; right?: ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
+      <div style={{ minWidth: 0, flex: '1 1 380px' }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: T.text, margin: 0, fontFamily: display, letterSpacing: '-0.01em' }}>{title}</h1>
+        {sub && <p style={{ fontSize: 14, lineHeight: 1.55, color: T.muted, margin: '7px 0 0', maxWidth: 760 }}>{sub}</p>}
+      </div>
+      {right && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>{right}</div>}
+    </div>
+  )
+}
+
+export function Empty({ children }: { children: ReactNode }) {
+  return <div style={{ padding: '26px 18px', fontSize: 13.5, color: T.faint, lineHeight: 1.6, textAlign: 'center' }}>{children}</div>
+}
+
+export const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '9px 12px', background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8,
+  color: T.text, fontSize: 13.5, outline: 'none', fontFamily: 'inherit',
+}
+
+export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return (
+    <label style={{ display: 'block' }}>
+      <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: T.muted, marginBottom: 6 }}>{label}</span>
+      {children}
+      {hint && <span style={{ display: 'block', fontSize: 12, color: T.faint, marginTop: 5, lineHeight: 1.5 }}>{hint}</span>}
+    </label>
+  )
+}
+
+/* On/off. Used where a setting really is one or the other. */
+export function Switch({ on, onChange, label, hint }: { on: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '9px 0' }}>
+      <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} style={{
+        width: 36, height: 21, borderRadius: 11, flexShrink: 0, marginTop: 1, cursor: 'pointer', border: 'none', padding: 0,
+        position: 'relative', background: on ? T.orange : '#2A3444', transition: 'background 0.15s',
+      }}>
+        <span style={{ position: 'absolute', top: 3, left: on ? 18 : 3, width: 15, height: 15, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
+      </button>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13.5, color: T.text }}>{label}</div>
+        {hint && <div style={{ fontSize: 12, color: T.faint, marginTop: 2, lineHeight: 1.5 }}>{hint}</div>}
+      </div>
+    </div>
+  )
+}
+
+/* A hole drawn the way a driller thinks of it: how far down, against how far
+ * it is meant to go. The tick is the planned depth. */
+export function DepthBar({ drilled, planned, width = 160 }: { drilled: number; planned?: number; width?: number | string }) {
+  const max = Math.max(planned ?? 0, drilled, 1)
+  const pct = (drilled / max) * 100
+  return (
+    <div title={planned ? `${drilled} m drilled of ${planned} m planned` : `${drilled} m drilled`} style={{ width, minWidth: 90 }}>
+      <div style={{ position: 'relative', height: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 4 }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: T.bar, borderRadius: 4 }} />
+        {planned != null && planned >= drilled && (
+          <span aria-hidden style={{ position: 'absolute', right: 0, top: -3, width: 2, height: 14, background: T.muted, borderRadius: 1 }} />
+        )}
+      </div>
+      <div style={{ fontSize: 12, color: T.faint, marginTop: 5, fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ color: T.text, fontWeight: 600 }}>{Math.round(drilled)} m</span>{planned != null ? ` of ${planned} m` : ''}
+      </div>
+    </div>
+  )
+}
+
+/* Fourteen small bars: one per day. A gap in the row is a day with no metres. */
+export function Spark({ values, height = 26 }: { values: { date: string; metres: number }[]; height?: number }) {
+  const max = Math.max(...values.map(v => v.metres), 1)
+  return (
+    <div aria-label="Metres per day, last 14 days" style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height }}>
+      {values.map(v => (
+        <div key={v.date} title={`${v.date}: ${v.metres} m`} style={{
+          width: 5, height: v.metres > 0 ? Math.max(3, (v.metres / max) * height) : 2,
+          background: v.metres > 0 ? T.bar : 'rgba(255,255,255,0.12)', borderRadius: '2px 2px 0 0',
+        }} />
+      ))}
+    </div>
+  )
+}
+
+/* Change against a comparison, said in words and with a mark. `goodWhenUp`
+ * decides which direction is the good one (metres up is good, cost up is not). */
+export function Delta({ now, before, goodWhenUp = true, unit = '%' }: { now: number; before: number; goodWhenUp?: boolean; unit?: '%' | 'pts' }) {
+  if (!before) return <span style={{ color: T.faint }}>no earlier figure</span>
+  const change = unit === '%' ? ((now - before) / Math.abs(before)) * 100 : now - before
+  if (Math.abs(change) < 0.5) return <span style={{ color: T.faint }}>same as last month</span>
+  const up = change > 0
+  const good = up === goodWhenUp
+  return (
+    <span style={{ color: good ? T.green : T.amber }}>
+      <span aria-hidden style={{ marginRight: 4 }}>{up ? '▲' : '▼'}</span>
+      {Math.abs(change).toFixed(unit === '%' ? 0 : 1)}{unit === '%' ? '%' : ' pts'} {up ? 'up' : 'down'} on last month
+    </span>
+  )
+}
