@@ -1,7 +1,8 @@
 'use client'
 
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react'
-import { TODAY } from './inventory-store'
+import { TODAY, addDays as plusDays } from './inventory-store'
+import { buildSurvey, type Survey } from './survey'
 import {
   BREAKDOWN_REASONS, chargeShift, versionOn, isOwnerLinked, money, perUnit, useCosting,
   type ShiftLog, type HoleStatus, type Invoice, type LineReview, type ClientRate,
@@ -58,39 +59,7 @@ export const CONTRACTORS: Record<ContractorId, { id: ContractorId; name: string;
  * invoices. In the demo that is Contractor A. */
 export const LIVE_CONTRACTOR: ContractorId = 'A'
 
-// ── PROGRAMME: PLAN, ACTUAL, FORECAST ─────────────────────────────────────
-
-const ACTUAL_CUM = [420, 880, 1300, 1650, 2150, 2600, 2950, 3400, 3850, 4200, 4650, 5100]
-
-export interface WeekPoint {
-  week: string; plan: number | null; actual: number | null
-  forecast: number | null; high: number | null; low: number | null
-}
-/* Plan is 500 m a week to 7,000 m at week 14. Actual runs to week 12. The
- * forecast carries on from the last twelve weeks' real rate and lands in
- * week 17; the range is what a better and a worse run of weeks would give. */
-export const PROGRAMME_WEEKS: WeekPoint[] = Array.from({ length: 18 }, (_, i) => {
-  const w = i + 1
-  const now = PROGRAMME.currentWeek
-  const done = ACTUAL_CUM[now - 1]
-  const ahead = w - now
-  const proj = (perWeek: number) => (w < now ? null : Math.min(PROGRAMME.plannedMetres, Math.round(done + ahead * perWeek)))
-  return {
-    week: `W${w}`,
-    plan: Math.min(PROGRAMME.plannedMetres, w * PROGRAMME.planPerWeek),
-    actual: w <= now ? ACTUAL_CUM[w - 1] : null,
-    forecast: proj(380),
-    high: proj(475),
-    low: proj(317),
-  }
-})
-export const PROGRAMME_NOW = {
-  actual: ACTUAL_CUM[PROGRAMME.currentWeek - 1],
-  plan: PROGRAMME.currentWeek * PROGRAMME.planPerWeek,
-  get behindPct() { return Math.round(((this.plan - this.actual) / this.plan) * 100) },
-  forecastFinishWeek: 17,
-  weeksLate: 3,
-}
+// ── RATE OF PENETRATION ───────────────────────────────────────────────────
 
 export const ROP_BY_WEEK = [6.8, 7.1, 6.9, 6.2, 5.8, 5.5, 6.0, 6.4, 6.6, 6.3, 6.4, 6.2]
   .map((rop, i) => ({ week: `W${i + 1}`, rop, target: PROGRAMME.ropTarget }))
@@ -180,11 +149,11 @@ export const DEMO_HOLES: DemoHole[] = [
   H('DH-102', 'A', 400, 388, 17, 6.1, 94, 6.8, 'Drilling', '2026-08-28'),
   H('DH-103', 'B', 300, 300, 11, 7.2, 98, 1.4, 'Closed', '2026-08-27', '2026-09-06', 'waiting'),
   H('DH-104', 'C', 450, 210, 12, 5.2, 91, 3.0, 'Drilling', '2026-09-02'),
-  H('DH-105', 'C', 350, null, null, null, null, null, 'Planned'),
+  H('DH-105', 'A', 375, null, null, null, null, null, 'Planned'),
   H('DH-106', 'B', 300, 142, 6, 6.9, 96, 1.1, 'Drilling', '2026-09-08'),
   H('DH-107', 'A', 380, null, null, null, null, null, 'Planned'),
   H('DH-108', 'B', 380, null, null, null, null, null, 'Planned'),
-  H('DH-109', 'C', 375, null, null, null, null, null, 'Planned'),
+  H('DH-109', 'B', 350, null, null, null, null, null, 'Planned'),
 ]
 export function demoHole(id: string) { return DEMO_HOLES.find(h => h.id === id) }
 
@@ -316,31 +285,117 @@ export function demoHoleBilling(h: DemoHole) {
   })).filter(b => b.metres > 0)
 }
 
-/* Survey stations for a demo hole — illustrative until DrilAxis (Phase 4).
- * Offset from the planned path grows with depth and ends at the hole's
- * recorded off-plan distance. */
-export function surveyStations(h: DemoHole) {
-  if (h.drilled == null || h.offPlan == null) return []
-  const out: { depth: number; dip: number; azimuth: number; offset: number }[] = []
-  for (let d = 50; d <= h.drilled; d += 50) {
-    const f = d / h.drilled
-    out.push({
-      depth: d,
-      dip: +(-60 + f * (h.offPlan > 5 ? 4.2 : 1.6)).toFixed(1),
-      azimuth: +(135 + f * (h.offPlan > 5 ? 5.5 : 1.8)).toFixed(1),
-      offset: +(h.offPlan * Math.pow(f, 1.6)).toFixed(1),
-    })
-  }
-  // The last station is always at the bottom of the hole as drilled.
-  if (h.drilled % 50 !== 0) {
-    out.push({
-      depth: h.drilled,
-      dip: +(-60 + (h.offPlan > 5 ? 4.2 : 1.6)).toFixed(1),
-      azimuth: +(135 + (h.offPlan > 5 ? 5.5 : 1.8)).toFixed(1),
-      offset: h.offPlan,
-    })
-  }
+// ── PROGRAMME FORECAST ────────────────────────────────────────────────────
+
+/* Metres each contractor drilled in the last four weeks (weeks 9 to 12). They
+ * add up to the programme's weekly totals on the chart. The forecast walks
+ * forward from these: the average is the expected case, the worst of the four
+ * weeks is the slow case and the best is the fast case. */
+export const RECENT_WEEK_METRES: Record<ContractorId, number[]> = {
+  A: [158, 128, 168, 170],
+  B: [192, 152, 190, 190],
+  C: [100, 70, 92, 90],
+}
+export type ForecastCase = 'expected' | 'slow' | 'fast'
+export function weeklyRate(c: ContractorId, k: ForecastCase = 'expected') {
+  const w = RECENT_WEEK_METRES[c]
+  return k === 'slow' ? Math.min(...w) : k === 'fast' ? Math.max(...w) : w.reduce((s, x) => s + x, 0) / w.length
+}
+export function weekOf(date: string) { return Math.floor(daysBetween(PROGRAMME.weekOneStart, date) / 7) + 1 }
+export function weekEnd(week: number) { return plusDays(PROGRAMME.weekOneStart, week * 7 - 1) }
+
+export interface ProgrammeDay {
+  date: string; week: number; contractor: ContractorId
+  hole: string; metres: number; amount: number; closes: boolean
+}
+
+/* One day at a time from tomorrow: each contractor finishes the hole he is on,
+ * then his planned holes in order, at his own weekly rate. Rig moves are
+ * already inside that rate, because the weeks it comes from had them too. */
+export function walkProgramme(k: ForecastCase = 'expected'): ProgrammeDay[] {
+  const out: ProgrammeDay[] = []
+  CONTRACTOR_IDS.forEach(c => {
+    const perDay = weeklyRate(c, k) / 7
+    const queue = [
+      ...DEMO_HOLES.filter(h => h.contractor === c && h.stage === 'Drilling'),
+      ...DEMO_HOLES.filter(h => h.contractor === c && h.stage === 'Planned'),
+    ].map(h => ({ id: h.id, depth: h.drilled ?? 0, planned: h.planned }))
+    let date = plusDays(PORTAL_TODAY, 1)
+    for (let guard = 0; queue.length && guard < 400; guard++) {
+      let left = perDay
+      while (left > 1e-9 && queue.length) {
+        const h = queue[0]
+        const m = Math.min(left, h.planned - h.depth)
+        const before = bandSplit(h.depth), after = bandSplit(h.depth + m)
+        const amount = after.reduce((s, x, i) => s + (x - before[i]) * RATE_CARD.bands[i].rate, 0)
+        h.depth += m; left -= m
+        const closes = h.depth >= h.planned - 1e-6
+        const last = out[out.length - 1]
+        if (last && last.date === date && last.contractor === c && last.hole === h.id) { last.metres += m; last.amount += amount; last.closes = closes }
+        else out.push({ date, week: weekOf(date), contractor: c, hole: h.id, metres: m, amount, closes })
+        if (closes) queue.shift()
+      }
+      date = plusDays(date, 1)
+    }
+  })
   return out
+}
+
+export function programmeFinish(k: ForecastCase = 'expected') {
+  const date = walkProgramme(k).map(d => d.date).sort().pop() ?? PORTAL_TODAY
+  return { date, week: weekOf(date) }
+}
+
+const ACTUAL_CUM = [420, 880, 1300, 1650, 2150, 2600, 2950, 3400, 3850, 4200, 4650, 5100]
+
+export interface WeekPoint {
+  week: string; plan: number | null; actual: number | null
+  forecast: number | null; high: number | null; low: number | null
+}
+/* Plan is 500 m a week to 7,000 m at week 14. Actual runs to week 12. From
+ * there the forecast is the walk above, hole by hole; the band is the same
+ * walk at each contractor's worst and best recent week. */
+export const PROGRAMME_WEEKS: WeekPoint[] = (() => {
+  const now = PROGRAMME.currentWeek
+  const done = ACTUAL_CUM[now - 1]
+  const runs = { expected: walkProgramme('expected'), slow: walkProgramme('slow'), fast: walkProgramme('fast') }
+  const upTo = (k: ForecastCase, w: number) => Math.round(done + runs[k].filter(d => d.week <= w).reduce((s, d) => s + d.metres, 0))
+  return Array.from({ length: 19 }, (_, i) => {
+    const w = i + 1
+    return {
+      week: `W${w}`,
+      plan: Math.min(PROGRAMME.plannedMetres, w * PROGRAMME.planPerWeek),
+      actual: w <= now ? ACTUAL_CUM[w - 1] : null,
+      forecast: w < now ? null : upTo('expected', w),
+      high: w < now ? null : upTo('fast', w),
+      low: w < now ? null : upTo('slow', w),
+    }
+  })
+})()
+const FINISH = programmeFinish()
+export const PROGRAMME_NOW = {
+  actual: ACTUAL_CUM[PROGRAMME.currentWeek - 1],
+  plan: PROGRAMME.currentWeek * PROGRAMME.planPerWeek,
+  get behindPct() { return Math.round(((this.plan - this.actual) / this.plan) * 100) },
+  forecastFinishWeek: FINISH.week,
+  forecastFinishDate: FINISH.date,
+  weeksLate: FINISH.week - PROGRAMME.weeks,
+}
+
+/* Survey stations for a demo hole. Sample readings until DrilAxis; the
+ * distances are worked out from them by the same geometry the DrilAxis
+ * preview uses, so the hole page and the preview show the same numbers. */
+export function demoSurvey(h: DemoHole): Survey | null {
+  if (h.drilled == null || h.offPlan == null || h.drilled < 50) return null
+  const n = Number(h.id.replace(/\D/g, ''))
+  return buildSurvey({
+    id: h.id, plannedDepth: Math.max(h.planned, h.drilled), drilled: h.drilled, offPlan: h.offPlan,
+    spacing: 50, tolerance: PROGRAMME.maxOffPlan,
+    lift: n % 2 ? -0.7 : 1, turn: n % 3 === 0 ? -1.6 : 1.8,
+  })
+}
+export function surveyStations(h: DemoHole) {
+  return (demoSurvey(h)?.stations.slice(1) ?? []).map(s => ({ depth: s.depth, dip: s.dip, azimuth: s.azimuth, offset: s.offset }))
 }
 
 // ── INVOICES ──────────────────────────────────────────────────────────────

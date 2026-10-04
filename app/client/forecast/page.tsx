@@ -1,58 +1,98 @@
 'use client'
 
-import { PROGRAMME, PROGRAMME_NOW } from '../../../lib/owner-portal'
-import { Page, PageHead, Card, InDevelopment, T, display } from '../ui'
+import { useMemo } from 'react'
+import { moneyL } from '../../../lib/costing-store'
+import { PROGRAMME, CONTRACTORS, usePortal, shortDate, num } from '../../../lib/owner-portal'
+import { buildOwnerForecast } from '../../../lib/owner-forecast'
+import { Page, PageHead, Card, Tile, Grid, InDevelopment, Who } from '../ui'
 import { ProgrammeChart } from '../charts'
+import { Timeline, TimelineKey, SwotGrid, RiskTable, Basis, type Lane } from '../../components/outlook'
 
-/* AI PREDICTION — where the programme is heading.
+/* AI PREDICTION — what is coming next month, for the mine owner.
  *
- * Phase 3. Nothing on this screen is calculated yet; the figures are a worked
- * example of what the forecast will say once it learns from real shifts,
- * surveys and invoices. The banner says so, and stays. */
+ * The forecast is calculated: the programme is walked forward hole by hole at
+ * each contractor's own recent rate (lib/owner-forecast.ts). It reads metres,
+ * holes, the rate card, the shift record and the invoices — the things an
+ * owner is entitled to see — and nothing of a contractor's cost or stock.
+ *
+ * It is still marked as Phase 3, because the part that learns from surveys,
+ * core and past programmes is not built. The banner says which is which. */
 
-const CARDS = [
-  { title: 'Completion date', figure: 'Week 17 · 18 Oct', body: 'Three weeks after the planned finish of 27 Sep, at the real metres per day of the last twelve weeks. Likely range: week 16 to week 18.' },
-  { title: 'Cost to complete', figure: '₹3.52 Cr', body: 'About ₹12 L over the ₹3.40 Cr budget. The extra is three more weeks of standby and more metres in the deepest rate band.' },
-  { title: 'Contractor at risk', figure: 'Contractor C', body: 'Drilling 19 m per rig per day against the 24 the plan needs. Accounts for most of the gap.' },
-  { title: 'Downtime ahead', figure: 'Parts, then water', body: 'Waiting for parts cost 58 hours last month and is rising on Rig C-1. Water shortfalls are building at Contractor B’s site.' },
-  { title: 'Hole off-target risk', figure: 'DH-102', body: '6.8 m off the planned path at 388 m and still drifting. Flagged before the target is missed. Needs DrilAxis surveys (Phase 4).' },
-  { title: 'Unusual claims', figure: 'Standby, Contractor C', body: '9 standby days claimed against 5 in the shift record. The pattern does not match the other two contractors.' },
-]
+const nextDay = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) + 86400000).toISOString().slice(0, 10)
 
 export default function ForecastPage() {
+  const p = usePortal()
+  const f = useMemo(() => buildOwnerForecast(p.invoices), [p.invoices])
+  const end = f.horizonEnd
+  const late = f.finish.week - PROGRAMME.weeks
+
+  const lanes: Lane[] = f.contractors.map(c => ({
+    key: c.id,
+    label: <Who id={c.id} />,
+    sub: `${CONTRACTORS[c.id].rig} · ${Math.round(c.perWeek)} m a week`,
+    bars: [
+      // A hole that starts on the day the last one finished is drawn from the next day.
+      ...c.bars.map((b, i) => ({
+        kind: 'work' as const, from: i > 0 && c.bars[i - 1].to === b.from && b.from < b.to ? nextDay(b.from) : b.from, to: b.to, label: b.hole, ends: b.closes,
+        title: `${b.hole}: ${shortDate(b.from)} to ${shortDate(b.to)}, ${Math.round(b.metres)} m`,
+      })),
+      ...(c.finish < end ? [{
+        kind: 'idle' as const, from: nextDay(c.finish), to: end,
+        title: `${CONTRACTORS[c.id].rig} has no hole left after ${shortDate(c.finish)}`,
+      }] : []),
+    ],
+  }))
+
   return (
     <Page>
       <PageHead
-        question="Where is the programme heading?"
+        question={`What is coming in ${f.nextName}?`}
         tone="warn"
         answer={<>
-          Forecast finish is week {PROGRAMME_NOW.forecastFinishWeek}, {PROGRAMME_NOW.weeksLate} weeks late. Contractor C drives most of the gap.
-          Your reports tell you what went wrong last month; this tells you what will go wrong next month.
+          At the pace of the last four weeks the programme finishes on {shortDate(f.finish.date)}, {late} weeks late.
+          {' '}{f.nextName} brings about {num(Math.round(f.metres.next))} m and {moneyL(f.money.spendNext)} of invoices,
+          and the cost at completion is heading for {moneyL(f.money.atCompletion)} against a budget of {moneyL(PROGRAMME.budget)}.
         </>}
       />
 
       <InDevelopment phase="PHASE 3">
-        This screen shows what AI prediction will look like. The figures are an illustration built from the demo data, not a working forecast.
+        The forecast below is calculated now, from the shift record, the hole plan and the rate card, on sample data.
+        Still to come in Phase 3: learning from surveys, core and past programmes, so the forecast sees a problem before the metres show it.
       </InDevelopment>
 
-      <Card title="Cumulative metres: plan, actual and forecast" subtitle={`Illustrative. Plan finishes at week ${PROGRAMME.weeks}; the shaded band is the likely range.`}>
+      <Grid min={200}>
+        <Tile label="Programme finishes" value={shortDate(f.finish.date)} tone="warn"
+          note={`Week ${f.finish.week}, planned week ${PROGRAMME.weeks} · slow run ${shortDate(f.slowFinish.date)}`} />
+        <Tile label={`Metres in ${f.nextName}`} value={`${num(Math.round(f.metres.next))} m`}
+          note={`${num(Math.round(f.metres.toGo))} m left in the programme · ${num(Math.round(f.metres.rest))} m more this month`} />
+        <Tile label={`Invoices in ${f.nextName}`} value={moneyL(f.money.spendNext)}
+          note={`Metres, about ${f.money.standbyNext.toFixed(1)} standby days and ${f.money.demobNext ? 'demobilisation' : 'no demobilisation'}`} />
+        <Tile label="Cost at completion" value={moneyL(f.money.atCompletion)} tone={f.money.overBudget > 0 ? 'bad' : 'good'}
+          note={f.money.overBudget > 0 ? `${moneyL(f.money.overBudget)} over the ${moneyL(PROGRAMME.budget)} budget` : `Inside the ${moneyL(PROGRAMME.budget)} budget`} />
+        <Tile label="Holes coming to you" value={String(f.closingNext.length)}
+          note={f.closingNext.length ? `${f.closingNext.map(c => c.hole).join(', ')} close in ${f.nextName} and need your approval` : `No hole closes in ${f.nextName}`} />
+      </Grid>
+
+      <Card title="Cumulative metres: plan, actual and forecast"
+        subtitle={`Plan finishes at week ${PROGRAMME.weeks}. The forecast walks each contractor forward hole by hole; the shaded band is a slow run and a fast run.`}>
         <ProgrammeChart forecast height={320} />
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-        {CARDS.map(c => (
-          <div key={c.title} style={{ padding: '16px 18px', background: T.card, border: `1px solid ${T.border}`, borderRadius: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: T.faint }}>{c.title}</div>
-            <div style={{ fontSize: 19, fontWeight: 700, color: T.text, fontFamily: display, margin: '7px 0 8px' }}>{c.figure}</div>
-            <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.55 }}>{c.body}</div>
-          </div>
-        ))}
-      </div>
+      <Card title={`Who drills what, to ${shortDate(end)}`} subtitle="Each contractor finishes the hole he is on, then his planned holes in order, at his own pace of the last four weeks.">
+        <div style={{ marginBottom: 14 }}><TimelineKey idle="Rig free: no hole left" move={false} /></div>
+        <Timeline lanes={lanes} start={f.horizonStart} end={end} split={`${f.nextMonth}-01`} splitLabel={`${f.nextName} starts`} idleLabel="Rig free" />
+      </Card>
 
-      <div style={{ fontSize: 13, color: T.faint, lineHeight: 1.6, maxWidth: 820 }}>
-        You will see the full forecast for your own programme. A contractor sees only a summary of the completion date and of his own delay risk,
-        and never your budget, your cost to complete or the comparison with other contractors.
-      </div>
+      <SwotGrid swot={f.swot} />
+
+      <Card title="Risk register" subtitle="Highest chance first. Each line has a date, what is at stake and one thing to do." pad={false}>
+        <RiskTable risks={f.risks} />
+      </Card>
+
+      <Basis lines={f.basis} note={<>
+        You see the full forecast for your own programme. A contractor sees only his own holes and dates in his own XPLORIX account,
+        and never your budget, your cost at completion or the comparison with other contractors.
+      </>} />
     </Page>
   )
 }

@@ -5,7 +5,7 @@ import {
   CartesianGrid, Tooltip, ReferenceLine, Cell,
 } from 'recharts'
 import {
-  PROGRAMME, PROGRAMME_WEEKS, ROP_BY_WEEK, DEMO_HOLES, DOWNTIME_REASONS, CONTRACTORS, CONTRACTOR_IDS,
+  PROGRAMME, PROGRAMME_WEEKS, PROGRAMME_NOW, ROP_BY_WEEK, DEMO_HOLES, DOWNTIME_REASONS, CONTRACTORS, CONTRACTOR_IDS,
   downtimeFor, num, type ContractorId, type OwnerShift,
 } from '../../lib/owner-portal'
 import { T, Tip, Legend, axisTick, gridStroke } from './ui'
@@ -31,7 +31,7 @@ const endLabel = (index: number, text: string, side: 'above' | 'right', fill: st
 export function ProgrammeChart({ forecast = false, height = 300 }: { forecast?: boolean; height?: number }) {
   const now = PROGRAMME.currentWeek
   const data = PROGRAMME_WEEKS
-    .slice(0, forecast ? 18 : PROGRAMME.weeks)
+    .slice(0, forecast ? Math.max(18, PROGRAMME_NOW.forecastFinishWeek + 1) : PROGRAMME.weeks)
     .map(w => ({ ...w, band: w.low != null && w.high != null ? [w.low, w.high] : null }))
   const last = data[now - 1]
   return (
@@ -62,7 +62,7 @@ export function ProgrammeChart({ forecast = false, height = 300 }: { forecast?: 
             dot={{ r: 3.5, fill: T.actual, stroke: T.card, strokeWidth: 2 }} activeDot={{ r: 5, stroke: T.card, strokeWidth: 2 }}
             label={endLabel(now - 1, `Actual ${num(last.actual ?? 0)} m`, 'right', T.text)} />
           {forecast && <ReferenceLine x={`W${PROGRAMME.weeks}`} stroke={T.dim} label={{ value: 'Planned finish', position: 'top', fill: T.faint, fontSize: 11 }} />}
-          {forecast && <ReferenceLine x="W17" stroke={T.forecast} strokeOpacity={0.5} label={{ value: 'Forecast finish', position: 'top', fill: T.muted, fontSize: 11 }} />}
+          {forecast && <ReferenceLine x={`W${PROGRAMME_NOW.forecastFinishWeek}`} stroke={T.forecast} strokeOpacity={0.5} label={{ value: 'Forecast finish', position: 'top', fill: T.muted, fontSize: 11 }} />}
         </ComposedChart>
       </ResponsiveContainer>
     </div>

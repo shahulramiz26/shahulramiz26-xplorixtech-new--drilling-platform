@@ -1,7 +1,9 @@
 'use client'
 
-import { demoHole, surveyStations, PROGRAMME } from '../../../lib/owner-portal'
-import { Page, PageHead, Card, Split, Table, Flag, InDevelopment, Legend, Meter, th, thR, td, tdR, rowLine, T } from '../ui'
+import { demoHole, demoSurvey, DEMO_HOLES, PROGRAMME } from '../../../lib/owner-portal'
+import { type Survey } from '../../../lib/survey'
+import { Page, PageHead, Card, Split, Table, InDevelopment, Meter, th, thR, td, tdR, rowLine, T } from '../ui'
+import { DrilAxis } from '../../components/drilaxis'
 
 /* DIRECTION AND CORE — did the hole go where it was planned, and is the core
  * what it says it is.
@@ -11,7 +13,7 @@ import { Page, PageHead, Card, Split, Table, Flag, InDevelopment, Legend, Meter,
  * cannot be mistaken for somebody's core. */
 
 const HOLE = demoHole('DH-102')!
-const STATIONS = surveyStations(HOLE)
+const SURVEYS = DEMO_HOLES.filter(h => h.stage === 'Drilling').map(demoSurvey).filter((s): s is Survey => !!s)
 const RQD = [
   { from: 0, to: 50, rqd: 84 }, { from: 50, to: 100, rqd: 78 }, { from: 100, to: 150, rqd: 71 },
   { from: 150, to: 200, rqd: 58 }, { from: 200, to: 250, rqd: 52 }, { from: 250, to: 300, rqd: 66 },
@@ -19,80 +21,27 @@ const RQD = [
 ]
 const BOXES = Array.from({ length: 8 }, (_, i) => ({ n: 79 + i, from: 351 + i * 4.5, to: 351 + (i + 1) * 4.5, photo: i !== 5 }))
 
-/* Section view. Depth is to scale; the sideways drift is drawn ten times
- * larger than life, because 6.8 m in 388 m would be a hair's width. */
-function Section() {
-  const W = 520, Ht = 330, x0 = 90, y0 = 46, scale = 0.66, dx = 0.42, ex = 10
-  const planned = (d: number) => ({ x: x0 + d * dx, y: y0 + d * scale })
-  const actual = [{ depth: 0, offset: 0 }, ...STATIONS]
-    .map(s => ({ x: planned(s.depth).x - s.offset * ex * 0.55, y: planned(s.depth).y + s.offset * ex * 0.18, ...s }))
-  const end = planned(HOLE.planned)
-  return (
-    <svg viewBox={`0 0 ${W} ${Ht}`} width="100%" role="img" aria-label={`Section of hole ${HOLE.id}: planned path against surveyed path`} style={{ display: 'block' }}>
-      <line x1={20} y1={y0} x2={W - 20} y2={y0} stroke={T.faint} strokeWidth={1} />
-      <text x={W - 22} y={y0 - 8} textAnchor="end" fontSize={11} fill={T.faint}>surface</text>
-      {[100, 200, 300, 400].map(d => (
-        <g key={d}>
-          <line x1={20} y1={y0 + d * scale} x2={W - 20} y2={y0 + d * scale} stroke="rgba(30,41,59,0.9)" strokeWidth={1} />
-          <text x={24} y={y0 + d * scale - 5} fontSize={11} fill={T.faint}>{d} m</text>
-        </g>
-      ))}
-      <ellipse cx={end.x} cy={end.y} rx={46} ry={20} fill="rgba(234,88,12,0.14)" stroke={T.actual} strokeWidth={1} />
-      <text x={end.x} y={end.y + 4} textAnchor="middle" fontSize={11.5} fontWeight={600} fill={T.text}>target</text>
-      <line x1={x0} y1={y0} x2={end.x} y2={end.y} stroke={T.plan} strokeWidth={2} strokeDasharray="6 5" />
-      <polyline points={actual.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={T.actual} strokeWidth={2} strokeLinejoin="round" />
-      {actual.slice(1).map(p => (
-        <circle key={p.depth} cx={p.x} cy={p.y} r={4} fill={T.actual} stroke={T.card} strokeWidth={2}>
-          <title>{`${p.depth} m: ${p.offset} m off the planned path`}</title>
-        </circle>
-      ))}
-      <text x={actual[actual.length - 1].x - 14} y={actual[actual.length - 1].y + 4} textAnchor="end" fontSize={12} fontWeight={600} fill={T.text}>
-        {HOLE.offPlan} m off plan at {HOLE.drilled} m
-      </text>
-    </svg>
-  )
-}
-
 export default function DirectionCorePage() {
-  const worst = STATIONS.filter(s => s.offset > PROGRAMME.maxOffPlan)
+  const first = SURVEYS.find(x => x.id === HOLE.id)
   return (
     <Page>
       <PageHead
         question="Did the hole go where it was planned, and is the core sound?"
         tone="warn"
         answer={<>
-          Sample view for {HOLE.id}: {HOLE.offPlan} m off the planned path at {HOLE.drilled} m, past the {PROGRAMME.maxOffPlan} m limit from {worst[0]?.depth ?? '—'} m down.
+          Sample view for {HOLE.id}: {HOLE.offPlan} m off the planned path at {HOLE.drilled} m, past the {PROGRAMME.maxOffPlan} m limit from {first?.firstOver ?? '—'} m down.
           A hole that misses its target costs twice: once to drill, once to drill again.
         </>}
       />
 
-      <InDevelopment phase="PHASE 3 AND 4">
-        Downhole surveys come with DrilAxis (Phase 4); core logging, RQD and core photos come with XPLORIX Core (Phase 3).
-        Everything below is sample data showing what you will see.
+      <InDevelopment phase="DRILAXIS AND XPLORIX CORE">
+        Downhole surveys come with DrilAxis, after Phase 3; core logging, RQD and core photos come with XPLORIX Core in Phase 3.
+        The readings below are samples. The distances, the projected miss and the steer are worked out from them exactly as they will be from real readings.
       </InDevelopment>
 
-      <Split left={3} right={2}>
-        <Card title={`Hole ${HOLE.id}: planned path against surveyed path`} subtitle="Depth to scale. Sideways drift drawn ten times larger so it can be seen.">
-          <div style={{ marginBottom: 8 }}>
-            <Legend items={[{ color: T.plan, label: 'Planned', line: true, dash: true }, { color: T.actual, label: 'Surveyed', line: true }]} />
-          </div>
-          <Section />
-        </Card>
-        <Card title="Survey stations" subtitle={`Every 50 m and at the bottom. ▲ marks more than ${PROGRAMME.maxOffPlan} m off the planned path.`} pad={false}>
-          <Table>
-            <thead><tr><th style={thR}>Depth</th><th style={thR}>Dip</th><th style={thR}>Azimuth</th><th style={thR}>Off plan</th></tr></thead>
-            <tbody>
-              {STATIONS.map(s => (
-                <tr key={s.depth} style={{ borderBottom: rowLine }}>
-                  <td style={tdR}>{s.depth} m</td><td style={tdR}>{s.dip}°</td><td style={tdR}>{s.azimuth}°</td>
-                  <td style={tdR}><Flag on={s.offset > PROGRAMME.maxOffPlan}>{s.offset.toFixed(1)} m</Flag></td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </Card>
-      </Split>
+      <DrilAxis surveys={SURVEYS} audience="owner" />
 
+      <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginTop: 6 }}>Core from {HOLE.id}</div>
       <Split left={2} right={3}>
         <Card title="Rock quality (RQD) by depth" subtitle="Share of core in sound pieces of 10 cm or longer" pad={false}>
           <Table>

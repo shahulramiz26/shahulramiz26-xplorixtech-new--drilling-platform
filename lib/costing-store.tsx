@@ -1134,6 +1134,15 @@ export const SEED_SHIFT_LOGS: ShiftLog[] =
 const OPEN_HOLE_PLANS: Record<string, number> = {
   'DH-003': 120, 'DH-012': 150, 'DH-004': 200, 'DH-013': 220, 'DH-102': 300,
 }
+const UPCOMING_HOLES: [string, string, number][] = [
+  ['DH-005', 'Site A - North Field', 200],
+  ['DH-006', 'Site A - North Field', 180],
+  ['DH-014', 'Site A - North Field', 220],
+  ['DH-015', 'Site A - North Field', 240],
+  ['DH-121', 'Site B - South Ridge', 300],
+  ['DH-122', 'Site B - South Ridge', 280],
+  ['DH-123', 'Site B - South Ridge', 320],
+]
 export const SEED_HOLE_PLANS: Record<string, HolePlan> = (() => {
   const drilled: Record<string, { m: number; project: string }> = {}
   SEED_SHIFT_LOGS.forEach(l => {
@@ -1145,6 +1154,9 @@ export const SEED_HOLE_PLANS: Record<string, HolePlan> = (() => {
   Object.entries(drilled).forEach(([hole, d]) => {
     out[hole] = { plannedDepth: OPEN_HOLE_PLANS[hole] ?? Math.ceil(d.m / 5) * 5, project: d.project }
   })
+  // Holes that are planned but not started. These are what the next-month
+  // forecast drills into once the current holes reach their planned depth.
+  UPCOMING_HOLES.forEach(([hole, project, plannedDepth]) => { out[hole] = { plannedDepth, project } })
   return out
 })()
 
@@ -1185,6 +1197,12 @@ function initial(): State {
     clientRates: SEED_CLIENT_RATES, holeStatus: SEED_HOLE_STATUS, invoices: [],
     holePlans: SEED_HOLE_PLANS,
   }
+}
+
+/* A browser that saved its state before a seed plan existed still gets that
+ * plan; anything the user set himself wins over the seed. */
+function withSeedPlans(s: State): State {
+  return { ...s, holePlans: { ...SEED_HOLE_PLANS, ...(s.holePlans ?? {}) } }
 }
 
 export const uid = (p: string) => `${p}_${Date.now()}_${Math.floor(Math.random() * 9999)}`
@@ -1230,7 +1248,7 @@ function CostingRoot({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    try { const raw = localStorage.getItem(KEY); if (raw) setState(s => ({ ...initial(), ...JSON.parse(raw) })) } catch {}
+    try { const raw = localStorage.getItem(KEY); if (raw) setState(() => withSeedPlans({ ...initial(), ...JSON.parse(raw) })) } catch {}
     setLoaded(true)
   }, [])
   useEffect(() => { if (loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }, [state, loaded])
@@ -1244,7 +1262,7 @@ function CostingRoot({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key !== KEY || !e.newValue) return
-      try { setState({ ...initial(), ...JSON.parse(e.newValue) }) } catch {}
+      try { setState(withSeedPlans({ ...initial(), ...JSON.parse(e.newValue) })) } catch {}
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)

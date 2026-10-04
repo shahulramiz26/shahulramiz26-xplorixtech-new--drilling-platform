@@ -26,6 +26,9 @@ export const T = {
   contractorSide: '#3B82F6', ownerSide: '#EA580C',
   bar: '#3B82F6',
 }
+/* A colour at part strength, for tinted backgrounds and soft borders. Written
+ * this way so it works on a token that is a CSS variable, in either theme. */
+export const tint = (color: string, pct: number) => `color-mix(in srgb, ${color} ${pct}%, transparent)`
 export const display = "'Space Grotesk', 'Inter', sans-serif"
 export const mono = 'ui-monospace, SFMono-Regular, Menlo, monospace'
 
