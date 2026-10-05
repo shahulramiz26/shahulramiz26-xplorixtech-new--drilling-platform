@@ -5,11 +5,12 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, Settings, Truck, CreditCard, BarChart3, LogOut, Menu, Search,
-  DollarSign, X, Boxes, FileText, Brain, Store, HardHat, Target, Bell, CornerDownLeft,
+  DollarSign, X, Boxes, FileText, Brain, Store, HardHat, Target, Bell, CornerDownLeft, Link2,
 } from 'lucide-react'
 import { CurrencyProvider } from '../components/currency-context'
 import { CostingProvider, monthOf, projectCode } from '../../lib/costing-store'
 import { useAdminOverview, financeLink, type Tone } from '../../lib/admin-overview'
+import { useConnections, waitingForMe } from '../../lib/connect-store'
 import { T, display, toneColor } from '../components/kit'
 import { ThemeScope, ThemeToggle } from '../components/theme'
 
@@ -28,13 +29,14 @@ import { ThemeScope, ThemeToggle } from '../components/theme'
  * copy and the badges stay true as work is done.
  * ========================================================================== */
 
-type NavItem = { href: string; label: string; icon: React.ElementType; badge?: 'finance' | 'inventory' | 'projects' | number }
+type NavItem = { href: string; label: string; icon: React.ElementType; badge?: 'finance' | 'inventory' | 'projects' | 'connections' | number }
 const NAV: { title: string | null; items: NavItem[] }[] = [
   { title: null, items: [{ href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
   {
     title: 'Operations',
     items: [
       { href: '/admin/projects', label: 'Projects', icon: FolderOpen, badge: 'projects' },
+      { href: '/admin/connections', label: 'Connections', icon: Link2, badge: 'connections' },
       { href: '/admin/rigs', label: 'Rigs & equipment', icon: Truck },
       { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
       { href: '/admin/reports', label: 'Performance reports', icon: FileText },
@@ -99,7 +101,8 @@ function Shell({ children }: { children: React.ReactNode }) {
     .find(n => pathname === n.href || pathname.startsWith(n.href + '/'))
 
   const financeCount = o.money.returned.length + o.money.disputed.length
-  const badge = (b: NavItem['badge']) => b === 'finance' ? financeCount : b === 'inventory' ? o.urgentAlerts.length : b === 'projects' ? o.projectNews : b ?? 0
+  const requests = waitingForMe(useConnections(), 'contractor').length
+  const badge = (b: NavItem['badge']) => b === 'finance' ? financeCount : b === 'inventory' ? o.urgentAlerts.length : b === 'projects' ? o.projectNews : b === 'connections' ? requests : b ?? 0
   const badgeTone = (b: NavItem['badge']) => (b === 'finance' && financeCount) || (b === 'inventory' && o.urgentAlerts.length) ? T.red : T.orange
 
   // Ctrl K or ⌘ K opens search from anywhere; so does "/" when not typing.

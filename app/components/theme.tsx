@@ -7,17 +7,17 @@ import { THEME_KEY, type ThemeName } from '../../lib/theme'
 /* ==========================================================================
  * THEME SWITCH
  *
- * Dark is the default. The choice is kept in this browser, so the screen opens
+ * Light is the default, the look of the website and the film. The choice is kept in this browser, so the screen opens
  * the way it was left, and a second tab follows the first.
  *
  * The theme lives on <html data-theme>. Only the app shells (Company Admin,
  * Client Portal, Supervisor) mount ThemeScope, so the landing page and the
- * sign-in page, which are designed dark, never turn white.
+ * sign-in page, which carry their own light design, are left alone.
  * ========================================================================== */
 
 const listeners = new Set<() => void>()
 const read = (): ThemeName => {
-  try { return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark' } catch { return 'dark' }
+  try { return localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light' } catch { return 'light' }
 }
 const apply = (t: ThemeName) => {
   if (t === 'light') document.documentElement.dataset.theme = 'light'
@@ -37,7 +37,7 @@ export function setTheme(t: ThemeName) {
 }
 
 export function useTheme(): ThemeName {
-  return useSyncExternalStore(subscribe, read, () => 'dark')
+  return useSyncExternalStore(subscribe, read, () => 'light')
 }
 
 /* Mounted once by each app shell. */

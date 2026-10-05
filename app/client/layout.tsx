@@ -5,10 +5,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Activity, Target, ClipboardList, Clock, BarChart3, ShieldCheck,
-  ListChecks, Scale, FileText, TrendingUp, Compass, LogOut, Menu, X, ChevronRight, FolderOpen,
+  ListChecks, Scale, FileText, TrendingUp, Compass, LogOut, Menu, X, ChevronRight, FolderOpen, Link2,
 } from 'lucide-react'
 import { CostingProvider, OWNER_NAME, useCosting } from '../../lib/costing-store'
 import { ownerInbox } from '../../lib/projects'
+import { useConnections, waitingForMe } from '../../lib/connect-store'
 import { OwnerPortalProvider, usePortal, PORTAL_TODAY, shortDate } from '../../lib/owner-portal'
 import { T, display } from './ui'
 import { ThemeScope, ThemeToggle } from '../components/theme'
@@ -24,7 +25,7 @@ import { ThemeScope, ThemeToggle } from '../components/theme'
  * the programme, how each contractor is doing, what am I being asked to pay.
  * ========================================================================== */
 
-type Item = { href: string; label: string; icon: React.ElementType; badge?: 'holes' | 'invoices' | 'today' | 'projects'; dev?: boolean }
+type Item = { href: string; label: string; icon: React.ElementType; badge?: 'holes' | 'invoices' | 'today' | 'projects' | 'connections'; dev?: boolean }
 const GROUPS: { title: string; items: Item[] }[] = [
   {
     title: 'Programme',
@@ -41,6 +42,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
     title: 'Contractors',
     items: [
       { href: '/client/scorecard', label: 'Scorecard', icon: BarChart3 },
+      { href: '/client/connections', label: 'Connections', icon: Link2, badge: 'connections' },
       { href: '/client/hse', label: 'HSE', icon: ShieldCheck },
     ],
   },
@@ -74,6 +76,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const p = usePortal()
   const inbox = ownerInbox(useCosting().state)
+  const requests = waitingForMe(useConnections(), 'owner').length
 
   const current = [...ALL].sort((a, b) => b.href.length - a.href.length)
     .find(n => pathname === n.href || pathname.startsWith(n.href + '/'))
@@ -81,6 +84,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     b === 'holes' ? p.holesWaiting
     : b === 'invoices' ? p.toVerify.length
     : b === 'projects' ? inbox.count
+    : b === 'connections' ? requests
     : b === 'today' ? p.holesWaiting + p.toVerify.length + p.claimsWaiting.length + p.missingShifts.length + inbox.waiting.length
     : 0
 

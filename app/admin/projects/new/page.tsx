@@ -12,6 +12,7 @@ import { TODAY } from '../../../../lib/inventory-store'
 import { nextProjectCode, holeSeriesStart, rateLines, structureWords, day } from '../../../../lib/projects'
 import { Page, Head, Card, Btn, Field, Note, Switch, inputStyle, T, tint } from '../../../components/kit'
 import { RateEditor, ratesUsable } from '../../../components/rate-card'
+import { DIRECTORY, companyByName, connectedClient, mine, useConnections } from '../../../../lib/connect-store'
 import { HoleRowsEditor, holeRowProblems, rowsToHoles, Fact, type HoleRow } from '../../../components/project-ui'
 
 /* NEW PROJECT — the contract, entered once, in the order it is agreed.
@@ -105,6 +106,16 @@ export default function NewProjectPage() {
   const holesOk = holeRowProblems(holes, takenHoles).every(p => !p)
   const done = (i: number) => i === 0 ? step1 : i === 1 ? useRates && ratesUsable(rate) : i === 2 ? rigs.length > 0 : i === 3 ? holes.length > 0 && holesOk : true
   const toggle = (list: string[], set: (v: string[]) => void, v: string) => set(list.includes(v) ? list.filter(x => x !== v) : [...list, v])
+  /* A project can be shared only with a mine owner the company is connected to. */
+  const connections = useConnections()
+  const linked = connectedClient(connections, f.client)
+  const known = companyByName(f.client)?.side === 'owner' ? companyByName(f.client) : undefined
+  const connectedNames = mine(connections, 'contractor').filter(c => c.status === 'connected').map(c => DIRECTORY.find(d => d.id === c.owner)?.name).filter(Boolean) as string[]
+  const clientHint = !f.client.trim() ? 'Pick a mine owner you are connected to, or type any client name.'
+    : linked ? `Connected on XPLORIX as ${linked.id}. You can share this project with him.`
+    : known ? `${known.id} is on XPLORIX but not connected to you yet. The project stays private until he accepts a request.`
+    : 'Not connected on XPLORIX. The project stays private; you can still run it and invoice it.'
+  const willShare = shared && !!linked
   const go = (i: number) => { if (i > 0 && !step1) { setTried(true); setStep(0); return } setStep(i) }
 
   const missing = [
@@ -119,7 +130,7 @@ export default function NewProjectPage() {
     const project: ProjectRecord = {
       id: f.code.trim().toUpperCase(), code: f.code.trim().toUpperCase(), name, location: f.location.trim(), client: f.client.trim(),
       status: 'active', startDate: f.startDate, plannedMetres: parseFloat(f.plannedMetres) || undefined, holeSize: f.holeSize,
-      shared, rigs, supervisors, drillers, createdAt: TODAY,
+      shared: willShare, rigs, supervisors, drillers, createdAt: TODAY,
     }
     createProject(project, {
       rate: useRates && ratesUsable(rate) ? { ...rate, project: name, effectiveFrom: f.startDate, note: 'Contract as awarded' } : undefined,
@@ -149,8 +160,9 @@ export default function NewProjectPage() {
               <input value={f.code} onChange={e => setF({ ...f, code: e.target.value })} style={inputStyle} />
               {codeClash && <div style={err}>This code is already used</div>}
             </Field>
-            <Field label="Client">
-              <input value={f.client} onChange={e => setF({ ...f, client: e.target.value })} placeholder="Who pays for the metres" style={inputStyle} />
+            <Field label="Client" hint={clientHint}>
+              <input value={f.client} onChange={e => setF({ ...f, client: e.target.value })} placeholder="Who pays for the metres" style={inputStyle} list="connected-clients" />
+              <datalist id="connected-clients">{connectedNames.map(n => <option key={n} value={n} />)}</datalist>
               {tried && !f.client.trim() && <div style={err}>Enter the client</div>}
             </Field>
             <Field label="Location">
@@ -231,10 +243,15 @@ export default function NewProjectPage() {
           </Card>
 
           <Card title="Share with the client">
-            <Switch on={shared} onChange={setShared} label={`${f.client.trim() || 'The client'} is on XPLORIX: share this project`}
-              hint="The project appears in the client's portal the moment you create it, and every later change reaches him as a notification." />
+            {linked
+              ? <Switch on={shared} onChange={setShared} label={`You are connected to ${linked.name} (${linked.id}): share this project`}
+                  hint="The project appears in the client's portal the moment you create it, and every later change reaches him as a notification." />
+              : <Note tone="warn">
+                  {known ? <>{known.name} ({known.id}) is on XPLORIX, but you are not connected yet. </> : <>{f.client.trim() || 'This client'} is not a company you are connected to on XPLORIX. </>}
+                  The project is created private. Send a request under <Link href="/admin/connections" style={{ color: T.orange }}>Connections</Link>, and share the project from there once it is accepted.
+                </Note>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, marginTop: 12 }}>
-              <div style={{ padding: '13px 15px', borderRadius: 10, border: `1px solid ${T.border}`, opacity: shared ? 1 : 0.55 }}>
+              <div style={{ padding: '13px 15px', borderRadius: 10, border: `1px solid ${T.border}`, opacity: willShare ? 1 : 0.55 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: T.text, marginBottom: 7 }}>The client sees</div>
                 <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: T.muted, lineHeight: 1.75 }}>
                   <li>The contract rates, and any change you propose</li>
@@ -253,7 +270,7 @@ export default function NewProjectPage() {
                 </ul>
               </div>
             </div>
-            {shared && (
+            {willShare && (
               <div style={{ marginTop: 12 }}>
                 <Note tone="info">After the project is shared, a change to the contract rates is sent to the client as a proposal and starts only when he accepts it. Changes to rigs, crew and holes take effect at once and he is notified.</Note>
               </div>
@@ -268,7 +285,7 @@ export default function NewProjectPage() {
           {step > 0 && step < 4 && <button type="button" onClick={() => setStep(4)} style={{ background: 'none', border: 'none', color: T.muted, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Skip to review</button>}
           {step < 4
             ? <Btn kind="primary" onClick={() => go(step + 1)} disabled={step === 3 && !holesOk}>Next: {STEPS[step + 1].toLowerCase()}</Btn>
-            : <Btn kind="primary" onClick={create} disabled={!step1 || !holesOk}>{shared ? 'Create and share with the client' : 'Create project'}</Btn>}
+            : <Btn kind="primary" onClick={create} disabled={!step1 || !holesOk}>{willShare ? 'Create and share with the client' : 'Create project'}</Btn>}
         </div>
       </div>
 
