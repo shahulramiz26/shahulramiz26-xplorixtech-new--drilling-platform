@@ -2,18 +2,18 @@
 import LegalLayout from '../components/LegalLayout'
 
 const H2 = ({c}:{c:string}) => (
-  <h2 style={{fontSize:18,fontWeight:700,color:'#F97316',marginBottom:10,marginTop:36,paddingBottom:8,borderBottom:'1px solid rgba(249,115,22,0.15)'}}>{c}</h2>
+  <h2 style={{fontSize:18,fontWeight:700,color:'#C2410C',marginBottom:10,marginTop:36,paddingBottom:8,borderBottom:'1px solid rgba(249,115,22,0.15)'}}>{c}</h2>
 )
 const P = ({c}:{c:string}) => (
-  <p style={{fontSize:14,color:'#94A3B8',lineHeight:1.8,marginBottom:10}}>{c}</p>
+  <p style={{fontSize:14,color:'#56606E',lineHeight:1.8,marginBottom:10}}>{c}</p>
 )
 const B = ({c}:{c:string}) => (
-  <p style={{fontSize:14,fontWeight:700,color:'#F8FAFC',marginBottom:4,marginTop:14}}>{c}</p>
+  <p style={{fontSize:14,fontWeight:700,color:'#0B0F17',marginBottom:4,marginTop:14}}>{c}</p>
 )
 const Ul = ({items}:{items:string[]}) => (
   <ul style={{paddingLeft:20,marginBottom:10}}>
     {items.map((t,i)=>(
-      <li key={i} style={{fontSize:14,color:'#94A3B8',lineHeight:1.8,marginBottom:3}}>{t}</li>
+      <li key={i} style={{fontSize:14,color:'#56606E',lineHeight:1.8,marginBottom:3}}>{t}</li>
     ))}
   </ul>
 )
@@ -23,7 +23,7 @@ const Table = ({rows}:{rows:[string,string,string][]}) => (
       <thead>
         <tr>
           {['Cookie Name','Purpose','Duration'].map(h=>(
-            <th key={h} style={{padding:'10px 14px',background:'rgba(249,115,22,0.08)',border:'1px solid rgba(255,255,255,0.06)',color:'#F97316',fontWeight:700,textAlign:'left'}}>{h}</th>
+            <th key={h} style={{padding:'10px 14px',background:'rgba(249,115,22,0.08)',border:'1px solid rgba(11,15,23,0.06)',color:'#C2410C',fontWeight:700,textAlign:'left'}}>{h}</th>
           ))}
         </tr>
       </thead>
@@ -31,7 +31,7 @@ const Table = ({rows}:{rows:[string,string,string][]}) => (
         {rows.map((row,i)=>(
           <tr key={i}>
             {row.map((cell,j)=>(
-              <td key={j} style={{padding:'9px 14px',border:'1px solid rgba(255,255,255,0.06)',color:'#94A3B8',background:i%2===0?'rgba(255,255,255,0.02)':'transparent'}}>{cell}</td>
+              <td key={j} style={{padding:'9px 14px',border:'1px solid rgba(11,15,23,0.06)',color:'#56606E',background:i%2===0?'rgba(11,15,23,0.02)':'transparent'}}>{cell}</td>
             ))}
           </tr>
         ))}

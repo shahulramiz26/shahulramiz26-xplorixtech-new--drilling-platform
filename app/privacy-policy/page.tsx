@@ -1,10 +1,10 @@
 'use client'
 import LegalLayout from '../components/LegalLayout'
 
-const H2 = ({c}:{c:string}) => <h2 style={{fontSize:18,fontWeight:700,color:'#F97316',marginBottom:10,marginTop:36,paddingBottom:8,borderBottom:'1px solid rgba(249,115,22,0.15)'}}>{c}</h2>
-const P  = ({c}:{c:string}) => <p  style={{fontSize:14,color:'#94A3B8',lineHeight:1.8,marginBottom:10}}>{c}</p>
-const B  = ({c}:{c:string}) => <p  style={{fontSize:14,fontWeight:700,color:'#F8FAFC',marginBottom:4,marginTop:14}}>{c}</p>
-const Ul = ({items}:{items:string[]}) => <ul style={{paddingLeft:20,marginBottom:10}}>{items.map((t,i)=><li key={i} style={{fontSize:14,color:'#94A3B8',lineHeight:1.8,marginBottom:3}}>{t}</li>)}</ul>
+const H2 = ({c}:{c:string}) => <h2 style={{fontSize:18,fontWeight:700,color:'#C2410C',marginBottom:10,marginTop:36,paddingBottom:8,borderBottom:'1px solid rgba(249,115,22,0.15)'}}>{c}</h2>
+const P  = ({c}:{c:string}) => <p  style={{fontSize:14,color:'#56606E',lineHeight:1.8,marginBottom:10}}>{c}</p>
+const B  = ({c}:{c:string}) => <p  style={{fontSize:14,fontWeight:700,color:'#0B0F17',marginBottom:4,marginTop:14}}>{c}</p>
+const Ul = ({items}:{items:string[]}) => <ul style={{paddingLeft:20,marginBottom:10}}>{items.map((t,i)=><li key={i} style={{fontSize:14,color:'#56606E',lineHeight:1.8,marginBottom:3}}>{t}</li>)}</ul>
 
 export default function PrivacyPolicy() {
   return (

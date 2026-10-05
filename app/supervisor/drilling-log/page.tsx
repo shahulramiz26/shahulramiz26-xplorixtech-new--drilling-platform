@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, ReactNode } from 'react'
+import { useState, useMemo, useEffect, ReactNode } from 'react'
 import { Plus, Trash2, Search, X, Drill, Wrench } from 'lucide-react'
 import {
   useInventory, rigHoldings, formationUse, FORMATION_USE_LABEL,
@@ -8,6 +8,8 @@ import {
   type RigHoldingLine, type PartCategory,
 } from '../../../lib/inventory-store'
 import { useCostingOptional } from '../../../lib/costing-store'
+import { projectHoles } from '../../../lib/projects'
+import { hexA } from '../../../lib/theme'
 
 /* ==========================================================================
  * DRILL LOG
@@ -27,11 +29,11 @@ import { useCostingOptional } from '../../../lib/costing-store'
  * ========================================================================== */
 
 const C = {
-  bg: '#080B10', card: '#0D1117', border: '#1E293B',
-  orange: '#F97316', orangeD: '#EA580C',
-  green: '#10B981', red: '#EF4444', amber: '#F59E0B',
-  blue: '#3B82F6', purple: '#8B5CF6', teal: '#14B8A6',
-  text: '#F8FAFC', muted: '#94A3B8', faint: '#64748B', dim: '#334155',
+  bg: 'var(--x-bg)', card: 'var(--x-card)', border: 'var(--x-border)',
+  orange: 'var(--x-orange)', orangeD: 'var(--x-orange-d)',
+  green: 'var(--x-green)', red: 'var(--x-red)', amber: 'var(--x-amber)',
+  blue: 'var(--x-blue)', purple: 'var(--x-purple)', teal: 'var(--x-teal)',
+  text: 'var(--x-text)', muted: 'var(--x-muted)', faint: 'var(--x-faint)', dim: 'var(--x-dim)',
 }
 
 const iStyle: React.CSSProperties = {
@@ -42,13 +44,13 @@ const numStyle: React.CSSProperties = { ...iStyle, textAlign: 'right', fontFamil
 const th: React.CSSProperties = {
   padding: '8px 14px', textAlign: 'left', fontSize: 10, color: C.faint, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap',
-  borderBottom: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.02)',
+  borderBottom: `1px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)',
 }
 const thR: React.CSSProperties = { ...th, textAlign: 'right' }
 const td: React.CSSProperties = { padding: '10px 14px', fontSize: 12.5, color: C.muted, whiteSpace: 'nowrap' }
 const tdN: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }
 const tdMono: React.CSSProperties = { ...td, fontFamily: 'ui-monospace, monospace' }
-const rowBorder = '1px solid rgba(30,41,59,0.5)'
+const rowBorder = '1px solid color-mix(in srgb, var(--x-border) 50%, transparent)'
 
 const SHIFTS = ['Day', 'Night'] as const
 const SHIFT_HOURS = [8, 10, 12] as const
@@ -106,7 +108,7 @@ const Grid = ({ cols, children }: { cols: number; children: ReactNode }) =>
 
 function Tag({ children, tone = C.faint }: { children: ReactNode; tone?: string }) {
   return (
-    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 5, color: tone, background: `${tone}1A`, border: `1px solid ${tone}33`, whiteSpace: 'nowrap' }}>
+    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 5, color: tone, background: `${hexA(tone, 0x1A)}`, border: `1px solid ${hexA(tone, 0x33)}`, whiteSpace: 'nowrap' }}>
       {children}
     </span>
   )
@@ -117,8 +119,8 @@ function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md', type = 
 }) {
   const tones: Record<string, React.CSSProperties> = {
     primary: { background: `linear-gradient(135deg, ${C.orange}, ${C.orangeD})`, color: '#fff', border: 'none' },
-    ghost: { background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted },
-    danger: { background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', color: C.red },
+    ghost: { background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.muted },
+    danger: { background: 'color-mix(in srgb, var(--x-red) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--x-red) 22%, transparent)', color: C.red },
   }
   return (
     <button type={type} onClick={onClick} disabled={disabled} style={{
@@ -130,7 +132,7 @@ function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md', type = 
 }
 
 function Note({ tone = C.blue, children }: { tone?: string; children: ReactNode }) {
-  return <div style={{ padding: '10px 13px', borderRadius: 9, background: `${tone}0F`, border: `1px solid ${tone}33`, fontSize: 11.5, color: tone, lineHeight: 1.6 }}>{children}</div>
+  return <div style={{ padding: '10px 13px', borderRadius: 9, background: `${hexA(tone, 0x0F)}`, border: `1px solid ${hexA(tone, 0x33)}`, fontSize: 11.5, color: tone, lineHeight: 1.6 }}>{children}</div>
 }
 
 function Switch({ on, onChange, label, hint, tone = C.orange }: {
@@ -140,7 +142,7 @@ function Switch({ on, onChange, label, hint, tone = C.orange }: {
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0' }}>
       <button type="button" onClick={() => onChange(!on)} role="switch" aria-checked={on} style={{
         width: 40, height: 23, borderRadius: 12, flexShrink: 0, marginTop: 1, cursor: 'pointer',
-        border: 'none', padding: 0, position: 'relative', background: on ? tone : '#2A3444', transition: 'background .18s',
+        border: 'none', padding: 0, position: 'relative', background: on ? tone : 'var(--x-border3)', transition: 'background .18s',
       }}>
         <span style={{ position: 'absolute', top: 3, left: on ? 20 : 3, width: 17, height: 17, borderRadius: '50%', background: '#fff', transition: 'left .18s' }} />
       </button>
@@ -217,7 +219,7 @@ function PartPickerModal({ title, subtitle, parts, onPick, onClose }: {
 
   return (
     <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(10px)',
+      position: 'fixed', inset: 0, background: 'rgba(var(--x-shadow),0.82)', backdropFilter: 'blur(10px)',
       zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
     }}>
       <div onClick={e => e.stopPropagation()} style={{
@@ -229,7 +231,7 @@ function PartPickerModal({ title, subtitle, parts, onPick, onClose }: {
             <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{title}</div>
             <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>{subtitle}</div>
           </div>
-          <button type="button" onClick={onClose} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0 }}>
+          <button type="button" onClick={onClose} style={{ padding: 8, borderRadius: 8, background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0 }}>
             <X size={15} />
           </button>
         </div>
@@ -262,7 +264,7 @@ function PartPickerModal({ title, subtitle, parts, onPick, onClose }: {
                 {shown.map(p => (
                   <tr key={p.itemId} onClick={() => { onPick(p); onClose() }}
                     style={{ borderBottom: rowBorder, cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(249,115,22,0.06)'}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--x-orange) 6%, transparent)'}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
                     <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber || '—'}</td>
                     <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 230 }}>{p.name}</td>
@@ -385,11 +387,11 @@ function BitUsageSection({ parts, rows, setRows }: {
                       <div style={{ flex: 1 }} />
                       <button type="button" onClick={() => upd(r.id, { replaced: !r.replaced })} style={{
                         padding: '9px 14px', borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600,
-                        background: r.replaced ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.04)',
-                        border: `1px solid ${r.replaced ? `${C.orange}66` : C.border}`, color: r.replaced ? C.orange : C.muted,
+                        background: r.replaced ? 'color-mix(in srgb, var(--x-orange) 12%, transparent)' : 'rgba(var(--x-ov),0.04)',
+                        border: `1px solid ${r.replaced ? `${hexA(C.orange, 0x66)}` : C.border}`, color: r.replaced ? C.orange : C.muted,
                       }}>{r.replaced ? 'Bit was changed' : 'Not yet replaced'}</button>
                       <button type="button" onClick={() => setRows(rows.filter(x => x.id !== r.id))}
-                        style={{ padding: 9, borderRadius: 9, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', color: C.red, cursor: 'pointer', lineHeight: 0 }}>
+                        style={{ padding: 9, borderRadius: 9, background: 'color-mix(in srgb, var(--x-red) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--x-red) 22%, transparent)', color: C.red, cursor: 'pointer', lineHeight: 0 }}>
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -472,7 +474,7 @@ function AccessoriesSection({ parts, rows, setRows, metresThisShift }: {
           {rows.map((r, i) => {
             const over = r.part && parseFloat(r.qty) > r.part.onRig
             return (
-              <div key={r.id} style={{ background: C.bg, border: `1px solid ${over ? `${C.red}55` : C.border}`, borderRadius: 11, padding: '12px 14px' }}>
+              <div key={r.id} style={{ background: C.bg, border: `1px solid ${over ? `${hexA(C.red, 0x55)}` : C.border}`, borderRadius: 11, padding: '12px 14px' }}>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                   <span style={{ fontSize: 12, color: C.faint, fontFamily: 'ui-monospace, monospace', paddingTop: 10, width: 16 }}>{i + 1}.</span>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 9 }}>
@@ -494,7 +496,7 @@ function AccessoriesSection({ parts, rows, setRows, metresThisShift }: {
                           placeholder="Metres run" style={numStyle} />
                       </div>
                       <button type="button" onClick={() => setRows(rows.filter(x => x.id !== r.id))}
-                        style={{ padding: 9, borderRadius: 9, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', color: C.red, cursor: 'pointer', lineHeight: 0 }}>
+                        style={{ padding: 9, borderRadius: 9, background: 'color-mix(in srgb, var(--x-red) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--x-red) 22%, transparent)', color: C.red, cursor: 'pointer', lineHeight: 0 }}>
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -542,6 +544,13 @@ export default function DrillingLogPage() {
 
   const [standby, setStandby] = useState(false)
   const [holeNumber, setHoleNumber] = useState('')
+  const record = costing?.state.projects?.find(p => p.name === project)
+  // Rigs assigned to the project come first; with none assigned, every rig is offered.
+  const rigChoices = record?.rigs.length ? record.rigs : RIGS
+  useEffect(() => { if (!rigChoices.includes(rig)) setRig(rigChoices[0]) }, [rigChoices, rig])
+  const openHoles = useMemo(
+    () => costing ? projectHoles(costing.state, project).filter(h => h.status === 'planned' || h.status === 'drilling') : [],
+    [costing, project])
   const [holeSize, setHoleSize] = useState<string>('HQ')
   const [formation, setFormation] = useState<string>('Hard Formation')
   const [crewCount, setCrewCount] = useState(4)
@@ -668,11 +677,11 @@ export default function DrillingLogPage() {
             </Field>
             <Field label="Rig">
               <select value={rig} onChange={e => setRig(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}>
-                {RIGS.map(x => <option key={x} value={x}>{x}</option>)}
+                {rigChoices.map(x => <option key={x} value={x}>{x}</option>)}
               </select>
             </Field>
             <Field label="Date">
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle, colorScheme: 'dark' }} />
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle }} />
             </Field>
             <Field label="Shift">
               <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: 4 }}>
@@ -706,7 +715,7 @@ export default function DrillingLogPage() {
       </Card>
 
       <Card accent={standby ? C.amber : undefined} pad>
-        <div style={{ background: C.bg, border: `1px solid ${standby ? `${C.amber}44` : C.border}`, borderRadius: 11, padding: '4px 16px' }}>
+        <div style={{ background: C.bg, border: `1px solid ${standby ? `${hexA(C.amber, 0x44)}` : C.border}`, borderRadius: 11, padding: '4px 16px' }}>
           <Switch on={standby} onChange={enterStandby} tone={C.amber} label="Standby — the client stopped work"
             hint="No metres, no formation, no parts. The drilling fields come off the form and the whole shift is logged as client downtime, because the waiting is what gets billed." />
         </div>
@@ -716,7 +725,13 @@ export default function DrillingLogPage() {
         <>
           <Card title="The hole" accent={C.orange}>
             <Grid cols={4}>
-              <Field label="Hole number"><input value={holeNumber} onChange={e => setHoleNumber(e.target.value)} placeholder="e.g. DH-004" style={{ ...iStyle, fontFamily: 'ui-monospace, monospace' }} /></Field>
+              <Field label="Hole number">
+                <input value={holeNumber} onChange={e => setHoleNumber(e.target.value)} placeholder={openHoles[0] ? `e.g. ${openHoles[0].id}` : 'e.g. DH-004'} list="holes-on-project" style={{ ...iStyle, fontFamily: 'ui-monospace, monospace' }} />
+                {/* The holes on this project's plan that are not finished: pick one instead of typing it. */}
+                <datalist id="holes-on-project">
+                  {openHoles.map(h => <option key={h.id} value={h.id}>{h.status === 'planned' ? `planned, ${h.planned} m` : `${Math.round(h.drilled)} m of ${h.planned ?? '?'} m`}</option>)}
+                </datalist>
+              </Field>
               <Field label="Hole size">
                 <select value={holeSize} onChange={e => setHoleSize(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}>
                   {HOLE_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -744,7 +759,7 @@ export default function DrillingLogPage() {
                   style={{ ...numStyle, color: coreRecovery > metres ? C.red : recoveryPct >= 90 ? C.green : C.amber }} />
               </Field>
               <Field label="Depth at end of shift">
-                <div style={{ ...iStyle, background: 'rgba(255,255,255,0.02)', borderStyle: 'dashed', fontFamily: 'ui-monospace, monospace', textAlign: 'right', fontWeight: 700 }}>
+                <div style={{ ...iStyle, background: 'rgba(var(--x-ov),0.02)', borderStyle: 'dashed', fontFamily: 'ui-monospace, monospace', textAlign: 'right', fontWeight: 700 }}>
                   {(fromDepth + metres).toFixed(1)} m
                 </div>
               </Field>

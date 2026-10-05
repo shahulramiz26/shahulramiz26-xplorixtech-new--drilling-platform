@@ -76,18 +76,18 @@ export default function SupervisorAnalyticsDashboard() {
     >
       {/* Header */}
       <motion.div variants={itemVariants}>
-        <h1 className="text-3xl font-bold text-white">Analytics Dashboard</h1>
-        <p className="text-[#94A3B8] mt-1">Performance metrics for your assigned projects</p>
+        <h1 className="text-3xl font-bold text-[color:var(--x-text)]">Analytics Dashboard</h1>
+        <p className="text-[color:var(--x-muted)] mt-1">Performance metrics for your assigned projects</p>
       </motion.div>
 
       {/* Filter */}
       <motion.div 
         variants={itemVariants}
-        className="flex items-center gap-2 px-4 py-2 bg-[#151A27] rounded-lg border border-[#2A3040] w-fit"
+        className="flex items-center gap-2 px-4 py-2 bg-[var(--x-panel)] rounded-lg border border-[color:var(--x-border2)] w-fit"
       >
-        <span className="text-[#94A3B8]">Filter:</span>
+        <span className="text-[color:var(--x-muted)]">Filter:</span>
         <span className="text-sm">Last 7 Days</span>
-        <svg className="w-4 h-4 text-[#94A3B8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 text-[color:var(--x-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </motion.div>
@@ -100,15 +100,15 @@ export default function SupervisorAnalyticsDashboard() {
             <Link
               key={category.title}
               href={category.href}
-              className="block p-6 bg-[#151A27] rounded-xl border border-[#2A3040] hover:border-[#3A4050] hover:bg-[#1A1F2E] transition-all group"
+              className="block p-6 bg-[var(--x-panel)] rounded-xl border border-[color:var(--x-border2)] hover:border-[color:var(--x-border3)] hover:bg-[var(--x-raised2)] transition-all group"
             >
               <div className={`w-12 h-12 rounded-lg ${category.color} flex items-center justify-center mb-4`}>
                 <Icon className={`w-6 h-6 ${category.iconColor}`} />
               </div>
-              <h3 className="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors">
+              <h3 className="text-lg font-semibold text-[color:var(--x-text)] group-hover:text-blue-400 transition-colors">
                 {category.title}
               </h3>
-              <p className="text-[#94A3B8] text-sm mt-1">{category.description}</p>
+              <p className="text-[color:var(--x-muted)] text-sm mt-1">{category.description}</p>
             </Link>
           );
         })}
