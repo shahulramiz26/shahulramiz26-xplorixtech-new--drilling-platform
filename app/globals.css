@@ -68,10 +68,11 @@
 }
 
 html[data-theme="light"] {
-  --x-bg: #F3F5F8;  --x-card: #FFFFFF;  --x-side: #FFFFFF;
-  --x-raised: #F8FAFC;  --x-panel: #FFFFFF;  --x-raised2: #EEF2F6;
-  --x-border: #DFE5EC;  --x-border2: #DFE5EC;  --x-border3: #CBD5E1;
-  --x-text: #0F172A;  --x-muted: #475569;  --x-faint: #64748B;  --x-dim2: #8492A6;  --x-dim: #9AA6B6;
+  /* Warm paper, the same background as the website and the film; cards stay white. */
+  --x-bg: #F6EDE5;  --x-card: #FFFFFF;  --x-side: #FFFFFF;
+  --x-raised: #FBF6F1;  --x-panel: #FFFFFF;  --x-raised2: #F3E8DD;
+  --x-border: #E7DACD;  --x-border2: #E7DACD;  --x-border3: #D2C2B2;
+  --x-text: #0B0F17;  --x-muted: #475569;  --x-faint: #5B6675;  --x-dim2: #857F7A;  --x-dim: #A39B93;
 
   --x-orange: #EA580C;  --x-orange-d: #C2410C;  --x-orange-b: #EA580C;  --x-orange-p: #C2410C;
   --x-green: #059669;  --x-green-b: #059669;  --x-green-d: #047857;  --x-good-text: #065F46;
@@ -84,12 +85,19 @@ html[data-theme="light"] {
   --x-actual: #C2410C;  --x-plan: #64748B;  --x-forecast: #EA580C;  --x-trips: #8492A6;
 
   --x-ov: 15,23,42;
-  --x-shadow: 71,85,105;
-  --x-card-shadow: 0 1px 2px rgba(15,23,42,0.05), 0 1px 1px rgba(15,23,42,0.03);
+  --x-shadow: 92,62,36;
+  --x-card-shadow: 0 1px 2px rgba(122,60,8,0.07), 0 6px 18px rgba(122,60,8,0.05);
   color-scheme: light;
 }
 html[data-theme="light"] body { background: var(--x-bg); color: var(--x-text); }
 html[data-theme="light"] .bg-grid-pattern { display: none; }
+/* The soft peach glow in two corners, fixed behind the app while it scrolls. */
+html[data-theme="light"] .xpl-app {
+  background-image:
+    radial-gradient(1100px 760px at 104% 104%, rgba(253,184,119,0.55) 0%, rgba(253,184,119,0) 62%),
+    radial-gradient(900px 640px at -6% -6%, rgba(255,211,174,0.6) 0%, rgba(255,211,174,0) 60%) !important;
+  background-attachment: fixed !important;
+}
 html[data-theme="light"] ::-webkit-scrollbar-track { background: var(--x-bg); }
 html[data-theme="light"] ::-webkit-scrollbar-thumb { background: var(--x-dim); }
 html[data-theme="light"] ::selection { background: rgba(234,88,12,0.18); color: var(--x-text); }

@@ -89,7 +89,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     : 0
 
   return (
-    <div className="min-h-screen flex" style={{ background: T.bg, color: T.text }}>
+    <div className="min-h-screen flex xpl-app" style={{ background: T.bg, color: T.text }}>
       {/* Set as raw HTML: React escapes quotes in a style tag on the server
           but not in the browser, and the two would not match. */}
       <style dangerouslySetInnerHTML={{ __html: PORTAL_CSS }} />

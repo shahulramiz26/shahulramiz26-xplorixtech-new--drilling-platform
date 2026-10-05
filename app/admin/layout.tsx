@@ -117,7 +117,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   useEffect(() => { setOpen(false); setBell(false) }, [pathname])
 
   return (
-    <div className="min-h-screen flex" style={{ background: T.bg, color: T.text }}>
+    <div className="min-h-screen flex xpl-app" style={{ background: T.bg, color: T.text }}>
       <style dangerouslySetInnerHTML={{ __html: SHELL_CSS }} />
 
       {open && <div className="lg:hidden fixed inset-0 z-40" style={{ background: 'rgba(var(--x-shadow),0.7)' }} onClick={() => setOpen(false)} />}

@@ -35,7 +35,7 @@ function SupervisorShell({ children }: { children: React.ReactNode }) {
   const pageLabel = currentPage?.label || pathname.split('/')[2] || 'Dashboard'
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'var(--x-bg)', color: 'var(--x-text)' }}>
+    <div className="min-h-screen flex xpl-app" style={{ background: 'var(--x-bg)', color: 'var(--x-text)' }}>
       <ThemeScope />
 
       <AnimatePresence>
