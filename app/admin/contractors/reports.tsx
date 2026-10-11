@@ -9,7 +9,7 @@ import {
 } from '../../../lib/contracting'
 import { when } from '../../../lib/projects'
 import { T, tint, Card, Btn, Note, Modal, Field, Switch, Status, Empty, Table, inputStyle, th, thR, td, tdR, rowLine, toneColor } from '../../components/kit'
-import { ME, n1, shortDay, linkBtn, numInput, SourceTag } from './shared'
+import { me, n1, shortDay, linkBtn, numInput, SourceTag } from './shared'
 
 /* DAILY REPORTS — a contractor's shifts, before and after they are checked.
  *
@@ -124,7 +124,7 @@ export function ReportsTab({ project, orders }: { project: string; orders: WorkO
 
       <Card title={`Waiting to be checked · ${waiting.length}`} pad={false}
         subtitle="Reported by the contractor, not yet in the record. Nothing here is paid or billed on until you accept it."
-        right={clean.length > 1 ? <Btn kind="good" size="sm" onClick={() => clean.forEach(r => acceptReport(r.id, ME))}>Accept the {clean.length} with nothing flagged</Btn> : undefined}>
+        right={clean.length > 1 ? <Btn kind="good" size="sm" onClick={() => clean.forEach(r => acceptReport(r.id, me()))}>Accept the {clean.length} with nothing flagged</Btn> : undefined}>
         {waiting.length === 0 && <Empty>Nothing is waiting. Every shift the contractors have sent is in the record.</Empty>}
         {waiting.map((r, i) => {
           const flags = flagsOf[r.id] ?? []
@@ -149,7 +149,7 @@ export function ReportsTab({ project, orders }: { project: string; orders: WorkO
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <Btn size="sm" kind="danger" onClick={() => { setReturning(r); setReason('') }}>Send back</Btn>
                 <Btn size="sm" onClick={() => setChecking(r)}>{r.standbyHours > 0 ? 'Decide standby' : 'Change and accept'}</Btn>
-                {r.standbyHours === 0 && <Btn size="sm" kind="good" onClick={() => acceptReport(r.id, ME)}>Accept</Btn>}
+                {r.standbyHours === 0 && <Btn size="sm" kind="good" onClick={() => acceptReport(r.id, me())}>Accept</Btn>}
               </div>
             </div>
           )
@@ -211,13 +211,13 @@ export function ReportsTab({ project, orders }: { project: string; orders: WorkO
       </Card>
 
       {checking && <AcceptModal r={checking} flags={flagsOf[checking.id] ?? []} onClose={() => setChecking(null)}
-        onAccept={a => { acceptReport(checking.id, ME, a); setChecking(null) }} />}
+        onAccept={a => { acceptReport(checking.id, me(), a); setChecking(null) }} />}
 
       {returning && (
         <Modal title={`Send back ${returning.rig}, ${shortDay(returning.date)} ${returning.shift.toLowerCase()}`} width={520} onClose={() => setReturning(null)}
           subtitle="It stays out of the record. The contractor sees your note in his drill log, corrects the shift and sends it again."
           footer={<><Btn onClick={() => setReturning(null)}>Cancel</Btn>
-            <Btn kind="danger" disabled={!reason.trim()} onClick={() => { returnReport(returning.id, ME, reason); setReturning(null) }}>Send back</Btn></>}>
+            <Btn kind="danger" disabled={!reason.trim()} onClick={() => { returnReport(returning.id, me(), reason); setReturning(null) }}>Send back</Btn></>}>
           <Field label="What needs correcting" hint="The contractor reads this.">
             <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} autoFocus style={{ ...inputStyle, resize: 'vertical' }} />
           </Field>

@@ -2136,7 +2136,8 @@ function CostingScreen() {
   }, [params])
 
   const v = useRigMonthView(project, rig, month)
-  const invoices = state.invoices.filter(i => i.project === project)
+  // Newest first, whatever order they were saved in.
+  const invoices = state.invoices.filter(i => i.project === project).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number))
   /* A rig named on a work order for this project is a contractor's. It is
    * costed at what the work order pays, and has no costs of its own to set. */
   const bought = (r: string) => !!workOrderFor(state, project, r)

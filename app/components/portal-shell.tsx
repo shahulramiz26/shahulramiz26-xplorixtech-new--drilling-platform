@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation'
 import { LogOut, Menu, X, ChevronRight } from 'lucide-react'
 import { COMPANY_NAME, type UserRole } from '../../lib/costing-store'
 import { useSignedIn, useArrival, signInAs } from '../../lib/session'
+import { useSession, signOut } from '../../lib/backend'
+import { Guard, SavedState } from './guard'
 import { T, display, Page, Card, Empty } from './kit'
 import { ThemeToggle } from './theme'
 
@@ -26,13 +28,22 @@ const CSS = `
   .xpl-nav:hover { background: rgba(var(--x-ov),0.04); color: var(--x-text) !important; }
 `
 
-export function PortalShell({ role, label, home, nav, group, children }: {
+export function PortalShell(props: {
+  role: UserRole; label: string; home: string; nav: ShellItem[]; group?: string; children: ReactNode
+}) {
+  return <Guard role={props.role}><Shell {...props} /></Guard>
+}
+
+function Shell({ role, label, home, nav, group, children }: {
   role: UserRole; label: string; home: string; nav: ShellItem[]; group?: string; children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
   useArrival(role)
   const { user, all } = useSignedIn(role)
+  const session = useSession()
+  const real = session.status === 'in'
+  const adminLooking = real && session.user.role === 'admin'
 
   const current = [...nav].sort((a, b) => b.href.length - a.href.length).find(n => pathname === n.href || pathname.startsWith(n.href + '/'))
 
@@ -94,7 +105,11 @@ export function PortalShell({ role, label, home, nav, group, children }: {
               <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name ?? 'No login'}</div>
               <div style={{ fontSize: 11, color: T.faint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.username ?? ''}</div>
             </div>
-            <Link href="/auth/login" aria-label="Sign out" style={{ padding: 6, color: T.faint, borderRadius: 8, display: 'flex' }}><LogOut size={15} /></Link>
+            {adminLooking
+              ? <Link href="/admin/users" aria-label="Back to Users" title="Back to Users" style={{ padding: 6, color: T.faint, borderRadius: 8, display: 'flex' }}><LogOut size={15} /></Link>
+              : real
+                ? <button type="button" onClick={() => void signOut()} aria-label="Sign out" title="Sign out" style={{ padding: 6, color: T.faint, borderRadius: 8, display: 'flex', background: 'none', border: 'none', cursor: 'pointer' }}><LogOut size={15} /></button>
+                : <Link href="/auth/login" aria-label="Sign out" style={{ padding: 6, color: T.faint, borderRadius: 8, display: 'flex' }}><LogOut size={15} /></Link>}
           </div>
         </div>
       </aside>
@@ -114,12 +129,13 @@ export function PortalShell({ role, label, home, nav, group, children }: {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {all.length > 1 && user && (
                 <label className="hidden sm:flex" style={{ alignItems: 'center', gap: 7, fontSize: 12, color: T.faint }}>
-                  Demo: signed in as
+                  {adminLooking ? 'Looking as' : 'Demo: signed in as'}
                   <select value={user.id} onChange={e => signInAs(role, e.target.value)} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 7, color: T.text, fontSize: 12, padding: '5px 8px', fontFamily: 'inherit', cursor: 'pointer' }}>
                     {all.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </label>
               )}
+              <SavedState />
               <ThemeToggle />
               <span style={{
                 fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', padding: '4px 10px', borderRadius: 6,

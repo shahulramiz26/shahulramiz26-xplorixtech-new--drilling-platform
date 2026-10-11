@@ -290,7 +290,7 @@ export function seedInvoices(state: CostingStateLike, project: string, client: s
     })
     mine.forEach(h => { holeStatus[h.id] = { status: 'invoiced', invoiceId: id } })
   })
-  return { invoices: invoices.reverse(), holeStatus }
+  return { invoices, holeStatus }
 }
 
 // ── SMALL FORMATTERS ──────────────────────────────────────────────────────

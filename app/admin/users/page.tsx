@@ -8,6 +8,7 @@ import {
 } from '../../../lib/costing-store'
 import { TODAY } from '../../../lib/inventory-store'
 import { day } from '../../../lib/projects'
+import { useSession, issuePassword, revokeLogin } from '../../../lib/backend'
 import {
   Page, Head, Card, Btn, Table, Status, Modal, Field, Note, Empty, Seg, Grid, Tile, inputStyle, th, td, tdStrong, rowLine, T, mono,
 } from '../../components/kit'
@@ -53,7 +54,17 @@ function UsersScreen() {
   const [filter, setFilter] = useState<'all' | UserRole>('all')
   const [creating, setCreating] = useState<UserRole | null>(null)
   const [form, setForm] = useState({ name: '', pick: '', email: '' })
-  const [secret, setSecret] = useState<{ title: string; username: string; password: string; role: UserRole } | null>(null)
+  const [secret, setSecret] = useState<{ title: string; username: string; password: string; role: UserRole; error?: string } | null>(null)
+  const session = useSession()
+  const real = session.status === 'in'
+  /* With a database connected the password is made on the server, which
+   * keeps only a hash of it. In the browser demo it is made here, for show. */
+  const givePassword = async (u: { id: string; username: string; role: UserRole }, title: string) => {
+    if (!real) { setSecret({ title, username: u.username, password: makePassword(), role: u.role }); return }
+    setSecret({ title, username: u.username, password: '', role: u.role })
+    const r = await issuePassword(u.id)
+    setSecret(r.ok ? { title, username: r.username, password: r.password, role: u.role } : { title, username: u.username, password: '', role: u.role, error: r.error })
+  }
   const [removing, setRemoving] = useState<AppUser | null>(null)
 
   // A link from a project or a work order opens the right form, filled in.
@@ -107,7 +118,7 @@ function UsersScreen() {
       saveUser({ ...base, contractorId })
     } else if (creating === 'client') saveUser({ ...base, client: name })
     else saveUser(base)
-    setSecret({ title: `${USER_ROLE_LABEL[creating]} login created`, username, password: makePassword(), role: creating })
+    void givePassword({ id: base.id, username, role: creating }, `${USER_ROLE_LABEL[creating]} login created`)
     setCreating(null)
   }
 
@@ -150,7 +161,7 @@ function UsersScreen() {
                   <td style={{ ...td, textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: 6 }}>
                       {u.active && <Btn size="sm" href={OPEN[u.role](u)}>See what they see</Btn>}
-                      <Btn size="sm" onClick={() => setSecret({ title: 'Password reset', username: u.username, password: makePassword(), role: u.role })}>Reset password</Btn>
+                      <Btn size="sm" onClick={() => void givePassword(u, 'Password reset')}>Reset password</Btn>
                       <Btn size="sm" onClick={() => saveUser({ ...u, active: !u.active })}>{u.active ? 'Switch off' : 'Switch on'}</Btn>
                       <Btn size="sm" kind="danger" onClick={() => setRemoving(u)}>Remove</Btn>
                     </div>
@@ -234,7 +245,7 @@ function UsersScreen() {
           </>}>
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '12px 18px', fontSize: 14 }}>
             <span style={{ color: T.faint }}>Username</span><span style={{ color: T.text, fontWeight: 600, fontFamily: mono }}>{secret.username}</span>
-            <span style={{ color: T.faint }}>Password</span><span style={{ color: T.text, fontWeight: 600, letterSpacing: '0.04em', fontFamily: mono }}>{secret.password}</span>
+            <span style={{ color: T.faint }}>Password</span><span style={{ color: secret.error ? T.red : T.text, fontWeight: 600, letterSpacing: secret.password ? '0.04em' : undefined, fontFamily: secret.password ? mono : 'inherit' }}>{secret.password || secret.error || 'Making a password…'}</span>
             <span style={{ color: T.faint }}>Signs in as</span><span style={{ color: T.text }}>{USER_ROLE_LABEL[secret.role]}</span>
           </div>
         </Modal>
@@ -243,7 +254,7 @@ function UsersScreen() {
       {removing && (
         <Modal title={`Remove ${removing.name}'s login?`} subtitle={`${removing.username} will no longer be able to sign in. Everything already logged is kept.`} width={460} onClose={() => setRemoving(null)}
           footer={<><Btn onClick={() => setRemoving(null)}>Keep login</Btn>
-            <Btn kind="danger" onClick={() => { removeUser(removing.id); setRemoving(null) }}>Remove login</Btn></>}>
+            <Btn kind="danger" onClick={() => { removeUser(removing.id); if (real) void revokeLogin(removing.id); setRemoving(null) }}>Remove login</Btn></>}>
           <div style={{ fontSize: 13.5, color: T.muted, lineHeight: 1.6 }}>If it is only for a while, switch the login off instead. It can be switched back on.</div>
         </Modal>
       )}

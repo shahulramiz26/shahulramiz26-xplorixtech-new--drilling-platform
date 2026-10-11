@@ -11,6 +11,7 @@ import {
   type Contractor, type WorkOrder, type ContractorReport, type ContractorBill, type ShiftCheck, type Wording, type BillSnapshot,
 } from './contracting'
 import { seedInvoices } from './client-record'
+import { useServerSync } from './backend'
 
 /* ==========================================================================
  * XPLORIX COSTING
@@ -1747,7 +1748,10 @@ export interface AppUser {
   contractorId?: string       // role contractor
   client?: string             // role client: the client's name as written on the project
 }
-export const ADMIN_NAME = 'Admin User'
+/* Who the Company Admin is, for "checked by" and "logged by". The demo's
+ * admin, until someone signs in and it becomes them. */
+export let ADMIN_NAME = 'Admin User'
+export function setAdminName(name: string) { if (name) ADMIN_NAME = name }
 export const COMPANY_NAME = 'Apex Drilling Solutions'
 
 export const SEED_USERS: AppUser[] = [
@@ -1805,6 +1809,20 @@ function initial(): State {
   const demo = seedInvoices(base, SEED_PROJECTS[0].name, SEED_PROJECTS[0].client)
   const withInvoices = { ...base, invoices: demo.invoices, holeStatus: { ...base.holeStatus, ...demo.holeStatus } }
   return { ...withInvoices, contractorBills: seedBills(withInvoices) }
+}
+
+/* The demo company as it is first loaded. Sent to the server once, by the
+ * first-time set-up, when a database is connected. */
+export const seedCostingState = () => initial()
+
+/* A company with nothing in it yet: what a store holds until the server has
+ * answered. */
+function emptyState(): State {
+  return {
+    shiftLogs: [], maintenance: [], ownership: [], operating: [], clientRates: [], holeStatus: {}, invoices: [],
+    holePlans: {}, projects: [], projectEvents: [], rateProposals: [], contractors: [], workOrders: [],
+    contractorReports: [], contractorBills: [], wording: 'standard', users: [],
+  }
 }
 
 /* A browser that saved its state before a seed plan existed still gets that
@@ -1884,6 +1902,10 @@ interface CtxValue {
   markBillPaid: (id: string) => void
   setWording: (w: Wording) => void
   resetAll: () => void
+  /* True once the state on screen is the real one: read from this browser in
+   * the demo, or from the server when a database is connected. */
+  ready: boolean
+  mode: 'loading' | 'demo' | 'server'
 }
 
 /* What a change is called in the project's change list. */
@@ -1907,12 +1929,17 @@ export function CostingProvider({ children }: { children: ReactNode }) {
 function CostingRoot({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
   const [loaded, setLoaded] = useState(false)
+  /* With a database connected the state comes from the server and goes back
+   * to it. Without one it lives in this browser, as it always did. */
+  const sync = useServerSync('costing', state, setState, emptyState)
+  const local = sync.mode === 'demo'
 
   useEffect(() => {
+    if (!local) return
     try { const raw = localStorage.getItem(KEY); if (raw) setState(() => withSeedPlans({ ...initial(), ...JSON.parse(raw) })) } catch {}
     setLoaded(true)
-  }, [])
-  useEffect(() => { if (loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }, [state, loaded])
+  }, [local])
+  useEffect(() => { if (local && loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }, [state, loaded, local])
 
   /* The company and its client are two tabs on the same store. When one
    * tab saves, the browser tells every other tab; taking that value here is
@@ -1921,13 +1948,14 @@ function CostingRoot({ children }: { children: ReactNode }) {
    * back over the newer one. Writing an identical value fires no event, so the
    * two tabs settle instead of echoing. */
   useEffect(() => {
+    if (!local) return
     const onStorage = (e: StorageEvent) => {
       if (e.key !== KEY || !e.newValue) return
       try { setState(withSeedPlans({ ...initial(), ...JSON.parse(e.newValue) })) } catch {}
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
-  }, [])
+  }, [local])
 
   function upsert<T extends { id: string }>(list: T[], item: T): T[] {
     return list.some(x => x.id === item.id) ? list.map(x => x.id === item.id ? item : x) : [...list, item]
@@ -1950,7 +1978,7 @@ function CostingRoot({ children }: { children: ReactNode }) {
   const addInvoice: CtxValue['addInvoice'] = inv => setState(s => {
     const hs = { ...s.holeStatus }
     inv.holeNumbers.forEach(n => { hs[n] = { status: 'invoiced', invoiceId: inv.id } })
-    return { ...s, invoices: [inv, ...s.invoices], holeStatus: hs }
+    return { ...s, invoices: [...s.invoices, inv], holeStatus: hs }
   })
   const updateInvoice: CtxValue['updateInvoice'] = inv => setState(s => {
     const hs = { ...s.holeStatus }
@@ -2172,7 +2200,8 @@ function CostingRoot({ children }: { children: ReactNode }) {
       saveShiftLog, deleteShiftLog, saveMaintenance, deleteMaintenance, saveUser, removeUser,
       saveContractor, saveWorkOrder, addReports, saveReport, acceptReport, returnReport, reopenReport, deleteReport,
       saveBill, approveBill, returnBill, reopenBill, markBillPaid, setWording,
-      resetAll: () => setState(initial()),
+      resetAll: () => { if (local) setState(initial()) },
+      ready: local ? loaded : sync.ready, mode: sync.mode,
     }}>{children}</CostingContext.Provider>
   )
 }

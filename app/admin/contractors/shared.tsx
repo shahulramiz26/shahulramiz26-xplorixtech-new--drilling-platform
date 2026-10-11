@@ -9,7 +9,7 @@ import { useCosting, loginOfContractor, ADMIN_NAME } from '../../../lib/costing-
 
 /* Who is signed in. The MVP has no accounts yet, so every check and approval
  * is stamped with this name; with real logins it becomes the user's own. */
-export const ME = ADMIN_NAME
+export const me = () => ADMIN_NAME
 
 export const n0 = (v: number) => Math.round(v).toLocaleString('en-IN')
 export const n1 = (v: number) => (Math.round(v * 10) / 10).toLocaleString('en-IN', { maximumFractionDigits: 1 })

@@ -10,7 +10,7 @@ import {
 } from '../../../lib/contracting'
 import { day, when } from '../../../lib/projects'
 import { T, tint, Card, Tile, Grid, Btn, Note, Modal, Field, Status, Empty, Table, inputStyle, th, thR, td, tdR, rowLine, type Tone } from '../../components/kit'
-import { ME, n0, rs, period, linkBtn, numInput, SourceTag, Sum } from './shared'
+import { me, n0, rs, period, linkBtn, numInput, SourceTag, Sum } from './shared'
 
 /* BILLS — what each contractor has asked for, against what the checked record
  * supports.
@@ -67,7 +67,7 @@ function BillModal({ bill, onClose }: { bill: ContractorBill; onClose: () => voi
         <Btn onClick={exportIt}>Export statement</Btn>
         <span style={{ flex: 1 }} />
         {open && <Btn kind="danger" onClick={() => { setSendBack(true); setReason(problems.flatMap(p => p.problems.map(x => `${p.line.label}: ${x}`)).join('\n')) }}>Send back</Btn>}
-        {open && <Btn kind="primary" onClick={() => { approveBill(bill.id, snapshotOf(c, ME, nowStamp())); onClose() }}>Approve {rs(c.net)} for payment</Btn>}
+        {open && <Btn kind="primary" onClick={() => { approveBill(bill.id, snapshotOf(c, me(), nowStamp())); onClose() }}>Approve {rs(c.net)} for payment</Btn>}
         {bill.status === 'approved' && <><Btn onClick={() => reopenBill(bill.id)}>Reopen</Btn><Btn kind="good" onClick={() => { markBillPaid(bill.id); onClose() }}>Mark as paid</Btn></>}
         {(bill.status === 'returned' || bill.status === 'paid') && <Btn onClick={() => reopenBill(bill.id)}>Reopen</Btn>}
       </>}>

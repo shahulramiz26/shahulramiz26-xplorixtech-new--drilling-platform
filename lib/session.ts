@@ -2,15 +2,17 @@
 
 import { useEffect, useSyncExternalStore } from 'react'
 import { useCosting, type AppUser, type UserRole } from './costing-store'
+import { useSession } from './backend'
 
 /* ==========================================================================
  * WHO IS SIGNED IN
  *
  * The supervisor's, the contractor's and the client's screens each belong to
  * one login, and show only what that login may see. The MVP has no accounts
- * yet, so the login is chosen by the link the person arrived on (?as=) or the
- * "signed in as" picker in the header, and kept in this browser. With real
- * accounts it is simply the user who signed in; nothing else changes.
+ * in the browser demo, so there the login is chosen by the link the person
+ * arrived on (?as=) or the "signed in as" picker in the header. With a
+ * database connected it is simply the user who signed in. The Company Admin
+ * can still open any login's screens to see what they see.
  * ========================================================================== */
 
 const key = (role: UserRole) => `xplorix_as_${role}`
@@ -32,22 +34,31 @@ export function signInAs(role: UserRole, id: string) {
 export function useSignedIn(role: UserRole) {
   const store = useCosting()
   const saved = useSyncExternalStore(subscribe, () => { try { return localStorage.getItem(key(role)) ?? '' } catch { return '' } }, () => '')
+  const session = useSession()
   const all = store.state.users.filter(u => u.role === role && u.active)
+  // Signed in for real: you are who the server says you are, and nobody else.
+  if (session.status === 'in' && session.user.role !== 'admin') {
+    const me = all.find(u => u.id === session.user.userRef)
+    return { ...store, user: me, all: me ? [me] : [], preview: false }
+  }
   const match = (u: AppUser) => u.id === saved || (!!saved && (u.contractorId === saved || u.client === saved || u.name === saved))
   const user: AppUser | undefined = all.find(match) ?? all[0]
-  return { ...store, user, all }
+  // The demo, or the Company Admin looking at what a login sees.
+  return { ...store, user, all, preview: true }
 }
 
 /* Mounted once by each shell: reads ?as= and marks a new login as opened the
  * first time its owner arrives. */
 export function useArrival(role: UserRole) {
   const { user, saveUser } = useSignedIn(role)
+  const session = useSession()
   useEffect(() => {
     const as = new URLSearchParams(window.location.search).get('as')
     if (as) signInAs(role, as)
   }, [role])
   useEffect(() => {
-    if (user && !user.opened) saveUser({ ...user, opened: true })
+    // Only the login's own owner opening it counts, not the admin looking in.
+    if (user && !user.opened && !(session.status === 'in' && session.user.role === 'admin')) saveUser({ ...user, opened: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 }

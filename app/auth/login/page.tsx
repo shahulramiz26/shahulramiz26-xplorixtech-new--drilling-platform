@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff } from 'lucide-react'
+import { useSession, signIn, HOME } from '../../../lib/backend'
 
 function XLogo({ size = 40 }: { size?: number }) {
   return (
@@ -22,10 +23,27 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({ email:'', password:'', role:'' })
+  const [error, setError] = useState('')
+  /* With a database connected this is a real sign-in: a username and a
+   * password, and the server says which login it is. Without one it is the
+   * demo's door, where you pick which login to look at. */
+  const session = useSession()
+  const real = session.status !== 'demo' && session.status !== 'loading'
+  useEffect(() => {
+    if (session.status === 'setup') window.location.href = '/setup'
+    if (session.status === 'in') window.location.href = HOME[session.user.role]
+  }, [session])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
     setLoading(true)
+    if (real) {
+      const r = await signIn(formData.email, formData.password)
+      if (r.ok) { window.location.href = HOME[r.role]; return }
+      setError(r.error); setLoading(false)
+      return
+    }
     await new Promise(r => setTimeout(r, 800))
     // One company account, four kinds of login. The Company Admin creates the
     // other three from the Users screen.
@@ -101,8 +119,8 @@ export default function LoginPage() {
 
             {/* Email */}
             <div style={{ marginBottom:14 }}>
-              <label style={{ display:'block', fontSize:10, fontWeight:700, color:'#6B7280', letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:6 }}>Email</label>
-              <input type="email" required placeholder="Enter your email"
+              <label style={{ display:'block', fontSize:10, fontWeight:700, color:'#6B7280', letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:6 }}>{real ? 'Username' : 'Email'}</label>
+              <input type={real ? 'text' : 'email'} required placeholder={real ? 'Enter your username' : 'Enter your email'} autoCapitalize="none" autoCorrect="off" autoComplete="username"
                 value={formData.email} onChange={e=>setFormData({...formData,email:e.target.value})}
                 style={inputBase} onFocus={onFocus} onBlur={onBlur}/>
             </div>
@@ -121,8 +139,8 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Role */}
-            <div style={{ marginBottom:18 }}>
+            {/* Role: only in the demo. A real login already knows what it is. */}
+            {!real && <div style={{ marginBottom:18 }}>
               <label style={{ display:'block', fontSize:10, fontWeight:700, color:'#6B7280', letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:6 }}>Login As</label>
               <select required value={formData.role} onChange={e=>setFormData({...formData,role:e.target.value})}
                 style={{ ...inputBase, cursor:'pointer', appearance:'none' as const, color:formData.role?'#0B0F17':'#6B7280' }}
@@ -133,9 +151,14 @@ export default function LoginPage() {
                 <option value="contractor" style={{ background:'#FFFFFF' }}>Contractor</option>
                 <option value="client" style={{ background:'#FFFFFF' }}>Client</option>
               </select>
-            </div>
+            </div>}
+
+            {error && <div role="alert" style={{ marginBottom:14, padding:'10px 12px', borderRadius:10, background:'rgba(220,38,38,0.06)', border:'1px solid rgba(220,38,38,0.25)', color:'#B91C1C', fontSize:13 }}>{error}</div>}
 
             {/* Remember + Forgot */}
+            {real ? (
+              <p style={{ fontSize:12, color:'#56606E', marginBottom:20, lineHeight:1.5 }}>Forgot your password? Ask your Company Admin to reset it in Users.</p>
+            ) : (
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
               <label style={{ display:'flex', alignItems:'center', gap:7, fontSize:12, color:'#56606E', cursor:'pointer' }}>
                 <input type="checkbox" style={{ width:13, height:13, accentColor:'#F97316' }}/>
@@ -146,6 +169,7 @@ export default function LoginPage() {
                 Forgot password?
               </Link>
             </div>
+            )}
 
             {/* Submit */}
             <button type="submit" disabled={loading}

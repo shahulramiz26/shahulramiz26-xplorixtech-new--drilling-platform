@@ -13,6 +13,8 @@ import { CostingProvider, monthOf, projectCode } from '../../lib/costing-store'
 import { useAdminOverview, financeLink, type Tone } from '../../lib/admin-overview'
 import { T, display, toneColor } from '../components/kit'
 import { ThemeScope, ThemeToggle } from '../components/theme'
+import { Guard, SavedState } from '../components/guard'
+import { useSession, signOut } from '../../lib/backend'
 
 /* ==========================================================================
  * COMPANY ADMIN — the shell around every screen
@@ -109,6 +111,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const [bell, setBell] = useState(false)
   const pathname = usePathname()
   const o = useAdminOverview()
+  const session = useSession()
 
   const current = [...ALL].sort((a, b) => b.href.length - a.href.length)
     .find(n => pathname === n.href || pathname.startsWith(n.href + '/'))
@@ -194,10 +197,12 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 2px 2px 4px' }}>
             <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: 'var(--x-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12.5, color: T.text }}>A</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text }}>Admin User</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session.status === 'in' ? session.user.name : 'Admin User'}</div>
               <div style={{ fontSize: 11.5, color: T.faint }}>Company admin</div>
             </div>
-            <Link href="/auth/login" aria-label="Sign out" title="Sign out" className="xpl-hit" style={{ padding: 7, color: T.faint, borderRadius: 8, display: 'flex' }}><LogOut size={15} /></Link>
+            {session.status === 'in'
+              ? <button type="button" onClick={() => void signOut()} aria-label="Sign out" title="Sign out" className="xpl-hit" style={{ padding: 7, color: T.faint, borderRadius: 8, display: 'flex', background: 'none', border: 'none', cursor: 'pointer' }}><LogOut size={15} /></button>
+              : <Link href="/auth/login" aria-label="Sign out" title="Sign out" className="xpl-hit" style={{ padding: 7, color: T.faint, borderRadius: 8, display: 'flex' }}><LogOut size={15} /></Link>}
           </div>
         </div>
       </aside>
@@ -222,6 +227,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span className="hidden md:inline" style={{ fontSize: 12.5, color: T.faint, whiteSpace: 'nowrap' }}>{longDate(o.today)}</span>
+              <SavedState />
               <ThemeToggle />
               <div style={{ position: 'relative' }}>
                 <button onClick={() => setBell(b => !b)} aria-label={`${o.attention.length} things need attention`} aria-expanded={bell} className="xpl-hit"
@@ -349,7 +355,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <CurrencyProvider>
       <CostingProvider>
         <ThemeScope />
-        <Shell>{children}</Shell>
+        <Guard role="admin"><Shell>{children}</Shell></Guard>
       </CostingProvider>
     </CurrencyProvider>
   )
