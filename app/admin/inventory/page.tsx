@@ -20,7 +20,17 @@ import {
   type ShiftFact, type TerrainRow, type ToolingRates,
 } from '../../../lib/inventory-store'
 import { useCosting, monthOf } from '../../../lib/costing-store'
+import { ownLogs } from '../../../lib/contracting'
 import { hexA } from '../../../lib/theme'
+
+/* Parts are ours only on our own rigs. A contractor's rig wears the
+ * contractor's bits and rods, so its shifts are left out of everything this
+ * screen works out: what each rig is carrying, how fast it burns through
+ * ground, and when the store runs dry. */
+function useOwnLogs() {
+  const { state } = useCosting()
+  return useMemo(() => ({ shiftLogs: ownLogs(state.shiftLogs) }), [state.shiftLogs])
+}
 
 const C = {
   bg: 'var(--x-bg)', card: 'var(--x-card)', border: 'var(--x-border)',
@@ -685,7 +695,7 @@ function SupplierTable() {
 
 function StoreTab() {
   const { state, addIssue, addRigKit, addStoreStock } = useInventory()
-  const { state: cost } = useCosting()
+  const cost = useOwnLogs()
   const nameOf = (id: string) => state.catalogue.find(p => p.id === id)?.name ?? id
 
   const [project, setProject]   = useState(PROJECTS.find(isLiveProject) ?? PROJECTS[0])
@@ -1146,7 +1156,7 @@ function IssueModal({ project, prefill, onSave, onClose }: {
 
 function InsightsTab() {
   const { state } = useInventory()
-  const { state: cost } = useCosting()
+  const cost = useOwnLogs()
   const [project, setProject] = useState(PROJECTS.find(isLiveProject) ?? PROJECTS[0])
   const [rig, setRig] = useState<string | 'All'>('All')
 
@@ -1735,7 +1745,7 @@ type Tab = typeof TABS[number]
 
 export default function InventoryPage() {
   const { state, savePart, savePO, placeOrder, addReceipt, addReorder, receiveReorder } = useInventory()
-  const { state: cost } = useCosting()
+  const cost = useOwnLogs()
   const [tab, setTab] = useState<Tab>('Catalogue')
   const [editPart, setEditPart] = useState<Part | null>(null)
   const [importing, setImporting] = useState(false)

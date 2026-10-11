@@ -207,6 +207,38 @@ export default function ConnectionsScreen({ viewer }: { viewer: Side }) {
         })}
       </Card>
 
+      {/* The same company can be on the paying side too. Contractors who drill
+          for us are listed here so both directions are in one place; the work
+          itself is run from the Contractors screen. */}
+      {viewer === 'contractor' && (
+        <Card title={`Contractors working for you · ${state.contractors.length}`} pad={false}
+          subtitle="A company can be on both sides: a contractor to its client on one project, and the client of another contractor on the next."
+          right={<Btn size="sm" href="/admin/contractors?tab=orders">Open contractors</Btn>}>
+          {state.contractors.length === 0 && <Empty>None yet. Add one with a work order under Contractors.</Empty>}
+          {state.contractors.map(c => {
+            const orders = state.workOrders.filter(o => o.contractorId === c.id)
+            return (
+              <div key={c.id} className="xpl-prow" style={{ display: 'flex', gap: 14, alignItems: 'center', padding: '14px 18px', borderTop: rowLine, flexWrap: 'wrap' }}>
+                <span aria-hidden style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tint(T.orange, 12), color: T.orange, fontWeight: 700, fontFamily: display }}>
+                  {c.name.replace(/^Contractor /, '').charAt(0)}
+                </span>
+                <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 14.5, fontWeight: 600, color: T.text }}>{c.name}</span>
+                    {c.xplorixId && <IdBadge id={c.xplorixId} />}
+                  </div>
+                  <div style={{ fontSize: 12.5, color: T.faint, marginTop: 3, lineHeight: 1.5 }}>
+                    {orders.length ? orders.map(o => `${o.number} on ${o.project}`).join(' · ') : 'No work order yet'}
+                    {' · '}{c.xplorixId ? 'their shifts and bills arrive from their own XPLORIX' : c.login ? 'they write the drill log in the contractor login you gave them' : 'no login yet'}
+                  </div>
+                </div>
+                {c.xplorixId ? <Status tone="good">Connected</Status> : c.login ? <Status tone="info">Contractor login</Status> : <Status tone="neutral">No login yet</Status>}
+              </div>
+            )
+          })}
+        </Card>
+      )}
+
       {past.length > 0 && (
         <Card title="Ended and declined" subtitle="Kept as a record. Send a new request to connect again." pad={false}>
           {past.map(c => { const o = company(otherId(c, viewer))!; return (

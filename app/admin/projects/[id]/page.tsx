@@ -11,6 +11,7 @@ import {
 import { TODAY, addDays } from '../../../../lib/inventory-store'
 import { projectById, projectStats, holeSeriesStart, contractOf, eventsFor, structureWords, day, whenIn, type ProjectHole } from '../../../../lib/projects'
 import { financeLink } from '../../../../lib/admin-overview'
+import { words, contractorOf, workOrderProgress } from '../../../../lib/contracting'
 import {
   Page, Card, Tile, Grid, Split, Seg, Btn, Note, Modal, Field, Switch, Status, Empty, inputStyle, T, display,
 } from '../../../components/kit'
@@ -167,6 +168,11 @@ export default function ProjectPage() {
 
   const stats = projectStats(state, p)
   const c = contractOf(state, p.name)
+  // Contractors' rigs on this project, beside our own.
+  const orders = state.workOrders.filter(o => o.project === p.name && o.status === 'active')
+  const theirRigs = orders.flatMap(o => o.rigs)
+  const w = words(state.wording)
+  const contractorsLink = `/admin/contractors?tab=orders&project=${encodeURIComponent(p.name)}`
   const latest = c.versions[0]
   const minDate = latest && addDays(latest.effectiveFrom, 1) > TODAY ? addDays(latest.effectiveFrom, 1) : TODAY
   const client = p.client
@@ -236,7 +242,9 @@ export default function ProjectPage() {
           <Grid min={200}>
             <Tile label="Metres drilled" value={`${n0(stats.drilled)} m`} note={stats.target ? `of ${n0(stats.target)} m · ${n0(stats.toGo)} m on open holes` : 'No quantity set'} />
             <Tile label="Holes" value={stats.holes.length} note={`${stats.counts.drilling} drilling · ${stats.counts.planned} planned · ${stats.counts.done} finished`} />
-            <Tile label="On site" value={p.rigs.length ? p.rigs.join(', ') : 'No rig'} note={`${p.supervisors.length} supervisors, ${p.drillers.length} drillers`} tone={p.rigs.length || p.status !== 'active' ? undefined : 'warn'} />
+            <Tile label="On site" value={p.rigs.length ? p.rigs.join(', ') : theirRigs.length ? `${theirRigs.length} ${w.outLower} rigs` : 'No rig'}
+              note={theirRigs.length && p.rigs.length ? `plus ${theirRigs.length} ${w.outLower} ${theirRigs.length === 1 ? 'rig' : 'rigs'} · ${p.supervisors.length} supervisors, ${p.drillers.length} drillers` : `${p.supervisors.length} supervisors, ${p.drillers.length} drillers`}
+              tone={p.rigs.length || theirRigs.length || p.status !== 'active' ? undefined : 'warn'} />
             <Tile label="Contract rates" value={c.current ? structureWords(c.current) : 'Not set'} tone={c.current ? (c.waiting ? 'warn' : undefined) : 'bad'}
               note={c.waiting ? `A change is waiting for ${client}` : c.current ? `In force since ${fullDate(c.current.effectiveFrom)}` : 'Finance cannot bill this project yet'} />
           </Grid>
@@ -333,8 +341,25 @@ export default function ProjectPage() {
 
       {tab === 'team' && (
         <>
-          <Roster title="Rigs" subtitle="A rig can be on one running project at a time." items={p.rigs} pool={FLEET.map(r => r.rig)} busy={busy.rig}
+          <Roster title={orders.length ? w.ownRigs : 'Rigs'} subtitle="A rig can be on one running project at a time." items={p.rigs} pool={FLEET.map(r => r.rig)} busy={busy.rig}
             addLabel="Assign a rig" onChange={roster('rigs', 'rig', 'rig')} />
+          <Card title={w.outRigs} pad={false}
+            subtitle="Rigs a contractor brings under a work order. Their checked shifts count in the same record as your own."
+            right={<Btn size="sm" href={contractorsLink}>{orders.length ? 'Open work orders' : 'Bring in a contractor'}</Btn>}>
+            {orders.length === 0 && <Empty>None. Every rig on this project is your own.</Empty>}
+            {orders.map((o, i) => {
+              const pr = workOrderProgress(state, o, TODAY)
+              return (
+                <div key={o.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: '12px 18px', borderTop: i ? `1px solid ${T.line}` : undefined, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: T.text }}>{o.rigs.join(', ')}</div>
+                    <div style={{ fontSize: 12.5, color: T.muted, marginTop: 3 }}>{contractorOf(state, o.contractorId)?.name} · {o.number} · {n0(pr.metres)} m of {n0(o.plannedMetres)} m · to finish by {day(o.endDate)}</div>
+                  </div>
+                  {pr.late ? <Status tone="bad">{pr.daysLate} days late</Status> : <Status tone="good">Running</Status>}
+                </div>
+              )
+            })}
+          </Card>
           <Split>
             <Roster title="Supervisors" items={p.supervisors} pool={PEOPLE.supervisors} busy={busy.person} addLabel="Add a supervisor" allowNew onChange={roster('supervisors', 'crew', 'supervisor')} />
             <Roster title="Drillers" items={p.drillers} pool={PEOPLE.drillers} busy={busy.person} addLabel="Add a driller" allowNew onChange={roster('drillers', 'crew', 'driller')} />

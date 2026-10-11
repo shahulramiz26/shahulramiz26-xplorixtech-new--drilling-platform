@@ -22,6 +22,9 @@ import {
   type InvoiceStatus, type RateStructure,
 } from '../../../lib/costing-store'
 import { computeRigMonth, type RigMonthView } from '../../../lib/costing-view'
+import { workOrderFor, contractorName, words, currentPayRate } from '../../../lib/contracting'
+import { TODAY } from '../../../lib/inventory-store'
+import Link from 'next/link'
 import { hexA } from '../../../lib/theme'
 
 /* ==========================================================================
@@ -1429,6 +1432,20 @@ function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }:
                               </div>
                               <table style={tableStyle}>
                                 <tbody>
+                                  {/* A contractor drilled this hole. What it cost is
+                                      what his work order pays; fuel, crew, parts
+                                      and the rig are his and are not ours to show. */}
+                                  {v.workOrder ? (
+                                    <>
+                                      <tr><td style={td}>Metres at the work order rates</td><td style={tdN}>{money(h.days.reduce((a, d) => a + d.payCharges.reduce((b, c) => b + c.amount, 0), 0))}</td></tr>
+                                      <tr><td style={td}>Standby days paid</td><td style={tdN}>{money(h.days.filter(d => d.status === 'standby').reduce((a, d) => a + d.subcontract, 0))}</td></tr>
+                                      <tr style={{ borderTop: rowBorder }}>
+                                        <td style={{ ...td, color: LAYER.operating, fontWeight: 700 }}>Paid to the contractor · {v.workOrder.number}</td>
+                                        <td style={{ ...tdN, color: LAYER.operating, fontWeight: 700 }}>{money(h.roll.subcontract)}</td>
+                                      </tr>
+                                    </>
+                                  ) : (
+                                    <>
                                   {[
                                     ['Fuel', money(h.roll.fuel)],
                                     ['Water & additives', money(h.roll.water + h.roll.additives)],
@@ -1444,6 +1461,8 @@ function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }:
                                     <td style={{ ...td, color: LAYER.ownership, fontWeight: 700 }}>Ownership</td>
                                     <td style={{ ...tdN, color: LAYER.ownership, fontWeight: 700 }}>{money(h.roll.ownership)}</td>
                                   </tr>
+                                    </>
+                                  )}
                                   <tr style={{ borderTop: `2px solid ${C.border}` }}>
                                     <td style={{ ...td, color: LAYER.full, fontWeight: 900, fontSize: 13 }}>Full cost</td>
                                     <td style={{ ...tdN, color: LAYER.full, fontWeight: 900, fontSize: 13 }}>{money(h.roll.total)}</td>
@@ -1455,7 +1474,7 @@ function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }:
                                 <Mini k="Standby" v={`${h.roll.standbyDays}`} />
                                 <Mini k="Breakdown" v={`${h.roll.breakdownDays}`} />
                                 <Mini k="Downtime" v={`${h.roll.downtimeHours} hrs`} />
-                                <Mini k="Tooling / m" v={perUnit(h.roll.toolingPerUnit)} />
+                                {!v.workOrder && <Mini k="Tooling / m" v={perUnit(h.roll.toolingPerUnit)} />}
                               </div>
                             </div>
 
@@ -1992,6 +2011,87 @@ td{padding:10px 12px;border-bottom:1px solid #eee;font-size:13px}
   URL.revokeObjectURL(url)
 }
 
+/* A CONTRACTOR'S RIG — the same month, costed the only way it can be.
+ *
+ * Our own rig's month is fuel, crew, repairs, parts and ownership, day by
+ * day. A contractor's rig has none of those on our books: each checked day
+ * costs what his work order pays for it, and earns what our client pays for
+ * the same metres. The difference is what the rig leaves us. */
+function ContractorRigTab({ v, rig, project, month }: { v: RigMonthView; rig: string; project: string; month: string }) {
+  const { state } = useCosting()
+  const wo = v.workOrder ?? workOrderFor(state, project, rig)
+  const w = words(state.wording)
+  const name = contractorName(state, wo?.contractorId)
+  const link = `/admin/contractors?tab=orders&project=${encodeURIComponent(project)}`
+  if (!v.hasLogs) {
+    return <Card><Empty>No checked shifts from {rigCode(rig)} in {monthLabel(month)}.<br />A contractor&apos;s shift counts here once it has been accepted under <Link href={`/admin/contractors?tab=reports&project=${encodeURIComponent(project)}`} style={{ color: C.orange, fontWeight: 700 }}>Contractors</Link>.</Empty></Card>
+  }
+  const r = v.roll
+  const days = v.days.filter(d => d.submitted)
+  const rate = wo ? currentPayRate(wo, TODAY) : undefined
+  const noRate = days.some(d => d.payUnmatched)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <Note tone={C.orange}>
+        <b style={{ color: C.text }}>{rigCode(rig)} is {name}&apos;s rig</b>, working under {wo?.number ?? 'a work order'}. It has no fuel, crew, parts or ownership cost on your books:
+        each checked day costs what the work order pays. <Link href={link} style={{ color: C.orange, fontWeight: 700 }}>Open the work order</Link>
+      </Note>
+      {noRate && <Note tone={C.red}>Some metres have no matching line in the work order&apos;s rates, so they are costed at nil. Add the size or depth band to the work order.</Note>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
+        <Stat label="Metres, checked" value={`${r.units} m`} note={`${r.drillingDays} drilling days · core ${pct(r.coreRecoveryPct)}`} />
+        <Stat label="You pay the contractor" value={money(r.subcontract)} note={`${perUnit(r.cpu)} · ${r.standbyDays} standby ${r.standbyDays === 1 ? 'day' : 'days'} paid`} color={LAYER.operating} />
+        <Stat label="Your client pays" value={money(r.revenue)} note={perUnit(r.revenuePerUnit)} color={LAYER.revenue} />
+        <Stat label="Leaves you" value={money(r.margin)} note={`${r.revenue > 0 ? pct(r.marginPct) : '—'} · ${r.units ? perUnit(r.margin / r.units) : '—'}`} color={marginColor(r.margin)} />
+      </div>
+      <Card title={`${w.out} rig · day by day`} subtitle={`${rigCode(rig)} · ${monthLabel(month)} · only shifts your site has checked`} pad={false}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={tableStyle}>
+            <thead><tr>
+              <th style={th}>Date</th><th style={th}>Hole</th><th style={th}>Day</th><th style={thR}>Drill hrs</th><th style={thR}>Stopped</th>
+              <th style={thR}>Metres</th><th style={thR}>Core</th><th style={thR}>You pay / m</th><th style={thR}>You pay</th>
+              <th style={thR}>Client pays</th><th style={thR}>Leaves you</th>
+            </tr></thead>
+            <tbody>
+              {days.map(d => (
+                <tr key={d.date} style={{
+                  borderBottom: rowBorder,
+                  background: d.status === 'breakdown' ? 'color-mix(in srgb, var(--x-red) 5%, transparent)' : d.status === 'standby' ? 'color-mix(in srgb, var(--x-amber) 4.5%, transparent)' : undefined,
+                }}>
+                  <td style={{ ...td, color: C.text, fontWeight: 600 }}>{dayLabel(d.date)}</td>
+                  <td style={td}>{d.holeNumber || '—'}</td>
+                  <td style={td}>{DAY_STATUS_LABEL[d.status]}{d.status !== 'drilling' && d.shifts[0]?.downtimeReason ? ` · ${d.shifts[0].downtimeReason}` : ''}</td>
+                  <td style={tdN}>{d.drillingHours || '—'}</td>
+                  <td style={{ ...tdN, color: d.downtimeHours ? C.red : C.dim }}>{d.downtimeHours ? `${d.downtimeHours} h` : '—'}</td>
+                  <td style={{ ...tdN, color: d.units ? C.text : C.dim, fontWeight: 700 }}>{d.units || '—'}</td>
+                  <td style={tdN}>{d.units ? pct((d.coreRecovery / d.units) * 100) : '—'}</td>
+                  <td style={tdN}>{d.units ? perUnit(d.payRate) : '—'}</td>
+                  <td style={{ ...tdN, color: LAYER.operating }}>{d.subcontract ? money(d.subcontract) : '—'}</td>
+                  <td style={{ ...tdN, color: d.revenue > 0 ? LAYER.revenue : C.dim }}>{d.revenue > 0 ? money(d.revenue) : '—'}</td>
+                  <td style={{ ...tdN, fontWeight: 700, color: marginColor(d.revenue - d.total) }}>{d.revenue || d.total ? money(d.revenue - d.total) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: `2px solid ${C.border}` }}>
+                <td style={{ ...td, color: C.text, fontWeight: 800 }} colSpan={5}>{monthLabel(month)}</td>
+                <td style={{ ...tdN, color: C.text, fontWeight: 800 }}>{r.units}</td>
+                <td style={tdN}>{pct(r.coreRecoveryPct)}</td>
+                <td style={tdN}>{perUnit(r.cpu)}</td>
+                <td style={{ ...tdN, color: LAYER.operating, fontWeight: 800 }}>{money(r.subcontract)}</td>
+                <td style={{ ...tdN, color: LAYER.revenue, fontWeight: 800 }}>{money(r.revenue)}</td>
+                <td style={{ ...tdN, fontWeight: 800, color: marginColor(r.margin) }}>{money(r.margin)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div style={{ padding: '11px 16px', borderTop: rowBorder, fontSize: 11.5, color: C.faint, lineHeight: 1.6 }}>
+          {rate ? `Work order rates since ${fullDate(rate.effectiveFrom)}. ` : ''}What the contractor is finally paid can be lower: deductions for core recovery, lateness or shortfall are worked out on the bill, under Contractors.
+        </div>
+      </Card>
+    </div>
+  )
+}
+
 /* ==========================================================================
  * 6  The screen
  * ========================================================================== */
@@ -2036,6 +2136,10 @@ function CostingScreen() {
 
   const v = useRigMonthView(project, rig, month)
   const invoices = state.invoices.filter(i => i.project === project)
+  /* A rig named on a work order for this project is a contractor's. It is
+   * costed at what the work order pays, and has no costs of its own to set. */
+  const bought = (r: string) => !!workOrderFor(state, project, r)
+  const ownRigs = (p: string) => rigsFor(state.shiftLogs, p).filter(r => !workOrderFor(state, p, r))
 
   if (!project) {
     return <div style={{ padding: 24 }}><Card><Empty>No projects yet. Create one in Projects to start costing.</Empty></Card></div>
@@ -2067,7 +2171,7 @@ function CostingScreen() {
         </Chain>
         <span style={{ width: 1, height: 22, background: C.border }} />
         <Chain label="Rig">
-          {rigs.map(r => <Chip key={r} on={rig === r} onClick={() => setRig(r)} label={rigCode(r)} />)}
+          {rigs.map(r => <Chip key={r} on={rig === r} onClick={() => setRig(r)} label={bought(r) ? `${rigCode(r)} · contractor` : rigCode(r)} />)}
         </Chain>
         <div style={{ flex: 1 }} />
         {/* Any month is reachable, not just ones with logs — a month with none
@@ -2091,14 +2195,16 @@ function CostingScreen() {
         ))}
       </div>
 
-      {tab === 'Performance' && <PerformanceTab v={v} rig={rig} project={project} month={month} />}
+      {tab === 'Performance' && (bought(rig)
+        ? <ContractorRigTab v={v} rig={rig} project={project} month={month} />
+        : <PerformanceTab v={v} rig={rig} project={project} month={month} />)}
       {tab === 'Drillholes' && <DrillholesTab v={v} linked={isOwnerLinked(project)} onStatus={setHoleStatus}
         onSubmit={submitHole} onWithdraw={withdrawHole} onInvoice={h => setQuickInvoice(h)} />}
       {tab === 'Tracker' && <TrackerTab invoices={invoices} onUpdate={updateInvoice} />}
 
       {showRates && (
-        <SetRatesModal projects={projects} initialProject={project} initialRig={rig} month={month}
-          rigsForProject={p => rigsFor(state.shiftLogs, p)}
+        <SetRatesModal projects={projects} initialProject={project} initialRig={bought(rig) ? (ownRigs(project)[0] ?? rig) : rig} month={month}
+          rigsForProject={ownRigs}
           onClose={() => setShowRates(false)} />
       )}
       {quickInvoice && (

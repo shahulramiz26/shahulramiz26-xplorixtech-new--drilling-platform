@@ -12,6 +12,7 @@ import {
 import { computeRigMonth } from './costing-view'
 import { holesFromLogs, type LiveHole } from './owner-portal'
 import { contractorInbox, projectByName } from './projects'
+import { workOrderFor, contractorName, workOrderProgress, billFigures } from './contracting'
 
 /* ==========================================================================
  * THE CONTRACTOR'S DASHBOARD — what it reads
@@ -22,9 +23,11 @@ import { contractorInbox, projectByName } from './projects'
  * or Inventory, and opening either screen confirms it.
  * ========================================================================== */
 
-export type RigStatus = 'drilling' | 'standby' | 'breakdown' | 'no-shift'
+/* 'to-check' is a contractor's rig whose shift for today has come in but has
+ * not been checked by us yet, so it is not in the record. */
+export type RigStatus = 'drilling' | 'standby' | 'breakdown' | 'no-shift' | 'to-check'
 export const RIG_STATUS_LABEL: Record<RigStatus, string> = {
-  drilling: 'Drilling', standby: 'Standby', breakdown: 'Breakdown', 'no-shift': 'No shift received',
+  drilling: 'Drilling', standby: 'Standby', breakdown: 'Breakdown', 'no-shift': 'No shift received', 'to-check': 'Reported, to check',
 }
 
 export interface RigRow {
@@ -42,6 +45,8 @@ export interface RigRow {
   monthDays: number           // days this rig has a log for, this month
   monthLostHours: number
   last14: { date: string; metres: number }[]
+  // Set when the rig is a contractor's, working for us under a work order.
+  contractor?: string
 }
 
 export interface MonthNumbers {
@@ -124,12 +129,16 @@ export function useAdminOverview() {
       const withHole = [...mine].reverse().find(l => l.holeNumber)
       const hole = withHole?.holeNumber ? holeById.get(withHole.holeNumber) : undefined
       const inMonth = mine.filter(l => monthOf(l.date) === month)
-      const status: RigStatus = todays.length === 0 ? 'no-shift' : statusForShifts(todays)
+      const wo = latest ? workOrderFor(costing, latest.project, rig) : undefined
+      const unchecked = (costing.contractorReports ?? []).filter(r => r.rig === rig && r.status === 'waiting' && r.date === today)
+      const status: RigStatus = todays.length === 0 ? (unchecked.length ? 'to-check' : 'no-shift') : statusForShifts(todays)
       const lost = todays.filter(l => l.downtimeHours > 0)
       const shift = (name: 'Day' | 'Night') => todays.find(l => l.shift === name)?.metresDrilled ?? null
       return {
         rig, project: latest?.project ?? null, hole: hole?.id ?? null, status,
-        note: status === 'no-shift' ? (latest ? `Last shift received ${latest.date}` : 'No shifts logged yet')
+        contractor: wo ? contractorName(costing, wo.contractorId) : undefined,
+        note: status === 'to-check' ? `${unchecked.length} ${unchecked.length === 1 ? 'shift' : 'shifts'} reported today, ${unchecked.reduce((s, r) => s + r.metres, 0)} m, not checked yet`
+          : status === 'no-shift' ? (latest ? `Last shift received ${latest.date}` : 'No shifts logged yet')
           : lost.length ? lost.map(l => `${l.downtimeReason || 'Stoppage'}, ${l.downtimeHours} h`).join(' · ')
           : 'No stoppages today',
         holeDrilled: hole?.drilled ?? 0, holePlanned: hole?.planned,
@@ -144,6 +153,9 @@ export function useAdminOverview() {
         }),
       }
     })
+
+    // Our own rigs first, then the contractors' rigs.
+    rigs.sort((a, b) => Number(!!a.contractor) - Number(!!b.contractor) || a.rig.localeCompare(b.rig))
 
     // ── this month against last month, same number of days ─────────────────
     const now = monthNumbers(costing, inv, month)
@@ -220,8 +232,38 @@ export function useAdminOverview() {
       }),
     ]
 
+    // ── contractors working for us ─────────────────────────────────────────
+    const reportsWaiting = (costing.contractorReports ?? []).filter(r => r.status === 'waiting')
+    const billsToCheck = (costing.contractorBills ?? []).filter(b => b.status === 'received')
+    const lateOrders = (costing.workOrders ?? []).filter(w => workOrderProgress(costing, w, today).late)
+    const ctrLink = (tab: string, project?: string) => `/admin/contractors?tab=${tab}${project ? `&project=${encodeURIComponent(project)}` : ''}`
+    const contractorItems: Attention[] = [
+      ...(reportsWaiting.length ? [{
+        key: 'ctr_reports', tone: 'warn' as Tone, action: 'Check them', href: ctrLink('reports', reportsWaiting[0].project),
+        title: `${reportsWaiting.length} contractor ${reportsWaiting.length === 1 ? 'shift is' : 'shifts are'} waiting to be checked`,
+        detail: `${Array.from(new Set(reportsWaiting.map(r => r.rig))).join(', ')} · not in the record, and not paid or billed, until accepted`,
+      }] : []),
+      ...billsToCheck.map(b => {
+        const f = billFigures(costing, b)
+        return {
+          key: `ctr_bill_${b.id}`, tone: (f.claimed > f.supported ? 'bad' : 'info') as Tone, action: 'Check the bill', href: ctrLink('bills', b.project),
+          title: `Bill ${b.number} from ${contractorName(costing, b.contractorId)} is waiting · ${money(f.claimed)}`,
+          detail: f.claimed > f.supported ? `It claims ${money(f.claimed - f.supported)} more than the checked record supports` : 'Every line matches the checked record',
+        }
+      }),
+      ...lateOrders.map(w => {
+        const p = workOrderProgress(costing, w, today)
+        return {
+          key: `ctr_late_${w.id}`, tone: 'warn' as Tone, action: 'Open work order', href: ctrLink('orders', w.project),
+          title: `${contractorName(costing, w.contractorId)} is ${p.daysLate} days past the finish date on ${w.number}`,
+          detail: `${Math.round(p.plannedLeft)} m still to drill of ${w.plannedMetres} m`,
+        }
+      }),
+    ]
+
     const attention: Attention[] = [
       ...projectItems,
+      ...contractorItems,
       ...rigs.filter(r => r.status === 'breakdown').map(r => ({
         key: `bd_${r.rig}`, tone: 'bad' as Tone, action: 'Open rig', href: '/admin/rigs',
         title: `${r.rig} is broken down today`, detail: `${r.project ?? ''} · ${r.note}`,
@@ -267,6 +309,7 @@ export function useAdminOverview() {
     return {
       today, month, dayOfMonth, rigs, now, prev, daily, lost, money: money_, alerts, urgentAlerts, attention, holes,
       projects: costing.projects ?? [], projectNews: inbox.count + inbox.returned.length,
+      contractorWork: reportsWaiting.length + billsToCheck.length,
     }
   }, [costing, inv])
 }

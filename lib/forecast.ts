@@ -288,6 +288,9 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
   const holes = holesFromLogs(costing)
   const holeById = new Map(holes.map(h => [h.id, h]))
   const plans = costing.holePlans ?? {}
+  // Rigs that belong to a contractor working for us. Their metres and billing
+  // are ours to forecast; their breakdowns, crew and parts are not.
+  const contractorRigs = new Set(logs.filter(l => l.contractor).map(l => l.rig))
 
   // ── rigs that are working now ────────────────────────────────────────────
   const rigNames = Array.from(new Set(logs.map(l => l.rig))).sort()
@@ -330,7 +333,8 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
     ;[thisMonth, shiftMonth(thisMonth, -1)].forEach(m => {
       computeRigMonth(costing, inv, project, rig, m).days.forEach(d => {
         if (!d.submitted) return
-        const v = d.fuel + d.water + d.additives + d.parts
+        // A contractor's rig is paid by the metre, so what it costs moves with metres too.
+        const v = d.fuel + d.water + d.additives + d.parts + d.subcontract
         variable += v; fixed += d.total - v; days += 1; units += d.units
       })
     })
@@ -468,7 +472,9 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
   const dates: string[] = []
   for (let d = horizonStart; d <= horizonEnd; d = addDays(d, 1)) dates.push(d)
   const groundByDate: Record<string, Partial<Record<Formation, number>>> = {}
-  rows.forEach(r => {
+  /* Only our own rigs wear our parts. A contractor's metres are left out of
+   * the wear, or the forecast would order bits for rigs that bring their own. */
+  rows.filter(r => !contractorRigs.has(r.rig)).forEach(r => {
     const e = (groundByDate[r.date] ||= {})
     ;(Object.entries(r.byGround) as [Formation, number][]).forEach(([g, m]) => { e[g] = (e[g] ?? 0) + m })
   })
@@ -521,14 +527,15 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
   const idleCost = sum(rigs, r => r.next.idleDays * r.fixedPerDay)
   const idleBilling = sum(rigs, r => r.next.idleDays * r.perDay) * (next.ratePerMetre || 0)
   const steady = [...rigs].filter(r => r.loggedDays >= 10).sort((a, b) => (a.zeroDays / a.loggedDays) - (b.zeroDays / b.loggedDays) || b.perDay - a.perDay)[0]
-  const ownHours = sum(rigs, r => r.ownHours)
-  const worstOwn = [...rigs].sort((a, b) => b.ownHours - a.ownHours)[0]
+  const ownRigs = rigs.filter(r => !contractorRigs.has(r.rig))
+  const ownHours = sum(ownRigs, r => r.ownHours)
+  const worstOwn = [...ownRigs].sort((a, b) => b.ownHours - a.ownHours)[0]
   const metresPerHour = (r: RigForecast) => {
     const recent = logs.filter(l => l.rig === r.rig && l.date >= windowStart && l.date <= today)
     const hours = sum(recent, l => l.drillingHours)
     return hours ? sum(recent, l => l.metresDrilled) / hours : 0
   }
-  const ownMetresLost = sum(rigs, r => r.ownHours * metresPerHour(r))
+  const ownMetresLost = sum(ownRigs, r => r.ownHours * metresPerHour(r))
   const slowRevenue = sum(slowRows.filter(inNext), r => r.revenue)
   const stuckValue = sum(stuckOpen, s => s.value)
   const stuckToGo = sum(stuckOpen, s => Math.max(0, s.planned - s.drilled))

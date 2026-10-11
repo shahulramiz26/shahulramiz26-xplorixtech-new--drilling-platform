@@ -6,6 +6,10 @@ import {
   PROJECTS as INV_PROJECTS, COMPLETED_PROJECTS as INV_COMPLETED, RIGS as INV_RIGS, PROJECT_CODES as INV_CODES,
 } from './inventory-store'
 import type { ToolingRates, Formation } from './inventory-store'
+import {
+  reportToShift, seedBills,
+  type Contractor, type WorkOrder, type ContractorReport, type ContractorBill, type ShiftCheck, type Wording, type BillSnapshot,
+} from './contracting'
 
 /* ==========================================================================
  * XPLORIX COSTING
@@ -85,6 +89,14 @@ export interface ShiftLog {
   fuelLitres: number
   waterLitres: number
   additivesKg: number
+  /* Set when the rig belongs to a contractor working for us under a work
+   * order. The shift then carries no fuel, crew or parts of ours: what it cost
+   * us is what the work order says we pay for those metres. Only a shift that
+   * our own site staff has checked gets this far, and `check` says who checked
+   * it and what the contractor first reported. */
+  contractor?: string
+  workOrderId?: string
+  check?: ShiftCheck
 }
 
 export interface MaintenanceLog {
@@ -115,6 +127,8 @@ export const DAY_STATUS_LABEL: Record<DayStatus, string> = {
 export const BREAKDOWN_REASONS = [
   'Mechanical Breakdown', 'Hydraulic Issue', 'Electrical Fault',
   'Bit Change', 'Rod Change', 'Fuel Shortage', 'Operator Delay',
+  // A contractor's stoppage that our site staff did not accept as standby.
+  'Contractor Delay',
 ]
 
 export function statusForShifts(shifts: ShiftLog[]): DayStatus {
@@ -606,6 +620,13 @@ export interface DayCost {
   toolingRate: number
   toolingByFormation: ToolingCharge[]
   operating: number; ownership: number; total: number
+  /* A contractor's rig: what we owe him for the day under his work order.
+   * It takes the place of operating and ownership, which are both his. */
+  outsourced: boolean
+  subcontract: number
+  payRate: number
+  payUnmatched: boolean
+  payCharges: Charge[]
   cpu: number | null
   rate: number
   adjustmentPct: number
@@ -614,12 +635,16 @@ export interface DayCost {
   charges: Charge[]
 }
 
+/* `pay` is given only for a contractor's rig: the work order rates in force on
+ * the day (or undefined when none have been set yet). */
 export function dayCost(
   date: string, rig: string, project: string,
   shifts: ShiftLog[], maint: MaintenanceLog[],
   op: OperatingRate, own: RigOwnership, ob: OwnershipBreakdown,
   cr: ClientRate | undefined, tooling: ToolingRates, depthSoFar: number,
+  pay?: { rate: ClientRate | undefined },
 ): DayCost {
+  const outsourced = !!pay
   const submitted = shifts.length > 0
   const status = submitted ? statusForShifts(shifts) : 'standby'
   const sum = (f: (s: ShiftLog) => number) => shifts.reduce((a, s) => a + f(s), 0)
@@ -629,11 +654,13 @@ export function dayCost(
   const waterLitres = sum(s => s.waterLitres)
   const additivesKg = sum(s => s.additivesKg)
 
-  const fuel = fuelLitres * op.fuelPricePerLitre
-  const water = waterLitres * op.waterPricePerLitre
-  const additives = additivesKg * op.additivePricePerKg
-  const labour = labourForDay(shifts, units, op)
-  const repairs = maint.reduce((a, m) => a + m.cost, 0)
+  const fuel = outsourced ? 0 : fuelLitres * op.fuelPricePerLitre
+  const water = outsourced ? 0 : waterLitres * op.waterPricePerLitre
+  const additives = outsourced ? 0 : additivesKg * op.additivePricePerKg
+  const labour = outsourced
+    ? { labour: 0, lodging: 0, transport: 0, heads: 0, dayCrew: 0, nightCrew: 0, total: 0, perMetre: false }
+    : labourForDay(shifts, units, op)
+  const repairs = outsourced ? 0 : maint.reduce((a, m) => a + m.cost, 0)
   const maintenanceHours = maint.reduce((a, m) => a + m.hours, 0)
 
   /* Parts are amortised, not charged on the day they were bought, and each
@@ -650,7 +677,8 @@ export function dayCost(
   shifts.forEach(sh => {
     if (sh.metresDrilled <= 0) return
     const formation = groundOf(sh.formationType)
-    const rate = tooling.byFormation[formation] ?? tooling.blended
+    // The contractor's bits and rods are his own; the ground is still recorded.
+    const rate = outsourced ? 0 : tooling.byFormation[formation] ?? tooling.blended
     const existing = toolingByFormation.find(x => x.formation === formation)
     if (existing) {
       existing.metres += sh.metresDrilled
@@ -664,18 +692,30 @@ export function dayCost(
   const toolingRate = units > 0 ? partsByMetre / units : tooling.blended
 
   const operating = fuel + water + additives + labour.total + repairs + parts
-  const ownership = own.allocationBasis === 'expectedUnit' ? units * ob.perUnit : ob.perDay
-  const total = operating + ownership
+  const ownership = outsourced ? 0 : own.allocationBasis === 'expectedUnit' ? units * ob.perUnit : ob.perDay
 
   const holeNumber = shifts.find(s => s.holeNumber)?.holeNumber ?? null
   const ordered = [...shifts].sort((a, b) => (a.shift === 'Day' ? -1 : 1) - (b.shift === 'Day' ? -1 : 1))
   const charges: Charge[] = []
+  const payCharges: Charge[] = []
   let depth = depthSoFar
   ordered.forEach(sh => {
     if (sh.metresDrilled <= 0) return
     chargeShift(cr, sh, depth).forEach(c => charges.push(c))
+    /* The same stretch of hole priced a second time, at the work order's
+     * rates: a work order is a client rate read from the paying side. */
+    if (pay) chargeShift(pay.rate, sh, depth).forEach(c => payCharges.push(c))
     depth += sh.metresDrilled
   })
+
+  /* What a contractor's day costs us. Metres at his rate; a day the work was
+   * stopped for a reason that is not his, at his standby rate; a day lost to
+   * his own breakdown, nothing. */
+  const payDrill = payCharges.reduce((a, c) => a + c.amount, 0)
+  const subcontract = !outsourced ? 0
+    : status === 'standby' ? (submitted ? (pay!.rate?.standbyPerDay ?? 0) : 0)
+    : payDrill
+  const total = operating + ownership + subcontract
 
   const drillRevenue = charges.reduce((a, c) => a + c.amount, 0)
   const revenue = status === 'standby'
@@ -693,6 +733,9 @@ export function dayCost(
     fuel, water, additives, labour, repairs, parts, partsByMetre,
     toolingRate, toolingByFormation,
     operating, ownership, total,
+    outsourced, subcontract, payCharges,
+    payRate: units > 0 ? payDrill / units : 0,
+    payUnmatched: payCharges.some(c => !c.matched),
     cpu: units > 0 ? total / units : null,
     rate, adjustmentPct, revenue, unmatched, charges,
   }
@@ -714,7 +757,7 @@ export interface Rollup {
   drillingHours: number; downtimeHours: number; maintenanceHours: number; fuelLitres: number
   fuel: number; water: number; additives: number
   labour: number; repairs: number; parts: number
-  operating: number; ownership: number; total: number; revenue: number
+  operating: number; ownership: number; subcontract: number; total: number; revenue: number
   cpu: number; operatingCPU: number; ownershipCPU: number
   toolingPerUnit: number
   revenuePerUnit: number; margin: number; marginPct: number
@@ -725,7 +768,7 @@ export function rollup(days: DayCost[]): Rollup {
     days: 0, drillingDays: 0, standbyDays: 0, breakdownDays: 0, missingDays: 0,
     units: 0, coreRecovery: 0, coreRecoveryPct: 0, drillingHours: 0, downtimeHours: 0, maintenanceHours: 0,
     fuelLitres: 0, fuel: 0, water: 0, additives: 0,
-    labour: 0, repairs: 0, parts: 0, operating: 0, ownership: 0, total: 0, revenue: 0,
+    labour: 0, repairs: 0, parts: 0, operating: 0, ownership: 0, subcontract: 0, total: 0, revenue: 0,
     cpu: 0, operatingCPU: 0, ownershipCPU: 0, toolingPerUnit: 0,
     revenuePerUnit: 0, margin: 0, marginPct: 0,
   }
@@ -742,7 +785,7 @@ export function rollup(days: DayCost[]): Rollup {
     z.fuel += d.fuel; z.water += d.water; z.additives += d.additives
     z.labour += d.labour.total
     z.repairs += d.repairs; z.parts += d.parts
-    z.operating += d.operating; z.ownership += d.ownership; z.total += d.total
+    z.operating += d.operating; z.ownership += d.ownership; z.subcontract += d.subcontract; z.total += d.total
     z.revenue += d.revenue
   })
   if (z.units > 0) {
@@ -879,7 +922,7 @@ export const SEED_PROJECTS: ProjectRecord[] = [
   },
   {
     id: 'PRJ-002', code: 'PRJ-002', name: 'Site B - South Ridge', location: 'South Ridge block', client: 'South Ridge Minerals',
-    status: 'active', startDate: '2026-01-01', plannedMetres: 1500, holeSize: 'HQ', shared: false,
+    status: 'active', startDate: '2026-01-01', plannedMetres: 3000, holeSize: 'HQ', shared: false,
     rigs: ['RIG-003'], supervisors: ['Pradeep Rao'], drillers: ['Farid Khan', 'Gopal Das'], createdAt: '2025-12-15',
   },
   {
@@ -991,6 +1034,8 @@ export const SEED_HOLE_STATUS: Record<string, HoleState> = {
   'DH-001': { status: 'approved' },
   'DH-011': { status: 'approved' },
   'DH-101': { status: 'approved' },
+  // Drilled by a contractor, checked by our site, approved: ready to bill the client.
+  'DH-131': { status: 'approved' },
   // Waiting with the mine owner, so the Client Portal has a live approval on first load.
   'DH-002': { status: 'submitted', submittedAt: '2026-09-12' },
 }
@@ -1233,17 +1278,88 @@ export const SEED_SHIFT_LOGS_SEP: ShiftLog[] = [
   ], [[Infinity, 'Hard Formation']]),
 ]
 
+/* ── Contractors' rigs on Site B ───────────────────────────────────────────
+ *
+ * Site B is drilled three ways at once: our own RIG-003, two rigs from
+ * Contractor P and one from Contractor Q. The contractors' shifts below have
+ * already been checked by our site, so they are part of the record. They
+ * carry no fuel, crew or parts: those are the contractor's. */
+const SITE_B = 'Site B - South Ridge'
+const HARD_GROUND: [number, string][] = [[Infinity, 'Hard Formation']]
+const nextDay = (date: string) => { const d = new Date(`${date}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10) }
+
+function checked(logs: ShiftLog[], contractor: string, workOrderId: string, source: ShiftCheck['source'], recovery?: Record<string, number>): ShiftLog[] {
+  return logs.map(l => ({
+    ...l, crewCount: 0, fuelLitres: 0, waterLitres: 0, additivesKg: 0, partsUsed: [],
+    coreRecovery: l.holeNumber && recovery?.[l.holeNumber] ? +(l.metresDrilled * recovery[l.holeNumber]).toFixed(2) : l.coreRecovery,
+    contractor, workOrderId,
+    check: { by: 'Pradeep Rao', at: `${nextDay(l.date)}T09:${l.shift === 'Day' ? '10' : '25'}`, source },
+  }))
+}
+
+export const SEED_SHIFT_LOGS_CONTRACTORS: ShiftLog[] = [
+  ...checked([
+    ...expand('CP-01', SITE_B, '2026-08', 'HQ', [
+      [3, 'DH-131', 7, 6], [4, 'DH-131', 7, 6], [5, 'DH-131', 7, 7], [6, 'DH-131', 6, 6, 2, 0, 'Bit Change'],
+      [7, 'DH-131', 7, 6], [8, 'DH-131', 7, 7], [9, 'DH-131', 7, 6], [10, 'DH-131', 7, 6],
+      [11, 'DH-131', 6, 6], [12, 'DH-131', 7, 7], [13, 'DH-131', 7, 6], [14, 'DH-131', 7, 6],
+      [15, 'DH-131', 6, 5, 3, 0, 'Rod Change'], [16, 'DH-131', 7, 7], [17, 'DH-131', 7, 6],
+      [18, 'DH-131', 7, 6], [19, 'DH-131', 7, 7], [20, 'DH-131', 7, 6], [21, 'DH-131', 7, 6], [22, 'DH-131', 6, 6],
+      [23, '', 0, 0, 12, 12, 'Waiting for Instruction'],
+      [24, 'DH-132', 7, 6], [25, 'DH-132', 7, 7], [26, 'DH-132', 7, 6], [27, 'DH-132', 7, 6],
+      [28, 'DH-132', 6, 6, 2, 0, 'Hydraulic Issue'], [29, 'DH-132', 7, 7], [30, 'DH-132', 7, 6], [31, 'DH-132', 7, 6],
+    ], HARD_GROUND),
+    ...expand('CP-01', SITE_B, '2026-09', 'HQ', [
+      [1, 'DH-132', 7, 6], [2, 'DH-132', 7, 7], [3, 'DH-132', 7, 6], [4, 'DH-132', 7, 6],
+      [5, 'DH-132', 6, 6, 2, 0, 'Bit Change'], [6, 'DH-132', 7, 7], [7, 'DH-132', 7, 6], [8, 'DH-132', 7, 6],
+      [9, 'DH-132', 7, 7], [10, 'DH-132', 7, 6], [11, 'DH-132', 6, 6], [12, 'DH-132', 7, 6],
+    ], HARD_GROUND),
+    ...expand('CP-02', SITE_B, '2026-08', 'HQ', [
+      [10, 'DH-141', 6, 6], [11, 'DH-141', 6, 5], [12, 'DH-141', 6, 6], [13, 'DH-141', 6, 6],
+      [14, 'DH-141', 6, 5], [15, 'DH-141', 6, 6], [16, 'DH-141', 6, 6], [17, 'DH-141', 5, 5, 2, 0, 'Bit Change'],
+      [18, 'DH-141', 0, 0, 12, 12, 'Mechanical Breakdown'],
+      [19, 'DH-141', 6, 6], [20, 'DH-141', 6, 5], [21, 'DH-141', 6, 6], [22, 'DH-141', 6, 6],
+      [23, 'DH-141', 6, 5], [24, 'DH-141', 6, 6],
+      [25, '', 0, 0, 12, 12, 'Site Access Issue'],
+      [26, 'DH-141', 6, 6], [27, 'DH-141', 6, 5], [28, 'DH-141', 6, 6], [29, 'DH-141', 6, 6],
+      [30, 'DH-141', 6, 5], [31, 'DH-141', 6, 6],
+    ], HARD_GROUND),
+    ...expand('CP-02', SITE_B, '2026-09', 'HQ', [
+      [1, 'DH-142', 6, 6], [2, 'DH-142', 6, 5], [3, 'DH-142', 6, 6], [4, 'DH-142', 6, 6],
+      [5, 'DH-142', 6, 5], [6, 'DH-142', 6, 6], [7, 'DH-142', 5, 5, 3, 0, 'Rod Change'], [8, 'DH-142', 6, 6],
+      [9, 'DH-142', 6, 5], [10, 'DH-142', 6, 6], [11, 'DH-142', 6, 6], [12, 'DH-142', 6, 5],
+    ], HARD_GROUND),
+  ], 'ctr_p', 'wo_b1', 'xplorix'),
+  ...checked([
+    ...expand('CQ-01', SITE_B, '2026-08', 'HQ', [
+      [12, 'DH-151', 5, 4], [13, 'DH-151', 5, 5], [14, 'DH-151', 5, 4], [15, 'DH-151', 5, 5],
+      [16, 'DH-151', 5, 4], [17, 'DH-151', 5, 5], [18, 'DH-151', 5, 4], [19, 'DH-151', 5, 5],
+      [20, '', 0, 0, 12, 12, 'Weather Condition'],
+      [21, 'DH-151', 5, 4], [22, 'DH-151', 5, 5], [23, 'DH-151', 5, 4], [24, 'DH-151', 5, 5],
+      [25, 'DH-151', 5, 4], [26, 'DH-151', 3, 3, 4, 3, 'Mechanical Breakdown'], [27, 'DH-151', 5, 5],
+      [28, 'DH-151', 5, 4], [29, 'DH-151', 5, 5], [30, 'DH-151', 5, 4], [31, 'DH-151', 5, 5],
+    ], HARD_GROUND),
+    ...expand('CQ-01', SITE_B, '2026-09', 'HQ', [
+      [1, 'DH-152', 5, 4], [2, 'DH-152', 5, 5], [3, 'DH-152', 5, 4], [4, 'DH-152', 5, 5],
+      [5, 'DH-152', 4, 4, 3, 0, 'Hydraulic Issue'], [6, 'DH-152', 5, 5], [7, 'DH-152', 5, 4], [8, 'DH-152', 5, 5],
+      [9, 'DH-152', 5, 4], [10, 'DH-152', 5, 5], [11, 'DH-152', 5, 4], [12, 'DH-152', 5, 5],
+    ], HARD_GROUND),
+    // The night of the 11th was sent back to the contractor, so it is not in the record.
+  ].filter(l => !(l.date === '2026-09-11' && l.shift === 'Night')), 'ctr_q', 'wo_b2', 'login', { 'DH-151': 0.86 }),
+]
+
 export const SEED_SHIFT_LOGS: ShiftLog[] =
   markClosures(
     [...SEED_SHIFT_LOGS_JUNE, ...SEED_SHIFT_LOGS_JULY, ...SEED_SHIFT_LOGS_A,
-     ...SEED_SHIFT_LOGS_B, ...SEED_SHIFT_LOGS_SEP],
+     ...SEED_SHIFT_LOGS_B, ...SEED_SHIFT_LOGS_SEP, ...SEED_SHIFT_LOGS_CONTRACTORS],
     ['DH-901', 'DH-902', 'DH-911', 'DH-951', 'DH-952', 'DH-961',
-     'DH-001', 'DH-002', 'DH-011', 'DH-101'])
+     'DH-001', 'DH-002', 'DH-011', 'DH-101', 'DH-131', 'DH-141', 'DH-151'])
 
 /* Planned depth for every seeded hole. A closed hole was planned at what it
  * reached, rounded up to the next 5 m; a hole still drilling has further to go. */
 const OPEN_HOLE_PLANS: Record<string, number> = {
   'DH-003': 120, 'DH-012': 150, 'DH-004': 200, 'DH-013': 220, 'DH-102': 300,
+  'DH-132': 320, 'DH-142': 280, 'DH-152': 250,
 }
 const UPCOMING_HOLES: [string, string, number][] = [
   ['DH-005', 'Site A - North Field', 200],
@@ -1321,6 +1437,88 @@ export const SEED_RATE_PROPOSALS: RateProposal[] = [
   },
 ]
 
+/* ── Contractors, their work orders, and what is waiting to be checked ──── */
+
+export const SEED_CONTRACTORS: Contractor[] = [
+  { id: 'ctr_p', name: 'Contractor P', xplorixId: 'CT-3105', place: 'Demo company', contact: 'Site manager' },
+  // No XPLORIX of his own, so he writes his drill log in the login we gave him.
+  { id: 'ctr_q', name: 'Contractor Q', place: 'Demo company', contact: 'Proprietor', login: { email: 'site@contractor-q.example', status: 'active', since: '2026-08-08' } },
+]
+
+const payCard = (id: string, from: string, rates: [number, number, number], standby: number, mob: number, demob: number, note: string): ClientRate => ({
+  id, project: SITE_B, effectiveFrom: from, structure: 'slab', note,
+  rateRows: [
+    { id: `${id}_1`, holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 0, toDepth: 75, rate: rates[0], adjustments: [] },
+    { id: `${id}_2`, holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 75, toDepth: 150, rate: rates[1], adjustments: [] },
+    { id: `${id}_3`, holeSize: 'HQ', formation: ANY_FORMATION, fromDepth: 150, rate: rates[2], adjustments: [] },
+  ],
+  standbyPerDay: standby, mobilisation: mob, demobilisation: demob,
+})
+
+/* The deduction figures are examples so the section has something to show.
+ * Each customer's contract words these differently: switch a rule off, or
+ * change its figures and clause to match the real work order. */
+export const SEED_WORK_ORDERS: WorkOrder[] = [
+  {
+    id: 'wo_b1', number: 'WO-B-01', project: SITE_B, contractorId: 'ctr_p', rigs: ['CP-01', 'CP-02'],
+    startDate: '2026-08-01', endDate: '2026-10-31', plannedMetres: 1100, paymentDays: 30, reportsBy: 'xplorix', status: 'active',
+    rates: [payCard('wr_p1', '2026-08-01', [5900, 6800, 8000], 9000, 90000, 70000, 'Work order schedule of rates')],
+    rules: [
+      { id: 'd1', kind: 'coreRecovery', on: true, clause: 'Example clause 9.1', slabs: [{ belowPct: 90, deductPct: 10 }, { belowPct: 80, deductPct: 25 }] },
+      { id: 'd2', kind: 'lateCompletion', on: true, clause: 'Example clause 12', pctPerWeek: 0.5, capPct: 10 },
+      { id: 'd3', kind: 'shortfall', on: false, clause: '', minMetres: 250, perMetre: 200 },
+      { id: 'd4', kind: 'retention', on: true, clause: 'Example clause 15', holdPct: 5 },
+    ],
+  },
+  {
+    id: 'wo_b2', number: 'WO-B-02', project: SITE_B, contractorId: 'ctr_q', rigs: ['CQ-01'],
+    startDate: '2026-08-10', endDate: '2026-08-31', plannedMetres: 400, paymentDays: 45, reportsBy: 'login', status: 'active',
+    rates: [payCard('wr_q1', '2026-08-10', [5700, 6600, 7900], 8500, 80000, 60000, 'Work order schedule of rates')],
+    rules: [
+      { id: 'd1', kind: 'coreRecovery', on: true, clause: 'Example clause 9.1', slabs: [{ belowPct: 90, deductPct: 10 }, { belowPct: 80, deductPct: 25 }] },
+      { id: 'd2', kind: 'lateCompletion', on: true, clause: 'Example clause 12', pctPerWeek: 0.5, capPct: 10 },
+      { id: 'd3', kind: 'shortfall', on: true, clause: 'Example clause 10.3', minMetres: 300, perMetre: 200 },
+      { id: 'd4', kind: 'retention', on: true, clause: 'Example clause 15', holdPct: 5 },
+    ],
+  },
+]
+
+const waiting = (id: string, workOrderId: string, rig: string, shift: ShiftName, hole: string | null, from: number | undefined, metres: number, core: number,
+  hours: [number, number, number], reason: string, source: ContractorReport['source'], at: string, extra: Partial<ContractorReport> = {}): ContractorReport => ({
+  id, workOrderId, rig, project: SITE_B, date: '2026-09-13', shift, holeNumber: hole, holeSize: 'HQ',
+  formationType: metres > 0 ? 'Hard Formation' : '', fromDepth: from, toDepth: from != null ? from + metres : undefined,
+  metres, coreRecovery: core, drillingHours: hours[0], standbyHours: hours[1], breakdownHours: hours[2], reason,
+  source, receivedAt: at, status: 'waiting', ...extra,
+})
+
+/* Where each contractor hole stands in the seeded record, so the reports
+ * waiting below carry on from the right depth. */
+function seededDepth(hole: string) {
+  return SEED_SHIFT_LOGS.filter(l => l.holeNumber === hole).reduce((s, l) => s + l.metresDrilled, 0)
+}
+
+/* Today's shifts from the three contractor rigs, not yet checked, and one
+ * shift that was sent back. Between them they show what the checker is there
+ * to catch: a standby claim to decide, a figure far above the rig's best, and
+ * a depth that does not carry on from the record. */
+export const SEED_CONTRACTOR_REPORTS: ContractorReport[] = (() => {
+  const a = seededDepth('DH-132'), b = seededDepth('DH-142'), c = seededDepth('DH-152')
+  return [
+    waiting('rp_1', 'wo_b1', 'CP-01', 'Day', 'DH-132', a, 7, 6.8, [12, 0, 0], '', 'xplorix', '2026-09-13T18:12'),
+    waiting('rp_2', 'wo_b1', 'CP-01', 'Night', 'DH-132', a + 7, 6, 5.8, [12, 0, 0], '', 'xplorix', '2026-09-13T18:12'),
+    waiting('rp_3', 'wo_b1', 'CP-02', 'Day', 'DH-142', b, 6, 5.7, [12, 0, 0], '', 'xplorix', '2026-09-13T18:20'),
+    waiting('rp_4', 'wo_b1', 'CP-02', 'Night', null, undefined, 0, 0, [0, 12, 0], 'Waiting for Instruction', 'xplorix', '2026-09-13T18:20',
+      { remarks: 'Told to hold at 20:00 until the next hole location is cleared.' }),
+    waiting('rp_5', 'wo_b2', 'CQ-01', 'Day', 'DH-152', c + 4, 5, 4.7, [12, 0, 0], '', 'login', '2026-09-13T18:40'),
+    waiting('rp_6', 'wo_b2', 'CQ-01', 'Night', 'DH-152', c + 9, 9, 7.6, [12, 0, 0], '', 'login', '2026-09-13T18:40'),
+    {
+      ...waiting('rp_7', 'wo_b2', 'CQ-01', 'Night', 'DH-152', c - 10, 14, 11.9, [12, 0, 0], '', 'login', '2026-09-12T08:30'),
+      date: '2026-09-11', status: 'returned', returnedBy: 'Pradeep Rao', returnedAt: '2026-09-12T10:05',
+      returnReason: 'The log shows 14 m for one night shift. The rods on the rack give 4 m. Please correct and send again.',
+    },
+  ]
+})()
+
 interface State {
   shiftLogs: ShiftLog[]
   maintenance: MaintenanceLog[]
@@ -1333,16 +1531,25 @@ interface State {
   projects: ProjectRecord[]
   projectEvents: ProjectEvent[]
   rateProposals: RateProposal[]
+  // Rigs that are not ours: who runs them, under what, and what is waiting.
+  contractors: Contractor[]
+  workOrders: WorkOrder[]
+  contractorReports: ContractorReport[]
+  contractorBills: ContractorBill[]
+  wording: Wording
 }
 
 function initial(): State {
-  return {
+  const base = {
     shiftLogs: SEED_SHIFT_LOGS, maintenance: SEED_MAINTENANCE,
     ownership: SEED_OWNERSHIP, operating: SEED_OPERATING,
     clientRates: SEED_CLIENT_RATES, holeStatus: SEED_HOLE_STATUS, invoices: [],
     holePlans: SEED_HOLE_PLANS,
     projects: SEED_PROJECTS, projectEvents: SEED_PROJECT_EVENTS, rateProposals: SEED_RATE_PROPOSALS,
+    contractors: SEED_CONTRACTORS, workOrders: SEED_WORK_ORDERS, contractorReports: SEED_CONTRACTOR_REPORTS,
+    wording: 'standard' as Wording,
   }
+  return { ...base, contractorBills: seedBills(base) }
 }
 
 /* A browser that saved its state before a seed plan existed still gets that
@@ -1396,6 +1603,23 @@ interface CtxValue {
   withdrawProposal: (id: string) => void
   ownerAnswerRates: (id: string, accept: boolean, note?: string) => void
   markProjectSeen: (project: string, who: 'contractor' | 'owner') => void
+  // Contractors working for us
+  saveContractor: (c: Contractor) => void
+  saveWorkOrder: (w: WorkOrder) => void
+  addReports: (r: ContractorReport[]) => void
+  /* The contractor sends a shift, or sends a corrected one in place of the
+   * one that came back. */
+  saveReport: (r: ContractorReport) => void
+  acceptReport: (id: string, by: string, a?: { metres?: number; coreRecovery?: number; standbyPayable?: boolean; note?: string }) => void
+  returnReport: (id: string, by: string, reason: string) => void
+  reopenReport: (id: string) => void
+  deleteReport: (id: string) => void
+  saveBill: (b: ContractorBill) => void
+  approveBill: (id: string, snapshot: BillSnapshot) => void
+  returnBill: (id: string, reason: string) => void
+  reopenBill: (id: string) => void
+  markBillPaid: (id: string) => void
+  setWording: (w: Wording) => void
   resetAll: () => void
 }
 
@@ -1403,7 +1627,9 @@ interface CtxValue {
 export interface ProjectLog { kind: ProjectEventKind; title: string; detail?: string }
 
 const CostingContext = createContext<CtxValue | null>(null)
-const KEY = 'xplorix_costing_v2'
+/* v3: contractors, work orders and their shifts joined the record. An older
+ * saved copy has none of them, so it is left behind rather than merged. */
+const KEY = 'xplorix_costing_v3'
 
 /* One store per browser tab. A layout mounts the provider once; a screen that
  * also wraps itself in <CostingProvider> (Finance, Inventory, Projects do, so
@@ -1610,6 +1836,49 @@ function CostingRoot({ children }: { children: ReactNode }) {
     return { ...s, projectEvents: s.projectEvents.map(e => e.project === project && !e[key] ? { ...e, [key]: true } : e) }
   })
 
+  // ── contractors working for us ───────────────────────────────────────────
+  const saveContractor: CtxValue['saveContractor'] = c => setState(s => ({ ...s, contractors: upsert(s.contractors, c) }))
+  const saveWorkOrder: CtxValue['saveWorkOrder'] = w => setState(s => ({ ...s, workOrders: upsert(s.workOrders, w) }))
+  const addReports: CtxValue['addReports'] = list => setState(s => ({ ...s, contractorReports: [...s.contractorReports, ...list] }))
+  const saveReport: CtxValue['saveReport'] = r => setState(s => ({ ...s, contractorReports: upsert(s.contractorReports, r) }))
+  /* Accepting a report is what puts it in the record. From this moment the
+   * metres count toward progress, the client's invoice and what we owe. */
+  const acceptReport: CtxValue['acceptReport'] = (id, by, a) => setState(s => {
+    const r = s.contractorReports.find(x => x.id === id)
+    const wo = r && s.workOrders.find(w => w.id === r.workOrderId)
+    if (!r || !wo) return s
+    const shift = reportToShift(r, wo, by, nowStamp(), a)
+    return {
+      ...s,
+      contractorReports: s.contractorReports.filter(x => x.id !== id),
+      shiftLogs: [...s.shiftLogs.filter(l => l.id !== shift.id), shift],
+    }
+  })
+  const returnReport: CtxValue['returnReport'] = (id, by, reason) => setState(s => ({
+    ...s, contractorReports: s.contractorReports.map(r => r.id !== id ? r : {
+      ...r, status: 'returned', returnedBy: by, returnedAt: nowStamp(), returnReason: reason.trim() || 'Sent back without a reason',
+    }),
+  }))
+  const reopenReport: CtxValue['reopenReport'] = id => setState(s => ({
+    ...s, contractorReports: s.contractorReports.map(r => r.id !== id ? r : { ...r, status: 'waiting', returnedBy: undefined, returnedAt: undefined, returnReason: undefined }),
+  }))
+  const deleteReport: CtxValue['deleteReport'] = id => setState(s => ({ ...s, contractorReports: s.contractorReports.filter(r => r.id !== id) }))
+
+  const saveBill: CtxValue['saveBill'] = b => setState(s => ({ ...s, contractorBills: upsert(s.contractorBills, b) }))
+  const approveBill: CtxValue['approveBill'] = (id, snapshot) => setState(s => ({
+    ...s, contractorBills: s.contractorBills.map(b => b.id !== id ? b : { ...b, status: 'approved', approved: snapshot, returnReason: undefined }),
+  }))
+  const returnBill: CtxValue['returnBill'] = (id, reason) => setState(s => ({
+    ...s, contractorBills: s.contractorBills.map(b => b.id !== id ? b : { ...b, status: 'returned', approved: undefined, returnReason: reason.trim() || 'Sent back without a reason' }),
+  }))
+  const reopenBill: CtxValue['reopenBill'] = id => setState(s => ({
+    ...s, contractorBills: s.contractorBills.map(b => b.id !== id ? b : { ...b, status: 'received', approved: undefined, returnReason: undefined, paidAt: undefined }),
+  }))
+  const markBillPaid: CtxValue['markBillPaid'] = id => setState(s => ({
+    ...s, contractorBills: s.contractorBills.map(b => b.id !== id || !b.approved ? b : { ...b, status: 'paid', paidAt: nowStamp() }),
+  }))
+  const setWording: CtxValue['setWording'] = wording => setState(s => ({ ...s, wording }))
+
   // Plain helper functions elsewhere read the project list through mirrors;
   // bring them into step before anything below renders.
   syncRegistry(state.projects ?? SEED_PROJECTS)
@@ -1620,6 +1889,8 @@ function CostingRoot({ children }: { children: ReactNode }) {
       setHoleStatus, addInvoice, updateInvoice, deleteInvoice,
       submitHole, withdrawHole, ownerDecideHole, ownerReviewInvoice, ownerMarkPaid, setHolePlan,
       createProject, updateProject, planHoles, proposeRates, withdrawProposal, ownerAnswerRates, markProjectSeen,
+      saveContractor, saveWorkOrder, addReports, saveReport, acceptReport, returnReport, reopenReport, deleteReport,
+      saveBill, approveBill, returnBill, reopenBill, markBillPaid, setWording,
       resetAll: () => setState(initial()),
     }}>{children}</CostingContext.Provider>
   )

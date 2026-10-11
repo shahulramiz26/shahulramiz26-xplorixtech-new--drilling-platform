@@ -21,7 +21,7 @@ import {
  * It is laid out in the order an owner asks his questions each morning:
  * what needs me, are the rigs turning, are we making money. */
 
-const statusTone: Record<RigStatus, Tone> = { drilling: 'good', standby: 'warn', breakdown: 'bad', 'no-shift': 'neutral' }
+const statusTone: Record<RigStatus, Tone> = { drilling: 'good', standby: 'warn', breakdown: 'bad', 'no-shift': 'neutral', 'to-check': 'warn' }
 
 export default function AdminDashboard() {
   const o = useAdminOverview()
@@ -82,7 +82,10 @@ export default function AdminDashboard() {
           <tbody>
             {o.rigs.map(r => (
               <tr key={r.rig} className="xpl-row" style={{ borderBottom: rowLine }}>
-                <td style={{ ...td, color: T.text, fontWeight: 700, fontFamily: display, fontSize: 14 }}>{r.rig}</td>
+                <td style={{ ...td, color: T.text, fontWeight: 700, fontFamily: display, fontSize: 14 }}>
+                  {r.rig}
+                  {r.contractor && <div style={{ fontSize: 11.5, color: T.faint, fontWeight: 400, fontFamily: 'inherit', marginTop: 3 }}>{r.contractor}&apos;s rig</div>}
+                </td>
                 <td style={td}>
                   <Status tone={statusTone[r.status]}>{RIG_STATUS_LABEL[r.status]}</Status>
                   <div style={{ fontSize: 11.5, color: T.faint, marginTop: 5, whiteSpace: 'normal', maxWidth: 190 }}>{r.note}</div>
@@ -103,7 +106,9 @@ export default function AdminDashboard() {
                 <td style={tdR}>{r.monthLostHours ? `${r.monthLostHours} h` : <span style={{ color: T.dim }}>0</span>}</td>
                 <td style={td}><Spark values={r.last14} /></td>
                 <td style={{ ...td, textAlign: 'right' }}>
-                  {r.project && <Btn size="sm" href={financeLink({ project: r.project, rig: r.rig, month: o.month })}>Costing</Btn>}
+                  {r.status === 'to-check' && r.project
+                    ? <Btn size="sm" kind="primary" href={`/admin/contractors?tab=reports&project=${encodeURIComponent(r.project)}`}>Check</Btn>
+                    : r.project && <Btn size="sm" href={financeLink({ project: r.project, rig: r.rig, month: o.month })}>Costing</Btn>}
                 </td>
               </tr>
             ))}

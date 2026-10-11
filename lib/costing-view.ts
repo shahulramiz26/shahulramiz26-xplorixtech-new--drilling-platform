@@ -1,6 +1,7 @@
 'use client'
 
 import { toolingRatesFor, type useInventory } from './inventory-store'
+import { workOrderFor, payRateOn, type WorkOrder } from './contracting'
 import {
   monthOf, daysInMonth, versionOn, ownershipBreakdown, blankOperating, blankOwnership,
   dayCost, rollup, withCumulative, holesFromDays, holeResult,
@@ -31,6 +32,9 @@ export interface RigMonthView {
   unallocatedDays: number
   budgetOwnershipCPU: number
   productionVariancePct: number
+  /* Set when the rig is a contractor's: its cost is then what the work order
+   * pays for the metres, and ownership, fuel, crew and parts are all nil. */
+  workOrder?: WorkOrder
   // The committee assigns one rock category for the whole project. If the logs
   // disagree, every metre is underpriced and there is no line item to recover
   // it — so the mismatch is surfaced rather than left to final billing.
@@ -58,7 +62,9 @@ export function computeRigMonth(state: CostingState, inv: InvState, project: str
     }
   }
 
-  const ownVersions = state.ownership.filter(o => o.rig === rig)
+  // A rig named on a work order for this project is a contractor's rig.
+  const workOrder = workOrderFor(state, project, rig)
+  const ownVersions = workOrder ? [] : state.ownership.filter(o => o.rig === rig)
   const opVersions = state.operating.filter(o => o.rig === rig && o.project === project)
   const crVersions = state.clientRates.filter(c => c.project === project)
 
@@ -74,7 +80,11 @@ export function computeRigMonth(state: CostingState, inv: InvState, project: str
   const raw: DayCost[] = []
   const depthByHole: Record<string, number> = {}
 
-  for (let n = 1; n <= lastDay; n++) {
+  /* Our own rig costs money from the first of the month whether it drilled or
+   * not, so its month starts on day one. A contractor's rig costs nothing on a
+   * day it was not here, so its month starts at its first shift. */
+  const firstDay = workOrder ? Number(logs.map(l => l.date).sort()[0].slice(8)) : 1
+  for (let n = firstDay; n <= lastDay; n++) {
     const date = `${month}-${String(n).padStart(2, '0')}`
     const shifts = logs.filter(l => l.date === date)
     const maint = state.maintenance.filter(m => m.rig === rig && m.project === project && m.date === date)
@@ -91,7 +101,8 @@ export function computeRigMonth(state: CostingState, inv: InvState, project: str
     const hole = shifts.find(s => s.holeNumber)?.holeNumber ?? null
     const depthSoFar = hole ? (depthByHole[hole] ?? 0) : 0
 
-    const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, tooling, depthSoFar)
+    const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, tooling, depthSoFar,
+      workOrder ? { rate: payRateOn(workOrder, date) } : undefined)
     if (hole) depthByHole[hole] = depthSoFar + d.units
     raw.push(d)
   }
@@ -107,7 +118,7 @@ export function computeRigMonth(state: CostingState, inv: InvState, project: str
   const loggedFormation = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
 
   return {
-    hasLogs: true, ownership, ob, operating, clientRate, days, roll, holes,
+    hasLogs: true, ownership, ob, operating, clientRate, days, roll, holes, workOrder,
     unallocated: orphan.reduce((s, d) => s + d.total, 0),
     unallocatedDays: orphan.length,
     budgetOwnershipCPU: ownership && ownership.expectedUnitsPerMonth > 0 ? ob.perMonth / ownership.expectedUnitsPerMonth : 0,

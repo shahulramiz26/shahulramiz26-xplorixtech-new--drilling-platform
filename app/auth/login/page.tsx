@@ -29,6 +29,10 @@ export default function LoginPage() {
     await new Promise(r => setTimeout(r, 800))
     if (formData.role === 'admin') {
       window.location.href = '/admin/dashboard'
+    } else if (formData.role === 'contractor') {
+      // A contractor working for a company on XPLORIX: the login that company
+      // gave him, for his drill log and his bills.
+      window.location.href = '/contractor'
     } else if (formData.role === 'owner') {
       // The mine owner — the client the contractor drills for — lands in the
       // Client Portal, not in the contractor's console.
@@ -131,6 +135,7 @@ export default function LoginPage() {
                 <option value="admin" style={{ background:'#FFFFFF' }}>Company Admin</option>
                 <option value="supervisor" style={{ background:'#FFFFFF' }}>Supervisor</option>
                 <option value="owner" style={{ background:'#FFFFFF' }}>Mine Owner (Client Portal)</option>
+                <option value="contractor" style={{ background:'#FFFFFF' }}>Contractor (drill log for a client)</option>
               </select>
             </div>
 

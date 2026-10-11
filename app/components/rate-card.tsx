@@ -69,7 +69,9 @@ export function RateSchedule({ rate, before }: { rate: ClientRate; before?: Clie
 const num: React.CSSProperties = { ...inputStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
 const parse = (v: string) => (v === '' ? 0 : Math.max(0, parseFloat(v) || 0))
 
-export function RateEditor({ value, onChange }: { value: ClientRate; onChange: (c: ClientRate) => void }) {
+/* `paying` turns the wording round for a work order, where we are the ones
+ * who pay the rate. The form and the arithmetic are the same either way. */
+export function RateEditor({ value, onChange, paying }: { value: ClientRate; onChange: (c: ClientRate) => void; paying?: boolean }) {
   const f = value
   const u = (p: Partial<ClientRate>) => onChange({ ...f, ...p })
   const row = (i: number, p: Partial<RateRow>) => u({ rateRows: f.rateRows.map((r, j) => j === i ? { ...r, ...p } : r) })
@@ -97,7 +99,7 @@ export function RateEditor({ value, onChange }: { value: ClientRate; onChange: (
   return (
     <div style={{ display: 'grid', gap: 18 }}>
       <div>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: T.muted, marginBottom: 7 }}>How the contract prices a metre</div>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: T.muted, marginBottom: 7 }}>{paying ? 'How the work order prices a metre' : 'How the contract prices a metre'}</div>
         <Seg<RateStructure> options={[{ value: 'flat', label: 'By ground' }, { value: 'slab', label: 'By depth' }]} value={f.structure} onChange={reshape} />
         <div style={{ fontSize: 12, color: T.faint, marginTop: 7, lineHeight: 1.5 }}>
           {flat
@@ -154,7 +156,7 @@ export function RateEditor({ value, onChange }: { value: ClientRate; onChange: (
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
-        <Field label="Standby, ₹ a day" hint="Billed when the client stops work.">
+        <Field label="Standby, ₹ a day" hint={paying ? 'Paid for a day lost for a reason that is not the contractor’s.' : 'Billed when the client stops work.'}>
           <input type="number" value={f.standbyPerDay || ''} placeholder="0" onChange={e => u({ standbyPerDay: parse(e.target.value) })} style={num} />
         </Field>
         <Field label="Mobilisation, ₹">

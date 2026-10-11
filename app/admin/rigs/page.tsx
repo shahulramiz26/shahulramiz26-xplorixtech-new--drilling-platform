@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { projectCode } from '../../../lib/costing-store'
 import { useAdminOverview, financeLink, RIG_STATUS_LABEL, type RigStatus } from '../../../lib/admin-overview'
 import { num } from '../../../lib/owner-portal'
@@ -16,7 +17,7 @@ import {
  * is off costs nothing and cannot. */
 
 const DAILY_RATE = 10   // USD per active rig per day — XPLORIX's own charge
-const statusTone: Record<RigStatus, Tone> = { drilling: 'good', standby: 'warn', breakdown: 'bad', 'no-shift': 'neutral' }
+const statusTone: Record<RigStatus, Tone> = { drilling: 'good', standby: 'warn', breakdown: 'bad', 'no-shift': 'neutral', 'to-check': 'warn' }
 const SPARE = [{ rig: 'RIG-004', type: 'Core' }, { rig: 'RIG-005', type: 'Core' }]
 
 export default function RigsPage() {
@@ -25,8 +26,13 @@ export default function RigsPage() {
   const isOn = (rig: string) => !off.includes(rig)
   const toggle = (rig: string) => setOff(isOn(rig) ? [...off, rig] : off.filter(r => r !== rig))
 
+  /* This screen is the company's own fleet. A contractor's rig working on one
+   * of our projects is his equipment, so it is counted on the Contractors
+   * screen and left out here. */
+  const own = o.rigs.filter(r => !r.contractor)
+  const theirs = o.rigs.filter(r => r.contractor)
   const rows = [
-    ...o.rigs.map(r => ({ ...r, type: 'Core', spare: false })),
+    ...own.map(r => ({ ...r, type: 'Core', spare: false })),
     ...SPARE.map(s => ({
       rig: s.rig, type: s.type, spare: true, project: null, hole: null, status: 'no-shift' as RigStatus, note: 'Not assigned to a project',
       holeDrilled: 0, holePlanned: undefined, monthMetres: 0, monthDays: 0, monthLostHours: 0,
@@ -41,7 +47,7 @@ export default function RigsPage() {
 
       <Grid>
         <Tile label="Rigs" value={rows.length} note={`${on.length} switched on`} />
-        <Tile label="Drilling today" value={`${o.rigs.filter(r => r.status === 'drilling').length} of ${o.rigs.length}`} note="From today's shift logs" />
+        <Tile label="Drilling today" value={`${own.filter(r => r.status === 'drilling').length} of ${own.length}`} note="From today's shift logs" />
         <Tile label="Metres this month" value={`${num(o.now.metres)} m`} note={`${o.now.perRigDay.toFixed(1)} m per rig per day`} />
         <Tile label="XPLORIX charge this month" value={`$${num(billDays * DAILY_RATE)}`} note={`${billDays} rig-days at $${DAILY_RATE} a day`} />
       </Grid>
@@ -100,6 +106,13 @@ export default function RigsPage() {
           </tbody>
         </Table>
       </Card>
+
+      {theirs.length > 0 && (
+        <Note>
+          {theirs.length} {theirs.length === 1 ? 'rig' : 'rigs'} from contractors ({theirs.map(r => r.rig).join(', ')}) {theirs.length === 1 ? 'is' : 'are'} also drilling on your projects.
+          They are not part of your fleet. See them under <Link href="/admin/contractors" style={{ color: T.orange, fontWeight: 600, textDecoration: 'none' }}>Contractors</Link>.
+        </Note>
+      )}
 
       <Note>
         A rig that logged a shift today cannot be switched off, so no shift or maintenance record is lost. Switch it off once it is idle and off the project.
