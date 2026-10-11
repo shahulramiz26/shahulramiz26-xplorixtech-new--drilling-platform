@@ -7,11 +7,12 @@ import {
   carouselSlides, pickCampaign, trackCampaign, SLIDE_DURATION,
   type Campaign,
 } from './billboards'
+import { hexA } from '../../../lib/theme'
 
 const C = {
-  panel: '#0D1117', panelHi: '#11161F', border: '#1E293B',
-  text: '#F8FAFC', dim: '#94A3B8', muted: '#64748B', faint: '#334155',
-  green: '#10B981', accent: '#F97316',
+  panel: 'var(--x-card)', panelHi: 'var(--x-raised)', border: 'var(--x-border)',
+  text: 'var(--x-text)', dim: 'var(--x-muted)', muted: 'var(--x-faint)', faint: 'var(--x-dim)',
+  green: 'var(--x-green)', accent: 'var(--x-orange)',
 }
 const display = "'Space Grotesk', sans-serif"
 
@@ -110,7 +111,7 @@ export default function BillboardCarousel() {
                 style={{
                   height: 4, width: on ? 44 : 16, borderRadius: 2, border: 'none',
                   cursor: 'pointer', padding: 0, overflow: 'hidden',
-                  background: on ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.16)',
+                  background: on ? 'rgba(var(--x-ov),0.16)' : 'rgba(var(--x-ov),0.16)',
                   transition: 'width .35s ease',
                 }}
               >
@@ -143,7 +144,7 @@ export default function BillboardCarousel() {
             style={{
               width: 28, height: 28, borderRadius: 8, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(8,11,16,0.6)', border: `1px solid ${C.border}`,
+              background: 'color-mix(in srgb, var(--x-bg) 60%, transparent)', border: `1px solid ${C.border}`,
               color: C.muted, backdropFilter: 'blur(6px)',
             }}
           >
@@ -184,7 +185,7 @@ function Slide({ c, active }: { c: Campaign; active: boolean }) {
         flex: '0 0 100%', minWidth: 0, position: 'relative', overflow: 'hidden',
         minHeight: 352, padding: '38px 44px 66px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40,
-        background: `linear-gradient(125deg, ${C.panelHi} 0%, #080B10 68%)`,
+        background: `linear-gradient(125deg, ${C.panelHi} 0%, var(--x-bg) 68%)`,
       }}
     >
       {/* backdrop */}
@@ -196,12 +197,12 @@ function Slide({ c, active }: { c: Campaign; active: boolean }) {
       )}
       <div aria-hidden style={{
         position: 'absolute', inset: 0, opacity: 0.5,
-        backgroundImage: 'repeating-linear-gradient(115deg, rgba(148,163,184,0.05) 0 1px, transparent 1px 13px)',
+        backgroundImage: 'repeating-linear-gradient(115deg, color-mix(in srgb, var(--x-muted) 5%, transparent) 0 1px, transparent 1px 13px)',
       }} />
       <div aria-hidden style={{
         position: 'absolute', right: -90, top: -110, width: 460, height: 460,
         borderRadius: 70, transform: 'rotate(15deg)',
-        background: `linear-gradient(135deg, ${c.accent}26, transparent 62%)`,
+        background: `linear-gradient(135deg, ${hexA(c.accent, 0x26)}, transparent 62%)`,
       }} />
       <div aria-hidden style={{
         position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
@@ -214,7 +215,7 @@ function Slide({ c, active }: { c: Campaign; active: boolean }) {
           <span style={{
             display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 5,
             fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase',
-            background: 'rgba(255,255,255,0.05)', border: `1px solid ${C.border}`, color: C.muted,
+            background: 'rgba(var(--x-ov),0.05)', border: `1px solid ${C.border}`, color: C.muted,
           }}>
             {house ? 'From XPLORIX' : 'Sponsored'}
           </span>
@@ -259,9 +260,9 @@ function Slide({ c, active }: { c: Campaign; active: boolean }) {
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 9, padding: '12px 22px',
             borderRadius: 11, fontSize: 13.5, fontWeight: 700, textDecoration: 'none',
-            background: hover ? c.accent : `${c.accent}1F`,
+            background: hover ? c.accent : `${hexA(c.accent, 0x1F)}`,
             color: hover ? '#08111A' : c.accent,
-            border: `1px solid ${hover ? c.accent : `${c.accent}55`}`,
+            border: `1px solid ${hover ? c.accent : `${hexA(c.accent, 0x55)}`}`,
             transition: 'all .2s',
           }}
         >
@@ -274,7 +275,7 @@ function Slide({ c, active }: { c: Campaign; active: boolean }) {
       <div className="xpb-mark" style={{ position: 'relative', flexShrink: 0, textAlign: 'right' }}>
         <div style={{
           fontSize: 92, fontWeight: 700, fontFamily: display, letterSpacing: '-0.05em',
-          lineHeight: 1, color: `${c.accent}1A`,
+          lineHeight: 1, color: `${hexA(c.accent, 0x1A)}`,
         }}>{c.brandMark}</div>
       </div>
     </div>
@@ -295,8 +296,8 @@ function Arrow({ side, onClick }: { side: 'left' | 'right'; onClick: () => void 
         position: 'absolute', top: '50%', [side]: 16, transform: 'translateY(-50%)',
         width: 38, height: 38, borderRadius: 11, cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: hover ? 'rgba(249,115,22,0.16)' : 'rgba(8,11,16,0.66)',
-        border: `1px solid ${hover ? 'rgba(249,115,22,0.4)' : C.border}`,
+        background: hover ? 'color-mix(in srgb, var(--x-orange) 16%, transparent)' : 'color-mix(in srgb, var(--x-bg) 66%, transparent)',
+        border: `1px solid ${hover ? 'color-mix(in srgb, var(--x-orange) 40%, transparent)' : C.border}`,
         color: hover ? C.accent : C.dim, backdropFilter: 'blur(8px)',
         transition: 'all .2s', zIndex: 2,
       } as React.CSSProperties}
@@ -324,13 +325,13 @@ export function GridPlacement({ rotationKey = 0 }: { rotationKey?: number }) {
       style={{
         position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column',
         padding: 18, borderRadius: 14, textDecoration: 'none',
-        background: `linear-gradient(150deg, ${C.panelHi} 0%, #090D13 100%)`,
-        border: `1px dashed ${hover ? `${c.accent}66` : C.border}`, transition: 'border-color .22s',
+        background: `linear-gradient(150deg, ${C.panelHi} 0%, var(--x-bg) 100%)`,
+        border: `1px dashed ${hover ? `${hexA(c.accent, 0x66)}` : C.border}`, transition: 'border-color .22s',
       }}
     >
       <div aria-hidden style={{
         position: 'absolute', right: -50, top: -50, width: 210, height: 210, borderRadius: 34,
-        transform: 'rotate(15deg)', background: `linear-gradient(135deg, ${c.accent}22, transparent 62%)`,
+        transform: 'rotate(15deg)', background: `linear-gradient(135deg, ${hexA(c.accent, 0x22)}, transparent 62%)`,
       }} />
       <div aria-hidden style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: c.accent, opacity: 0.85 }} />
 
@@ -338,7 +339,7 @@ export function GridPlacement({ rotationKey = 0 }: { rotationKey?: number }) {
         <span style={{
           display: 'inline-flex', padding: '3px 8px', borderRadius: 5, fontSize: 9,
           fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase',
-          background: 'rgba(255,255,255,0.05)', border: `1px solid ${C.border}`, color: C.muted,
+          background: 'rgba(var(--x-ov),0.05)', border: `1px solid ${C.border}`, color: C.muted,
         }}>
           {c.tier === 'House' ? 'From XPLORIX' : 'Sponsored'}
         </span>

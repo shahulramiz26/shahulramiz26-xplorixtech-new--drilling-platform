@@ -8,8 +8,9 @@ import {
 } from 'recharts'
 import { TrendingUp, Clock, AlertCircle, Activity, Filter, ChevronDown, X, Search, ChevronUp } from 'lucide-react'
 import AIInsights from '../../../components/AIInsights'
+import { hexA } from '../../../../lib/theme'
 
-const PIE_COLORS = ['#F97316', '#3B82F6', '#10B981', '#F59E0B']
+const PIE_COLORS = ['var(--x-orange)', 'var(--x-blue)', 'var(--x-green)', 'var(--x-amber)']
 
 // ── FILTER OPTIONS ──────────────────────────────────────────────────────────
 const filterOptions = {
@@ -42,7 +43,7 @@ function RankedList({ items, showPercent = true, showValue = true, showRank = fa
   const [search, setSearch] = useState('')
   const [othersExpanded, setOthersExpanded] = useState(false)
 
-  const COLORS = ['#F97316','#3B82F6','#10B981','#8B5CF6','#F59E0B','#64748B','#06B6D4','#EF4444']
+  const COLORS = ['var(--x-orange)','var(--x-blue)','var(--x-green)','var(--x-purple)','var(--x-amber)','var(--x-faint)','var(--x-cyan)','var(--x-red)']
   const sorted = [...items].sort((a, b) => b.value - a.value)
   const total = sorted.reduce((s, i) => s + i.value, 0)
   const maxVal = sorted[0]?.value || 1
@@ -54,9 +55,9 @@ function RankedList({ items, showPercent = true, showValue = true, showRank = fa
     <div>
       {searchable && (
         <div style={{ position:'relative', marginBottom:12 }}>
-          <Search size={12} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#64748B' }} />
+          <Search size={12} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--x-faint)' }} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
-            style={{ width:'100%', padding:'7px 10px 7px 28px', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:12, outline:'none', fontFamily:'inherit' }} />
+            style={{ width:'100%', padding:'7px 10px 7px 28px', background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)', borderRadius:8, color:'var(--x-text)', fontSize:12, outline:'none', fontFamily:'inherit' }} />
         </div>
       )}
       <div style={{ display:'flex', flexDirection:'column' }}>
@@ -69,43 +70,43 @@ function RankedList({ items, showPercent = true, showValue = true, showRank = fa
           const hasSubItems = !!(item.subItems && item.subItems.length > 0)
 
           return (
-            <div key={item.label} style={{ paddingTop:13, paddingBottom:13, borderBottom: index < visible.length - 1 ? '1px solid rgba(30,41,59,0.4)' : 'none' }}>
+            <div key={item.label} style={{ paddingTop:13, paddingBottom:13, borderBottom: index < visible.length - 1 ? '1px solid color-mix(in srgb, var(--x-border) 40%, transparent)' : 'none' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:7 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
-                  {showRank && <span style={{ fontSize:10, fontWeight:700, color:'#334155', width:16, flexShrink:0, textAlign:'right' }}>{index + 1}</span>}
+                  {showRank && <span style={{ fontSize:10, fontWeight:700, color:'var(--x-dim)', width:16, flexShrink:0, textAlign:'right' }}>{index + 1}</span>}
                   {isOthers && hasSubItems ? (
                     <button onClick={() => setOthersExpanded(!othersExpanded)}
                       style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', alignItems:'center', gap:5, fontFamily:'inherit' }}>
-                      <span style={{ fontSize:13, fontWeight:600, color:'#3B82F6', textDecoration:'underline', textDecorationStyle:'dotted', textUnderlineOffset:3 }}>
+                      <span style={{ fontSize:13, fontWeight:600, color:'var(--x-blue)', textDecoration:'underline', textDecorationStyle:'dotted', textUnderlineOffset:3 }}>
                         Others
                       </span>
-                      <span style={{ fontSize:10, color:'#3B82F6' }}>{othersExpanded ? '▲' : '▼'}</span>
+                      <span style={{ fontSize:10, color:'var(--x-blue)' }}>{othersExpanded ? '▲' : '▼'}</span>
                     </button>
                   ) : (
-                    <span style={{ fontSize:13, fontWeight: isTop ? 700 : 600, color: isTop ? '#F8FAFC' : '#94A3B8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    <span style={{ fontSize:13, fontWeight: isTop ? 700 : 600, color: isTop ? 'var(--x-text)' : 'var(--x-muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                       {item.label}
                     </span>
                   )}
                 </div>
                 <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0, marginLeft:12 }}>
-                  {showValue && <span style={{ fontSize:13, fontWeight:700, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>{item.value.toLocaleString()}{item.unit ? ` ${item.unit}` : ''}</span>}
-                  {showPercent && <span style={{ fontSize:12, fontWeight:700, color:'#94A3B8', minWidth:36, textAlign:'right' }}>{pct.toFixed(0)}%</span>}
+                  {showValue && <span style={{ fontSize:13, fontWeight:700, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>{item.value.toLocaleString()}{item.unit ? ` ${item.unit}` : ''}</span>}
+                  {showPercent && <span style={{ fontSize:12, fontWeight:700, color:'var(--x-muted)', minWidth:36, textAlign:'right' }}>{pct.toFixed(0)}%</span>}
                 </div>
               </div>
-              <div style={{ background:'#1A2234', borderRadius:4, height:5, overflow:'hidden' }}>
+              <div style={{ background:'var(--x-raised2)', borderRadius:4, height:5, overflow:'hidden' }}>
                 <div style={{ width:`${barWidth}%`, height:'100%', background:color, borderRadius:4, transition:'width 0.6s ease' }} />
               </div>
 
               {/* ── OTHERS EXPANDED SUB-TABLE ── */}
               {isOthers && hasSubItems && othersExpanded && (
-                <div style={{ marginTop:10, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.15)', borderRadius:10, overflow:'hidden' }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, padding:'8px 14px', borderBottom:'1px solid rgba(59,130,246,0.1)', fontSize:10, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                <div style={{ marginTop:10, background:'color-mix(in srgb, var(--x-blue) 4%, transparent)', border:'1px solid color-mix(in srgb, var(--x-blue) 15%, transparent)', borderRadius:10, overflow:'hidden' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, padding:'8px 14px', borderBottom:'1px solid color-mix(in srgb, var(--x-blue) 10%, transparent)', fontSize:10, fontWeight:700, color:'var(--x-faint)', textTransform:'uppercase', letterSpacing:'0.06em' }}>
                     <span>Reason</span><span style={{ textAlign:'right' }}>Hours</span>
                   </div>
                   {item.subItems!.map((sub, si) => (
-                    <div key={si} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, padding:'9px 14px', borderBottom: si < item.subItems!.length - 1 ? '1px solid rgba(30,41,59,0.5)' : 'none', alignItems:'center' }}>
-                      <span style={{ fontSize:12, color:'#F8FAFC', fontWeight:500 }}>{sub.label}</span>
-                      <span style={{ fontSize:12, fontWeight:700, color:'#F8FAFC', textAlign:'right', fontFamily:"'Space Grotesk',sans-serif" }}>{sub.value}{sub.unit ? ` ${sub.unit}` : ''}</span>
+                    <div key={si} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, padding:'9px 14px', borderBottom: si < item.subItems!.length - 1 ? '1px solid color-mix(in srgb, var(--x-border) 50%, transparent)' : 'none', alignItems:'center' }}>
+                      <span style={{ fontSize:12, color:'var(--x-text)', fontWeight:500 }}>{sub.label}</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:'var(--x-text)', textAlign:'right', fontFamily:"'Space Grotesk',sans-serif" }}>{sub.value}{sub.unit ? ` ${sub.unit}` : ''}</span>
                     </div>
                   ))}
                 </div>
@@ -116,9 +117,9 @@ function RankedList({ items, showPercent = true, showValue = true, showRank = fa
       </div>
       {!search && hiddenCount > 0 && (
         <button onClick={() => setExpanded(!expanded)}
-          style={{ marginTop:10, width:'100%', padding:'8px', background:'rgba(255,255,255,0.03)', border:'1px solid #1E293B', borderRadius:8, color:'#64748B', fontSize:12, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.2s' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='#F8FAFC' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='#64748B' }}>
+          style={{ marginTop:10, width:'100%', padding:'8px', background:'rgba(var(--x-ov),0.03)', border:'1px solid var(--x-border)', borderRadius:8, color:'var(--x-faint)', fontSize:12, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.2s' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='var(--x-text)' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='var(--x-faint)' }}>
           {expanded ? <><ChevronUp size={13} /> Show less</> : <><ChevronDown size={13} /> Show {hiddenCount} more</>}
         </button>
       )}
@@ -131,19 +132,19 @@ function KpiCard({ label, value, unit, icon: Icon, color, trend, trendUp }: {
   label: string; value: string; unit?: string; icon: any; color: string; trend?: string; trendUp?: boolean
 }) {
   return (
-    <div style={{ padding:20, borderRadius:16, background:'#0D1117', border:'1px solid #1E293B', transition:'border-color 0.2s' }}
-      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${color}40`}
-      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+    <div style={{ padding:20, borderRadius:16, background:'var(--x-card)', border:'1px solid var(--x-border)', transition:'border-color 0.2s' }}
+      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${hexA(color, 0x40)}`}
+      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-        <div style={{ width:40, height:40, borderRadius:10, background:`${color}18`, border:`1px solid ${color}30`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ width:40, height:40, borderRadius:10, background:`${hexA(color, 0x18)}`, border:`1px solid ${hexA(color, 0x30)}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
           <Icon style={{ width:18, height:18, color }} />
         </div>
-        {trend && <span style={{ fontSize:11, fontWeight:700, color: trendUp ? '#10B981' : '#EF4444' }}>{trendUp ? '↑' : '↓'} {trend}</span>}
+        {trend && <span style={{ fontSize:11, fontWeight:700, color: trendUp ? 'var(--x-green)' : 'var(--x-red)' }}>{trendUp ? '↑' : '↓'} {trend}</span>}
       </div>
-      <div style={{ fontSize:26, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>
-        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'#64748B', marginLeft:4 }}>{unit}</span>}
+      <div style={{ fontSize:26, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>
+        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'var(--x-faint)', marginLeft:4 }}>{unit}</span>}
       </div>
-      <div style={{ fontSize:13, color:'#94A3B8', marginTop:4 }}>{label}</div>
+      <div style={{ fontSize:13, color:'var(--x-muted)', marginTop:4 }}>{label}</div>
     </div>
   )
 }
@@ -151,13 +152,13 @@ function KpiCard({ label, value, unit, icon: Icon, color, trend, trendUp }: {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#1A2234] border border-[#1E293B] rounded-xl p-4 shadow-[0_16px_64px_rgba(0,0,0,0.8)]">
-        <p className="text-[#94A3B8] text-sm mb-2">{label}</p>
+      <div className="bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl p-4 shadow-[0_16px_64px_rgba(var(--x-shadow),0.8)]">
+        <p className="text-[color:var(--x-muted)] text-sm mb-2">{label}</p>
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center gap-2 mb-1 last:mb-0">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-            <span className="text-[#94A3B8] text-sm">{entry.name}:</span>
-            <span className="text-[#F8FAFC] font-bold">{entry.value}</span>
+            <span className="text-[color:var(--x-muted)] text-sm">{entry.name}:</span>
+            <span className="text-[color:var(--x-text)] font-bold">{entry.value}</span>
           </div>
         ))}
       </div>
@@ -180,15 +181,15 @@ const metersData = [
   { date: 'Feb 26', meters: 250, recovery: 235 },
 ]
 const downtimeItems: RankedItem[] = [
-  { label: 'Mechanical',     value: 12, unit: 'hrs', color: '#EF4444' },
-  { label: 'Bit Change',     value: 8,  unit: 'hrs', color: '#F59E0B' },
-  { label: 'Water Shortage', value: 6,  unit: 'hrs', color: '#64748B' },
-  { label: 'Weather',        value: 4,  unit: 'hrs', color: '#64748B' },
-  { label: 'Operator Delay', value: 3,  unit: 'hrs', color: '#64748B' },
-  { label: 'Hydraulic',      value: 2,  unit: 'hrs', color: '#64748B' },
-  { label: 'Electrical',     value: 2,  unit: 'hrs', color: '#64748B' },
-  { label: 'Safety Hold',    value: 1,  unit: 'hrs', color: '#64748B' },
-  { label: 'Others', value: 1, unit: 'hrs', color: '#334155',
+  { label: 'Mechanical',     value: 12, unit: 'hrs', color: 'var(--x-red)' },
+  { label: 'Bit Change',     value: 8,  unit: 'hrs', color: 'var(--x-amber)' },
+  { label: 'Water Shortage', value: 6,  unit: 'hrs', color: 'var(--x-faint)' },
+  { label: 'Weather',        value: 4,  unit: 'hrs', color: 'var(--x-faint)' },
+  { label: 'Operator Delay', value: 3,  unit: 'hrs', color: 'var(--x-faint)' },
+  { label: 'Hydraulic',      value: 2,  unit: 'hrs', color: 'var(--x-faint)' },
+  { label: 'Electrical',     value: 2,  unit: 'hrs', color: 'var(--x-faint)' },
+  { label: 'Safety Hold',    value: 1,  unit: 'hrs', color: 'var(--x-faint)' },
+  { label: 'Others', value: 1, unit: 'hrs', color: 'var(--x-dim)',
     subItems: [
       { label: 'Waiting for client approval', value: 0.5, unit: 'hrs', date: '12-06-2026', rig: 'KEM-14', shift: 'Day'   },
       { label: 'Personal issue — driller',    value: 0.3, unit: 'hrs', date: '11-06-2026', rig: 'KEM-02', shift: 'Night' },
@@ -267,8 +268,8 @@ export default function AdminOperationDashboard() {
   ].filter(Boolean).length
 
   const selectCls: React.CSSProperties = {
-    width:'100%', padding:'10px 14px', background:'#0D1117',
-    border:'1px solid #1E293B', borderRadius:10, color:'#F8FAFC',
+    width:'100%', padding:'10px 14px', background:'var(--x-card)',
+    border:'1px solid var(--x-border)', borderRadius:10, color:'var(--x-text)',
     fontSize:13, outline:'none', appearance:'none', fontFamily:'inherit', cursor:'pointer',
   }
 
@@ -279,20 +280,20 @@ export default function AdminOperationDashboard() {
       {/* ── HEADER ── */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-[#F8FAFC]">Operation Dashboard</h2>
-          <p className="text-[#94A3B8] mt-1">Drilling performance and productivity metrics</p>
+          <h2 className="text-3xl font-bold text-[color:var(--x-text)]">Operation Dashboard</h2>
+          <p className="text-[color:var(--x-muted)] mt-1">Drilling performance and productivity metrics</p>
         </div>
 
         <div className="flex items-center gap-3">
           {/* Duration */}
-          <div className="flex items-center gap-2 px-4 py-2 bg-[#1A2234] border border-[#1E293B] rounded-xl">
-            <Clock className="w-4 h-4 text-[#64748B]" />
-            <span className="text-xs text-[#64748B]">Duration</span>
-            <select className="bg-transparent text-[#F8FAFC] text-sm outline-none cursor-pointer"
+          <div className="flex items-center gap-2 px-4 py-2 bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl">
+            <Clock className="w-4 h-4 text-[color:var(--x-faint)]" />
+            <span className="text-xs text-[color:var(--x-faint)]">Duration</span>
+            <select className="bg-transparent text-[color:var(--x-text)] text-sm outline-none cursor-pointer"
               value={dateRange} onChange={e => setDateRange(e.target.value)}>
-              <option value="7d"  className="bg-[#1A2234]">Last 7 Days</option>
-              <option value="30d" className="bg-[#1A2234]">Last 30 Days</option>
-              <option value="90d" className="bg-[#1A2234]">Last 90 Days</option>
+              <option value="7d"  className="bg-[var(--x-raised2)]">Last 7 Days</option>
+              <option value="30d" className="bg-[var(--x-raised2)]">Last 30 Days</option>
+              <option value="90d" className="bg-[var(--x-raised2)]">Last 90 Days</option>
             </select>
           </div>
 
@@ -301,13 +302,13 @@ export default function AdminOperationDashboard() {
             <button onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
                 showFilters || activeCount > 0
-                  ? 'bg-[#3B82F6]/10 border-[#3B82F6]/40 text-[#3B82F6]'
-                  : 'bg-[#1A2234] border-[#1E293B] text-[#F8FAFC] hover:border-[#3B82F6]/40'
+                  ? 'bg-[color-mix(in_srgb,var(--x-blue)_10%,transparent)] border-[color:color-mix(in_srgb,var(--x-blue)_40%,transparent)] text-[color:var(--x-blue)]'
+                  : 'bg-[var(--x-raised2)] border-[color:var(--x-border)] text-[color:var(--x-text)] hover:border-[color:color-mix(in_srgb,var(--x-blue)_40%,transparent)]'
               }`}>
               <Filter className="w-4 h-4" />
               Filters
               {activeCount > 0 && (
-                <span className="w-5 h-5 rounded-full bg-[#3B82F6] text-white text-xs flex items-center justify-center font-bold">
+                <span className="w-5 h-5 rounded-full bg-[var(--x-blue)] text-white text-xs flex items-center justify-center font-bold">
                   {activeCount}
                 </span>
               )}
@@ -315,66 +316,66 @@ export default function AdminOperationDashboard() {
             </button>
 
             {showFilters && (
-              <div className="absolute right-0 top-12 w-80 bg-[#111827] border border-[#1E293B] rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.8)] z-50 p-5">
+              <div className="absolute right-0 top-12 w-80 bg-[var(--x-raised)] border border-[color:var(--x-border)] rounded-2xl shadow-[0_24px_80px_rgba(var(--x-shadow),0.8)] z-50 p-5">
                 <div className="flex items-center justify-between mb-5">
-                  <p className="font-bold text-[#F8FAFC]">Dashboard Filters</p>
-                  <button onClick={() => setShowFilters(false)} className="p-1 text-[#64748B] hover:text-[#F8FAFC] transition">
+                  <p className="font-bold text-[color:var(--x-text)]">Dashboard Filters</p>
+                  <button onClick={() => setShowFilters(false)} className="p-1 text-[color:var(--x-faint)] hover:text-[color:var(--x-text)] transition">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="space-y-4">
                   {/* Project */}
                   <div>
-                    <label className="block text-xs text-[#64748B] mb-1.5">Project</label>
+                    <label className="block text-xs text-[color:var(--x-faint)] mb-1.5">Project</label>
                     <div className="relative">
                       <select style={selectCls} value={project} onChange={e => handleProjectChange(e.target.value)}>
-                        {filterOptions.projects.map(p => <option key={p} value={p} className="bg-[#0D1117]">{p}</option>)}
+                        {filterOptions.projects.map(p => <option key={p} value={p} className="bg-[var(--x-card)]">{p}</option>)}
                       </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#64748B] pointer-events-none" />
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[color:var(--x-faint)] pointer-events-none" />
                     </div>
                   </div>
                   {/* Rig */}
                   <div>
-                    <label className="block text-xs text-[#64748B] mb-1.5">Rig</label>
+                    <label className="block text-xs text-[color:var(--x-faint)] mb-1.5">Rig</label>
                     <div className="relative">
                       <select style={selectCls} value={rig} onChange={e => setRig(e.target.value)}>
                         {(filterOptions.rigs[project] || filterOptions.rigs['All Projects']).map(r => (
-                          <option key={r} value={r} className="bg-[#0D1117]">{r}</option>
+                          <option key={r} value={r} className="bg-[var(--x-card)]">{r}</option>
                         ))}
                       </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#64748B] pointer-events-none" />
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[color:var(--x-faint)] pointer-events-none" />
                     </div>
                   </div>
                   {/* Hole Number */}
                   <div>
-                    <label className="block text-xs text-[#64748B] mb-1.5">Hole Number</label>
+                    <label className="block text-xs text-[color:var(--x-faint)] mb-1.5">Hole Number</label>
                     <div className="relative">
                       <select style={selectCls} value={hole} onChange={e => setHole(e.target.value)}>
                         {(filterOptions.holes[project] || filterOptions.holes['All Projects']).map(h => (
-                          <option key={h} value={h} className="bg-[#0D1117]">{h}</option>
+                          <option key={h} value={h} className="bg-[var(--x-card)]">{h}</option>
                         ))}
                       </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#64748B] pointer-events-none" />
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[color:var(--x-faint)] pointer-events-none" />
                     </div>
                   </div>
                   {/* Shift */}
                   <div>
-                    <label className="block text-xs text-[#64748B] mb-1.5">Shift</label>
+                    <label className="block text-xs text-[color:var(--x-faint)] mb-1.5">Shift</label>
                     <div className="relative">
                       <select style={selectCls} value={shift} onChange={e => setShift(e.target.value)}>
-                        {filterOptions.shifts.map(s => <option key={s} value={s} className="bg-[#0D1117]">{s}</option>)}
+                        {filterOptions.shifts.map(s => <option key={s} value={s} className="bg-[var(--x-card)]">{s}</option>)}
                       </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#64748B] pointer-events-none" />
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[color:var(--x-faint)] pointer-events-none" />
                     </div>
                   </div>
                 </div>
                 <div className="flex gap-3 mt-5">
                   <button onClick={handleReset}
-                    className="flex-1 py-2.5 border border-[#1E293B] text-[#94A3B8] rounded-xl text-sm font-medium hover:bg-[#1A2234] transition">
+                    className="flex-1 py-2.5 border border-[color:var(--x-border)] text-[color:var(--x-muted)] rounded-xl text-sm font-medium hover:bg-[var(--x-raised2)] transition">
                     Reset
                   </button>
                   <button onClick={handleApply}
-                    className="flex-1 py-2.5 bg-[#3B82F6] text-white rounded-xl text-sm font-bold hover:bg-[#2563EB] transition">
+                    className="flex-1 py-2.5 bg-[var(--x-blue)] text-white rounded-xl text-sm font-bold hover:bg-[var(--x-blue-d)] transition">
                     Apply Filters
                   </button>
                 </div>
@@ -387,27 +388,27 @@ export default function AdminOperationDashboard() {
       {/* Active filter chips */}
       {activeCount > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-[#64748B]">Filtered by:</span>
+          <span className="text-xs text-[color:var(--x-faint)]">Filtered by:</span>
           {applied.project !== 'All Projects' && (
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-[#3B82F6]/10 border border-[#3B82F6]/30 rounded-full text-xs text-[#3B82F6] font-medium">
+            <span className="flex items-center gap-1.5 px-3 py-1 bg-[color-mix(in_srgb,var(--x-blue)_10%,transparent)] border border-[color:color-mix(in_srgb,var(--x-blue)_30%,transparent)] rounded-full text-xs text-[color:var(--x-blue)] font-medium">
               {applied.project}
               <button onClick={() => { setProject('All Projects'); setApplied(a => ({...a, project:'All Projects'})) }}><X className="w-3 h-3" /></button>
             </span>
           )}
           {applied.rig !== 'All Rigs' && (
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-[#3B82F6]/10 border border-[#3B82F6]/30 rounded-full text-xs text-[#3B82F6] font-medium">
+            <span className="flex items-center gap-1.5 px-3 py-1 bg-[color-mix(in_srgb,var(--x-blue)_10%,transparent)] border border-[color:color-mix(in_srgb,var(--x-blue)_30%,transparent)] rounded-full text-xs text-[color:var(--x-blue)] font-medium">
               {applied.rig}
               <button onClick={() => { setRig('All Rigs'); setApplied(a => ({...a, rig:'All Rigs'})) }}><X className="w-3 h-3" /></button>
             </span>
           )}
           {applied.hole !== 'All Holes' && (
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-[#3B82F6]/10 border border-[#3B82F6]/30 rounded-full text-xs text-[#3B82F6] font-medium">
+            <span className="flex items-center gap-1.5 px-3 py-1 bg-[color-mix(in_srgb,var(--x-blue)_10%,transparent)] border border-[color:color-mix(in_srgb,var(--x-blue)_30%,transparent)] rounded-full text-xs text-[color:var(--x-blue)] font-medium">
               {applied.hole}
               <button onClick={() => { setHole('All Holes'); setApplied(a => ({...a, hole:'All Holes'})) }}><X className="w-3 h-3" /></button>
             </span>
           )}
           {applied.shift !== 'All Shifts' && (
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-[#3B82F6]/10 border border-[#3B82F6]/30 rounded-full text-xs text-[#3B82F6] font-medium">
+            <span className="flex items-center gap-1.5 px-3 py-1 bg-[color-mix(in_srgb,var(--x-blue)_10%,transparent)] border border-[color:color-mix(in_srgb,var(--x-blue)_30%,transparent)] rounded-full text-xs text-[color:var(--x-blue)] font-medium">
               {applied.shift} Shift
               <button onClick={() => { setShift('All Shifts'); setApplied(a => ({...a, shift:'All Shifts'})) }}><X className="w-3 h-3" /></button>
             </span>
@@ -417,22 +418,22 @@ export default function AdminOperationDashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Avg ROP"        value="6.8"   unit="m/hr" icon={Activity}    color="#F97316" trend="+15%" trendUp={true}  />
-        <KpiCard label="Total Meters"   value="8,450" unit="m"    icon={TrendingUp}  color="#3B82F6" trend="+12%" trendUp={true}  />
-        <KpiCard label="Drilling Hours" value="1,240" unit="hrs"  icon={Clock}       color="#10B981" trend="+8%"  trendUp={true}  />
-        <KpiCard label="Downtime"       value="186"   unit="hrs"  icon={AlertCircle} color="#EF4444" trend="-5%"  trendUp={false} />
+        <KpiCard label="Avg ROP"        value="6.8"   unit="m/hr" icon={Activity}    color="var(--x-orange)" trend="+15%" trendUp={true}  />
+        <KpiCard label="Total Meters"   value="8,450" unit="m"    icon={TrendingUp}  color="var(--x-blue)" trend="+12%" trendUp={true}  />
+        <KpiCard label="Drilling Hours" value="1,240" unit="hrs"  icon={Clock}       color="var(--x-green)" trend="+8%"  trendUp={true}  />
+        <KpiCard label="Downtime"       value="186"   unit="hrs"  icon={AlertCircle} color="var(--x-red)" trend="-5%"  trendUp={false} />
       </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-[#F8FAFC]">ROP Trend Analysis</h3>
+            <h3 className="text-lg font-semibold text-[color:var(--x-text)]">ROP Trend Analysis</h3>
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-[#3B82F6]"></span><span className="text-xs text-[#94A3B8]">Actual</span>
-              <span className="w-3 h-3 rounded-full bg-[#64748B] ml-2"></span><span className="text-xs text-[#94A3B8]">Target</span>
+              <span className="w-3 h-3 rounded-full bg-[var(--x-blue)]"></span><span className="text-xs text-[color:var(--x-muted)]">Actual</span>
+              <span className="w-3 h-3 rounded-full bg-[var(--x-faint)] ml-2"></span><span className="text-xs text-[color:var(--x-muted)]">Target</span>
             </div>
           </div>
           <div className="h-72">
@@ -440,84 +441,84 @@ export default function AdminOperationDashboard() {
               <AreaChart data={ropData}>
                 <defs>
                   <linearGradient id="ropGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#3B82F6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                    <stop offset="5%"  stopColor="var(--x-blue)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--x-blue)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine y={50} stroke="#64748B" strokeDasharray="5 5" />
-                <Area type="monotone" dataKey="rop" stroke="#3B82F6" strokeWidth={3} fill="url(#ropGradient)" />
-                <Line type="monotone" dataKey="target" stroke="#64748B" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                <ReferenceLine y={50} stroke="var(--x-faint)" strokeDasharray="5 5" />
+                <Area type="monotone" dataKey="rop" stroke="var(--x-blue)" strokeWidth={3} fill="url(#ropGradient)" />
+                <Line type="monotone" dataKey="target" stroke="var(--x-faint)" strokeWidth={2} strokeDasharray="5 5" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
 
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Meters Drilled vs Core Recovery</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Meters Drilled vs Core Recovery</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={metersData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar dataKey="meters"   name="Meters Drilled" fill="#3B82F6" radius={[4,4,0,0]} />
-                <Bar dataKey="recovery" name="Core Recovery"  fill="#10B981" radius={[4,4,0,0]} />
+                <Bar dataKey="meters"   name="Meters Drilled" fill="var(--x-blue)" radius={[4,4,0,0]} />
+                <Bar dataKey="recovery" name="Core Recovery"  fill="var(--x-green)" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
 
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold text-[#F8FAFC]">Downtime by Reason</h3>
-            <span className="text-xs text-[#64748B] bg-[#1A2234] px-3 py-1 rounded-full border border-[#1E293B]">
+            <h3 className="text-lg font-semibold text-[color:var(--x-text)]">Downtime by Reason</h3>
+            <span className="text-xs text-[color:var(--x-faint)] bg-[var(--x-raised2)] px-3 py-1 rounded-full border border-[color:var(--x-border)]">
               {downtimeItems.reduce((s, i) => s + i.value, 0)} hrs total
             </span>
           </div>
-          <p className="text-xs text-[#64748B] mb-4">Top causes ranked by hours lost — click <span className="text-[#3B82F6]">Others</span> to see breakdown</p>
+          <p className="text-xs text-[color:var(--x-faint)] mb-4">Top causes ranked by hours lost — click <span className="text-[color:var(--x-blue)]">Others</span> to see breakdown</p>
           <RankedList items={downtimeItems} showPercent showValue showRank maxVisible={5} searchable highlightTop={2} />
         </motion.div>
 
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.3 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Productive Hours vs Downtime</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Productive Hours vs Downtime</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={productiveData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="left"  stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="right" orientation="right" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="left"  stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar  yAxisId="left" dataKey="drilling" name="Drilling Hours" stackId="a" fill="#10B981" radius={[4,4,0,0]} />
-                <Bar  yAxisId="left" dataKey="downtime" name="Downtime"       stackId="a" fill="#EF4444" radius={[4,4,0,0]} />
-                <Line yAxisId="right" type="monotone" dataKey="efficiency" name="Efficiency %" stroke="#8B5CF6" strokeWidth={3} dot={{ fill:'#8B5CF6', r:4 }} />
+                <Bar  yAxisId="left" dataKey="drilling" name="Drilling Hours" stackId="a" fill="var(--x-green)" radius={[4,4,0,0]} />
+                <Bar  yAxisId="left" dataKey="downtime" name="Downtime"       stackId="a" fill="var(--x-red)" radius={[4,4,0,0]} />
+                <Line yAxisId="right" type="monotone" dataKey="efficiency" name="Efficiency %" stroke="var(--x-purple)" strokeWidth={3} dot={{ fill:'var(--x-purple)', r:4 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
 
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.4 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Formation vs Average ROP</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Formation vs Average ROP</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={formationData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="formation" stroke="#94A3B8" tick={{ fill:'#94A3B8', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="formation" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="rop" name="ROP (m/hr)" fill="#8B5CF6" radius={[4,4,0,0]}>
-                  {formationData.map((_, index) => <Cell key={`cell-${index}`} fill={['#3B82F6','#10B981','#F59E0B','#8B5CF6'][index]} />)}
+                <Bar dataKey="rop" name="ROP (m/hr)" fill="var(--x-purple)" radius={[4,4,0,0]}>
+                  {formationData.map((_, index) => <Cell key={`cell-${index}`} fill={['var(--x-blue)','var(--x-green)','var(--x-amber)','var(--x-purple)'][index]} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -525,32 +526,32 @@ export default function AdminOperationDashboard() {
         </motion.div>
 
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.5 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Bit Performance & Cost</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Bit Performance & Cost</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={bitPerformanceData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="left"  stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="right" orientation="right" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="left"  stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar  yAxisId="left"  dataKey="meters" name="Meters"   fill="#06B6D4" radius={[4,4,0,0]} />
-                <Line yAxisId="right" type="monotone" dataKey="cost" name="Cost ($)" stroke="#F59E0B" strokeWidth={3} dot={{ fill:'#F59E0B', r:4 }} />
+                <Bar  yAxisId="left"  dataKey="meters" name="Meters"   fill="var(--x-cyan)" radius={[4,4,0,0]} />
+                <Line yAxisId="right" type="monotone" dataKey="cost" name="Cost ($)" stroke="var(--x-amber)" strokeWidth={3} dot={{ fill:'var(--x-amber)', r:4 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
 
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.6 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Completion Type Distribution</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Completion Type Distribution</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={completionData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={3} dataKey="value">
-                  {completionData.map((_, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="#111827" strokeWidth={3} />)}
+                  {completionData.map((_, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="var(--x-raised)" strokeWidth={3} />)}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
@@ -560,17 +561,17 @@ export default function AdminOperationDashboard() {
         </motion.div>
 
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.7 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Cost per Meter by Supplier</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Cost per Meter by Supplier</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={supplierData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="supplier" stroke="#94A3B8" tick={{ fill:'#94A3B8', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="supplier" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} formatter={(value) => `$${value}/m`} />
-                <Bar dataKey="cost" name="Cost/m" fill="#EC4899" radius={[4,4,0,0]}>
-                  {supplierData.map((_, index) => <Cell key={`cell-${index}`} fill={['#3B82F6','#10B981','#F59E0B'][index]} />)}
+                <Bar dataKey="cost" name="Cost/m" fill="var(--x-pink)" radius={[4,4,0,0]}>
+                  {supplierData.map((_, index) => <Cell key={`cell-${index}`} fill={['var(--x-blue)','var(--x-green)','var(--x-amber)'][index]} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

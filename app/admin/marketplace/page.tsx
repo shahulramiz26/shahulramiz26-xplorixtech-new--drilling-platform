@@ -16,12 +16,12 @@ import BillboardCarousel, { GridPlacement } from './BillboardCarousel'
 
 /* ---------------- tokens ---------------- */
 const C = {
-  accent: '#F97316', accentSoft: 'rgba(249,115,22,0.10)',
-  accentDim: 'rgba(249,115,22,0.14)', accentBorder: 'rgba(249,115,22,0.28)',
-  panel: '#0D1117', panelHi: '#11161F', bg: '#080B10',
-  border: '#1E293B', borderSoft: 'rgba(30,41,59,0.6)',
-  text: '#F8FAFC', dim: '#94A3B8', muted: '#64748B', faint: '#334155',
-  green: '#10B981',
+  accent: 'var(--x-orange)', accentSoft: 'color-mix(in srgb, var(--x-orange) 10%, transparent)',
+  accentDim: 'color-mix(in srgb, var(--x-orange) 14%, transparent)', accentBorder: 'color-mix(in srgb, var(--x-orange) 28%, transparent)',
+  panel: 'var(--x-card)', panelHi: 'var(--x-raised)', bg: 'var(--x-bg)',
+  border: 'var(--x-border)', borderSoft: 'color-mix(in srgb, var(--x-border) 60%, transparent)',
+  text: 'var(--x-text)', dim: 'var(--x-muted)', muted: 'var(--x-faint)', faint: 'var(--x-dim)',
+  green: 'var(--x-green)',
 }
 const display = "'Space Grotesk', sans-serif"
 
@@ -34,17 +34,17 @@ function Plate({ listing, height, big = false }: { listing: Listing; height: num
   return (
     <div style={{
       height, position: 'relative', overflow: 'hidden',
-      background: `linear-gradient(140deg, ${C.panelHi} 0%, #0A0E14 100%)`,
+      background: `linear-gradient(140deg, ${C.panelHi} 0%, var(--x-bg) 100%)`,
       display: 'flex', alignItems: 'flex-end', padding: big ? 22 : 15,
     }}>
       <div aria-hidden style={{
         position: 'absolute', inset: 0, opacity: 0.55,
-        backgroundImage: 'repeating-linear-gradient(115deg, rgba(148,163,184,0.05) 0 1px, transparent 1px 12px)',
+        backgroundImage: 'repeating-linear-gradient(115deg, color-mix(in srgb, var(--x-muted) 5%, transparent) 0 1px, transparent 1px 12px)',
       }} />
       <div aria-hidden style={{
         position: 'absolute', right: -40, top: -40, width: big ? 260 : 160, height: big ? 260 : 160,
         transform: 'rotate(15deg)', borderRadius: 32,
-        background: 'linear-gradient(135deg, rgba(249,115,22,0.11), transparent 62%)',
+        background: 'linear-gradient(135deg, color-mix(in srgb, var(--x-orange) 11%, transparent), transparent 62%)',
       }} />
       <div style={{ position: 'relative' }}>
         <div style={{ fontSize: 9.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: C.faint, fontWeight: 700 }}>
@@ -52,7 +52,7 @@ function Plate({ listing, height, big = false }: { listing: Listing; height: num
         </div>
         <div style={{
           fontSize: big ? 40 : 25, fontWeight: 700, fontFamily: display,
-          color: 'rgba(248,250,252,0.12)', letterSpacing: '-0.03em', lineHeight: 1.05,
+          color: 'color-mix(in srgb, var(--x-text) 12%, transparent)', letterSpacing: '-0.03em', lineHeight: 1.05,
         }}>
           {listing.model}
         </div>
@@ -63,9 +63,9 @@ function Plate({ listing, height, big = false }: { listing: Listing; height: num
 
 function ConditionPill({ condition, size = 'sm' }: { condition: string; size?: 'sm' | 'xs' }) {
   const map: Record<string, [string, string, string]> = {
-    New: ['rgba(16,185,129,0.10)', '#34D399', 'rgba(16,185,129,0.22)'],
-    Used: ['rgba(148,163,184,0.10)', '#94A3B8', 'rgba(148,163,184,0.20)'],
-    Refurbished: ['rgba(245,158,11,0.10)', '#FBBF24', 'rgba(245,158,11,0.22)'],
+    New: ['color-mix(in srgb, var(--x-green) 10%, transparent)', 'var(--x-green-b)', 'color-mix(in srgb, var(--x-green) 22%, transparent)'],
+    Used: ['color-mix(in srgb, var(--x-muted) 10%, transparent)', 'var(--x-muted)', 'color-mix(in srgb, var(--x-muted) 20%, transparent)'],
+    Refurbished: ['color-mix(in srgb, var(--x-amber) 10%, transparent)', 'var(--x-yellow)', 'color-mix(in srgb, var(--x-amber) 22%, transparent)'],
   }
   const [bg, fg, bd] = map[condition] ?? map.Used
   return (
@@ -84,7 +84,7 @@ function SpecStrip({ listing, dense = false }: { listing: Listing; dense?: boole
       background: C.border, border: `1px solid ${C.border}`, borderRadius: 9, overflow: 'hidden',
     }}>
       {listing.headlineSpecs.map((s) => (
-        <div key={s.label} style={{ background: '#0A0E14', padding: dense ? '7px 8px' : '9px 8px' }}>
+        <div key={s.label} style={{ background: 'var(--x-bg)', padding: dense ? '7px 8px' : '9px 8px' }}>
           <div style={{ fontSize: 9, color: C.faint, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700 }}>
             {s.label}
           </div>
@@ -109,7 +109,7 @@ function GridCard({ l, saved, onSave, onQuote }: {
         borderRadius: 14, overflow: 'hidden', background: C.panel,
         border: `1px solid ${hover ? C.accentBorder : C.border}`,
         transform: hover ? 'translateY(-3px)' : 'none',
-        boxShadow: hover ? '0 16px 36px rgba(0,0,0,0.5)' : 'none',
+        boxShadow: hover ? '0 16px 36px rgba(var(--x-shadow),0.5)' : 'none',
         transition: 'all .22s ease', display: 'flex', flexDirection: 'column',
       }}
     >
@@ -131,7 +131,7 @@ function GridCard({ l, saved, onSave, onQuote }: {
           style={{
             position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderRadius: 8,
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: saved ? C.accentDim : 'rgba(8,11,16,0.72)',
+            background: saved ? C.accentDim : 'color-mix(in srgb, var(--x-bg) 72%, transparent)',
             border: `1px solid ${saved ? C.accentBorder : C.border}`,
             color: saved ? C.accent : C.muted, backdropFilter: 'blur(6px)',
           }}>
@@ -178,7 +178,7 @@ function GridCard({ l, saved, onSave, onQuote }: {
             width: '100%', padding: '9px 14px', borderRadius: 10, cursor: 'pointer',
             fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            background: hover ? 'linear-gradient(135deg,#F97316,#EA580C)' : C.accentSoft,
+            background: hover ? 'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))' : C.accentSoft,
             color: hover ? '#fff' : C.accent,
             border: `1px solid ${hover ? 'transparent' : C.accentBorder}`, transition: 'all .22s',
           }}>Request quote <ArrowRight size={13} /></button>
@@ -237,11 +237,11 @@ function RowCard({ l, saved, onSave, onQuote }: {
         <div style={{ display: 'flex', gap: 7 }}>
           <button onClick={() => onQuote(l)} style={{
             flex: 1, padding: '9px', borderRadius: 9, cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
-            fontFamily: 'inherit', background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff', border: 'none',
+            fontFamily: 'inherit', background: 'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))', color: '#fff', border: 'none',
           }}>Request quote</button>
           <button onClick={() => onSave(l.id)} aria-label="Save" style={{
             width: 36, borderRadius: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: saved ? C.accentDim : 'rgba(255,255,255,0.03)',
+            background: saved ? C.accentDim : 'rgba(var(--x-ov),0.03)',
             border: `1px solid ${saved ? C.accentBorder : C.border}`, color: saved ? C.accent : C.muted,
           }}><Bookmark size={14} fill={saved ? C.accent : 'none'} /></button>
         </div>
@@ -395,7 +395,7 @@ export default function MarketplacePage() {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 11, padding: '13px 18px',
         borderRadius: 13, marginBottom: 24,
-        background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
+        background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${C.border}`,
       }}>
         <Search size={17} style={{ color: C.muted, flexShrink: 0 }} />
         <input value={query} onChange={(e) => setQuery(e.target.value)}
@@ -542,7 +542,7 @@ export default function MarketplacePage() {
                             })} style={{
                               padding: '4px 9px', borderRadius: 7, cursor: 'pointer', fontSize: 11.5,
                               fontWeight: 600, fontFamily: 'inherit',
-                              background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
+                              background: on ? C.accentDim : 'rgba(var(--x-ov),0.03)',
                               border: `1px solid ${on ? C.accentBorder : C.border}`,
                               color: on ? C.accent : C.dim,
                             }}>{o}</button>
@@ -571,7 +571,7 @@ export default function MarketplacePage() {
                     <button key={r} onClick={() => setRegion(on ? null : r)} style={{
                       padding: '4px 9px', borderRadius: 7, cursor: 'pointer', fontSize: 11.5,
                       fontWeight: 600, fontFamily: 'inherit',
-                      background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
+                      background: on ? C.accentDim : 'rgba(var(--x-ov),0.03)',
                       border: `1px solid ${on ? C.accentBorder : C.border}`, color: on ? C.accent : C.dim,
                     }}>{r}</button>
                   )
@@ -623,7 +623,7 @@ export default function MarketplacePage() {
                 <button onClick={() => setRailOpen(!railOpen)} className="xpl-rail-toggle"
                   style={{
                     display: 'none', alignItems: 'center', gap: 7, padding: '9px 14px', borderRadius: 10,
-                    background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
+                    background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${C.border}`,
                     color: C.dim, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
                   }}>
                   <SlidersHorizontal size={15} /> Filters
@@ -640,7 +640,7 @@ export default function MarketplacePage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                 <select value={sort} onChange={(e) => setSort(e.target.value)}
                   style={{
-                    padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)',
+                    padding: '9px 12px', borderRadius: 10, background: 'rgba(var(--x-ov),0.03)',
                     border: `1px solid ${C.border}`, color: C.dim, fontSize: 12.5,
                     fontFamily: 'inherit', cursor: 'pointer', outline: 'none', fontWeight: 600,
                   }}>
@@ -650,7 +650,7 @@ export default function MarketplacePage() {
                   <option value="price_high">Price, high to low</option>
                 </select>
 
-                <div style={{ display: 'flex', gap: 2, padding: 3, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}` }}>
+                <div style={{ display: 'flex', gap: 2, padding: 3, borderRadius: 10, background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${C.border}` }}>
                   {(['grid', 'list'] as const).map((v) => {
                     const Icon = v === 'grid' ? LayoutGrid : ListIcon
                     const on = view === v
@@ -708,7 +708,7 @@ export default function MarketplacePage() {
               <div style={{ padding: '60px 24px', textAlign: 'center', borderRadius: 14, background: C.panel, border: `1px dashed ${C.border}` }}>
                 <div style={{
                   width: 46, height: 46, borderRadius: 12, margin: '0 auto 16px',
-                  background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`,
+                  background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}><Package size={20} style={{ color: C.muted }} /></div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 6, fontFamily: display }}>
@@ -752,7 +752,7 @@ function QuoteModal({ listing, onClose }: { listing: Listing; onClose: () => voi
 
   const field: React.CSSProperties = {
     width: '100%', padding: '10px 12px', borderRadius: 9,
-    background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
+    background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${C.border}`,
     color: C.text, fontSize: 13, fontFamily: 'inherit', outline: 'none',
   }
   const label: React.CSSProperties = {
@@ -763,7 +763,7 @@ function QuoteModal({ listing, onClose }: { listing: Listing; onClose: () => voi
   return (
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, zIndex: 100, padding: 20,
-      background: 'rgba(0,0,0,0.74)', backdropFilter: 'blur(6px)',
+      background: 'rgba(var(--x-shadow),0.74)', backdropFilter: 'blur(6px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
@@ -786,7 +786,7 @@ function QuoteModal({ listing, onClose }: { listing: Listing; onClose: () => voi
           <div style={{ padding: '30px 22px 26px', textAlign: 'center' }}>
             <div style={{
               width: 46, height: 46, borderRadius: 12, margin: '0 auto 14px',
-              background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)',
+              background: 'color-mix(in srgb, var(--x-green) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--x-green) 25%, transparent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}><BadgeCheck size={22} style={{ color: C.green }} /></div>
             <div style={{ fontSize: 14, color: C.text, fontWeight: 600, marginBottom: 6 }}>
@@ -797,12 +797,12 @@ function QuoteModal({ listing, onClose }: { listing: Listing; onClose: () => voi
             </p>
             <Link href="/admin/marketplace/inquiries" onClick={onClose} style={{
               display: 'inline-block', padding: '10px 20px', borderRadius: 10,
-              background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff', fontWeight: 700, fontSize: 13,
+              background: 'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))', color: '#fff', fontWeight: 700, fontSize: 13,
             }}>View my inquiries</Link>
           </div>
         ) : (
           <div style={{ padding: 22 }}>
-            <div style={{ padding: 14, borderRadius: 11, marginBottom: 20, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.14)' }}>
+            <div style={{ padding: 14, borderRadius: 11, marginBottom: 20, background: 'color-mix(in srgb, var(--x-orange) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--x-orange) 14%, transparent)' }}>
               <div style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.accent, fontWeight: 700, marginBottom: 10 }}>
                 Sent with your request
               </div>
@@ -831,9 +831,9 @@ function QuoteModal({ listing, onClose }: { listing: Listing; onClose: () => voi
 
             <button onClick={() => setSent(true)} style={{
               width: '100%', padding: 12, borderRadius: 10, cursor: 'pointer',
-              background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff',
+              background: 'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))', color: '#fff',
               border: 'none', fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
-              boxShadow: '0 4px 20px rgba(249,115,22,0.3)',
+              boxShadow: '0 4px 20px color-mix(in srgb, var(--x-orange) 30%, transparent)',
             }}>Send request</button>
           </div>
         )}

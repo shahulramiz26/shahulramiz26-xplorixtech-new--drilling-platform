@@ -9,49 +9,50 @@ import {
 import { Droplets, Package, Wrench, TrendingUp, ArrowUpRight, ArrowDownRight, Filter } from 'lucide-react'
 import AIInsights from '../../../components/AIInsights'
 import RankedList from '../../../components/RankedList'
+import { hexA } from '../../../../lib/theme'
 
 function KpiCard({ label, value, unit, icon: Icon, color, trend, trendUp }: {
   label: string; value: string; unit?: string; icon: any
   color: string; trend?: string; trendUp?: boolean
 }) {
   return (
-    <div style={{ padding:20, borderRadius:16, background:'#0D1117', border:'1px solid #1E293B', transition:'border-color 0.2s' }}
-      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${color}40`}
-      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+    <div style={{ padding:20, borderRadius:16, background:'var(--x-card)', border:'1px solid var(--x-border)', transition:'border-color 0.2s' }}
+      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${hexA(color, 0x40)}`}
+      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-        <div style={{ width:40, height:40, borderRadius:10, background:`${color}18`, border:`1px solid ${color}30`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ width:40, height:40, borderRadius:10, background:`${hexA(color, 0x18)}`, border:`1px solid ${hexA(color, 0x30)}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
           <Icon style={{ width:18, height:18, color }} />
         </div>
         {trend && (
-          <span style={{ fontSize:11, fontWeight:700, color: trendUp ? '#10B981' : '#EF4444' }}>
+          <span style={{ fontSize:11, fontWeight:700, color: trendUp ? 'var(--x-green)' : 'var(--x-red)' }}>
             {trendUp ? '↑' : '↓'} {trend}
           </span>
         )}
       </div>
-      <div style={{ fontSize:26, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>
-        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'#64748B', marginLeft:4 }}>{unit}</span>}
+      <div style={{ fontSize:26, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>
+        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'var(--x-faint)', marginLeft:4 }}>{unit}</span>}
       </div>
-      <div style={{ fontSize:13, color:'#94A3B8', marginTop:4 }}>{label}</div>
+      <div style={{ fontSize:13, color:'var(--x-muted)', marginTop:4 }}>{label}</div>
     </div>
   )
 }
 
 const COLORS = {
-  primary: '#3B82F6', accent: '#10B981', purple: '#8B5CF6',
-  warning: '#F59E0B', danger: '#EF4444', cyan: '#06B6D4', pink: '#EC4899'
+  primary: 'var(--x-blue)', accent: 'var(--x-green)', purple: 'var(--x-purple)',
+  warning: 'var(--x-amber)', danger: 'var(--x-red)', cyan: 'var(--x-cyan)', pink: 'var(--x-pink)'
 }
-const PIE_COLORS = ['#3B82F6', '#EF4444', '#F59E0B', '#10B981', '#8B5CF6', '#06B6D4']
+const PIE_COLORS = ['var(--x-blue)', 'var(--x-red)', 'var(--x-amber)', 'var(--x-green)', 'var(--x-purple)', 'var(--x-cyan)']
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#1A2234] border border-[#1E293B] rounded-xl p-4 shadow-[0_16px_64px_rgba(0,0,0,0.8)]">
-        <p className="text-[#94A3B8] text-sm mb-2">{label}</p>
+      <div className="bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl p-4 shadow-[0_16px_64px_rgba(var(--x-shadow),0.8)]">
+        <p className="text-[color:var(--x-muted)] text-sm mb-2">{label}</p>
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center gap-2 mb-1 last:mb-0">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
-            <span className="text-[#94A3B8] text-sm">{entry.name}:</span>
-            <span className="text-[#F8FAFC] font-bold">{entry.value}</span>
+            <span className="text-[color:var(--x-muted)] text-sm">{entry.name}:</span>
+            <span className="text-[color:var(--x-text)] font-bold">{entry.value}</span>
           </div>
         ))}
       </div>
@@ -72,14 +73,14 @@ const fluidData = [
 
 // ── ACCESSORIES DATA — supports unlimited items ────────────────────────────
 const accessoriesRankedItems = [
-  { label:'Drill Pipe',    value:12800, unit:'$', color:'#EF4444'  },
-  { label:'Core Barrel',  value:10800, unit:'$', color:'#3B82F6'  },
-  { label:'Casing',       value:8400,  unit:'$', color:'#F59E0B'  },
-  { label:'Core Lifter',  value:4500,  unit:'$', color:'#8B5CF6'  },
-  { label:'Reaming Shell',value:4500,  unit:'$', color:'#10B981'  },
-  { label:'Liner',        value:3300,  unit:'$', color:'#06B6D4'  },
-  { label:'Coupling',     value:2400,  unit:'$', color:'#EC4899'  },
-  { label:'O-Rings',      value:560,   unit:'$', color:'#64748B'  },
+  { label:'Drill Pipe',    value:12800, unit:'$', color:'var(--x-red)'  },
+  { label:'Core Barrel',  value:10800, unit:'$', color:'var(--x-blue)'  },
+  { label:'Casing',       value:8400,  unit:'$', color:'var(--x-amber)'  },
+  { label:'Core Lifter',  value:4500,  unit:'$', color:'var(--x-purple)'  },
+  { label:'Reaming Shell',value:4500,  unit:'$', color:'var(--x-green)'  },
+  { label:'Liner',        value:3300,  unit:'$', color:'var(--x-cyan)'  },
+  { label:'Coupling',     value:2400,  unit:'$', color:'var(--x-pink)'  },
+  { label:'O-Rings',      value:560,   unit:'$', color:'var(--x-faint)'  },
 ]
 
 const accessoriesTrend = [
@@ -100,12 +101,12 @@ const equipmentData = [
 ]
 
 const costBreakdown = [
-  { name:'Fuel',        value:6150,  color:'#EF4444' },
-  { name:'Water',       value:18900, color:'#3B82F6' },
-  { name:'Additives',   value:1140,  color:'#F59E0B' },
-  { name:'Oil',         value:373,   color:'#10B981' },
-  { name:'Accessories', value:51460, color:'#8B5CF6' },
-  { name:'Equipment',   value:28400, color:'#06B6D4' },
+  { name:'Fuel',        value:6150,  color:'var(--x-red)' },
+  { name:'Water',       value:18900, color:'var(--x-blue)' },
+  { name:'Additives',   value:1140,  color:'var(--x-amber)' },
+  { name:'Oil',         value:373,   color:'var(--x-green)' },
+  { name:'Accessories', value:51460, color:'var(--x-purple)' },
+  { name:'Equipment',   value:28400, color:'var(--x-cyan)' },
 ]
 
 const supplierPerformance = [
@@ -138,15 +139,15 @@ export default function AdminConsumablesDashboard() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-[#F8FAFC]">Consumable Dashboard</h2>
-          <p className="text-[#94A3B8] mt-1">Resource utilization and inventory management</p>
+          <h2 className="text-3xl font-bold text-[color:var(--x-text)]">Consumable Dashboard</h2>
+          <p className="text-[color:var(--x-muted)] mt-1">Resource utilization and inventory management</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 bg-[#1A2234] border border-[#1E293B] rounded-xl">
-            <Filter className="w-4 h-4 text-[#64748B]" />
-            <select className="bg-transparent text-[#F8FAFC] text-sm outline-none">
-              <option className="bg-[#1A2234]">All Projects</option>
-              <option className="bg-[#1A2234]">Gold Mine Project A</option>
+          <div className="flex items-center gap-2 px-4 py-2 bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl">
+            <Filter className="w-4 h-4 text-[color:var(--x-faint)]" />
+            <select className="bg-transparent text-[color:var(--x-text)] text-sm outline-none">
+              <option className="bg-[var(--x-raised2)]">All Projects</option>
+              <option className="bg-[var(--x-raised2)]">Gold Mine Project A</option>
             </select>
           </div>
         </div>
@@ -154,10 +155,10 @@ export default function AdminConsumablesDashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Total Fuel"       value="6,150"  unit="L"   icon={Droplets} color="#EF4444" trend="+10%" trendUp={false} />
-        <KpiCard label="Total Water"      value="18,900" unit="L"   icon={Droplets} color="#3B82F6" trend="+5%"  trendUp={false} />
-        <KpiCard label="Accessories Cost" value="$51,460"            icon={Package}  color="#8B5CF6" trend="+15%" trendUp={false} />
-        <KpiCard label="Equipment Hours"  value="1,248"  unit="hrs" icon={Wrench}   color="#06B6D4" trend="+8%"  trendUp={true}  />
+        <KpiCard label="Total Fuel"       value="6,150"  unit="L"   icon={Droplets} color="var(--x-red)" trend="+10%" trendUp={false} />
+        <KpiCard label="Total Water"      value="18,900" unit="L"   icon={Droplets} color="var(--x-blue)" trend="+5%"  trendUp={false} />
+        <KpiCard label="Accessories Cost" value="$51,460"            icon={Package}  color="var(--x-purple)" trend="+15%" trendUp={false} />
+        <KpiCard label="Equipment Hours"  value="1,248"  unit="hrs" icon={Wrench}   color="var(--x-cyan)" trend="+8%"  trendUp={true}  />
       </div>
 
       {/* Charts Grid */}
@@ -165,31 +166,31 @@ export default function AdminConsumablesDashboard() {
 
         {/* Fluid Consumption */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }} className="lg:col-span-2">
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Fluid Consumption Breakdown</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }} className="lg:col-span-2">
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Fluid Consumption Breakdown</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={fluidData}>
                 <defs>
                   <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.4}/><stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--x-blue)" stopOpacity={0.4}/><stop offset="95%" stopColor="var(--x-blue)" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="fuelGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.4}/><stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--x-red)" stopOpacity={0.4}/><stop offset="95%" stopColor="var(--x-red)" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="addGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.4}/><stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--x-amber)" stopOpacity={0.4}/><stop offset="95%" stopColor="var(--x-amber)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Area type="monotone" dataKey="water"    name="Water (L)"      stackId="1" stroke="#3B82F6" strokeWidth={2} fill="url(#waterGrad)" />
-                <Area type="monotone" dataKey="fuel"     name="Fuel (L)"       stackId="1" stroke="#EF4444" strokeWidth={2} fill="url(#fuelGrad)"  />
-                <Area type="monotone" dataKey="additives"name="Additives (kg)" stackId="1" stroke="#F59E0B" strokeWidth={2} fill="url(#addGrad)"   />
-                <Line type="monotone" dataKey="oil" name="Oil (L)" stroke="#10B981" strokeWidth={3} dot={{ fill:'#10B981', r:4 }} />
+                <Area type="monotone" dataKey="water"    name="Water (L)"      stackId="1" stroke="var(--x-blue)" strokeWidth={2} fill="url(#waterGrad)" />
+                <Area type="monotone" dataKey="fuel"     name="Fuel (L)"       stackId="1" stroke="var(--x-red)" strokeWidth={2} fill="url(#fuelGrad)"  />
+                <Area type="monotone" dataKey="additives"name="Additives (kg)" stackId="1" stroke="var(--x-amber)" strokeWidth={2} fill="url(#addGrad)"   />
+                <Line type="monotone" dataKey="oil" name="Oil (L)" stroke="var(--x-green)" strokeWidth={3} dot={{ fill:'var(--x-green)', r:4 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -197,14 +198,14 @@ export default function AdminConsumablesDashboard() {
 
         {/* ── ACCESSORIES USAGE — REPLACED WITH RankedList ── */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold text-[#F8FAFC]">Accessories Usage by Cost</h3>
-            <span className="text-xs text-[#64748B] bg-[#1A2234] px-3 py-1 rounded-full border border-[#1E293B]">
+            <h3 className="text-lg font-semibold text-[color:var(--x-text)]">Accessories Usage by Cost</h3>
+            <span className="text-xs text-[color:var(--x-faint)] bg-[var(--x-raised2)] px-3 py-1 rounded-full border border-[color:var(--x-border)]">
               ${accessoriesRankedItems.reduce((s,i) => s+i.value, 0).toLocaleString()} total
             </span>
           </div>
-          <p className="text-xs text-[#64748B] mb-4">Ranked by spend — works for unlimited accessories</p>
+          <p className="text-xs text-[color:var(--x-faint)] mb-4">Ranked by spend — works for unlimited accessories</p>
           <RankedList
             items={accessoriesRankedItems}
             showPercent={true}
@@ -220,19 +221,19 @@ export default function AdminConsumablesDashboard() {
 
         {/* Accessories Trend */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Accessories Usage Trend</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Accessories Usage Trend</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={accessoriesTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="left"  stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="right" orientation="right" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="left"  stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar  yAxisId="left"  dataKey="usage" name="Units Used" fill="#8B5CF6" radius={[4,4,0,0]} />
-                <Line yAxisId="right" type="monotone" dataKey="cost" name="Cost ($)" stroke="#EC4899" strokeWidth={3} dot={{ fill:'#EC4899', r:4 }} />
+                <Bar  yAxisId="left"  dataKey="usage" name="Units Used" fill="var(--x-purple)" radius={[4,4,0,0]} />
+                <Line yAxisId="right" type="monotone" dataKey="cost" name="Cost ($)" stroke="var(--x-pink)" strokeWidth={3} dot={{ fill:'var(--x-pink)', r:4 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -240,20 +241,20 @@ export default function AdminConsumablesDashboard() {
 
         {/* Equipment Usage Hours */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.3 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }} className="lg:col-span-2">
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Equipment Usage Hours by Type</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }} className="lg:col-span-2">
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Equipment Usage Hours by Type</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={equipmentData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar dataKey="compressor" name="Air Compressor" stackId="a" fill="#3B82F6" radius={[4,4,0,0]} />
-                <Bar dataKey="pump"       name="Mud Pump"       stackId="a" fill="#10B981" radius={[4,4,0,0]} />
-                <Bar dataKey="generator"  name="Generator"      stackId="a" fill="#F59E0B" radius={[4,4,0,0]} />
-                <Bar dataKey="other"      name="Other"          stackId="a" fill="#64748B" radius={[4,4,0,0]} />
+                <Bar dataKey="compressor" name="Air Compressor" stackId="a" fill="var(--x-blue)" radius={[4,4,0,0]} />
+                <Bar dataKey="pump"       name="Mud Pump"       stackId="a" fill="var(--x-green)" radius={[4,4,0,0]} />
+                <Bar dataKey="generator"  name="Generator"      stackId="a" fill="var(--x-amber)" radius={[4,4,0,0]} />
+                <Bar dataKey="other"      name="Other"          stackId="a" fill="var(--x-faint)" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -261,14 +262,14 @@ export default function AdminConsumablesDashboard() {
 
         {/* Cost Breakdown Pie */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.4 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Total Cost Breakdown</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Total Cost Breakdown</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={costBreakdown} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={4} dataKey="value">
                   {costBreakdown.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} stroke="#111827" strokeWidth={3} />
+                    <Cell key={`cell-${index}`} fill={entry.color} stroke="var(--x-raised)" strokeWidth={3} />
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} formatter={(value) => `$${Number(value).toLocaleString()}`} />
@@ -280,20 +281,20 @@ export default function AdminConsumablesDashboard() {
 
         {/* Supplier Performance */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.5 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Supplier Performance Score</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Supplier Performance Score</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={supplierPerformance}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="supplier" stroke="#94A3B8" tick={{ fill:'#94A3B8', fontSize:11 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} domain={[0,100]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="supplier" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:11 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} domain={[0,100]} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar dataKey="delivery" name="Delivery" fill="#3B82F6" radius={[4,4,0,0]} />
-                <Bar dataKey="quality"  name="Quality"  fill="#10B981" radius={[4,4,0,0]} />
-                <Bar dataKey="price"    name="Price"    fill="#F59E0B" radius={[4,4,0,0]} />
-                <Bar dataKey="support"  name="Support"  fill="#8B5CF6" radius={[4,4,0,0]} />
+                <Bar dataKey="delivery" name="Delivery" fill="var(--x-blue)" radius={[4,4,0,0]} />
+                <Bar dataKey="quality"  name="Quality"  fill="var(--x-green)" radius={[4,4,0,0]} />
+                <Bar dataKey="price"    name="Price"    fill="var(--x-amber)" radius={[4,4,0,0]} />
+                <Bar dataKey="support"  name="Support"  fill="var(--x-purple)" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -301,24 +302,24 @@ export default function AdminConsumablesDashboard() {
 
         {/* Inventory Levels */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.6 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }} className="lg:col-span-2">
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Inventory Levels</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }} className="lg:col-span-2">
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Inventory Levels</h3>
           <div className="space-y-4">
             {inventoryLevels.map((item, i) => (
               <div key={i} className="flex items-center gap-4">
-                <div className="w-32 text-sm text-[#94A3B8]">{item.item}</div>
+                <div className="w-32 text-sm text-[color:var(--x-muted)]">{item.item}</div>
                 <div className="flex-1">
-                  <div className="h-3 bg-[#1E293B] rounded-full overflow-hidden">
+                  <div className="h-3 bg-[var(--x-border)] rounded-full overflow-hidden">
                     <div className={`h-full rounded-full transition-all duration-500 ${
-                      item.status==='critical' ? 'bg-[#EF4444]' : item.status==='low' ? 'bg-[#F59E0B]' : 'bg-[#10B981]'
+                      item.status==='critical' ? 'bg-[var(--x-red)]' : item.status==='low' ? 'bg-[var(--x-amber)]' : 'bg-[var(--x-green)]'
                     }`} style={{ width:`${(item.current/item.max)*100}%` }} />
                   </div>
                 </div>
                 <div className="w-16 text-right">
                   <span className={`text-sm font-medium ${
-                    item.status==='critical' ? 'text-[#EF4444]' : item.status==='low' ? 'text-[#F59E0B]' : 'text-[#10B981]'
+                    item.status==='critical' ? 'text-[color:var(--x-red)]' : item.status==='low' ? 'text-[color:var(--x-amber)]' : 'text-[color:var(--x-green)]'
                   }`}>{item.current}</span>
-                  <span className="text-xs text-[#64748B]">/{item.max}</span>
+                  <span className="text-xs text-[color:var(--x-faint)]">/{item.max}</span>
                 </div>
               </div>
             ))}

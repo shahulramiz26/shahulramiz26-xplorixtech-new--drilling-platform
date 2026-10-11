@@ -976,11 +976,11 @@ export function daysUntil(from: string, to: string) {
 }
 
 export const C = {
-  bg: '#080B10', card: '#0D1117', border: '#1E293B',
-  orange: '#F97316', orangeD: '#EA580C',
-  green: '#10B981', red: '#EF4444', amber: '#F59E0B',
-  blue: '#3B82F6', purple: '#8B5CF6', teal: '#14B8A6',
-  text: '#F8FAFC', muted: '#94A3B8', faint: '#64748B', dim: '#334155',
+  bg: 'var(--x-bg)', card: 'var(--x-card)', border: 'var(--x-border)',
+  orange: 'var(--x-orange)', orangeD: 'var(--x-orange-d)',
+  green: 'var(--x-green)', red: 'var(--x-red)', amber: 'var(--x-amber)',
+  blue: 'var(--x-blue)', purple: 'var(--x-purple)', teal: 'var(--x-teal)',
+  text: 'var(--x-text)', muted: 'var(--x-muted)', faint: 'var(--x-faint)', dim: 'var(--x-dim)',
 }
 
 export const CONFIDENCE_TONE: Record<Confidence, string> = {

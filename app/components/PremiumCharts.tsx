@@ -27,15 +27,15 @@ import { motion } from "framer-motion";
 
 // Color palette matching the dark theme
 const COLORS = {
-  primary: "#3B82F6",
-  accent: "#F59E0B",
-  purple: "#8B5CF6",
-  warning: "#EF4444",
-  danger: "#DC2626",
-  cyan: "#06B6D4",
-  pink: "#EC4899",
-  slate: "#64748B",
-  emerald: "#10B981",
+  primary: "var(--x-blue)",
+  accent: "var(--x-amber)",
+  purple: "var(--x-purple)",
+  warning: "var(--x-red)",
+  danger: "var(--x-red-d)",
+  cyan: "var(--x-cyan)",
+  pink: "var(--x-pink)",
+  slate: "var(--x-faint)",
+  emerald: "var(--x-green)",
 };
 
 // Animation variants
@@ -65,8 +65,8 @@ const itemVariants = {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#1E2535] border border-[#2A3040] rounded-lg p-3 shadow-xl">
-        <p className="text-white font-medium mb-2">{label}</p>
+      <div className="bg-[var(--x-raised2)] border border-[color:var(--x-border2)] rounded-lg p-3 shadow-xl">
+        <p className="text-[color:var(--x-text)] font-medium mb-2">{label}</p>
         {payload.map((entry: any, index: number) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
             {entry.name}: {entry.value}
@@ -88,9 +88,9 @@ export function PerformanceChart({ data }: { data: any[] }) {
     >
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#2A3040" />
-          <XAxis dataKey="name" stroke="#64748B" fontSize={12} />
-          <YAxis stroke="#64748B" fontSize={12} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border2)" />
+          <XAxis dataKey="name" stroke="var(--x-faint)" fontSize={12} />
+          <YAxis stroke="var(--x-faint)" fontSize={12} />
           <Tooltip content={<CustomTooltip />} />
           <Legend />
           <Line
@@ -126,9 +126,9 @@ export function DrillingActivityChart({ data }: { data: any[] }) {
     >
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#2A3040" />
-          <XAxis dataKey="day" stroke="#64748B" fontSize={12} />
-          <YAxis stroke="#64748B" fontSize={12} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border2)" />
+          <XAxis dataKey="day" stroke="var(--x-faint)" fontSize={12} />
+          <YAxis stroke="var(--x-faint)" fontSize={12} />
           <Tooltip content={<CustomTooltip />} />
           <Legend />
           <Bar dataKey="drilling" name="Drilling Hours" fill={COLORS.emerald} radius={[4, 4, 0, 0]} />
@@ -155,9 +155,9 @@ export function ConsumptionChart({ data }: { data: any[] }) {
     >
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#2A3040" />
-          <XAxis dataKey="month" stroke="#64748B" fontSize={12} />
-          <YAxis stroke="#64748B" fontSize={12} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border2)" />
+          <XAxis dataKey="month" stroke="var(--x-faint)" fontSize={12} />
+          <YAxis stroke="var(--x-faint)" fontSize={12} />
           <Tooltip content={<CustomTooltip />} />
           <Legend />
           <Area
@@ -221,9 +221,9 @@ export function CrewPerformanceChart({ data }: { data: any[] }) {
     >
       <ResponsiveContainer width="100%" height="100%">
         <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
-          <PolarGrid stroke="#2A3040" />
-          <PolarAngleAxis dataKey="subject" stroke="#64748B" fontSize={12} />
-          <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="#64748B" />
+          <PolarGrid stroke="var(--x-border2)" />
+          <PolarAngleAxis dataKey="subject" stroke="var(--x-faint)" fontSize={12} />
+          <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="var(--x-faint)" />
           <Radar
             name="Current"
             dataKey="A"
@@ -255,9 +255,9 @@ export function MaintenanceTimelineChart({ data }: { data: any[] }) {
     >
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical">
-          <CartesianGrid strokeDasharray="3 3" stroke="#2A3040" />
-          <XAxis type="number" stroke="#64748B" fontSize={12} />
-          <YAxis dataKey="equipment" type="category" stroke="#64748B" fontSize={12} width={100} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border2)" />
+          <XAxis type="number" stroke="var(--x-faint)" fontSize={12} />
+          <YAxis dataKey="equipment" type="category" stroke="var(--x-faint)" fontSize={12} width={100} />
           <Tooltip content={<CustomTooltip />} />
           <Legend />
           <Bar dataKey="completed" name="Completed" stackId="a" fill={COLORS.emerald} radius={[0, 4, 4, 0]} />

@@ -29,9 +29,9 @@ interface RankedListProps {
 }
 
 const COLORS = [
-  '#F97316','#3B82F6','#10B981','#8B5CF6',
-  '#F59E0B','#64748B','#06B6D4','#EF4444',
-  '#EC4899','#14B8A6',
+  'var(--x-orange)','var(--x-blue)','var(--x-green)','var(--x-purple)',
+  'var(--x-amber)','var(--x-faint)','var(--x-cyan)','var(--x-red)',
+  'var(--x-pink)','var(--x-teal)',
 ]
 
 export default function RankedList({
@@ -46,7 +46,7 @@ export default function RankedList({
   searchable = false,
   othersThreshold = 0,
   colorMode = 'cycle',
-  singleColor = '#F97316',
+  singleColor = 'var(--x-orange)',
   emptyMessage = 'No data available',
   highlightTop = 0,
 }: RankedListProps) {
@@ -54,7 +54,7 @@ export default function RankedList({
   const [search, setSearch] = useState('')
 
   if (!items || items.length === 0) {
-    return <div style={{ padding:'20px 0', textAlign:'center', color:'#64748B', fontSize:13 }}>{emptyMessage}</div>
+    return <div style={{ padding:'20px 0', textAlign:'center', color:'var(--x-faint)', fontSize:13 }}>{emptyMessage}</div>
   }
 
   // Sort by value descending
@@ -72,7 +72,7 @@ export default function RankedList({
       othersItem = {
         label: `Others (${others.length} items)`,
         value: others.reduce((s, i) => s + i.value, 0),
-        color: '#334155',
+        color: 'var(--x-dim)',
       }
       displayItems = [...main, othersItem]
     }
@@ -98,20 +98,20 @@ export default function RankedList({
   return (
     <div>
       {title && (
-        <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC', marginBottom:14 }}>{title}</div>
+        <div style={{ fontSize:14, fontWeight:700, color:'var(--x-text)', marginBottom:14 }}>{title}</div>
       )}
 
       {searchable && (
         <div style={{ position:'relative', marginBottom:12 }}>
-          <Search size={12} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#64748B' }} />
+          <Search size={12} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--x-faint)' }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search..."
             style={{
               width:'100%', padding:'7px 10px 7px 28px',
-              background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B',
-              borderRadius:8, color:'#F8FAFC', fontSize:12, outline:'none',
+              background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)',
+              borderRadius:8, color:'var(--x-text)', fontSize:12, outline:'none',
               fontFamily:'inherit',
             }}
           />
@@ -129,14 +129,14 @@ export default function RankedList({
             <div key={`${item.label}-${index}`}
               style={{
                 paddingTop: py, paddingBottom: py,
-                borderBottom: index < visible.length - 1 ? '1px solid rgba(30,41,59,0.4)' : 'none',
+                borderBottom: index < visible.length - 1 ? '1px solid color-mix(in srgb, var(--x-border) 40%, transparent)' : 'none',
               }}
             >
               {/* Label row */}
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:7 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1 }}>
                   {showRank && (
-                    <span style={{ fontSize:10, fontWeight:700, color:'#334155', width:16, flexShrink:0, textAlign:'right' }}>
+                    <span style={{ fontSize:10, fontWeight:700, color:'var(--x-dim)', width:16, flexShrink:0, textAlign:'right' }}>
                       {index + 1}
                     </span>
                   )}
@@ -144,13 +144,13 @@ export default function RankedList({
                     <div style={{
                       fontSize: compact ? 12 : 13,
                       fontWeight: isTop ? 700 : 600,
-                      color: isTop ? '#F8FAFC' : '#94A3B8',
+                      color: isTop ? 'var(--x-text)' : 'var(--x-muted)',
                       overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                     }}>
                       {item.label}
                     </div>
                     {item.sublabel && (
-                      <div style={{ fontSize:10, color:'#64748B', marginTop:1 }}>{item.sublabel}</div>
+                      <div style={{ fontSize:10, color:'var(--x-faint)', marginTop:1 }}>{item.sublabel}</div>
                     )}
                   </div>
                 </div>
@@ -158,12 +158,12 @@ export default function RankedList({
                 {/* Value + Percent */}
                 <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0, marginLeft:12 }}>
                   {showValue && (
-                    <span style={{ fontSize: compact ? 12 : 13, fontWeight:700, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>
+                    <span style={{ fontSize: compact ? 12 : 13, fontWeight:700, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>
                       {valuePrefix}{item.value.toLocaleString()}{item.unit ? ` ${item.unit}` : ''}
                     </span>
                   )}
                   {showPercent && (
-                    <span style={{ fontSize: compact ? 11 : 12, fontWeight:700, color:'#94A3B8', minWidth:36, textAlign:'right' }}>
+                    <span style={{ fontSize: compact ? 11 : 12, fontWeight:700, color:'var(--x-muted)', minWidth:36, textAlign:'right' }}>
                       {pct.toFixed(0)}%
                     </span>
                   )}
@@ -171,7 +171,7 @@ export default function RankedList({
               </div>
 
               {/* Progress Bar */}
-              <div style={{ background:'#1A2234', borderRadius:4, height: compact ? 4 : 5, overflow:'hidden' }}>
+              <div style={{ background:'var(--x-raised2)', borderRadius:4, height: compact ? 4 : 5, overflow:'hidden' }}>
                 <div style={{
                   width:`${barWidth}%`, height:'100%',
                   background: color,
@@ -190,13 +190,13 @@ export default function RankedList({
           onClick={() => setExpanded(!expanded)}
           style={{
             marginTop:10, width:'100%', padding:'8px',
-            background:'rgba(255,255,255,0.03)', border:'1px solid #1E293B',
-            borderRadius:8, color:'#64748B', fontSize:12, fontWeight:600,
+            background:'rgba(var(--x-ov),0.03)', border:'1px solid var(--x-border)',
+            borderRadius:8, color:'var(--x-faint)', fontSize:12, fontWeight:600,
             cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
             transition:'all 0.2s',
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='#F8FAFC'; (e.currentTarget as HTMLElement).style.borderColor='#334155' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='#64748B'; (e.currentTarget as HTMLElement).style.borderColor='#1E293B' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='var(--x-text)'; (e.currentTarget as HTMLElement).style.borderColor='var(--x-dim)' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='var(--x-faint)'; (e.currentTarget as HTMLElement).style.borderColor='var(--x-border)' }}
         >
           {expanded
             ? <><ChevronUp size={13} /> Show less</>

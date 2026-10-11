@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { useServerSync } from './backend'
 
 /* ==========================================================================
  * XPLORIX PARTS & INVENTORY
@@ -1247,6 +1248,11 @@ function initial(): State {
   }
 }
 
+export const seedInventoryState = () => initial()
+function emptyInventory(): State {
+  return { catalogue: [], suppliers: [], pos: [], rigKit: [], storeStock: [], alerts: DEFAULT_ALERTS }
+}
+
 let seq = 0
 export const uid = (p: string) => `${p}_${Date.now()}_${++seq}_${Math.floor(Math.random() * 9999)}`
 
@@ -1275,11 +1281,24 @@ const InvCtx = createContext<Ctx | null>(null)
 const KEY = 'xplorix_inventory_v11'
 const LEGACY_KEY = 'xplorix_inventory_v10'
 
+/* One store per browser tab. The root layout mounts this once; the Finance and
+ * Inventory routes also wrap themselves in it, and when they do they join the
+ * one already above them rather than keeping a second copy of the stock. */
 export function InventoryProvider({ children }: { children: ReactNode }) {
+  const parent = useContext(InvCtx)
+  if (parent) return <>{children}</>
+  return <InventoryRoot>{children}</InventoryRoot>
+}
+
+function InventoryRoot({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initial)
   const [loaded, setLoaded] = useState(false)
+  // Kept on the server when a database is connected; in this browser when not.
+  const sync = useServerSync('inventory', state, setState, emptyInventory)
+  const local = sync.mode === 'demo'
 
   useEffect(() => {
+    if (!local) return
     try {
       const base = initial()
       const raw = localStorage.getItem(KEY) ?? localStorage.getItem(LEGACY_KEY)
@@ -1298,8 +1317,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       }
     } catch {}
     setLoaded(true)
-  }, [])
-  useEffect(() => { if (loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }, [state, loaded])
+  }, [local])
+  useEffect(() => { if (local && loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }, [state, loaded, local])
 
   function up<T extends { id: string }>(list: T[], x: T): T[] {
     return list.some(i => i.id === x.id) ? list.map(i => i.id === x.id ? x : i) : [...list, x]

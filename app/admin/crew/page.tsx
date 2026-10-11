@@ -13,11 +13,11 @@ import {
 } from './data'
 
 const C = {
-  accent: '#F97316', accentSoft: 'rgba(249,115,22,0.10)',
-  accentDim: 'rgba(249,115,22,0.14)', accentBorder: 'rgba(249,115,22,0.28)',
-  panel: '#0D1117', panelHi: '#11161F', bg: '#080B10',
-  border: '#1E293B', text: '#F8FAFC', dim: '#94A3B8',
-  muted: '#64748B', faint: '#334155', green: '#10B981', amber: '#FBBF24',
+  accent: 'var(--x-orange)', accentSoft: 'color-mix(in srgb, var(--x-orange) 10%, transparent)',
+  accentDim: 'color-mix(in srgb, var(--x-orange) 14%, transparent)', accentBorder: 'color-mix(in srgb, var(--x-orange) 28%, transparent)',
+  panel: 'var(--x-card)', panelHi: 'var(--x-raised)', bg: 'var(--x-bg)',
+  border: 'var(--x-border)', text: 'var(--x-text)', dim: 'var(--x-muted)',
+  muted: 'var(--x-faint)', faint: 'var(--x-dim)', green: 'var(--x-green)', amber: 'var(--x-yellow)',
 }
 const display = "'Space Grotesk', sans-serif"
 
@@ -124,10 +124,10 @@ function CollapsibleChecks({ options, selected, onToggle, counts, initial = 5 }:
  * ================================================================== */
 function Pill({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'neutral' | 'accent' | 'green' | 'amber' }) {
   const map = {
-    neutral: ['rgba(255,255,255,0.04)', C.dim, C.border],
+    neutral: ['rgba(var(--x-ov),0.04)', C.dim, C.border],
     accent: [C.accentSoft, C.accent, C.accentBorder],
-    green: ['rgba(16,185,129,0.10)', '#34D399', 'rgba(16,185,129,0.22)'],
-    amber: ['rgba(245,158,11,0.10)', C.amber, 'rgba(245,158,11,0.22)'],
+    green: ['color-mix(in srgb, var(--x-green) 10%, transparent)', 'var(--x-green-b)', 'color-mix(in srgb, var(--x-green) 22%, transparent)'],
+    amber: ['color-mix(in srgb, var(--x-amber) 10%, transparent)', C.amber, 'color-mix(in srgb, var(--x-amber) 22%, transparent)'],
   } as const
   const [bg, fg, bd] = map[tone]
   return (
@@ -154,7 +154,7 @@ function CrewCard({ c, onRequest }: { c: CrewProfile; onRequest: (c: CrewProfile
       <div style={{ display: 'flex', gap: 13, marginBottom: 14 }}>
         <div style={{
           width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-          background: 'linear-gradient(135deg, rgba(249,115,22,0.18), rgba(245,158,11,0.10))',
+          background: 'linear-gradient(135deg, color-mix(in srgb, var(--x-orange) 18%, transparent), color-mix(in srgb, var(--x-amber) 10%, transparent))',
           border: `1px solid ${C.accentBorder}`, display: 'flex', alignItems: 'center',
           justifyContent: 'center', fontFamily: display, fontWeight: 700, fontSize: 15, color: C.accent,
         }}>{c.initials}</div>
@@ -176,8 +176,8 @@ function CrewCard({ c, onRequest }: { c: CrewProfile; onRequest: (c: CrewProfile
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
         padding: '10px 12px', borderRadius: 10, marginBottom: 13,
-        background: avail.tone === 'now' ? 'rgba(16,185,129,0.07)' : 'rgba(255,255,255,0.025)',
-        border: `1px solid ${avail.tone === 'now' ? 'rgba(16,185,129,0.18)' : C.border}`,
+        background: avail.tone === 'now' ? 'color-mix(in srgb, var(--x-green) 7%, transparent)' : 'rgba(var(--x-ov),0.025)',
+        border: `1px solid ${avail.tone === 'now' ? 'color-mix(in srgb, var(--x-green) 18%, transparent)' : C.border}`,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <CalendarDays size={13} style={{ color: avail.tone === 'now' ? C.green : C.dim, flexShrink: 0 }} />
@@ -192,7 +192,7 @@ function CrewCard({ c, onRequest }: { c: CrewProfile; onRequest: (c: CrewProfile
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 9, padding: '11px 12px',
           borderRadius: 10, marginBottom: 13,
-          background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.16)',
+          background: 'color-mix(in srgb, var(--x-orange) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--x-orange) 16%, transparent)',
         }}>
           <ShieldCheck size={15} style={{ color: C.accent, flexShrink: 0, marginTop: 1 }} />
           <div>
@@ -207,7 +207,7 @@ function CrewCard({ c, onRequest }: { c: CrewProfile; onRequest: (c: CrewProfile
       ) : (
         <div style={{
           padding: '11px 12px', borderRadius: 10, marginBottom: 13, fontSize: 11.5,
-          color: C.muted, background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}`, lineHeight: 1.45,
+          color: C.muted, background: 'rgba(var(--x-ov),0.02)', border: `1px solid ${C.border}`, lineHeight: 1.45,
         }}>
           Experience self-reported — no XPLORIX-logged production on record.
         </div>
@@ -233,7 +233,7 @@ function CrewCard({ c, onRequest }: { c: CrewProfile; onRequest: (c: CrewProfile
         marginTop: 'auto', width: '100%', padding: '10px', borderRadius: 10, cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
         fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-        background: hover ? 'linear-gradient(135deg,#F97316,#EA580C)' : C.accentSoft,
+        background: hover ? 'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))' : C.accentSoft,
         color: hover ? '#fff' : C.accent,
         border: `1px solid ${hover ? 'transparent' : C.accentBorder}`, transition: 'all .2s',
       }}>
@@ -394,11 +394,11 @@ export default function CrewPage() {
       }}>
         <div aria-hidden style={{
           position: 'absolute', inset: 0, opacity: 0.5,
-          backgroundImage: 'repeating-linear-gradient(115deg, rgba(148,163,184,0.045) 0 1px, transparent 1px 14px)',
+          backgroundImage: 'repeating-linear-gradient(115deg, color-mix(in srgb, var(--x-muted) 4.5%, transparent) 0 1px, transparent 1px 14px)',
         }} />
         <div aria-hidden style={{
           position: 'absolute', right: -80, top: -90, width: 320, height: 320, borderRadius: 50,
-          transform: 'rotate(15deg)', background: 'linear-gradient(135deg, rgba(249,115,22,0.12), transparent 60%)',
+          transform: 'rotate(15deg)', background: 'linear-gradient(135deg, color-mix(in srgb, var(--x-orange) 12%, transparent), transparent 60%)',
         }} />
 
         <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -433,9 +433,9 @@ export default function CrewPage() {
             ))}
             <button onClick={() => setShowPost(true)} style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '11px 20px', borderRadius: 11,
-              background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff', border: 'none',
+              background: 'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))', color: '#fff', border: 'none',
               fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit',
-              boxShadow: '0 4px 20px rgba(249,115,22,0.3)', whiteSpace: 'nowrap',
+              boxShadow: '0 4px 20px color-mix(in srgb, var(--x-orange) 30%, transparent)', whiteSpace: 'nowrap',
             }}>
               <Plus size={16} /> Post a job
             </button>
@@ -444,7 +444,7 @@ export default function CrewPage() {
       </div>
 
       {/* ---------- tabs ---------- */}
-      <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, width: 'fit-content', marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${C.border}`, width: 'fit-content', marginBottom: 20 }}>
         {([['pool', 'Availability pool', Users], ['jobs', 'My job postings', Briefcase]] as const).map(([id, label, Icon]) => {
           const on = tab === id
           return (
@@ -491,7 +491,7 @@ export default function CrewPage() {
                     <button key={label} onClick={() => setWindowDays(d)} style={{
                       padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
                       fontWeight: 600, fontFamily: 'inherit',
-                      background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
+                      background: on ? C.accentDim : 'rgba(var(--x-ov),0.03)',
                       border: `1px solid ${on ? C.accentBorder : C.border}`,
                       color: on ? C.accent : C.dim,
                     }}>{label}</button>
@@ -526,7 +526,7 @@ export default function CrewPage() {
                     <button key={r} onClick={() => toggle(rotations, r, setRotations)} style={{
                       padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 11.5,
                       fontWeight: 600, fontFamily: 'inherit',
-                      background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
+                      background: on ? C.accentDim : 'rgba(var(--x-ov),0.03)',
                       border: `1px solid ${on ? C.accentBorder : C.border}`, color: on ? C.accent : C.dim,
                     }}>{r}</button>
                   )
@@ -566,7 +566,7 @@ export default function CrewPage() {
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '12px 15px',
               borderRadius: 12, marginBottom: 14,
-              background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
+              background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${C.border}`,
             }}>
               <Search size={16} style={{ color: C.muted, flexShrink: 0 }} />
               <input value={query} onChange={(e) => setQuery(e.target.value)}
@@ -586,7 +586,7 @@ export default function CrewPage() {
                 <button onClick={() => setRailOpen(!railOpen)} className="xpc-rail-toggle"
                   style={{
                     display: 'none', alignItems: 'center', gap: 7, padding: '9px 14px', borderRadius: 10,
-                    background: chips.length ? C.accentDim : 'rgba(255,255,255,0.03)',
+                    background: chips.length ? C.accentDim : 'rgba(var(--x-ov),0.03)',
                     border: `1px solid ${chips.length ? C.accentBorder : C.border}`,
                     color: chips.length ? C.accent : C.dim, fontSize: 13, fontWeight: 600,
                     cursor: 'pointer', fontFamily: 'inherit',
@@ -601,7 +601,7 @@ export default function CrewPage() {
 
               <select value={sort} onChange={(e) => setSort(e.target.value)}
                 style={{
-                  padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)',
+                  padding: '9px 12px', borderRadius: 10, background: 'rgba(var(--x-ov),0.03)',
                   border: `1px solid ${C.border}`, color: C.dim, fontSize: 12.5,
                   fontFamily: 'inherit', cursor: 'pointer', outline: 'none', fontWeight: 600,
                 }}>
@@ -633,7 +633,7 @@ export default function CrewPage() {
               <div style={{ padding: '56px 24px', textAlign: 'center', borderRadius: 14, background: C.panel, border: `1px dashed ${C.border}` }}>
                 <div style={{
                   width: 46, height: 46, borderRadius: 12, margin: '0 auto 16px',
-                  background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`,
+                  background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}><Users size={20} style={{ color: C.muted }} /></div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 6, fontFamily: display }}>
@@ -645,7 +645,7 @@ export default function CrewPage() {
                 </p>
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
                   <button onClick={clearAll} style={{
-                    padding: '9px 18px', borderRadius: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.03)',
+                    padding: '9px 18px', borderRadius: 10, cursor: 'pointer', background: 'rgba(var(--x-ov),0.03)',
                     border: `1px solid ${C.border}`, color: C.dim, fontWeight: 600, fontSize: 13, fontFamily: 'inherit',
                   }}>Reset filters</button>
                   <button onClick={() => setShowPost(true)} style={{
@@ -658,7 +658,7 @@ export default function CrewPage() {
 
             <div style={{
               marginTop: 22, padding: 15, borderRadius: 12, fontSize: 12, color: C.muted,
-              background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}`, lineHeight: 1.65,
+              background: 'rgba(var(--x-ov),0.02)', border: `1px solid ${C.border}`, lineHeight: 1.65,
             }}>
               Everyone here has opted in to being visible and confirmed their availability within
               the last 30 days. Contact details are released only after the person accepts your request.
@@ -707,12 +707,12 @@ export default function CrewPage() {
  * ================================================================== */
 const shell: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 100, padding: 20,
-  background: 'rgba(0,0,0,0.74)', backdropFilter: 'blur(6px)',
+  background: 'rgba(var(--x-shadow),0.74)', backdropFilter: 'blur(6px)',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
 }
 const field: React.CSSProperties = {
   width: '100%', padding: '10px 12px', borderRadius: 9,
-  background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
+  background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${C.border}`,
   color: C.text, fontSize: 13, fontFamily: 'inherit', outline: 'none',
 }
 const flabel: React.CSSProperties = {
@@ -749,7 +749,7 @@ function ContactModal({ c, onClose }: { c: CrewProfile; onClose: () => void }) {
             </p>
           ) : (
             <>
-              <div style={{ padding: 14, borderRadius: 11, marginBottom: 18, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.14)' }}>
+              <div style={{ padding: 14, borderRadius: 11, marginBottom: 18, background: 'color-mix(in srgb, var(--x-orange) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--x-orange) 14%, transparent)' }}>
                 <div style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.accent, fontWeight: 700, marginBottom: 10 }}>
                   They will see
                 </div>
@@ -779,7 +779,7 @@ function ContactModal({ c, onClose }: { c: CrewProfile; onClose: () => void }) {
 
               <button onClick={() => setSent(true)} style={{
                 width: '100%', padding: 12, borderRadius: 10, cursor: 'pointer',
-                background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff',
+                background: 'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))', color: '#fff',
                 border: 'none', fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
               }}>Send request</button>
 
@@ -864,7 +864,7 @@ function PostJobModal({ onClose }: { onClose: () => void }) {
               </div>
               <button onClick={() => setStep(2)} style={{
                 width: '100%', padding: 12, borderRadius: 10, cursor: 'pointer',
-                background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff',
+                background: 'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))', color: '#fff',
                 border: 'none', fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
               }}>Continue</button>
             </>
@@ -886,7 +886,7 @@ function PostJobModal({ onClose }: { onClose: () => void }) {
                       <button key={r} onClick={() => toggle(rigs, r, setRigs)} style={{
                         padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
                         fontWeight: 600, fontFamily: 'inherit',
-                        background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
+                        background: on ? C.accentDim : 'rgba(var(--x-ov),0.03)',
                         border: `1px solid ${on ? C.accentBorder : C.border}`, color: on ? C.accent : C.dim,
                       }}>{r}</button>
                     )
@@ -903,7 +903,7 @@ function PostJobModal({ onClose }: { onClose: () => void }) {
                       <button key={c} onClick={() => toggle(certs, c, setCerts)} style={{
                         padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
                         fontWeight: 600, fontFamily: 'inherit',
-                        background: on ? C.accentDim : 'rgba(255,255,255,0.03)',
+                        background: on ? C.accentDim : 'rgba(var(--x-ov),0.03)',
                         border: `1px solid ${on ? C.accentBorder : C.border}`, color: on ? C.accent : C.dim,
                       }}>{c}</button>
                     )
@@ -925,7 +925,7 @@ function PostJobModal({ onClose }: { onClose: () => void }) {
               {rigs.length > 0 && (
                 <div style={{
                   padding: 13, borderRadius: 11, marginBottom: 18, display: 'flex', gap: 10,
-                  background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.14)',
+                  background: 'color-mix(in srgb, var(--x-orange) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--x-orange) 14%, transparent)',
                 }}>
                   <Users size={16} style={{ color: C.accent, flexShrink: 0, marginTop: 1 }} />
                   <div style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.55 }}>
@@ -940,12 +940,12 @@ function PostJobModal({ onClose }: { onClose: () => void }) {
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={() => setStep(1)} style={{
                   padding: '12px 20px', borderRadius: 10, cursor: 'pointer',
-                  background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
+                  background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${C.border}`,
                   color: C.dim, fontWeight: 600, fontSize: 13.5, fontFamily: 'inherit',
                 }}>Back</button>
                 <button onClick={() => setStep(3)} style={{
                   flex: 1, padding: 12, borderRadius: 10, cursor: 'pointer',
-                  background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff',
+                  background: 'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))', color: '#fff',
                   border: 'none', fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
                 }}>Publish job</button>
               </div>
@@ -956,7 +956,7 @@ function PostJobModal({ onClose }: { onClose: () => void }) {
             <div style={{ textAlign: 'center', padding: '10px 0' }}>
               <div style={{
                 width: 48, height: 48, borderRadius: 13, margin: '0 auto 16px',
-                background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)',
+                background: 'color-mix(in srgb, var(--x-green) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--x-green) 25%, transparent)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}><BadgeCheck size={23} style={{ color: C.green }} /></div>
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8, fontFamily: display }}>
@@ -968,7 +968,7 @@ function PostJobModal({ onClose }: { onClose: () => void }) {
               </p>
               <button onClick={onClose} style={{
                 padding: '10px 22px', borderRadius: 10, cursor: 'pointer',
-                background: 'linear-gradient(135deg,#F97316,#EA580C)', color: '#fff',
+                background: 'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))', color: '#fff',
                 border: 'none', fontWeight: 700, fontSize: 13.5, fontFamily: 'inherit',
               }}>Done</button>
             </div>

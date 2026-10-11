@@ -125,8 +125,8 @@ const DATA: Record<string, ProjectData> = {
 const rigsByProject: Record<string, string[]> = { GMA: ['KEM-14', 'KEM-13'], CES: ['KEM-02'] }
 
 // ── STYLES ────────────────────────────────────────────────────────────────────
-const selectCls = "w-full px-4 py-2.5 bg-[#0D1117] border border-[#1E293B] rounded-xl text-[#F8FAFC] text-sm appearance-none outline-none focus:border-[#3B82F6] transition-colors cursor-pointer"
-const sectionCls = "rounded-2xl bg-[#111827] border border-[#1E293B] overflow-hidden"
+const selectCls = "w-full px-4 py-2.5 bg-[var(--x-card)] border border-[color:var(--x-border)] rounded-xl text-[color:var(--x-text)] text-sm appearance-none outline-none focus:border-[color:var(--x-blue)] transition-colors cursor-pointer"
+const sectionCls = "rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)] overflow-hidden"
 
 export default function PerformanceDashboard() {
   const [project, setProject] = useState('')
@@ -151,17 +151,17 @@ export default function PerformanceDashboard() {
 
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-[#F8FAFC]">Performance Dashboard</h1>
-        <p className="text-[#64748B] mt-1">Select a hole to see the full shift-by-shift breakdown</p>
+        <h1 className="text-3xl font-bold text-[color:var(--x-text)]">Performance Dashboard</h1>
+        <p className="text-[color:var(--x-faint)] mt-1">Select a hole to see the full shift-by-shift breakdown</p>
       </div>
 
       {/* Filter bar */}
-      <div className="p-5 rounded-2xl bg-[#111827] border border-[#1E293B]">
+      <div className="p-5 rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)]">
         <div className="flex items-center gap-3 flex-wrap">
 
           {/* Project */}
           <div className="flex-1 min-w-[160px]">
-            <label className="block text-xs text-[#64748B] mb-1.5">Project</label>
+            <label className="block text-xs text-[color:var(--x-faint)] mb-1.5">Project</label>
             <div className="relative">
               <select className={selectCls} value={project} onChange={e => onProject(e.target.value)}>
                 <option value="">Select project...</option>
@@ -170,22 +170,22 @@ export default function PerformanceDashboard() {
             </div>
           </div>
 
-          <ChevronRight className="w-4 h-4 text-[#334155] flex-shrink-0 mt-4" />
+          <ChevronRight className="w-4 h-4 text-[color:var(--x-dim)] flex-shrink-0 mt-4" />
 
           {/* Rig */}
           <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs text-[#64748B] mb-1.5">Rig</label>
+            <label className="block text-xs text-[color:var(--x-faint)] mb-1.5">Rig</label>
             <select className={selectCls} value={rig} onChange={e => onRig(e.target.value)} disabled={!project}>
               <option value="">{project ? 'Select rig...' : '— select project first'}</option>
               {rigs.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
 
-          <ChevronRight className="w-4 h-4 text-[#334155] flex-shrink-0 mt-4" />
+          <ChevronRight className="w-4 h-4 text-[color:var(--x-dim)] flex-shrink-0 mt-4" />
 
           {/* Hole */}
           <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs text-[#64748B] mb-1.5">Hole Number</label>
+            <label className="block text-xs text-[color:var(--x-faint)] mb-1.5">Hole Number</label>
             <select className={selectCls} value={hole} onChange={e => setHole(e.target.value)} disabled={!rig}>
               <option value="">{rig ? 'Select hole...' : '— select rig first'}</option>
               {holes.map(h => <option key={h} value={h}>{h}</option>)}
@@ -196,7 +196,7 @@ export default function PerformanceDashboard() {
           {(project || rig || hole) && (
             <button
               onClick={() => { setProject(''); setRig(''); setHole('') }}
-              className="mt-4 px-4 py-2.5 text-sm text-[#64748B] border border-[#1E293B] rounded-xl hover:text-[#F8FAFC] hover:border-[#334155] transition-colors"
+              className="mt-4 px-4 py-2.5 text-sm text-[color:var(--x-faint)] border border-[color:var(--x-border)] rounded-xl hover:text-[color:var(--x-text)] hover:border-[color:var(--x-dim)] transition-colors"
             >
               Reset
             </button>
@@ -206,14 +206,14 @@ export default function PerformanceDashboard() {
 
       {/* Prompt state */}
       {!holeData && (
-        <div className="flex flex-col items-center justify-center py-20 rounded-2xl bg-[#111827] border border-[#1E293B]">
-          <div className="w-14 h-14 rounded-2xl bg-[#3B82F6]/10 border border-[#3B82F6]/20 flex items-center justify-center mb-4">
-            <ChevronRight className="w-6 h-6 text-[#3B82F6]" />
+        <div className="flex flex-col items-center justify-center py-20 rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)]">
+          <div className="w-14 h-14 rounded-2xl bg-[color-mix(in_srgb,var(--x-blue)_10%,transparent)] border border-[color:color-mix(in_srgb,var(--x-blue)_20%,transparent)] flex items-center justify-center mb-4">
+            <ChevronRight className="w-6 h-6 text-[color:var(--x-blue)]" />
           </div>
-          <p className="text-[#F8FAFC] font-semibold mb-2">
+          <p className="text-[color:var(--x-text)] font-semibold mb-2">
             {!project ? 'Select a project to begin' : !rig ? 'Now select a rig' : 'Now select a hole'}
           </p>
-          <p className="text-sm text-[#64748B]">
+          <p className="text-sm text-[color:var(--x-faint)]">
             {!hole ? "You'll see a full shift-by-shift breakdown of the selected hole" : ''}
           </p>
         </div>
@@ -223,19 +223,19 @@ export default function PerformanceDashboard() {
       {holeData && (
         <>
           {/* Hole header */}
-          <div className="p-5 rounded-2xl bg-[#111827] border border-[#1E293B]">
+          <div className="p-5 rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)]">
             <div className="flex items-center gap-3 mb-4 flex-wrap">
-              <h2 className="text-xl font-bold text-[#F8FAFC]">{hole}</h2>
-              <span className="text-[#64748B] text-sm">·</span>
-              <span className="text-[#94A3B8] text-sm">{rig}</span>
-              <span className="text-[#64748B] text-sm">·</span>
-              <span className="text-[#94A3B8] text-sm">{DATA[project].name}</span>
+              <h2 className="text-xl font-bold text-[color:var(--x-text)]">{hole}</h2>
+              <span className="text-[color:var(--x-faint)] text-sm">·</span>
+              <span className="text-[color:var(--x-muted)] text-sm">{rig}</span>
+              <span className="text-[color:var(--x-faint)] text-sm">·</span>
+              <span className="text-[color:var(--x-muted)] text-sm">{DATA[project].name}</span>
               <span className={`ml-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
                 holeData.status === 'OPEN'
-                  ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30'
-                  : 'bg-[#64748B]/20 text-[#64748B] border border-[#64748B]/30'
+                  ? 'bg-[color-mix(in_srgb,var(--x-green)_20%,transparent)] text-[color:var(--x-green)] border border-[color:color-mix(in_srgb,var(--x-green)_30%,transparent)]'
+                  : 'bg-[color-mix(in_srgb,var(--x-faint)_20%,transparent)] text-[color:var(--x-faint)] border border-[color:color-mix(in_srgb,var(--x-faint)_30%,transparent)]'
               }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${holeData.status === 'OPEN' ? 'bg-[#10B981]' : 'bg-[#64748B]'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${holeData.status === 'OPEN' ? 'bg-[var(--x-green)]' : 'bg-[var(--x-faint)]'}`} />
                 {holeData.status}
               </span>
             </div>
@@ -247,9 +247,9 @@ export default function PerformanceDashboard() {
                 { label: 'Total Meters', val: `${totalMeters}m` },
                 { label: 'Total Downtime', val: `${totalDt} hrs` },
               ].map(item => (
-                <div key={item.label} className="p-3 rounded-xl bg-[#0D1117] border border-[#1E293B]">
-                  <p className="text-xs text-[#64748B] mb-1">{item.label}</p>
-                  <p className="text-sm font-bold text-[#F8FAFC]">{item.val}</p>
+                <div key={item.label} className="p-3 rounded-xl bg-[var(--x-card)] border border-[color:var(--x-border)]">
+                  <p className="text-xs text-[color:var(--x-faint)] mb-1">{item.label}</p>
+                  <p className="text-sm font-bold text-[color:var(--x-text)]">{item.val}</p>
                 </div>
               ))}
             </div>
@@ -257,59 +257,59 @@ export default function PerformanceDashboard() {
 
           {/* Shift-by-shift table */}
           <div className={sectionCls}>
-            <div className="px-5 py-4 border-b border-[#1E293B]">
-              <h3 className="text-sm font-semibold text-[#F8FAFC]">Shift-by-shift log</h3>
-              <p className="text-xs text-[#64748B] mt-0.5">{holeData.shifts.length} shifts · {bitsUsed} bit{bitsUsed > 1 ? 's' : ''} used</p>
+            <div className="px-5 py-4 border-b border-[color:var(--x-border)]">
+              <h3 className="text-sm font-semibold text-[color:var(--x-text)]">Shift-by-shift log</h3>
+              <p className="text-xs text-[color:var(--x-faint)] mt-0.5">{holeData.shifts.length} shifts · {bitsUsed} bit{bitsUsed > 1 ? 's' : ''} used</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="text-left border-b border-[#1E293B] bg-[#0D1117]">
+                  <tr className="text-left border-b border-[color:var(--x-border)] bg-[var(--x-card)]">
                     {['Date', 'Shift', 'Depth From', 'Depth To', 'Meters Drilled', 'Bit(s)', 'Downtime'].map(h => (
-                      <th key={h} className="px-5 py-3 text-xs font-semibold text-[#64748B] uppercase tracking-wider whitespace-nowrap">{h}</th>
+                      <th key={h} className="px-5 py-3 text-xs font-semibold text-[color:var(--x-faint)] uppercase tracking-wider whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#1E293B]">
+                <tbody className="divide-y divide-[color:var(--x-border)]">
                   {holeData.shifts.map((s, i) => {
                     return (
-                      <tr key={i} className="hover:bg-[#1A2234]/50 transition">
-                        <td className="px-5 py-3 text-sm text-[#94A3B8] whitespace-nowrap">{s.date}</td>
+                      <tr key={i} className="hover:bg-[color-mix(in_srgb,var(--x-raised2)_50%,transparent)] transition">
+                        <td className="px-5 py-3 text-sm text-[color:var(--x-muted)] whitespace-nowrap">{s.date}</td>
                         <td className="px-5 py-3">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
                             s.shift === 'Day'
-                              ? 'bg-[#3B82F6]/10 text-[#60A5FA] border border-[#3B82F6]/20'
-                              : 'bg-[#8B5CF6]/10 text-[#A78BFA] border border-[#8B5CF6]/20'
+                              ? 'bg-[color-mix(in_srgb,var(--x-blue)_10%,transparent)] text-[color:var(--x-blue-b)] border border-[color:color-mix(in_srgb,var(--x-blue)_20%,transparent)]'
+                              : 'bg-[color-mix(in_srgb,var(--x-purple)_10%,transparent)] text-[color:var(--x-purple-b)] border border-[color:color-mix(in_srgb,var(--x-purple)_20%,transparent)]'
                           }`}>
                             {s.shift === 'Day' ? '☀ Day' : '🌙 Night'}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-sm font-mono text-[#94A3B8]">{s.depthFrom}m</td>
-                        <td className="px-5 py-3 text-sm font-mono font-bold text-[#F8FAFC]">{s.depthTo}m</td>
-                        <td className="px-5 py-3 text-sm font-bold text-[#F8FAFC]">{s.meters}m</td>
+                        <td className="px-5 py-3 text-sm font-mono text-[color:var(--x-muted)]">{s.depthFrom}m</td>
+                        <td className="px-5 py-3 text-sm font-mono font-bold text-[color:var(--x-text)]">{s.depthTo}m</td>
+                        <td className="px-5 py-3 text-sm font-bold text-[color:var(--x-text)]">{s.meters}m</td>
                         <td className="px-5 py-3">
                           <div className="space-y-1">
                             {s.bits.map((b, bi) => (
                               <div key={bi} className="flex items-center gap-1.5">
                                 {b.replaced ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/20">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-[color-mix(in_srgb,var(--x-red)_10%,transparent)] text-[color:var(--x-red)] border border-[color:color-mix(in_srgb,var(--x-red)_20%,transparent)]">
                                     ✕ {b.serial} · {b.bitType}
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-[color-mix(in_srgb,var(--x-green)_10%,transparent)] text-[color:var(--x-green)] border border-[color:color-mix(in_srgb,var(--x-green)_20%,transparent)]">
                                     ✓ {b.serial} · {b.bitType}
                                   </span>
                                 )}
-                                <span className="text-xs text-[#64748B] font-mono">{b.meterStart}→{b.meterEnd}m</span>
+                                <span className="text-xs text-[color:var(--x-faint)] font-mono">{b.meterStart}→{b.meterEnd}m</span>
                               </div>
                             ))}
                           </div>
                         </td>
                         <td className="px-5 py-3">
                           {s.downtime > 0 ? (
-                            <span className="text-sm font-bold text-[#EF4444]">{s.downtime} hrs</span>
+                            <span className="text-sm font-bold text-[color:var(--x-red)]">{s.downtime} hrs</span>
                           ) : (
-                            <span className="text-sm text-[#334155]">—</span>
+                            <span className="text-sm text-[color:var(--x-dim)]">—</span>
                           )}
                         </td>
                       </tr>

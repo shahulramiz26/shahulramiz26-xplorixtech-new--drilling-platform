@@ -34,8 +34,8 @@ export default function DualMetricList({
   title,
   metric1Label,
   metric2Label,
-  metric1Color = '#3B82F6',
-  metric2Color = '#EF4444',
+  metric1Color = 'var(--x-blue)',
+  metric2Color = 'var(--x-red)',
   metric1Prefix = '',
   metric2Prefix = '',
   maxVisible = 8,
@@ -68,12 +68,12 @@ export default function DualMetricList({
       {/* Header */}
       {(title || searchable) && (
         <div style={{ marginBottom:14 }}>
-          {title && <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC', marginBottom: searchable ? 10 : 0 }}>{title}</div>}
+          {title && <div style={{ fontSize:14, fontWeight:700, color:'var(--x-text)', marginBottom: searchable ? 10 : 0 }}>{title}</div>}
           {searchable && (
             <div style={{ position:'relative' }}>
-              <Search size={12} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#64748B' }} />
+              <Search size={12} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--x-faint)' }} />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search components..."
-                style={{ width:'100%', padding:'7px 10px 7px 28px', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:12, outline:'none', fontFamily:'inherit' }} />
+                style={{ width:'100%', padding:'7px 10px 7px 28px', background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)', borderRadius:8, color:'var(--x-text)', fontSize:12, outline:'none', fontFamily:'inherit' }} />
             </div>
           )}
         </div>
@@ -88,14 +88,14 @@ export default function DualMetricList({
               style={{
                 display:'flex', alignItems:'center', gap:5, border:'none', cursor:'pointer',
                 padding:'3px 8px', borderRadius:6,
-                background: activeSortBy===m.key ? 'rgba(255,255,255,0.06)' : 'transparent',
+                background: activeSortBy===m.key ? 'rgba(var(--x-ov),0.06)' : 'transparent',
               }}>
               <div style={{ width:10, height:10, borderRadius:2, background:m.color, flexShrink:0 }} />
-              <span style={{ fontSize:11, fontWeight:600, color: activeSortBy===m.key ? '#F8FAFC' : '#64748B' }}>{m.label}</span>
+              <span style={{ fontSize:11, fontWeight:600, color: activeSortBy===m.key ? 'var(--x-text)' : 'var(--x-faint)' }}>{m.label}</span>
             </button>
           ))}
         </div>
-        <span style={{ fontSize:10, color:'#334155' }}>tap legend to sort</span>
+        <span style={{ fontSize:10, color:'var(--x-dim)' }}>tap legend to sort</span>
       </div>
 
       {/* Rows */}
@@ -106,8 +106,8 @@ export default function DualMetricList({
             <div key={`${item.label}-${index}`}
               style={{
                 paddingTop: py, paddingBottom: py,
-                borderBottom: index < visible.length - 1 ? '1px solid rgba(30,41,59,0.4)' : 'none',
-                background: isAlert ? 'rgba(239,68,68,0.02)' : 'transparent',
+                borderBottom: index < visible.length - 1 ? '1px solid color-mix(in srgb, var(--x-border) 40%, transparent)' : 'none',
+                background: isAlert ? 'color-mix(in srgb, var(--x-red) 2%, transparent)' : 'transparent',
                 borderRadius: isAlert ? 6 : 0,
                 paddingLeft: isAlert ? 6 : 0,
               }}
@@ -115,9 +115,9 @@ export default function DualMetricList({
               {/* Label */}
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  {isAlert && <AlertTriangle size={11} style={{ color:'#EF4444', flexShrink:0 }} />}
-                  <span style={{ fontSize: compact ? 12 : 13, fontWeight:600, color: isAlert ? '#F8FAFC' : '#94A3B8' }}>{item.label}</span>
-                  {item.sublabel && <span style={{ fontSize:10, color:'#64748B' }}>· {item.sublabel}</span>}
+                  {isAlert && <AlertTriangle size={11} style={{ color:'var(--x-red)', flexShrink:0 }} />}
+                  <span style={{ fontSize: compact ? 12 : 13, fontWeight:600, color: isAlert ? 'var(--x-text)' : 'var(--x-muted)' }}>{item.label}</span>
+                  {item.sublabel && <span style={{ fontSize:10, color:'var(--x-faint)' }}>· {item.sublabel}</span>}
                 </div>
                 {/* Values */}
                 <div style={{ display:'flex', gap:16, flexShrink:0 }}>
@@ -125,13 +125,13 @@ export default function DualMetricList({
                     <div style={{ fontSize: compact ? 11 : 12, fontWeight:700, color:metric1Color }}>
                       {metric1Prefix}{item.metric1.toLocaleString()}{item.metric1Unit ? ` ${item.metric1Unit}` : ''}
                     </div>
-                    <div style={{ fontSize:9, color:'#64748B', marginTop:1 }}>{metric1Label}</div>
+                    <div style={{ fontSize:9, color:'var(--x-faint)', marginTop:1 }}>{metric1Label}</div>
                   </div>
                   <div style={{ textAlign:'right' }}>
-                    <div style={{ fontSize: compact ? 11 : 12, fontWeight:700, color: isAlert ? '#EF4444' : metric2Color }}>
+                    <div style={{ fontSize: compact ? 11 : 12, fontWeight:700, color: isAlert ? 'var(--x-red)' : metric2Color }}>
                       {metric2Prefix}{item.metric2.toLocaleString()}{item.metric2Unit ? ` ${item.metric2Unit}` : ''}
                     </div>
-                    <div style={{ fontSize:9, color:'#64748B', marginTop:1 }}>{metric2Label}</div>
+                    <div style={{ fontSize:9, color:'var(--x-faint)', marginTop:1 }}>{metric2Label}</div>
                   </div>
                 </div>
               </div>
@@ -140,16 +140,16 @@ export default function DualMetricList({
               <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                 {/* Metric 1 bar */}
                 <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <div style={{ width:60, fontSize:9, color:'#334155', textAlign:'right', flexShrink:0 }}>{metric1Label}</div>
-                  <div style={{ flex:1, background:'#1A2234', borderRadius:3, height: compact ? 4 : 5 }}>
+                  <div style={{ width:60, fontSize:9, color:'var(--x-dim)', textAlign:'right', flexShrink:0 }}>{metric1Label}</div>
+                  <div style={{ flex:1, background:'var(--x-raised2)', borderRadius:3, height: compact ? 4 : 5 }}>
                     <div style={{ width:`${(item.metric1/maxM1)*100}%`, height:'100%', borderRadius:3, background:metric1Color, transition:'width 0.6s ease' }} />
                   </div>
                 </div>
                 {/* Metric 2 bar */}
                 <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <div style={{ width:60, fontSize:9, color:'#334155', textAlign:'right', flexShrink:0 }}>{metric2Label}</div>
-                  <div style={{ flex:1, background:'#1A2234', borderRadius:3, height: compact ? 4 : 5 }}>
-                    <div style={{ width:`${(item.metric2/maxM2)*100}%`, height:'100%', borderRadius:3, background: isAlert ? '#EF4444' : metric2Color, transition:'width 0.6s ease' }} />
+                  <div style={{ width:60, fontSize:9, color:'var(--x-dim)', textAlign:'right', flexShrink:0 }}>{metric2Label}</div>
+                  <div style={{ flex:1, background:'var(--x-raised2)', borderRadius:3, height: compact ? 4 : 5 }}>
+                    <div style={{ width:`${(item.metric2/maxM2)*100}%`, height:'100%', borderRadius:3, background: isAlert ? 'var(--x-red)' : metric2Color, transition:'width 0.6s ease' }} />
                   </div>
                 </div>
               </div>
@@ -161,9 +161,9 @@ export default function DualMetricList({
       {/* Show more */}
       {!search && hiddenCount > 0 && (
         <button onClick={() => setExpanded(!expanded)}
-          style={{ marginTop:10, width:'100%', padding:'8px', background:'rgba(255,255,255,0.03)', border:'1px solid #1E293B', borderRadius:8, color:'#64748B', fontSize:12, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.2s' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='#F8FAFC' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='#64748B' }}
+          style={{ marginTop:10, width:'100%', padding:'8px', background:'rgba(var(--x-ov),0.03)', border:'1px solid var(--x-border)', borderRadius:8, color:'var(--x-faint)', fontSize:12, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.2s' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='var(--x-text)' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='var(--x-faint)' }}
         >
           {expanded ? <><ChevronUp size={13}/> Show less</> : <><ChevronDown size={13}/> Show {hiddenCount} more</>}
         </button>

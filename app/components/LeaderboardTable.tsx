@@ -103,7 +103,7 @@ export default function LeaderboardTable({
   }
 
   const getValueColor = (val: any, col: LeaderboardColumn, rank: number) => {
-    if (!col.highlight) return '#94A3B8'
+    if (!col.highlight) return 'var(--x-muted)'
     if (col.highlightColor) return col.highlightColor
     // Auto color based on rank among all sorted values
     const allVals = sorted.map(r => r[col.key]).filter(v => typeof v === 'number')
@@ -113,9 +113,9 @@ export default function LeaderboardTable({
     const ratio = (val - minV) / range
     const isGood = col.lowerIsBetter ? ratio < 0.33 : ratio > 0.66
     const isBad  = col.lowerIsBetter ? ratio > 0.66 : ratio < 0.33
-    if (isGood) return '#10B981'
-    if (isBad)  return '#EF4444'
-    return '#F59E0B'
+    if (isGood) return 'var(--x-green)'
+    if (isBad)  return 'var(--x-red)'
+    return 'var(--x-amber)'
   }
 
   const py = compact ? '8px 12px' : '12px 16px'
@@ -124,19 +124,19 @@ export default function LeaderboardTable({
     <div>
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
-        {title && <div style={{ fontSize:14, fontWeight:700, color:'#F8FAFC' }}>{title}</div>}
+        {title && <div style={{ fontSize:14, fontWeight:700, color:'var(--x-text)' }}>{title}</div>}
         {searchable && (
           <div style={{ position:'relative', flex:1, maxWidth:280 }}>
-            <Search size={12} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#64748B' }} />
+            <Search size={12} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--x-faint)' }} />
             <input
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1) }}
               placeholder={searchPlaceholder}
-              style={{ width:'100%', padding:'7px 10px 7px 28px', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:12, outline:'none', fontFamily:'inherit' }}
+              style={{ width:'100%', padding:'7px 10px 7px 28px', background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)', borderRadius:8, color:'var(--x-text)', fontSize:12, outline:'none', fontFamily:'inherit' }}
             />
           </div>
         )}
-        <div style={{ fontSize:11, color:'#64748B' }}>
+        <div style={{ fontSize:11, color:'var(--x-faint)' }}>
           {filtered.length} {filtered.length === 1 ? 'result' : 'results'}
         </div>
       </div>
@@ -145,11 +145,11 @@ export default function LeaderboardTable({
       <div style={{ overflowX:'auto' }}>
         <table style={{ width:'100%', borderCollapse:'collapse' }}>
           <thead>
-            <tr style={{ borderBottom:'1px solid #1E293B' }}>
+            <tr style={{ borderBottom:'1px solid var(--x-border)' }}>
               {showRank && (
-                <th style={{ padding: py, width:36, textAlign:'center', fontSize:10, fontWeight:700, color:'#334155', letterSpacing:'0.1em' }}>#</th>
+                <th style={{ padding: py, width:36, textAlign:'center', fontSize:10, fontWeight:700, color:'var(--x-dim)', letterSpacing:'0.1em' }}>#</th>
               )}
-              <th style={{ padding: py, textAlign:'left', fontSize:10, fontWeight:700, color:'#64748B', letterSpacing:'0.1em', textTransform:'uppercase' }}>
+              <th style={{ padding: py, textAlign:'left', fontSize:10, fontWeight:700, color:'var(--x-faint)', letterSpacing:'0.1em', textTransform:'uppercase' }}>
                 Name
               </th>
               {columns.map(col => (
@@ -157,7 +157,7 @@ export default function LeaderboardTable({
                   onClick={() => col.sortable !== false && handleSort(col.key)}
                   style={{
                     padding: py, textAlign:'right', fontSize:10, fontWeight:700,
-                    color: sortKey===col.key ? '#F97316' : '#64748B',
+                    color: sortKey===col.key ? 'var(--x-orange)' : 'var(--x-faint)',
                     letterSpacing:'0.1em', textTransform:'uppercase',
                     cursor: col.sortable !== false ? 'pointer' : 'default',
                     whiteSpace:'nowrap', width: col.width,
@@ -179,7 +179,7 @@ export default function LeaderboardTable({
             {paginated.length === 0 && (
               <tr>
                 <td colSpan={columns.length + (showRank ? 2 : 1)}
-                  style={{ padding:'30px', textAlign:'center', color:'#64748B', fontSize:13 }}>
+                  style={{ padding:'30px', textAlign:'center', color:'var(--x-faint)', fontSize:13 }}>
                   No results found
                 </td>
               </tr>
@@ -192,20 +192,20 @@ export default function LeaderboardTable({
                 <tr key={row.id}
                   onClick={() => onRowClick?.(row)}
                   style={{
-                    borderBottom:'1px solid rgba(30,41,59,0.4)',
-                    background: isAlert ? 'rgba(239,68,68,0.02)' : 'transparent',
+                    borderBottom:'1px solid color-mix(in srgb, var(--x-border) 40%, transparent)',
+                    background: isAlert ? 'color-mix(in srgb, var(--x-red) 2%, transparent)' : 'transparent',
                     cursor: onRowClick ? 'pointer' : 'default',
                     transition:'background 0.15s',
                   }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = isAlert ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.02)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = isAlert ? 'rgba(239,68,68,0.02)' : 'transparent'}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = isAlert ? 'color-mix(in srgb, var(--x-red) 5%, transparent)' : 'rgba(var(--x-ov),0.02)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = isAlert ? 'color-mix(in srgb, var(--x-red) 2%, transparent)' : 'transparent'}
                 >
                   {/* Rank */}
                   {showRank && (
                     <td style={{ padding: py, textAlign:'center' }}>
                       <span style={{
                         fontSize:11, fontWeight:800,
-                        color: globalRank === 1 ? '#F59E0B' : globalRank === 2 ? '#94A3B8' : globalRank === 3 ? '#CD7F32' : '#334155',
+                        color: globalRank === 1 ? 'var(--x-amber)' : globalRank === 2 ? 'var(--x-muted)' : globalRank === 3 ? '#CD7F32' : 'var(--x-dim)',
                       }}>
                         {globalRank === 1 ? '🥇' : globalRank === 2 ? '🥈' : globalRank === 3 ? '🥉' : globalRank}
                       </span>
@@ -218,26 +218,26 @@ export default function LeaderboardTable({
                       {/* Avatar */}
                       <div style={{
                         width:28, height:28, borderRadius:'50%', flexShrink:0,
-                        background: row.avatarColor || 'linear-gradient(135deg,#F97316,#F59E0B)',
+                        background: row.avatarColor || 'linear-gradient(135deg,var(--x-orange),var(--x-amber))',
                         display:'flex', alignItems:'center', justifyContent:'center',
                         fontSize:11, fontWeight:700, color:'#fff',
                       }}>
                         {row.avatar || row.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ fontSize: compact ? 12 : 13, fontWeight: isTopN ? 700 : 500, color: isTopN ? '#F8FAFC' : '#94A3B8', whiteSpace:'nowrap' }}>
+                        <div style={{ fontSize: compact ? 12 : 13, fontWeight: isTopN ? 700 : 500, color: isTopN ? 'var(--x-text)' : 'var(--x-muted)', whiteSpace:'nowrap' }}>
                           {row.name}
                         </div>
                         {row.sublabel && (
-                          <div style={{ fontSize:10, color:'#64748B', marginTop:1 }}>{row.sublabel}</div>
+                          <div style={{ fontSize:10, color:'var(--x-faint)', marginTop:1 }}>{row.sublabel}</div>
                         )}
                       </div>
                       {/* Trend */}
                       {row.trend && (
                         <div style={{ marginLeft:4 }}>
-                          {row.trend === 'up'   && <TrendingUp   size={12} style={{ color:'#10B981' }} />}
-                          {row.trend === 'down' && <TrendingDown size={12} style={{ color:'#EF4444' }} />}
-                          {row.trend === 'flat' && <Minus        size={12} style={{ color:'#64748B' }} />}
+                          {row.trend === 'up'   && <TrendingUp   size={12} style={{ color:'var(--x-green)' }} />}
+                          {row.trend === 'down' && <TrendingDown size={12} style={{ color:'var(--x-red)' }} />}
+                          {row.trend === 'flat' && <Minus        size={12} style={{ color:'var(--x-faint)' }} />}
                         </div>
                       )}
                     </div>
@@ -265,13 +265,13 @@ export default function LeaderboardTable({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:14, paddingTop:12, borderTop:'1px solid #1E293B' }}>
-          <span style={{ fontSize:11, color:'#64748B' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:14, paddingTop:12, borderTop:'1px solid var(--x-border)' }}>
+          <span style={{ fontSize:11, color:'var(--x-faint)' }}>
             Showing {(page-1)*pageSize + 1}–{Math.min(page*pageSize, sorted.length)} of {sorted.length}
           </span>
           <div style={{ display:'flex', gap:4 }}>
             <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page===1}
-              style={{ padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color: page===1 ? '#334155' : '#94A3B8', cursor: page===1 ? 'not-allowed' : 'pointer' }}>
+              style={{ padding:'5px 8px', borderRadius:6, background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)', color: page===1 ? 'var(--x-dim)' : 'var(--x-muted)', cursor: page===1 ? 'not-allowed' : 'pointer' }}>
               <ChevronLeft size={13} />
             </button>
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -284,16 +284,16 @@ export default function LeaderboardTable({
               return (
                 <button key={p} onClick={() => setPage(p)}
                   style={{ padding:'5px 10px', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer', transition:'all 0.15s',
-                    background: page===p ? '#F97316' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${page===p ? '#F97316' : '#1E293B'}`,
-                    color: page===p ? '#fff' : '#94A3B8',
+                    background: page===p ? 'var(--x-orange)' : 'rgba(var(--x-ov),0.04)',
+                    border: `1px solid ${page===p ? 'var(--x-orange)' : 'var(--x-border)'}`,
+                    color: page===p ? '#fff' : 'var(--x-muted)',
                   }}>
                   {p}
                 </button>
               )
             })}
             <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page===totalPages}
-              style={{ padding:'5px 8px', borderRadius:6, background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', color: page===totalPages ? '#334155' : '#94A3B8', cursor: page===totalPages ? 'not-allowed' : 'pointer' }}>
+              style={{ padding:'5px 8px', borderRadius:6, background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)', color: page===totalPages ? 'var(--x-dim)' : 'var(--x-muted)', cursor: page===totalPages ? 'not-allowed' : 'pointer' }}>
               <ChevronRight size={13} />
             </button>
           </div>

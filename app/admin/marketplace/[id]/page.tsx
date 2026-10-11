@@ -10,16 +10,16 @@ import {
 import { getListing, LISTINGS, formatPrice, type Listing } from '../data'
 
 const C = {
-  accent: '#F97316',
-  accentDim: 'rgba(249,115,22,0.12)',
-  accentBorder: 'rgba(249,115,22,0.25)',
-  panel: '#0D1117',
-  border: '#1E293B',
-  text: '#F8FAFC',
-  dim: '#94A3B8',
-  muted: '#64748B',
-  faint: '#334155',
-  green: '#10B981',
+  accent: 'var(--x-orange)',
+  accentDim: 'color-mix(in srgb, var(--x-orange) 12%, transparent)',
+  accentBorder: 'color-mix(in srgb, var(--x-orange) 25%, transparent)',
+  panel: 'var(--x-card)',
+  border: 'var(--x-border)',
+  text: 'var(--x-text)',
+  dim: 'var(--x-muted)',
+  muted: 'var(--x-faint)',
+  faint: 'var(--x-dim)',
+  green: 'var(--x-green)',
 }
 const display = "'Space Grotesk', sans-serif"
 
@@ -72,25 +72,25 @@ export default function ListingDetailPage() {
           {/* Hero plate */}
           <div style={{
             height: 320, borderRadius: 14, overflow: 'hidden', position: 'relative',
-            background: 'linear-gradient(135deg, #11161F 0%, #0A0E14 100%)',
+            background: 'linear-gradient(135deg, var(--x-raised) 0%, var(--x-bg) 100%)',
             border: `1px solid ${C.border}`,
             display: 'flex', alignItems: 'flex-end', padding: 26, marginBottom: 22,
           }}>
             <div aria-hidden style={{
               position: 'absolute', inset: 0, opacity: 0.5,
               backgroundImage:
-                'repeating-linear-gradient(115deg, rgba(148,163,184,0.05) 0px, rgba(148,163,184,0.05) 1px, transparent 1px, transparent 13px)',
+                'repeating-linear-gradient(115deg, color-mix(in srgb, var(--x-muted) 5%, transparent) 0px, color-mix(in srgb, var(--x-muted) 5%, transparent) 1px, transparent 1px, transparent 13px)',
             }} />
             <div aria-hidden style={{
               position: 'absolute', right: -60, top: -60, width: 300, height: 300,
               transform: 'rotate(15deg)', borderRadius: 40,
-              background: 'linear-gradient(135deg, rgba(249,115,22,0.10), transparent 65%)',
+              background: 'linear-gradient(135deg, color-mix(in srgb, var(--x-orange) 10%, transparent), transparent 65%)',
             }} />
             <div style={{ position: 'relative' }}>
               <div style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: C.faint, fontWeight: 700 }}>
                 {listing.brand}
               </div>
-              <div style={{ fontSize: 62, fontWeight: 700, color: 'rgba(248,250,252,0.10)', fontFamily: display, letterSpacing: '-0.03em', lineHeight: 1 }}>
+              <div style={{ fontSize: 62, fontWeight: 700, color: 'color-mix(in srgb, var(--x-text) 10%, transparent)', fontFamily: display, letterSpacing: '-0.03em', lineHeight: 1 }}>
                 {listing.model}
               </div>
             </div>
@@ -111,7 +111,7 @@ export default function ListingDetailPage() {
                 <div key={s.label} style={{
                   display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
                   padding: '12px 16px',
-                  background: i % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'transparent',
+                  background: i % 2 === 0 ? 'rgba(var(--x-ov),0.015)' : 'transparent',
                   borderTop: i === 0 ? 'none' : `1px solid ${C.border}`,
                 }}>
                   <div style={{ fontSize: 13, color: C.muted }}>{s.label}</div>
@@ -191,10 +191,10 @@ export default function ListingDetailPage() {
               onClick={() => setShowQuote(true)}
               style={{
                 width: '100%', padding: '13px', borderRadius: 11, cursor: 'pointer',
-                background: 'linear-gradient(135deg, #F97316, #EA580C)', color: '#fff',
+                background: 'linear-gradient(135deg, var(--x-orange), var(--x-orange-d))', color: '#fff',
                 border: 'none', fontWeight: 700, fontSize: 14.5, fontFamily: 'inherit',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: '0 4px 20px rgba(249,115,22,0.3)', marginBottom: 10,
+                boxShadow: '0 4px 20px color-mix(in srgb, var(--x-orange) 30%, transparent)', marginBottom: 10,
               }}
             >
               Request quote <ArrowRight size={16} />
@@ -222,7 +222,7 @@ export default function ListingDetailPage() {
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
               <div style={{
                 width: 42, height: 42, borderRadius: 11, flexShrink: 0,
-                background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`,
+                background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <Building2 size={18} style={{ color: C.dim }} />
@@ -240,7 +240,7 @@ export default function ListingDetailPage() {
             {listing.partner.verified ? (
               <div style={{
                 display: 'flex', alignItems: 'flex-start', gap: 9, padding: 12, borderRadius: 10,
-                background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.16)',
+                background: 'color-mix(in srgb, var(--x-green) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--x-green) 16%, transparent)',
               }}>
                 <BadgeCheck size={16} style={{ color: C.green, flexShrink: 0, marginTop: 1 }} />
                 <div>
@@ -253,7 +253,7 @@ export default function ListingDetailPage() {
             ) : (
               <div style={{
                 padding: 12, borderRadius: 10, fontSize: 11.5, color: C.muted, lineHeight: 1.5,
-                background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}`,
+                background: 'rgba(var(--x-ov),0.02)', border: `1px solid ${C.border}`,
               }}>
                 Verification in progress. Confirm terms directly with the supplier before payment.
               </div>
@@ -288,7 +288,7 @@ function Tag({ icon, children }: { icon: React.ReactNode; children: React.ReactN
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,
       padding: '5px 10px', borderRadius: 7, fontSize: 11.5, fontWeight: 600,
-      background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, color: C.dim,
+      background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${C.border}`, color: C.dim,
     }}>
       {icon}{children}
     </span>
@@ -310,7 +310,7 @@ function SecondaryButton({
         flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
         fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-        background: active ? C.accentDim : 'rgba(255,255,255,0.03)',
+        background: active ? C.accentDim : 'rgba(var(--x-ov),0.03)',
         border: `1px solid ${active ? C.accentBorder : C.border}`,
         color: active ? C.accent : C.dim,
       }}
@@ -328,7 +328,7 @@ function QuoteModal({ listing, onClose }: { listing: Listing; onClose: () => voi
   return (
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, zIndex: 100, padding: 20,
-      background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)',
+      background: 'rgba(var(--x-shadow),0.72)', backdropFilter: 'blur(6px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
@@ -354,7 +354,7 @@ function QuoteModal({ listing, onClose }: { listing: Listing; onClose: () => voi
             <>
               <div style={{
                 padding: 14, borderRadius: 11, marginBottom: 18,
-                background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.14)',
+                background: 'color-mix(in srgb, var(--x-orange) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--x-orange) 14%, transparent)',
               }}>
                 <div style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: C.accent, fontWeight: 700, marginBottom: 10 }}>
                   Sent with your request
@@ -372,13 +372,13 @@ function QuoteModal({ listing, onClose }: { listing: Listing; onClose: () => voi
                 placeholder="Anything the supplier should know — site conditions, delivery terms, inspection window."
                 style={{
                   width: '100%', minHeight: 92, padding: '10px 12px', borderRadius: 9, marginBottom: 18,
-                  background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`,
+                  background: 'rgba(var(--x-ov),0.03)', border: `1px solid ${C.border}`,
                   color: C.text, fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'vertical',
                 }}
               />
               <button onClick={() => setSent(true)} style={{
                 width: '100%', padding: 12, borderRadius: 10, cursor: 'pointer',
-                background: 'linear-gradient(135deg, #F97316, #EA580C)', color: '#fff',
+                background: 'linear-gradient(135deg, var(--x-orange), var(--x-orange-d))', color: '#fff',
                 border: 'none', fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
               }}>
                 Send request

@@ -9,47 +9,48 @@ import {
 import { Wrench, Clock, AlertTriangle, TrendingUp, ArrowUpRight, ArrowDownRight, Filter } from 'lucide-react'
 import AIInsights from '../../../components/AIInsights'
 import DualMetricList from '../../../components/DualMetricList'
+import { hexA } from '../../../../lib/theme'
 
 // KpiCard component
 function KpiCard({ label, value, unit, icon: Icon, color, trend, trendUp }: { label: string; value: string; unit?: string; icon: any; color: string; trend?: string; trendUp?: boolean }) {
   return (
-    <div style={{ padding:20, borderRadius:16, background:'#0D1117', border:'1px solid #1E293B', transition:'border-color 0.2s' }}
-      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${color}40`}
-      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='#1E293B'}>
+    <div style={{ padding:20, borderRadius:16, background:'var(--x-card)', border:'1px solid var(--x-border)', transition:'border-color 0.2s' }}
+      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${hexA(color, 0x40)}`}
+      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-        <div style={{ width:40, height:40, borderRadius:10, background:`${color}18`, border:`1px solid ${color}30`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ width:40, height:40, borderRadius:10, background:`${hexA(color, 0x18)}`, border:`1px solid ${hexA(color, 0x30)}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
           <Icon style={{ width:18, height:18, color }} />
         </div>
         {trend && (
-          <span style={{ fontSize:11, fontWeight:700, color: trendUp ? '#10B981' : '#EF4444' }}>
+          <span style={{ fontSize:11, fontWeight:700, color: trendUp ? 'var(--x-green)' : 'var(--x-red)' }}>
             {trendUp ? '↑' : '↓'} {trend}
           </span>
         )}
       </div>
-      <div style={{ fontSize:26, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>
-        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'#64748B', marginLeft:4 }}>{unit}</span>}
+      <div style={{ fontSize:26, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>
+        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'var(--x-faint)', marginLeft:4 }}>{unit}</span>}
       </div>
-      <div style={{ fontSize:13, color:'#94A3B8', marginTop:4 }}>{label}</div>
+      <div style={{ fontSize:13, color:'var(--x-muted)', marginTop:4 }}>{label}</div>
     </div>
   )
 }
 
 const COLORS_UNUSED = {
-  primary: '#3B82F6', accent: '#10B981', purple: '#8B5CF6',
-  warning: '#F59E0B', danger: '#EF4444', cyan: '#06B6D4', pink: '#EC4899'
+  primary: 'var(--x-blue)', accent: 'var(--x-green)', purple: 'var(--x-purple)',
+  warning: 'var(--x-amber)', danger: 'var(--x-red)', cyan: 'var(--x-cyan)', pink: 'var(--x-pink)'
 }
-const PIE_COLORS = ['#3B82F6', '#EF4444', '#F59E0B', '#10B981']
+const PIE_COLORS = ['var(--x-blue)', 'var(--x-red)', 'var(--x-amber)', 'var(--x-green)']
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#1A2234] border border-[#1E293B] rounded-xl p-4 shadow-[0_16px_64px_rgba(0,0,0,0.8)]">
-        <p className="text-[#94A3B8] text-sm mb-2">{label}</p>
+      <div className="bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl p-4 shadow-[0_16px_64px_rgba(var(--x-shadow),0.8)]">
+        <p className="text-[color:var(--x-muted)] text-sm mb-2">{label}</p>
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center gap-2 mb-1 last:mb-0">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-            <span className="text-[#94A3B8] text-sm">{entry.name}:</span>
-            <span className="text-[#F8FAFC] font-bold">{entry.value}</span>
+            <span className="text-[color:var(--x-muted)] text-sm">{entry.name}:</span>
+            <span className="text-[color:var(--x-text)] font-bold">{entry.value}</span>
           </div>
         ))}
       </div>
@@ -126,15 +127,15 @@ export default function AdminMaintenanceDashboard() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-[#F8FAFC]">Maintenance Dashboard</h2>
-          <p className="text-[#94A3B8] mt-1">Rig maintenance and component health metrics</p>
+          <h2 className="text-3xl font-bold text-[color:var(--x-text)]">Maintenance Dashboard</h2>
+          <p className="text-[color:var(--x-muted)] mt-1">Rig maintenance and component health metrics</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 bg-[#1A2234] border border-[#1E293B] rounded-xl">
-            <Filter className="w-4 h-4 text-[#64748B]" />
-            <select className="bg-transparent text-[#F8FAFC] text-sm outline-none">
-              <option className="bg-[#1A2234]">Last 7 Days</option>
-              <option className="bg-[#1A2234]">Last 30 Days</option>
+          <div className="flex items-center gap-2 px-4 py-2 bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl">
+            <Filter className="w-4 h-4 text-[color:var(--x-faint)]" />
+            <select className="bg-transparent text-[color:var(--x-text)] text-sm outline-none">
+              <option className="bg-[var(--x-raised2)]">Last 7 Days</option>
+              <option className="bg-[var(--x-raised2)]">Last 30 Days</option>
             </select>
           </div>
         </div>
@@ -142,10 +143,10 @@ export default function AdminMaintenanceDashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Total Maint. Logs" value="28"  icon={Wrench}       color="#F59E0B" trend="+12%" trendUp={true}  />
-        <KpiCard label="Maint. Hours"      value="84"  unit="hrs" icon={Clock} color="#EF4444" trend="+8%"  trendUp={false} />
-        <KpiCard label="Pending Service"   value="5"   icon={AlertTriangle} color="#F97316" trend="-2"   trendUp={true}  />
-        <KpiCard label="Avg MTBF"          value="410" unit="hrs" icon={TrendingUp} color="#10B981" trend="+5%" trendUp={true} />
+        <KpiCard label="Total Maint. Logs" value="28"  icon={Wrench}       color="var(--x-amber)" trend="+12%" trendUp={true}  />
+        <KpiCard label="Maint. Hours"      value="84"  unit="hrs" icon={Clock} color="var(--x-red)" trend="+8%"  trendUp={false} />
+        <KpiCard label="Pending Service"   value="5"   icon={AlertTriangle} color="var(--x-orange)" trend="-2"   trendUp={true}  />
+        <KpiCard label="Avg MTBF"          value="410" unit="hrs" icon={TrendingUp} color="var(--x-green)" trend="+5%" trendUp={true} />
       </div>
 
       {/* Charts Grid */}
@@ -153,14 +154,14 @@ export default function AdminMaintenanceDashboard() {
 
         {/* Maintenance Type Donut */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Maintenance Type Distribution</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Maintenance Type Distribution</h3>
           <div className="h-72 relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={maintenanceTypeData} cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={4} dataKey="value">
                   {maintenanceTypeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="#111827" strokeWidth={3} />
+                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="var(--x-raised)" strokeWidth={3} />
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
@@ -169,8 +170,8 @@ export default function AdminMaintenanceDashboard() {
             </ResponsiveContainer>
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-center">
-                <p className="text-3xl font-bold text-[#F8FAFC]">100</p>
-                <p className="text-xs text-[#94A3B8]">Total</p>
+                <p className="text-3xl font-bold text-[color:var(--x-text)]">100</p>
+                <p className="text-xs text-[color:var(--x-muted)]">Total</p>
               </div>
             </div>
           </div>
@@ -178,25 +179,25 @@ export default function AdminMaintenanceDashboard() {
 
         {/* Maintenance Hours Trend */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Maintenance Hours & Cost Trend</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Maintenance Hours & Cost Trend</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={maintenanceHoursData}>
                 <defs>
                   <linearGradient id="maintGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--x-amber)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--x-amber)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="left"  stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis yAxisId="right" orientation="right" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="left"  stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Area yAxisId="left" type="monotone" dataKey="hours" name="Hours" stroke="#F59E0B" strokeWidth={3} fill="url(#maintGradient)" />
-                <Line yAxisId="right" type="monotone" dataKey="cost" name="Cost ($)" stroke="#EF4444" strokeWidth={3} dot={{ fill:'#EF4444', r:4 }} />
+                <Area yAxisId="left" type="monotone" dataKey="hours" name="Hours" stroke="var(--x-amber)" strokeWidth={3} fill="url(#maintGradient)" />
+                <Line yAxisId="right" type="monotone" dataKey="cost" name="Cost ($)" stroke="var(--x-red)" strokeWidth={3} dot={{ fill:'var(--x-red)', r:4 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -204,20 +205,20 @@ export default function AdminMaintenanceDashboard() {
 
         {/* ── COMPONENT FAILURE ANALYSIS — REPLACED WITH DualMetricList ── */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold text-[#F8FAFC]">Component Failure Analysis</h3>
-            <span className="text-xs text-[#64748B] bg-[#1A2234] px-3 py-1 rounded-full border border-[#1E293B]">
+            <h3 className="text-lg font-semibold text-[color:var(--x-text)]">Component Failure Analysis</h3>
+            <span className="text-xs text-[color:var(--x-faint)] bg-[var(--x-raised2)] px-3 py-1 rounded-full border border-[color:var(--x-border)]">
               {componentFailureItems.reduce((s,i) => s+i.metric2, 0)} hrs total downtime
             </span>
           </div>
-          <p className="text-xs text-[#64748B] mb-4">Ranked by downtime hours — tap legend to sort by failures</p>
+          <p className="text-xs text-[color:var(--x-faint)] mb-4">Ranked by downtime hours — tap legend to sort by failures</p>
           <DualMetricList
             items={componentFailureItems}
             metric1Label="Failures"
             metric2Label="Downtime"
-            metric1Color="#3B82F6"
-            metric2Color="#EF4444"
+            metric1Color="var(--x-blue)"
+            metric2Color="var(--x-red)"
             maxVisible={6}
             searchable={true}
             alertThreshold={40}
@@ -227,18 +228,18 @@ export default function AdminMaintenanceDashboard() {
 
         {/* Action Taken Distribution */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.3 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Action Taken Distribution</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Action Taken Distribution</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={actionData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="action" stroke="#94A3B8" tick={{ fill:'#94A3B8', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="action" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="count" name="Count" fill="#8B5CF6" radius={[4,4,0,0]}>
+                <Bar dataKey="count" name="Count" fill="var(--x-purple)" radius={[4,4,0,0]}>
                   {actionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={['#3B82F6','#10B981','#F59E0B'][index]} />
+                    <Cell key={`cell-${index}`} fill={['var(--x-blue)','var(--x-green)','var(--x-amber)'][index]} />
                   ))}
                 </Bar>
               </BarChart>
@@ -248,31 +249,31 @@ export default function AdminMaintenanceDashboard() {
 
         {/* Oil Consumption */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.4 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }} className="lg:col-span-2">
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Oil Consumption Breakdown</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }} className="lg:col-span-2">
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Oil Consumption Breakdown</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={oilData}>
                 <defs>
                   <linearGradient id="engineGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.4}/><stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--x-blue)" stopOpacity={0.4}/><stop offset="95%" stopColor="var(--x-blue)" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="hydraulicGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.4}/><stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--x-red)" stopOpacity={0.4}/><stop offset="95%" stopColor="var(--x-red)" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="transmissionGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.4}/><stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--x-amber)" stopOpacity={0.4}/><stop offset="95%" stopColor="var(--x-amber)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="date" stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Area type="monotone" dataKey="engine"       name="Engine Oil"       stackId="1" stroke="#3B82F6" strokeWidth={2} fill="url(#engineGradient)"       />
-                <Area type="monotone" dataKey="hydraulic"    name="Hydraulic Oil"    stackId="1" stroke="#EF4444" strokeWidth={2} fill="url(#hydraulicGradient)"    />
-                <Area type="monotone" dataKey="transmission" name="Transmission Oil" stackId="1" stroke="#F59E0B" strokeWidth={2} fill="url(#transmissionGradient)" />
-                <Line type="monotone" dataKey="total" name="Total" stroke="#10B981" strokeWidth={3} strokeDasharray="5 5" dot={false} />
+                <Area type="monotone" dataKey="engine"       name="Engine Oil"       stackId="1" stroke="var(--x-blue)" strokeWidth={2} fill="url(#engineGradient)"       />
+                <Area type="monotone" dataKey="hydraulic"    name="Hydraulic Oil"    stackId="1" stroke="var(--x-red)" strokeWidth={2} fill="url(#hydraulicGradient)"    />
+                <Area type="monotone" dataKey="transmission" name="Transmission Oil" stackId="1" stroke="var(--x-amber)" strokeWidth={2} fill="url(#transmissionGradient)" />
+                <Line type="monotone" dataKey="total" name="Total" stroke="var(--x-green)" strokeWidth={3} strokeDasharray="5 5" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -280,19 +281,19 @@ export default function AdminMaintenanceDashboard() {
 
         {/* MTBF by Rig */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.5 }}
-          style={{ background:'#0D1117', border:'1px solid #1E293B', borderRadius:16, padding:24 }} className="lg:col-span-2">
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-6">Mean Time Between Failures (MTBF) by Rig</h3>
+          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }} className="lg:col-span-2">
+          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Mean Time Between Failures (MTBF) by Rig</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={mtbfData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                <XAxis dataKey="rig" stroke="#94A3B8" tick={{ fill:'#94A3B8', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
-                <YAxis stroke="#64748B" tick={{ fill:'#64748B', fontSize:12 }} tickLine={false} axisLine={{ stroke:'#1E293B' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
+                <XAxis dataKey="rig" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
+                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine y={400} stroke="#F59E0B" strokeDasharray="5 5" label={{ value:'Target: 400h', fill:'#F59E0B', fontSize:12 }} />
-                <Bar dataKey="mtbf" name="MTBF (hours)" fill="#06B6D4" radius={[4,4,0,0]}>
+                <ReferenceLine y={400} stroke="var(--x-amber)" strokeDasharray="5 5" label={{ value:'Target: 400h', fill:'var(--x-amber)', fontSize:12 }} />
+                <Bar dataKey="mtbf" name="MTBF (hours)" fill="var(--x-cyan)" radius={[4,4,0,0]}>
                   {mtbfData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.mtbf >= 400 ? '#10B981' : '#EF4444'} />
+                    <Cell key={`cell-${index}`} fill={entry.mtbf >= 400 ? 'var(--x-green)' : 'var(--x-red)'} />
                   ))}
                 </Bar>
               </ComposedChart>

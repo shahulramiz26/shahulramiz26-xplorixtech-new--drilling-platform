@@ -429,37 +429,37 @@ export default function AdminReportPage() {
 
         {/* Page header */}
         <div>
-          <h1 style={{ fontSize:24, fontWeight:800, color:'#F8FAFC', fontFamily:"'Space Grotesk',sans-serif" }}>Performance Reports</h1>
-          <p style={{ fontSize:13, color:'#64748B', marginTop:4 }}>Select a driller or supervisor to generate and download their official performance certificate</p>
+          <h1 style={{ fontSize:24, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>Performance Reports</h1>
+          <p style={{ fontSize:13, color:'var(--x-faint)', marginTop:4 }}>Select a driller or supervisor to generate and download their official performance certificate</p>
         </div>
 
         {/* Search + filter bar */}
-        <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap', padding:'14px 20px', background:'#0D1117', border:'1px solid #1E293B', borderRadius:14 }}>
+        <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap', padding:'14px 20px', background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:14 }}>
           <div style={{ position:'relative', flex:1, minWidth:220 }}>
-            <Search size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#64748B' }} />
+            <Search size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--x-faint)' }} />
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or ID..."
-              style={{ width:'100%', padding:'8px 12px 8px 30px', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', borderRadius:8, color:'#F8FAFC', fontSize:13, outline:'none' }} />
+              style={{ width:'100%', padding:'8px 12px 8px 30px', background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)', borderRadius:8, color:'var(--x-text)', fontSize:13, outline:'none' }} />
           </div>
           {/* Type filter */}
           <div style={{ display:'flex', gap:6 }}>
             {(['All','Driller','Supervisor'] as const).map(t=>(
               <button key={t} onClick={()=>setFilterType(t)}
                 style={{ padding:'7px 14px', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', transition:'all 0.2s',
-                  background: filterType===t ? 'linear-gradient(135deg,#F97316,#EA580C)' : 'rgba(255,255,255,0.04)',
-                  color: filterType===t ? '#fff' : '#94A3B8',
-                  border: filterType===t ? 'none' : '1px solid #1E293B',
+                  background: filterType===t ? 'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))' : 'rgba(var(--x-ov),0.04)',
+                  color: filterType===t ? '#fff' : 'var(--x-muted)',
+                  border: filterType===t ? 'none' : '1px solid var(--x-border)',
                 }}>{t}</button>
             ))}
           </div>
           {/* Period selector */}
-          <div style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', background:'rgba(255,255,255,0.04)', border:'1px solid #1E293B', borderRadius:8 }}>
-            <Clock size={12} style={{ color:'#64748B' }} />
+          <div style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', background:'rgba(var(--x-ov),0.04)', border:'1px solid var(--x-border)', borderRadius:8 }}>
+            <Clock size={12} style={{ color:'var(--x-faint)' }} />
             <select value={period} onChange={e=>setPeriod(e.target.value)}
-              style={{ background:'transparent', color:'#F8FAFC', fontSize:12, border:'none', outline:'none', cursor:'pointer' }}>
-              <option style={{ background:'#0D1117' }}>All Time</option>
-              <option style={{ background:'#0D1117' }}>Last 12 Months</option>
-              <option style={{ background:'#0D1117' }}>Last 90 Days</option>
-              <option style={{ background:'#0D1117' }}>Last 30 Days</option>
+              style={{ background:'transparent', color:'var(--x-text)', fontSize:12, border:'none', outline:'none', cursor:'pointer' }}>
+              <option style={{ background:'var(--x-card)' }}>All Time</option>
+              <option style={{ background:'var(--x-card)' }}>Last 12 Months</option>
+              <option style={{ background:'var(--x-card)' }}>Last 90 Days</option>
+              <option style={{ background:'var(--x-card)' }}>Last 30 Days</option>
             </select>
           </div>
         </div>
@@ -468,23 +468,23 @@ export default function AdminReportPage() {
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:14 }}>
           {filtered.map(p=>(
             <div key={p.id} onClick={()=>setSelected(p)}
-              style={{ padding:18, borderRadius:14, background:'#0D1117', cursor:'pointer', transition:'all 0.2s',
-                border: selected?.id===p.id ? '2px solid #F97316' : '1px solid #1E293B',
-                boxShadow: selected?.id===p.id ? '0 0 20px rgba(249,115,22,0.15)' : 'none',
+              style={{ padding:18, borderRadius:14, background:'var(--x-card)', cursor:'pointer', transition:'all 0.2s',
+                border: selected?.id===p.id ? '2px solid var(--x-orange)' : '1px solid var(--x-border)',
+                boxShadow: selected?.id===p.id ? '0 0 20px color-mix(in srgb, var(--x-orange) 15%, transparent)' : 'none',
               }}
-              onMouseEnter={e=>{ if(selected?.id!==p.id)(e.currentTarget as HTMLElement).style.borderColor='rgba(249,115,22,0.4)' }}
-              onMouseLeave={e=>{ if(selected?.id!==p.id)(e.currentTarget as HTMLElement).style.borderColor='#1E293B' }}
+              onMouseEnter={e=>{ if(selected?.id!==p.id)(e.currentTarget as HTMLElement).style.borderColor='color-mix(in srgb, var(--x-orange) 40%, transparent)' }}
+              onMouseLeave={e=>{ if(selected?.id!==p.id)(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)' }}
             >
               <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
                 <div style={{ width:44,height:44,borderRadius:12,background:p.avatarColor,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700,color:'#fff',flexShrink:0 }}>{p.avatar}</div>
                 <div style={{ flex:1,minWidth:0 }}>
-                  <div style={{ fontSize:14,fontWeight:700,color:'#F8FAFC',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{p.name}</div>
-                  <div style={{ fontSize:11,color:'#64748B',marginTop:1 }}>{p.role} · {p.id}</div>
+                  <div style={{ fontSize:14,fontWeight:700,color:'var(--x-text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{p.name}</div>
+                  <div style={{ fontSize:11,color:'var(--x-faint)',marginTop:1 }}>{p.role} · {p.id}</div>
                 </div>
                 <div style={{ padding:'3px 8px',borderRadius:20,fontSize:10,fontWeight:700,
-                  background: p.type==='Driller' ? 'rgba(249,115,22,0.1)' : 'rgba(59,130,246,0.1)',
-                  color: p.type==='Driller' ? '#F97316' : '#60A5FA',
-                  border: `1px solid ${p.type==='Driller'?'rgba(249,115,22,0.2)':'rgba(59,130,246,0.2)'}`,
+                  background: p.type==='Driller' ? 'color-mix(in srgb, var(--x-orange) 10%, transparent)' : 'color-mix(in srgb, var(--x-blue) 10%, transparent)',
+                  color: p.type==='Driller' ? 'var(--x-orange)' : 'var(--x-blue-b)',
+                  border: `1px solid ${p.type==='Driller'?'color-mix(in srgb, var(--x-orange) 20%, transparent)':'color-mix(in srgb, var(--x-blue) 20%, transparent)'}`,
                 }}>{p.type}</div>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
@@ -492,37 +492,37 @@ export default function AdminReportPage() {
                   ? [{ l:'Meters', v:`${(p.totalMeters/1000).toFixed(0)}k m` },{ l:'ROP', v:`${p.avgROP} m/hr` },{ l:'Grade', v:p.grade }]
                   : [{ l:'Shifts', v:p.totalShifts.toString() },{ l:'Efficiency', v:`${p.efficiency}%` },{ l:'Grade', v:p.grade }]
                 ).map((s,i)=>(
-                  <div key={i} style={{ padding:'8px 10px',background:'rgba(255,255,255,0.03)',borderRadius:8,border:'1px solid #1E293B' }}>
-                    <div style={{ fontSize:9,color:'#64748B',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:2 }}>{s.l}</div>
-                    <div style={{ fontSize:13,fontWeight:800,color:i===2?'#F97316':'#F8FAFC',fontFamily:"'Space Grotesk',sans-serif" }}>{s.v}</div>
+                  <div key={i} style={{ padding:'8px 10px',background:'rgba(var(--x-ov),0.03)',borderRadius:8,border:'1px solid var(--x-border)' }}>
+                    <div style={{ fontSize:9,color:'var(--x-faint)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:2 }}>{s.l}</div>
+                    <div style={{ fontSize:13,fontWeight:800,color:i===2?'var(--x-orange)':'var(--x-text)',fontFamily:"'Space Grotesk',sans-serif" }}>{s.v}</div>
                   </div>
                 ))}
               </div>
               {selected?.id===p.id && (
-                <div style={{ marginTop:10,display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:600,color:'#F97316' }}>
-                  <CheckCircle size={12} style={{ color:'#F97316' }} />
+                <div style={{ marginTop:10,display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:600,color:'var(--x-orange)' }}>
+                  <CheckCircle size={12} style={{ color:'var(--x-orange)' }} />
                   Selected — see report below
                 </div>
               )}
             </div>
           ))}
           {filtered.length===0 && (
-            <div style={{ gridColumn:'1/-1',textAlign:'center',padding:'40px',color:'#64748B',fontSize:13 }}>No results found.</div>
+            <div style={{ gridColumn:'1/-1',textAlign:'center',padding:'40px',color:'var(--x-faint)',fontSize:13 }}>No results found.</div>
           )}
         </div>
 
         {/* Download button */}
         {selected && (
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', background:'rgba(249,115,22,0.05)', border:'1px solid rgba(249,115,22,0.2)', borderRadius:12 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', background:'color-mix(in srgb, var(--x-orange) 5%, transparent)', border:'1px solid color-mix(in srgb, var(--x-orange) 20%, transparent)', borderRadius:12 }}>
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
               <div style={{ width:36,height:36,borderRadius:10,background:selected.avatarColor,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,color:'#fff' }}>{selected.avatar}</div>
               <div>
-                <div style={{ fontSize:14,fontWeight:700,color:'#F8FAFC' }}>Ready: {selected.name}</div>
-                <div style={{ fontSize:11,color:'#64748B' }}>{selected.role} · {period} · Certificate ID: XPL-2026-{selected.id}</div>
+                <div style={{ fontSize:14,fontWeight:700,color:'var(--x-text)' }}>Ready: {selected.name}</div>
+                <div style={{ fontSize:11,color:'var(--x-faint)' }}>{selected.role} · {period} · Certificate ID: XPL-2026-{selected.id}</div>
               </div>
             </div>
             <button onClick={handlePrint}
-              style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 24px',background:'linear-gradient(135deg,#F97316,#EA580C)',color:'#fff',fontWeight:700,fontSize:13,borderRadius:10,border:'none',cursor:'pointer',boxShadow:'0 4px 20px rgba(249,115,22,0.3)' }}>
+              style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 24px',background:'linear-gradient(135deg,var(--x-orange),var(--x-orange-d))',color:'#fff',fontWeight:700,fontSize:13,borderRadius:10,border:'none',cursor:'pointer',boxShadow:'0 4px 20px color-mix(in srgb, var(--x-orange) 30%, transparent)' }}>
               <Download size={15} />
               Download PDF Certificate
             </button>
@@ -530,8 +530,8 @@ export default function AdminReportPage() {
         )}
 
         {/* Divider */}
-        {selected && <div style={{ height:1,background:'linear-gradient(90deg,transparent,#1E293B,transparent)' }} />}
-        {selected && <div style={{ fontSize:12,color:'#64748B',textAlign:'center',marginTop:-16,marginBottom:-8 }}>↓ Report Preview ↓</div>}
+        {selected && <div style={{ height:1,background:'linear-gradient(90deg,transparent,var(--x-border),transparent)' }} />}
+        {selected && <div style={{ fontSize:12,color:'var(--x-faint)',textAlign:'center',marginTop:-16,marginBottom:-8 }}>↓ Report Preview ↓</div>}
       </div>
 
       {/* ── REPORT PREVIEW ── */}
