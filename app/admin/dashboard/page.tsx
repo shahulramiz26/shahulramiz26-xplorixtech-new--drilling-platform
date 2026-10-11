@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts'
-import { moneyL, perUnit, monthLabel, shiftMonth, projectCode, monthOf } from '../../../lib/costing-store'
+import { moneyL, perUnit, monthLabel, shiftMonth, projectCode, monthOf, useCosting } from '../../../lib/costing-store'
+import { useInventory } from '../../../lib/inventory-store'
+import { IS_DEMO } from '../../../lib/company'
 import { useAdminOverview, financeLink, RIG_STATUS_LABEL, type RigStatus, type Attention } from '../../../lib/admin-overview'
 import { num } from '../../../lib/client-record'
 import {
@@ -22,6 +24,42 @@ import {
  * what needs me, are the rigs turning, are we making money. */
 
 const statusTone: Record<RigStatus, Tone> = { drilling: 'good', standby: 'warn', breakdown: 'bad', 'no-shift': 'neutral', 'to-check': 'warn' }
+
+/* A new company opens on an empty Dashboard. This says what to do first, in
+ * the order it has to be done, and ticks each step off from the record
+ * itself. It goes away once the first shift is logged. */
+function StartHere() {
+  const { state } = useCosting()
+  const { state: inv } = useInventory()
+  if (IS_DEMO || state.shiftLogs.length > 0) return null
+  const hasProject = state.projects.length > 0
+  const steps: { done: boolean | null; title: string; detail: string; href: string; action: string }[] = [
+    { done: null, title: 'Change your password', detail: 'You were given it by XPLORIX. Make it your own.', href: '/admin/settings', action: 'Open Settings' },
+    { done: hasProject, title: 'Create your first project', detail: 'The client, the contract rates, the rigs and crew on it, and the holes to drill.', href: '/admin/projects/new', action: 'New project' },
+    { done: state.ownership.length + state.operating.length > 0, title: 'Enter what each rig costs', detail: 'Fuel, crew and the rig itself, in Finance under Set costs. Without it Finance shows what you bill, and no cost or margin.', href: '/admin/finance', action: 'Open Finance' },
+    { done: state.users.length > 0, title: 'Create the logins', detail: 'One for each supervisor, and for a contractor or your client if you want them to sign in.', href: '/admin/users', action: 'Open Users' },
+    { done: inv.catalogue.length > 0, title: 'Add your bits and parts', detail: 'Can wait. Needed when you want parts cost on each metre and stock warnings.', href: '/admin/inventory', action: 'Open inventory' },
+    { done: false, title: 'Log the first shift', detail: 'A supervisor signs in and saves a drill log. From then on this Dashboard fills itself.', href: '/admin/logs/drill', action: 'Open drill logs' },
+  ]
+  return (
+    <Card title="Start here" subtitle="Six steps to your first day on XPLORIX. Each one is ticked when it is done." pad={false}>
+      {steps.map((s, i) => (
+        <Link key={s.title} href={s.href} className="xpl-row" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 18px', borderTop: i ? rowLine : undefined, textDecoration: 'none' }}>
+          <span aria-hidden style={{
+            width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: 700,
+            background: s.done ? 'color-mix(in srgb, var(--x-green) 16%, transparent)' : 'rgba(var(--x-ov),0.05)', color: s.done ? T.green : T.muted,
+            border: `1px solid ${s.done ? 'color-mix(in srgb, var(--x-green) 40%, transparent)' : T.border}`,
+          }}>{s.done ? '✓' : i + 1}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{s.title}{s.done && <span style={{ fontWeight: 400, color: T.faint }}> · done</span>}</div>
+            <div style={{ fontSize: 12.5, color: T.muted, marginTop: 2, lineHeight: 1.5 }}>{s.detail}</div>
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 600, color: T.orange, whiteSpace: 'nowrap' }}>{s.action} →</span>
+        </Link>
+      ))}
+    </Card>
+  )
+}
 
 export default function AdminDashboard() {
   const o = useAdminOverview()
@@ -49,6 +87,8 @@ export default function AdminDashboard() {
           <Btn href="/admin/finance" kind="primary">Open Finance</Btn>
         </>}
       />
+
+      <StartHere />
 
       <Split left={3} right={2}>
         <Card title={`Needs you${o.attention.length ? ` · ${o.attention.length}` : ''}`} subtitle="Most urgent first. Each line opens the screen where you fix it." pad={false}>
@@ -80,6 +120,7 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody>
+            {o.rigs.length === 0 && <tr><td colSpan={10} style={{ ...td, padding: 22, textAlign: 'center', whiteSpace: 'normal' }}>No rig is on a project yet. A rig appears here once it is on a project.</td></tr>}
             {o.rigs.map(r => (
               <tr key={r.rig} className="xpl-row" style={{ borderBottom: rowLine }}>
                 <td style={{ ...td, color: T.text, fontWeight: 700, fontFamily: display, fontSize: 14 }}>

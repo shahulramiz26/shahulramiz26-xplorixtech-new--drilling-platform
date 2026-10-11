@@ -12,6 +12,7 @@ import {
 } from './contracting'
 import { seedInvoices } from './client-record'
 import { useServerSync } from './backend'
+import { COMPANY_CODE, IS_DEMO } from './company'
 
 /* ==========================================================================
  * XPLORIX COSTING
@@ -1069,6 +1070,26 @@ export const PEOPLE = {
   drillers: ['Mahesh Yadav', 'Ravi Kumar', 'Santosh Patil', 'Dinesh Sahu', 'Farid Khan', 'Gopal Das', 'Naveen Reddy', 'Lokesh Meena'],
 }
 
+/* The rigs and people to pick from when a project is staffed. A real company
+ * keeps no separate list: a rig or a person exists once it has been named on
+ * a project (or, for a rig, given its costs in Finance). The demo company
+ * also has the spare fleet and crew above. */
+export function rigPool(state: { projects: ProjectRecord[]; ownership: RigOwnership[] }): { rig: string; type: string }[] {
+  const known = new Map<string, string>()
+  if (IS_DEMO) FLEET.forEach(f => known.set(f.rig, f.type))
+  const add = (rig: string) => { if (rig && !known.has(rig)) known.set(rig, 'Core') }
+  state.projects.forEach(p => p.rigs.forEach(add))
+  state.ownership.forEach(o => add(o.rig))
+  return Array.from(known, ([rig, type]) => ({ rig, type })).sort((a, b) => a.rig.localeCompare(b.rig, undefined, { numeric: true }))
+}
+export function peoplePool(state: { projects: ProjectRecord[]; users: AppUser[] }): { supervisors: string[]; drillers: string[] } {
+  const uniq = (list: string[]) => Array.from(new Set(list.filter(Boolean)))
+  return {
+    supervisors: uniq([...(IS_DEMO ? PEOPLE.supervisors : []), ...state.projects.flatMap(p => p.supervisors), ...state.users.filter(u => u.role === 'supervisor').map(u => u.name)]),
+    drillers: uniq([...(IS_DEMO ? PEOPLE.drillers : []), ...state.projects.flatMap(p => p.drillers)]),
+  }
+}
+
 export const SEED_PROJECTS: ProjectRecord[] = [
   {
     id: 'PRJ-001', code: 'PRJ-001', name: 'Site A - North Field', location: 'North Field block', client: DEMO_CLIENT,
@@ -1100,7 +1121,7 @@ export function syncRegistry(projects: ProjectRecord[]) {
   fill(SHARED_PROJECTS, projects.filter(p => p.shared).map(p => p.name))
   fill(INV_PROJECTS, projects.map(p => p.name))
   fill(INV_COMPLETED, projects.filter(p => p.status === 'completed').map(p => p.name))
-  fill(INV_RIGS, Array.from(new Set([...FLEET.slice(0, 3).map(f => f.rig), ...projects.flatMap(p => p.rigs)])).sort())
+  fill(INV_RIGS, Array.from(new Set([...(IS_DEMO ? FLEET.slice(0, 3).map(f => f.rig) : []), ...projects.flatMap(p => p.rigs)])).sort())
   const codes = projects.map(p => [p.name, p.code] as [string, string])
   refill(PROJECT_CODES, codes)
   refill(INV_CODES, codes)
@@ -1752,7 +1773,7 @@ export interface AppUser {
  * admin, until someone signs in and it becomes them. */
 export let ADMIN_NAME = 'Admin User'
 export function setAdminName(name: string) { if (name) ADMIN_NAME = name }
-export const COMPANY_NAME = 'Apex Drilling Solutions'
+export { COMPANY_NAME } from './company'
 
 export const SEED_USERS: AppUser[] = [
   { id: 'u_s1', name: 'Arun Verma', username: 'APX_SUP01', role: 'supervisor', active: true, created: '2026-06-01', opened: true },
@@ -1771,7 +1792,7 @@ export function loginOfClient(users: AppUser[] | undefined, client: string | und
 export function nextUsername(users: AppUser[], role: UserRole) {
   const tag = role === 'supervisor' ? 'SUP' : role === 'contractor' ? 'CON' : 'CLI'
   const n = Math.max(0, ...users.filter(u => u.role === role).map(u => Number(u.username.match(/(\d+)$/)?.[1] ?? 0))) + 1
-  return `APX_${tag}${String(n).padStart(2, '0')}`
+  return `${COMPANY_CODE}_${tag}${String(n).padStart(2, '0')}`
 }
 
 interface State {

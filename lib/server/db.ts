@@ -77,6 +77,9 @@ create table if not exists xp_records (
   primary key (company_id, store, coll, id)
 );
 create index if not exists xp_records_rev on xp_records (company_id, rev);
+alter table xp_companies add column if not exists code text;
+create unique index if not exists xp_companies_code on xp_companies (upper(code));
+update xp_companies set code = 'APX' where id = 'c1' and code is null;
 create table if not exists xp_attempts (
   key text primary key,
   fails int not null default 0,

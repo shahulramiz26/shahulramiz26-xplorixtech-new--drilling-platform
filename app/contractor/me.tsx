@@ -16,7 +16,8 @@ import { Page, Card, Empty } from '../components/kit'
  * ========================================================================== */
 
 /* The company that gave the login: the client, from where the contractor sits. */
-export const CLIENT_NAME = COMPANY_NAME
+/* The company the contractor works for. Always the current value. */
+export { COMPANY_NAME as CLIENT_NAME } from '../../lib/costing-store'
 
 export function useMe() {
   const store = useSignedIn('contractor')

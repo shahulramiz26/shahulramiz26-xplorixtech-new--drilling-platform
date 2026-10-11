@@ -261,8 +261,22 @@ export function useAdminOverview() {
       }),
     ]
 
+    /* Metres in the record that no line of the contract rates covers. They bill
+     * at zero until the line is added, so the admin is told the same day. */
+    const unpriced = new Map<string, { metres: number; lines: Set<string> }>()
+    holes.filter(h => h.status !== 'invoiced').forEach(h => h.billing.filter(b => b.metres > 0 && b.rate === 0).forEach(b => {
+      const e = unpriced.get(h.project) ?? { metres: 0, lines: new Set<string>() }
+      e.metres += b.metres; e.lines.add(b.label); unpriced.set(h.project, e)
+    }))
+    const rateItems: Attention[] = Array.from(unpriced.entries()).map(([name, u]) => ({
+      key: `norate_${name}`, tone: 'bad' as Tone, action: 'Open contract rates', href: `/admin/projects/${idOf(name)}?tab=rates`,
+      title: `${Math.round(u.metres * 10) / 10} m on ${name} has no contract rate`,
+      detail: `${Array.from(u.lines).slice(0, 3).join(', ')} · these metres bill at zero until the rate is added`,
+    }))
+
     const attention: Attention[] = [
       ...projectItems,
+      ...rateItems,
       ...contractorItems,
       ...rigs.filter(r => r.status === 'breakdown').map(r => ({
         key: `bd_${r.rig}`, tone: 'bad' as Tone, action: 'Open rig', href: '/admin/rigs',

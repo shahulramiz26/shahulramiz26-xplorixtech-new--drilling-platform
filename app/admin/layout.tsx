@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, Settings, Truck, CreditCard, BarChart3, LogOut, Menu, Search,
   DollarSign, X, Boxes, FileText, Store, HardHat, Target, Bell, CornerDownLeft, Handshake,
-  Activity, Wrench, GitCompare, Flag, CalendarRange, ShieldAlert,
+  Activity, Wrench, GitCompare, Flag, CalendarRange, ShieldAlert, Building2,
 } from 'lucide-react'
 import { CurrencyProvider } from '../components/currency-context'
 import { CostingProvider, monthOf, projectCode } from '../../lib/costing-store'
@@ -15,6 +15,7 @@ import { T, display, toneColor } from '../components/kit'
 import { ThemeScope, ThemeToggle } from '../components/theme'
 import { Guard, SavedState } from '../components/guard'
 import { useSession, signOut } from '../../lib/backend'
+import { IS_DEMO, COMPANY_NAME } from '../../lib/company'
 
 /* ==========================================================================
  * COMPANY ADMIN — the shell around every screen
@@ -32,7 +33,9 @@ import { useSession, signOut } from '../../lib/backend'
  * copy and the badges stay true as work is done.
  * ========================================================================== */
 
-type NavItem = { href: string; label: string; icon: React.ElementType; badge?: 'finance' | 'inventory' | 'projects' | 'contractors' | number }
+/* `sample` marks a screen that still runs on sample data: shown for the demo
+ * company only. `owner` is for the account that set XPLORIX up. */
+type NavItem = { href: string; label: string; icon: React.ElementType; badge?: 'finance' | 'inventory' | 'projects' | 'contractors' | number; sample?: true; owner?: true }
 const NAV: { title: string | null; items: NavItem[] }[] = [
   { title: null, items: [{ href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
   {
@@ -41,8 +44,8 @@ const NAV: { title: string | null; items: NavItem[] }[] = [
       { href: '/admin/projects', label: 'Projects', icon: FolderOpen, badge: 'projects' },
       { href: '/admin/contractors', label: 'Contractors', icon: Handshake, badge: 'contractors' },
       { href: '/admin/rigs', label: 'Rigs & equipment', icon: Truck },
-      { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
-      { href: '/admin/reports', label: 'Performance reports', icon: FileText },
+      { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, sample: true },
+      { href: '/admin/reports', label: 'Performance reports', icon: FileText, sample: true },
     ],
   },
   {
@@ -55,7 +58,7 @@ const NAV: { title: string | null; items: NavItem[] }[] = [
   {
     title: 'Commercial',
     items: [
-      { href: '/admin/bid-intelligence', label: 'Bid Intelligence', icon: Target },
+      { href: '/admin/bid-intelligence', label: 'Bid Intelligence', icon: Target, sample: true },
       { href: '/admin/finance', label: 'Finance & costing', icon: DollarSign, badge: 'finance' },
     ],
   },
@@ -75,20 +78,25 @@ const NAV: { title: string | null; items: NavItem[] }[] = [
   {
     title: 'Exchange',
     items: [
-      { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
-      { href: '/admin/crew', label: 'Crew & jobs', icon: HardHat, badge: 8 },
+      { href: '/admin/marketplace', label: 'Marketplace', icon: Store, sample: true },
+      { href: '/admin/crew', label: 'Crew & jobs', icon: HardHat, badge: 8, sample: true },
     ],
   },
   {
     title: 'Account',
     items: [
       { href: '/admin/users', label: 'Users', icon: Users },
-      { href: '/admin/billing', label: 'Billing', icon: CreditCard },
+      { href: '/admin/billing', label: 'Billing', icon: CreditCard, sample: true },
+      { href: '/admin/companies', label: 'Companies', icon: Building2, owner: true },
       { href: '/admin/settings', label: 'Settings', icon: Settings },
     ],
   },
 ]
 const ALL = NAV.flatMap(g => g.items)
+/* The menu for this company and this person. */
+function menuFor(demo: boolean, owner: boolean) {
+  return NAV.map(g => ({ ...g, items: g.items.filter(i => (demo || !i.sample) && (owner || !i.owner)) })).filter(g => g.items.length > 0)
+}
 
 const SHELL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap');
@@ -115,6 +123,11 @@ function Shell({ children }: { children: React.ReactNode }) {
 
   const current = [...ALL].sort((a, b) => b.href.length - a.href.length)
     .find(n => pathname === n.href || pathname.startsWith(n.href + '/'))
+  const demo = IS_DEMO
+  const owner = session.status === 'in' && !!session.user.owner
+  const menu = menuFor(demo, owner)
+  // A screen on sample data, opened by its address in a real company: say so instead of showing someone else's numbers.
+  const blocked = !!current && ((current.sample && !demo) || (current.owner && !owner))
 
   const financeCount = o.money.returned.length + o.money.disputed.length
   const badge = (b: NavItem['badge']) => b === 'finance' ? financeCount : b === 'inventory' ? o.urgentAlerts.length : b === 'projects' ? o.projectNews : b === 'contractors' ? o.contractorWork : b ?? 0
@@ -151,7 +164,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             </svg>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: T.text, letterSpacing: '0.05em', fontFamily: display }}>XPLORIX</div>
-              <div style={{ fontSize: 11.5, color: T.faint, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Apex Drilling Solutions</div>
+              <div style={{ fontSize: 11.5, color: T.faint, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{COMPANY_NAME}</div>
             </div>
           </Link>
           <button className="lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu"
@@ -159,7 +172,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto" style={{ padding: '8px 10px 14px', scrollbarWidth: 'none' }}>
-          {NAV.map((g, gi) => (
+          {menu.map((g, gi) => (
             <div key={g.title ?? 'top'} style={{ marginTop: gi === 0 ? 4 : 11 }}>
               {g.title && <div style={{ fontSize: 11.5, fontWeight: 600, color: T.dim, padding: '0 10px 5px' }}>{g.title}</div>}
               {g.items.map(item => {
@@ -187,6 +200,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div style={{ padding: 12, borderTop: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {demo && (
           <Link href="/admin/billing" className="xpl-hit" style={{
             display: 'block', padding: '9px 11px', borderRadius: 9, textDecoration: 'none',
             border: '1px solid color-mix(in srgb, var(--x-orange) 28%, transparent)', background: 'color-mix(in srgb, var(--x-orange) 6%, transparent)',
@@ -194,6 +208,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text }}>Free trial: 12 days left</div>
             <div style={{ fontSize: 11.5, color: T.muted, marginTop: 2 }}>See plans and upgrade</div>
           </Link>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 2px 2px 4px' }}>
             <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: 'var(--x-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12.5, color: T.text }}>A</div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -266,7 +281,19 @@ function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="flex-1" style={{ padding: '26px 28px' }}>{children}</div>
+        <div className="flex-1" style={{ padding: '26px 28px' }}>
+          {blocked ? (
+            <div style={{ maxWidth: 620, margin: '40px auto', padding: 24, background: T.card, border: `1px solid ${T.border}`, borderRadius: 14 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: T.text, fontFamily: display }}>{current?.owner ? 'Not for this login' : `${current?.label} is in development`}</div>
+              <p style={{ fontSize: 13.5, color: T.muted, lineHeight: 1.6, margin: '8px 0 16px' }}>
+                {current?.owner
+                  ? 'Only the account that set XPLORIX up can open this screen.'
+                  : 'This screen still runs on sample data, so it is shown in the demo company only. It will open here when it reads your own logs.'}
+              </p>
+              <Link href="/admin/dashboard" style={{ fontSize: 13.5, fontWeight: 600, color: T.orange, textDecoration: 'none' }}>Back to the Dashboard</Link>
+            </div>
+          ) : children}
+        </div>
       </main>
 
       {palette && <Palette onClose={() => setPalette(false)} />}
@@ -285,7 +312,7 @@ function Palette({ onClose }: { onClose: () => void }) {
   useEffect(() => { input.current?.focus() }, [])
 
   const items = useMemo(() => {
-    const pages = ALL.map(n => ({ kind: 'Page', label: n.label, sub: '', href: n.href }))
+    const pages = ALL.filter(n => (IS_DEMO || !n.sample) && !n.owner).map(n => ({ kind: 'Page', label: n.label, sub: '', href: n.href }))
     const rigs = o.rigs.map(r => ({ kind: 'Rig', label: r.rig, sub: [r.project, r.hole ? `on ${r.hole}` : ''].filter(Boolean).join(' · '), href: '/admin/rigs' }))
     const projects = o.projects.map(p => ({ kind: 'Project', label: p.name, sub: `${p.code} · ${p.client}`, href: `/admin/projects/${p.id}` }))
     const holes = o.holes.map(h => ({
@@ -330,7 +357,7 @@ function Palette({ onClose }: { onClose: () => void }) {
           <kbd style={{ fontSize: 11, padding: '1px 6px', borderRadius: 5, border: `1px solid ${T.border}`, color: T.faint, fontFamily: 'inherit' }}>Esc</kbd>
         </div>
         <div style={{ maxHeight: '52vh', overflowY: 'auto', padding: 6 }}>
-          {hits.length === 0 && <div style={{ padding: '18px 12px', fontSize: 13.5, color: T.faint }}>Nothing matches &ldquo;{q}&rdquo;. Try a rig number like RIG-001 or a hole like DH-004.</div>}
+          {hits.length === 0 && <div style={{ padding: '18px 12px', fontSize: 13.5, color: T.faint }}>Nothing matches &ldquo;{q}&rdquo;. Try a rig number or a hole number.</div>}
           {hits.map((h, i) => (
             <button key={`${h.kind}_${h.label}`} onClick={() => go(h.href)} onMouseEnter={() => setAt(i)} style={{
               display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '9px 11px', borderRadius: 9, cursor: 'pointer',

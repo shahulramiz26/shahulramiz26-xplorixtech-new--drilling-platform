@@ -109,11 +109,13 @@ export default function LoginPage() {
         {/* Card */}
         <div style={{ background:'#FFFFFF', border:'1px solid #E3D9CF', borderRadius:20, padding:28, boxShadow:'0 32px 80px rgba(122,60,8,0.16)' }}>
 
-          {/* Trial badge */}
+          {/* Trial badge: the demo's own. A real sign-in is not a trial. */}
+          {!real && (
           <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:7, padding:'8px 0', background:'rgba(249,115,22,0.05)', border:'1px solid rgba(249,115,22,0.12)', borderRadius:10, marginBottom:22 }}>
             <span style={{ width:6, height:6, borderRadius:'50%', background:'#F97316', display:'inline-block', animation:'xplPulse 1.5s infinite' }}/>
             <span style={{ fontSize:11, fontWeight:600, color:'#F97316' }}>15-day free trial · All features unlocked</span>
           </div>
+          )}
 
           <form onSubmit={handleSubmit}>
 
@@ -181,6 +183,7 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {!real && <>
           <div style={{ height:1, background:'linear-gradient(90deg,transparent,#E3D9CF,transparent)', margin:'20px 0' }}/>
 
           <p style={{ textAlign:'center', fontSize:13, color:'#6B7280' }}>
@@ -189,6 +192,7 @@ export default function LoginPage() {
               Start free trial
             </Link>
           </p>
+          </>}
         </div>
 
         <p style={{ textAlign:'center', fontSize:11, color:'#E3D9CF', marginTop:20 }}>

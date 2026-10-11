@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
-  useCosting, uid, nextUsername, loginOfContractor, loginOfClient, USER_ROLE_LABEL, PEOPLE,
+  useCosting, uid, nextUsername, loginOfContractor, loginOfClient, USER_ROLE_LABEL, peoplePool,
   type AppUser, type UserRole,
 } from '../../../lib/costing-store'
 import { TODAY } from '../../../lib/inventory-store'
@@ -76,8 +76,8 @@ function UsersScreen() {
   }, [params])
 
   // Who can still be given a login of each kind.
-  const supervisorsFree = useMemo(() => Array.from(new Set([...state.projects.flatMap(p => p.supervisors), ...PEOPLE.supervisors]))
-    .filter(n => !users.some(u => u.role === 'supervisor' && u.name === n)), [state.projects, users])
+  const supervisorsFree = useMemo(() => peoplePool(state).supervisors
+    .filter(n => !users.some(u => u.role === 'supervisor' && u.name === n)), [state, users])
   const contractorsFree = state.contractors.filter(c => !loginOfContractor(users, c.id))
   const clientsFree = Array.from(new Set(state.projects.map(p => p.client).filter(Boolean))).filter(c => !loginOfClient(users, c))
 

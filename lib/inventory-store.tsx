@@ -42,7 +42,8 @@ import { useServerSync } from './backend'
  *      charged at different rates.
  * ========================================================================== */
 
-export const TODAY = '2026-09-13'
+/* The day the app is on: fixed for the demo company, the real day for a real one. */
+export { TODAY } from './company'
 
 // ── FORMATIONS ────────────────────────────────────────────────────────────
 

@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { Page, Head, Card, Btn, Field, Switch, Split, inputStyle, T } from '../../components/kit'
 import { ThemeChoice } from '../../components/theme'
+import { ChangePasswordForm } from '../../components/change-password'
+import { useSession } from '../../../lib/backend'
+import { COMPANY_NAME, COMPANY_CODE, IS_DEMO } from '../../../lib/company'
 
 /* SETTINGS — company details and the few rules that apply everywhere.
  * One Save button for the whole screen, and it says so when it has saved. */
@@ -14,7 +17,50 @@ const START = {
   passwordPolicy: 'standard', rotatePasswords: true, twoFactor: false,
 }
 
+/* With a database connected, Settings holds what is really kept: who you are
+ * and your password. The rest of the old screen was a mock-up and is shown in
+ * the browser demo only. */
+function AccountSettings() {
+  const session = useSession()
+  if (session.status !== 'in') return null
+  const u = session.user
+  const row = (k: string, v: string) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '9px 0', borderBottom: `1px solid ${T.line}`, fontSize: 13.5 }}>
+      <span style={{ color: T.faint }}>{k}</span><span style={{ color: T.text, fontWeight: 600, textAlign: 'right' }}>{v}</span>
+    </div>
+  )
+  return (
+    <Page>
+      <Head title="Settings" sub="Your login and your company." />
+      <Split>
+        <Card title="Company">
+          {row('Company', COMPANY_NAME)}
+          {row('Code used in usernames', COMPANY_CODE)}
+          {row('Data', IS_DEMO ? 'Demo data, on a fixed date' : 'Your own records, on today’s date')}
+          <div style={{ fontSize: 12.5, color: T.faint, marginTop: 12, lineHeight: 1.55 }}>To change the company name, ask XPLORIX.</div>
+        </Card>
+        <Card title="Your login">
+          {row('Name', u.name)}
+          {row('Username', u.username)}
+          {row('Signs in as', 'Company Admin')}
+        </Card>
+      </Split>
+      <Card title="Change your password" subtitle="If you were given this password by someone else, change it now.">
+        <ChangePasswordForm />
+      </Card>
+      <Card title="Appearance" subtitle="Dark for the rig office at night, light for a bright room. Saved on this device.">
+        <ThemeChoice />
+      </Card>
+    </Page>
+  )
+}
+
 export default function SettingsPage() {
+  const session = useSession()
+  return session.status === 'in' ? <AccountSettings /> : <DemoSettings />
+}
+
+function DemoSettings() {
   const [saved, setSaved] = useState(START)
   const [s, setS] = useState(START)
   const [justSaved, setJustSaved] = useState(false)

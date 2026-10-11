@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { projectCode } from '../../../lib/costing-store'
+import { projectCode, rigPool, useCosting } from '../../../lib/costing-store'
+import { IS_DEMO } from '../../../lib/company'
 import { useAdminOverview, financeLink, RIG_STATUS_LABEL, type RigStatus } from '../../../lib/admin-overview'
 import { num } from '../../../lib/client-record'
 import {
@@ -22,7 +23,11 @@ const SPARE = [{ rig: 'RIG-004', type: 'Core' }, { rig: 'RIG-005', type: 'Core' 
 
 export default function RigsPage() {
   const o = useAdminOverview()
-  const [off, setOff] = useState<string[]>(SPARE.map(s => s.rig))
+  const { state } = useCosting()
+  /* Switching a rig on and off, and the daily charge, are a mock-up of how
+   * XPLORIX will bill. They are shown in the demo company only. */
+  const demo = IS_DEMO
+  const [off, setOff] = useState<string[]>(demo ? SPARE.map(s => s.rig) : [])
   const isOn = (rig: string) => !off.includes(rig)
   const toggle = (rig: string) => setOff(isOn(rig) ? [...off, rig] : off.filter(r => r !== rig))
 
@@ -33,7 +38,8 @@ export default function RigsPage() {
   const theirs = o.rigs.filter(r => r.contractor)
   const rows = [
     ...own.map(r => ({ ...r, type: 'Core', spare: false })),
-    ...SPARE.map(s => ({
+    // Rigs on record that are on no running project.
+    ...(demo ? SPARE : rigPool(state).filter(r => !o.rigs.some(x => x.rig === r.rig))).map(s => ({
       rig: s.rig, type: s.type, spare: true, project: null, hole: null, status: 'no-shift' as RigStatus, note: 'Not assigned to a project',
       holeDrilled: 0, holePlanned: undefined, monthMetres: 0, monthDays: 0, monthLostHours: 0,
     })),
@@ -43,13 +49,13 @@ export default function RigsPage() {
 
   return (
     <Page>
-      <Head title="Rigs & equipment" sub="What each rig is doing today, and which rigs are switched on for XPLORIX." />
+      <Head title="Rigs & equipment" sub={demo ? 'What each rig is doing today, and which rigs are switched on for XPLORIX.' : 'What each of your rigs is doing today, from the shift logs.'} />
 
       <Grid>
         <Tile label="Rigs" value={rows.length} note={`${on.length} switched on`} />
         <Tile label="Drilling today" value={`${own.filter(r => r.status === 'drilling').length} of ${own.length}`} note="From today's shift logs" />
         <Tile label="Metres this month" value={`${num(o.now.metres)} m`} note={`${o.now.perRigDay.toFixed(1)} m per rig per day`} />
-        <Tile label="XPLORIX charge this month" value={`$${num(billDays * DAILY_RATE)}`} note={`${billDays} rig-days at $${DAILY_RATE} a day`} />
+        {demo && <Tile label="XPLORIX charge this month" value={`$${num(billDays * DAILY_RATE)}`} note={`${billDays} rig-days at $${DAILY_RATE} a day`} />}
       </Grid>
 
       <Card pad={false}>
@@ -57,7 +63,7 @@ export default function RigsPage() {
           <thead>
             <tr>
               <th style={th}>Rig</th><th style={th}>Today</th><th style={th}>Project and hole</th><th style={th}>Hole depth</th>
-              <th style={thR}>This month</th><th style={thR}>Hours lost</th><th style={th}>On XPLORIX</th><th style={th} />
+              <th style={thR}>This month</th><th style={thR}>Hours lost</th>{demo && <th style={th}>On XPLORIX</th>}<th style={th} />
             </tr>
           </thead>
           <tbody>
@@ -88,16 +94,16 @@ export default function RigsPage() {
                     </> : <span style={{ color: T.dim }}>—</span>}
                   </td>
                   <td style={tdR}>{r.monthLostHours ? `${r.monthLostHours} h` : <span style={{ color: T.dim }}>0</span>}</td>
-                  <td style={td}>
+                  {demo && <td style={td}>
                     <Status tone={active ? 'good' : 'neutral'}>{active ? 'On' : 'Off'}</Status>
                     <div style={{ fontSize: 11.5, color: T.faint, marginTop: 5 }}>{active ? `$${DAILY_RATE} a day` : 'No charge'}</div>
-                  </td>
+                  </td>}
                   <td style={{ ...td, textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: 6 }}>
                       {r.project && <Btn size="sm" href={financeLink({ project: r.project, rig: r.rig, month: o.month })}>Costing</Btn>}
-                      {active
+                      {demo && (active
                         ? <Btn size="sm" disabled={busy} onClick={() => toggle(r.rig)}>Switch off</Btn>
-                        : <Btn size="sm" kind="good" onClick={() => toggle(r.rig)}>Switch on</Btn>}
+                        : <Btn size="sm" kind="good" onClick={() => toggle(r.rig)}>Switch on</Btn>)}
                     </div>
                   </td>
                 </tr>
@@ -114,10 +120,18 @@ export default function RigsPage() {
         </Note>
       )}
 
-      <Note>
-        A rig that logged a shift today cannot be switched off, so no shift or maintenance record is lost. Switch it off once it is idle and off the project.
-        The charge stops the same day.
-      </Note>
+      {demo ? (
+        <Note>
+          A rig that logged a shift today cannot be switched off, so no shift or maintenance record is lost. Switch it off once it is idle and off the project.
+          The charge stops the same day.
+        </Note>
+      ) : (
+        <Note>
+          A rig appears here once it is on a project. Add a rig, or move one, on the project&rsquo;s Team tab under{' '}
+          <Link href="/admin/projects" style={{ color: T.orange, fontWeight: 600, textDecoration: 'none' }}>Projects</Link>.
+        </Note>
+      )}
+      {rows.length === 0 && <Note tone="warn">No rigs yet. Create a project and name its rigs, and they appear here.</Note>}
     </Page>
   )
 }
