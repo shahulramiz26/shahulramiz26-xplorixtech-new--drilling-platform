@@ -1,19 +1,19 @@
 'use client'
 
 import {
-  BREAKDOWN_REASONS, chargeShift, versionOn, monthOf, shiftMonth, daysInMonth, monthLabel,
-  isOwnerLinked, isOverdue, outstanding, disputedAmount, money, moneyL, OWNER_NAME,
+  chargeShift, versionOn, monthOf, shiftMonth, daysInMonth, monthLabel, isOwnStop, shiftOrder, clientOf,
+  isOverdue, outstanding, disputedAmount, money, moneyL,
   type ShiftLog, type ClientRate,
 } from './costing-store'
 import { computeRigMonth, type CostingState, type InvState } from './costing-view'
-import { holesFromLogs, shortDate, type LiveHole } from './owner-portal'
+import { holesFromLogs, shortDate, type LiveHole } from './client-record'
 import {
   TODAY, COMPLETED_PROJECTS, stockInStore, onOrder, partWorksIn, normFormation as groundOf,
   addDays, daysBetween, type Part, type Formation,
 } from './inventory-store'
 
 /* ==========================================================================
- * NEXT MONTH — the contractor's forecast
+ * LOOKING AHEAD — this month, next month and every open hole
  *
  * Nothing here is typed in and nothing is guessed. It is a walk forward, one
  * day at a time, from what the logs already say:
@@ -30,7 +30,7 @@ import {
  * go wrong on the way: a rig that runs out of planned holes, a part that runs
  * out before an order can arrive, money that is drilled but cannot be billed.
  *
- * It is a projection from the contractor's own record, not a trained model.
+ * It is a projection from the company's own record, not a trained model.
  * It gets sharper as more shifts are logged, and it is honest about its range:
  * the low and high cases are each rig's slowest and best month on record.
  * ========================================================================== */
@@ -60,6 +60,8 @@ export interface PeriodNumbers {
 
 export interface RigForecast {
   rig: string; project: string
+  contractor: boolean
+  mtd: { metres: number; revenue: number; cost: number; days: number }
   perDay: number; slow: number; fast: number
   loggedDays: number; zeroDays: number
   ownHours: number; ownEvents: number; clientHours: number
@@ -86,8 +88,14 @@ export interface PartNeed {
 export interface SwotItem { title: string; detail: string; figure?: string; href?: string }
 export interface Swot { strengths: SwotItem[]; weaknesses: SwotItem[]; opportunities: SwotItem[]; threats: SwotItem[] }
 
+export type RiskArea = 'holes' | 'rigs' | 'stock' | 'money' | 'contractors' | 'safety'
+export const RISK_AREA_LABEL: Record<RiskArea, string> = {
+  holes: 'Holes and plan', rigs: 'Rigs', stock: 'Parts and stock', money: 'Money', contractors: 'Contractors', safety: 'Safety',
+}
+
 export interface Risk {
   key: string
+  area: RiskArea
   title: string
   detail: string
   when: string
@@ -101,6 +109,21 @@ export interface Risk {
 
 export interface Closing { hole: string; rig: string; project: string; date: string; value: number }
 
+/* When a hole will reach its planned depth. The expected date uses the rig's
+ * last 30 days; earliest and latest use its best and slowest month on record. */
+export interface HoleFinish {
+  hole: string; rig: string; project: string
+  contractor: boolean
+  state: 'drilling' | 'next' | 'left'     // on the rig now, waiting its turn, or open with no rig on it
+  drilled: number; planned?: number; left: number
+  perDay: number
+  starts?: string
+  finish?: string; earliest?: string; latest?: string
+  daysLeft?: number
+  valueNow: number; valueAtFinish: number
+  problem?: 'no-plan' | 'at-depth' | 'no-rig' | 'beyond'
+}
+
 export interface Forecast {
   today: string
   thisMonth: string; nextMonth: string
@@ -108,7 +131,13 @@ export interface Forecast {
   rigs: RigForecast[]
   rest: PeriodNumbers; next: PeriodNumbers
   mtd: { metres: number; revenue: number; cost: number; margin: number; marginPct: number; days: number }
-  thisMonthTotal: { metres: number; revenue: number; cost: number; margin: number; marginPct: number }
+  thisMonthTotal: { metres: number; revenue: number; cost: number; margin: number; marginPct: number; low: number; high: number }
+  lastMonth: { month: string; metres: number; revenue: number; cost: number; margin: number; marginPct: number }
+  /* One row a day from the first of this month to the end of next: what the
+   * logs say up to today, and the walk after it. */
+  daily: { date: string; metres: number; forecast: boolean }[]
+  holeFinish: HoleFinish[]
+  farEnd: string
   byProject: { project: string; rigs: number; metres: number; revenue: number; cost: number; margin: number; idleDays: number; plannedLeft: number; lastHoleEnds?: string }[]
   closings: Closing[]
   cash: {
@@ -128,7 +157,7 @@ export interface Forecast {
   headline: { tone: Tone; text: string }
 }
 
-const order = (l: { date: string; shift: string }) => `${l.date}${l.shift === 'Day' ? '0' : '1'}`
+const order = shiftOrder
 const sum = <T,>(list: T[], f: (x: T) => number) => list.reduce((s, x) => s + f(x), 0)
 const round = (n: number) => Math.round(n)
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
@@ -325,8 +354,8 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
     const slow = Math.min(perDay * 0.9, ...monthly)
     const fast = Math.max(perDay * 1.1, ...monthly)
 
-    const own = recent.filter(l => l.downtimeHours > 0 && BREAKDOWN_REASONS.includes(l.downtimeReason))
-    const client = recent.filter(l => l.downtimeHours > 0 && !BREAKDOWN_REASONS.includes(l.downtimeReason))
+    const own = recent.filter(l => l.downtimeHours > 0 && isOwnStop(l))
+    const client = recent.filter(l => l.downtimeHours > 0 && !isOwnStop(l))
 
     // What a rig-day and a metre have cost, this month and last.
     let fixed = 0, variable = 0, days = 0, units = 0
@@ -371,10 +400,12 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
   const rows = run(f => f.perDay)
   const slowRows = run(f => f.slow)
   const fastRows = run(f => f.fast)
-  // One more month, only to see when the planned holes end for rigs that are
-  // still busy at the end of next month.
-  const farEnd = addDays(horizonEnd, 45)
+  // Further out, to see when the planned holes end for rigs that are still
+  // busy at the end of next month, and when each open hole will be finished.
+  const farEnd = addDays(horizonEnd, 120)
   const farRows = walk(starts, queues, rig => fact(rig).perDay, horizonStart, farEnd, rateOn, ground)
+  const farSlow = walk(starts, queues, rig => fact(rig).slow, horizonStart, farEnd, rateOn, ground)
+  const farFast = walk(starts, queues, rig => fact(rig).fast, horizonStart, farEnd, rateOn, ground)
 
   const inRest = (r: DayRow) => r.date <= restEnd
   const inNext = (r: DayRow) => r.date > restEnd
@@ -390,8 +421,16 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
     const far = farRows.filter(r => r.rig === f.rig)
     const firstIdle = far.find(r => r.kind === 'idle')
     const lastDrill = [...far].reverse().find(r => r.kind === 'hole')
+    const m = { metres: 0, revenue: 0, cost: 0, days: 0 }
+    Array.from(new Set(logs.filter(l => l.rig === f.rig && monthOf(l.date) === thisMonth).map(l => l.project))).forEach(project => {
+      computeRigMonth(costing, inv, project, f.rig, thisMonth).days.forEach(d => {
+        if (!d.submitted) return
+        m.metres += d.units; m.revenue += d.revenue; m.cost += d.total; m.days += 1
+      })
+    })
     return {
       rig: f.rig, project: f.project, perDay: f.perDay, slow: f.slow, fast: f.fast,
+      contractor: contractorRigs.has(f.rig), mtd: m,
       loggedDays: f.loggedDays, zeroDays: f.zeroDays,
       ownHours: f.ownHours, ownEvents: f.ownEvents, clientHours: f.clientHours,
       fixedPerDay: f.fixedPerDay, variablePerMetre: f.variablePerMetre,
@@ -419,7 +458,31 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
   mtd.margin = mtd.revenue - mtd.cost
   mtd.marginPct = mtd.revenue ? (mtd.margin / mtd.revenue) * 100 : 0
   const tm = { metres: mtd.metres + rest.metres, revenue: mtd.revenue + rest.revenue, cost: mtd.cost + rest.cost }
-  const thisMonthTotal = { ...tm, margin: tm.revenue - tm.cost, marginPct: tm.revenue ? ((tm.revenue - tm.cost) / tm.revenue) * 100 : 0 }
+  const thisMonthTotal = {
+    ...tm, margin: tm.revenue - tm.cost, marginPct: tm.revenue ? ((tm.revenue - tm.cost) / tm.revenue) * 100 : 0,
+    low: mtd.metres + rest.low, high: mtd.metres + rest.high,
+  }
+
+  // ── last month, as it closed ─────────────────────────────────────────────
+  const prev = shiftMonth(thisMonth, -1)
+  const lm = { metres: 0, revenue: 0, cost: 0 }
+  const prevPairs = new Map<string, { project: string; rig: string }>()
+  logs.forEach(l => { if (monthOf(l.date) === prev) prevPairs.set(`${l.project}|${l.rig}`, { project: l.project, rig: l.rig }) })
+  prevPairs.forEach(({ project, rig }) => {
+    computeRigMonth(costing, inv, project, rig, prev).days.forEach(d => {
+      if (!d.submitted) return
+      lm.metres += d.units; lm.revenue += d.revenue; lm.cost += d.total
+    })
+  })
+  const lastMonth = { month: prev, ...lm, margin: lm.revenue - lm.cost, marginPct: lm.revenue ? ((lm.revenue - lm.cost) / lm.revenue) * 100 : 0 }
+
+  // ── day by day: the record to today, the walk after it ───────────────────
+  const daily: Forecast['daily'] = []
+  for (let d = `${thisMonth}-01`; d <= horizonEnd; d = addDays(d, 1)) {
+    daily.push(d <= today
+      ? { date: d, metres: sum(logs.filter(l => l.date === d), l => l.metresDrilled), forecast: false }
+      : { date: d, metres: sum(rows.filter(r => r.date === d), r => r.metres), forecast: true })
+  }
 
   // ── by project ───────────────────────────────────────────────────────────
   const byProject = projects.map(project => {
@@ -442,6 +505,44 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
     const toCome = sum(rows.filter(x => x.hole === r.hole), x => x.revenue)
     return { hole: r.hole!, rig: r.rig, project: r.project, date: r.date, value: drilledAlready + toCome }
   })
+
+  // ── when each open hole will be finished ─────────────────────────────────
+  const closeDate = (list: DayRow[], hole: string) => list.find(r => r.hole === hole && r.closes)?.date
+  const seenHoles = Array.from(new Set(farRows.filter(r => r.kind === 'hole' && r.hole).map(r => r.hole!)))
+  const holeFinish: HoleFinish[] = seenHoles.map(id => {
+    const mine = farRows.filter(r => r.hole === id)
+    const f = fact(mine[0].rig)
+    const now = holeById.get(id)
+    const isCurrent = f.current?.id === id
+    const drilled = now?.drilled ?? 0
+    const planned = now?.planned ?? plans[id]?.plannedDepth
+    const finish = closeDate(farRows, id)
+    const noPlan = isCurrent && !now?.planned
+    const atDepth = isCurrent && !!now?.planned && drilled >= now.planned
+    const valueNow = now?.value ?? 0
+    return {
+      hole: id, rig: f.rig, project: f.project, contractor: contractorRigs.has(f.rig),
+      state: isCurrent ? 'drilling' as const : 'next' as const,
+      drilled, planned, left: planned ? Math.max(0, planned - drilled) : 0, perDay: f.perDay,
+      starts: isCurrent ? undefined : mine[0].date,
+      finish: noPlan || atDepth ? undefined : finish,
+      earliest: noPlan || atDepth ? undefined : closeDate(farFast, id),
+      latest: noPlan || atDepth ? undefined : closeDate(farSlow, id),
+      daysLeft: noPlan || atDepth || !finish ? undefined : daysBetween(today, finish),
+      valueNow, valueAtFinish: valueNow + sum(mine, r => r.revenue),
+      problem: noPlan ? 'no-plan' as const : atDepth ? 'at-depth' as const : !finish ? 'beyond' as const : undefined,
+    }
+  })
+  const walked = new Set(holeFinish.map(h => h.hole))
+  holes.filter(h => h.status === 'drilling' && !walked.has(h.id) && !COMPLETED_PROJECTS.includes(h.project)).forEach(h => {
+    holeFinish.push({
+      hole: h.id, rig: h.rig, project: h.project, contractor: contractorRigs.has(h.rig), state: 'left',
+      drilled: h.drilled, planned: h.planned, left: h.planned ? Math.max(0, h.planned - h.drilled) : 0, perDay: 0,
+      valueNow: h.value, valueAtFinish: h.value, problem: 'no-rig',
+    })
+  })
+  const stateRank = { drilling: 0, left: 1, next: 2 }
+  holeFinish.sort((a, b) => stateRank[a.state] - stateRank[b.state] || (a.finish ?? a.starts ?? '9999').localeCompare(b.finish ?? b.starts ?? '9999'))
 
   // ── cash ─────────────────────────────────────────────────────────────────
   const invoices = costing.invoices.filter(i => i.status !== 'cancelled' && i.status !== 'draft')
@@ -636,7 +737,7 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
   })
   if (cash.overdue + cash.disputed > 0) threats.push({
     title: `Money already late or disputed`,
-    detail: `${cash.overdueCount ? `${plural(cash.overdueCount, 'invoice')} overdue. ` : ''}${cash.disputed ? `${moneyL(cash.disputed)} held back by the mine owner.` : ''}`,
+    detail: `${cash.overdueCount ? `${plural(cash.overdueCount, 'invoice')} overdue. ` : ''}${cash.disputed ? `${moneyL(cash.disputed)} held back by the client.` : ''}`,
     figure: moneyL(cash.overdue + cash.disputed), href: '/admin/finance',
   })
 
@@ -647,19 +748,19 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
     const first = mine.map(r => r.idleFrom!).sort()[0]
     const cost = sum(mine, r => r.next.idleDays * r.fixedPerDay)
     risks.push({
-      key: `idle_${p.project}`,
+      key: `idle_${p.project}`, area: 'holes',
       title: `${p.project}: planned holes run out`,
       detail: `${mine.map(r => `${r.rig} is idle from ${shortDate(r.idleFrom)}`).join('; ')}. ${plural(p.idleDays, 'rig-day')} with no hole to drill in ${nextName}.`,
       when: shortDate(first),
       impact: cost, impactNote: 'crew and ownership cost with nothing billed',
       likelihood: 'High',
-      action: `Ask ${isOwnerLinked(p.project) ? OWNER_NAME : 'the client'} to release the next holes by ${shortDate(addDays(first, -10))}, and add them under Projects.`,
+      action: `Ask ${clientOf(p.project)} to release the next holes by ${shortDate(addDays(first, -10))}, and add them under Projects.`,
       href: '/admin/projects', linkLabel: 'Open projects',
     })
   })
   rigs.filter(r => r.next.idleDays === 0 && r.idleFrom).forEach(r => {
     risks.push({
-      key: `idle_later_${r.rig}`,
+      key: `idle_later_${r.rig}`, area: 'holes',
       title: `${r.rig}: last planned hole ends ${shortDate(r.lastHoleEnds)}`,
       detail: `Busy through ${nextName}, but nothing is planned after that on ${r.project}.`,
       when: shortDate(r.idleFrom),
@@ -671,7 +772,7 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
   })
   shortParts.slice(0, 2).forEach(p => {
     risks.push({
-      key: `part_${p.part.id}`,
+      key: `part_${p.part.id}`, area: 'stock',
       title: `${p.part.name}: store runs out`,
       detail: `${p.inStore} in the store${p.onOrderQty ? `, ${p.onOrderQty} on order` : ', none on order'}. The forecast uses ${p.need.toFixed(p.need < 10 ? 1 : 0)} by the end of ${nextName}. ${p.part.supplier} needs ${p.part.leadTimeDays} days.`,
       when: shortDate(p.runOut),
@@ -686,7 +787,7 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
   if (shortParts.length > 2) {
     const others = shortParts.slice(2)
     risks.push({
-      key: 'parts_rest',
+      key: 'parts_rest', area: 'stock',
       title: `${plural(others.length, 'more part')} to order for ${nextName}`,
       detail: others.slice(0, 4).map(p => p.part.name).join(', ') + (others.length > 4 ? ' and more.' : '.'),
       when: shortDate(others.map(p => p.runOut!).sort()[0]),
@@ -697,7 +798,7 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
     })
   }
   if (stuckOpen.length) risks.push({
-    key: 'stuck',
+    key: 'stuck', area: 'holes',
     title: `Drilled but cannot be billed`,
     detail: `${stuckOpen.map(s => s.hole).join(' and ')} are still open in the record, so they cannot be approved or invoiced.`,
     when: 'Now',
@@ -707,7 +808,7 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
     href: '/admin/finance', linkLabel: 'Open finance',
   })
   if (cash.notApproved > 0) risks.push({
-    key: 'approval',
+    key: 'approval', area: 'money',
     title: `Closed holes waiting for approval`,
     detail: `${plural(cash.notApprovedCount, 'hole')} finished but not approved. Until then the money is yours on paper only.`,
     when: 'Now',
@@ -717,9 +818,9 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
     href: '/admin/finance', linkLabel: 'Open finance',
   })
   if (cash.overdue + cash.disputed > 0) risks.push({
-    key: 'cash',
+    key: 'cash', area: 'money',
     title: `Invoices overdue or disputed`,
-    detail: `${cash.overdueCount ? `${plural(cash.overdueCount, 'invoice')} past the due date. ` : ''}${cash.disputed ? `${moneyL(cash.disputed)} disputed by the mine owner.` : ''}`,
+    detail: `${cash.overdueCount ? `${plural(cash.overdueCount, 'invoice')} past the due date. ` : ''}${cash.disputed ? `${moneyL(cash.disputed)} disputed by the client.` : ''}`,
     when: 'Now',
     impact: cash.overdue + cash.disputed, impactNote: 'cash not in the bank',
     likelihood: 'High',
@@ -727,7 +828,7 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
     href: '/admin/finance', linkLabel: 'Open finance',
   })
   if (next.revenue - slowRevenue > 0) risks.push({
-    key: 'slow',
+    key: 'slow', area: 'rigs',
     title: `A slow month`,
     detail: `The forecast uses the last 30 days. Each rig at its slowest month on record makes ${round(next.metres - sum(slowRows.filter(inNext), r => r.metres))} m less.`,
     when: nextName,
@@ -761,7 +862,7 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
 
   return {
     today, thisMonth, nextMonth, horizonStart, horizonEnd,
-    rigs, rest, next, mtd, thisMonthTotal, byProject, closings, cash,
+    rigs, rest, next, mtd, thisMonthTotal, lastMonth, daily, holeFinish, farEnd, byProject, closings, cash,
     parts, partsSpend, swot: { strengths, weaknesses, opportunities, threats }, risks, basis, headline,
   }
 }

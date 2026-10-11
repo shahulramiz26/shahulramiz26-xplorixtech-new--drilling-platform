@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { projectCode } from '../../../lib/costing-store'
 import { useAdminOverview, financeLink, RIG_STATUS_LABEL, type RigStatus } from '../../../lib/admin-overview'
-import { num } from '../../../lib/owner-portal'
+import { num } from '../../../lib/client-record'
 import {
   Page, Head, Card, Tile, Grid, Btn, Table, Status, Note, DepthBar, th, thR, td, tdR, rowLine, T, display, type Tone,
 } from '../../components/kit'

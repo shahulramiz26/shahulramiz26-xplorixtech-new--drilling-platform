@@ -9,7 +9,7 @@ import { T, tint, display, Card, Status, type Tone } from './kit'
  * OUTLOOK — the pieces a forecast is shown with
  *
  * Used by XPLORIX Intelligence (the contractor) and by AI prediction in the
- * Client Portal (the mine owner). Same shapes on both sides, different facts.
+ * client login. Same shapes on both sides, different facts.
  *
  *   Timeline     who drills what, day by day, and where the gaps are
  *   SwotGrid     what is working, what is not, what can be gained, what can go wrong

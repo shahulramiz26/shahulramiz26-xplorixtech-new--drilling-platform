@@ -2,102 +2,122 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { money, moneyL, COMPANY_NAME } from '../../../lib/costing-store'
+import { useClient, CLIENT_HOLE } from '../../../lib/client-view'
+import { num, downloadCsv } from '../../../lib/client-record'
+import { projectHoles, day, type PlanStatus } from '../../../lib/projects'
 import {
-  usePortal, DEMO_HOLES, CONTRACTORS, PROGRAMME, recoveryFlag, offPlanFlag, num, downloadCsv, type ApprovalState,
-} from '../../../lib/owner-portal'
-import {
-  Page, PageHead, Card, Seg, Btn, Table, Status, Who, Flag, CONTRACTOR_FILTER,
-  th, thR, td, tdR, tdStrong, rowLine, T, type ContractorFilter, type Tone,
-} from '../ui'
+  Page, PageHead, Card, Tile, Grid, Seg, Btn, Table, Status, DepthBar, Empty, inputStyle,
+  th, thR, td, tdR, tdStrong, rowLine, T,
+} from '../../components/kit'
 
-/* HOLES — every hole from collar to close on one screen.
- * Orange marks the two things a contract can be broken on: core recovery
- * below the minimum, and a hole more than 5 m off its planned path. */
+/* ==========================================================================
+ * HOLES — every hole on the client's projects, from plan to invoice
+ *
+ * One row a hole: how deep it was meant to go, how deep it is, how long it
+ * took, how well the core came out, how many days he is charged standby for,
+ * and what it bills at his contract rates. A finished hole waits here for his
+ * approval before it can be invoiced.
+ * ========================================================================== */
 
-type View = 'current' | 'all' | 'Drilling' | 'Closed' | 'Planned'
+type View = 'all' | 'submitted' | PlanStatus
 const VIEWS: { value: View; label: string }[] = [
-  { value: 'current', label: 'Current holes' }, { value: 'all', label: 'All holes' },
-  { value: 'Drilling', label: 'Drilling' }, { value: 'Closed', label: 'Closed' }, { value: 'Planned', label: 'Planned' },
+  { value: 'all', label: 'All' }, { value: 'drilling', label: 'Drilling' }, { value: 'submitted', label: 'Waiting for you' },
+  { value: 'closed', label: 'Finished' }, { value: 'approved', label: 'Approved' }, { value: 'invoiced', label: 'Invoiced' }, { value: 'planned', label: 'Planned' },
 ]
-const APPROVAL: Record<ApprovalState, { label: string; tone: Tone } | null> = {
-  none: null,
-  waiting: { label: 'Waiting for you', tone: 'info' },
-  approved: { label: 'Approved', tone: 'good' },
-  returned: { label: 'Returned', tone: 'bad' },
-  invoiced: { label: 'Invoiced', tone: 'neutral' },
-}
-const stageTone: Record<string, Tone> = { Drilling: 'info', Closed: 'good', Planned: 'neutral' }
-
-export default function HolesPage() {
-  const p = usePortal()
+export default function ClientHoles() {
+  const c = useClient()
   const router = useRouter()
-  const [view, setView] = useState<View>('current')
-  const [who, setWho] = useState<ContractorFilter>('all')
+  const [view, setView] = useState<View>('all')
+  const [project, setProject] = useState('all')
 
-  const rows = DEMO_HOLES
-    .filter(h => view === 'all' ? true : view === 'current' ? h.id >= 'DH-101' && h.id <= 'DH-106' : h.stage === view)
-    .filter(h => who === 'all' || h.contractor === who)
-  const drilling = DEMO_HOLES.filter(h => h.stage === 'Drilling')
-  const flagged = drilling.filter(h => recoveryFlag(h.recovery) || offPlanFlag(h.offPlan))
+  // Holes the rigs have touched, plus the ones still only on the plan.
+  const planned = c.projects.flatMap(p => projectHoles(c.state, p.name).filter(h => h.status === 'planned').map(h => ({ ...h, project: p.name })))
+  const rows = [
+    ...c.holes.map(h => {
+      const hours = h.shifts.reduce((s, x) => s + x.drilling, 0)
+      return { id: h.id, project: h.project, rig: h.rig, planned: h.planned, drilled: h.drilled, days: h.days, rate: hours > 0 ? h.drilled / hours : null,
+        recovery: h.drilled > 0 ? h.recoveryPct : null, standbyDays: h.standbyDays, breakdownDays: h.breakdownDays, value: h.value, status: h.status as PlanStatus, start: h.start, end: h.end, returned: h.returnReason }
+    }),
+    ...planned.map(h => ({ id: h.id, project: h.project, rig: '', planned: h.planned, drilled: 0, days: 0, rate: null, recovery: null, standbyDays: 0, breakdownDays: 0, value: 0, status: 'planned' as PlanStatus, start: '', end: undefined, returned: undefined })),
+  ].filter(h => project === 'all' || h.project === project)
+  const shown = rows.filter(h => view === 'all' || h.status === view)
+
+  const touched = rows.filter(h => h.status !== 'planned')
+  const metres = touched.reduce((s, h) => s + h.drilled, 0)
+  const core = c.holes.filter(h => project === 'all' || h.project === project).reduce((s, h) => s + h.drilled * h.recoveryPct / 100, 0)
+  const waiting = rows.filter(h => h.status === 'submitted')
+  const count = (v: View) => v === 'all' ? rows.length : rows.filter(h => h.status === v).length
 
   const exportCsv = () => downloadCsv('xplorix-holes', [
-    ['Hole', 'Contractor', 'Planned m', 'Drilled m', 'Days', 'ROP m/hr', 'Recovery %', 'Off plan m', 'Status', 'Approval'],
-    ...rows.map(h => [h.id, CONTRACTORS[h.contractor].name, h.planned, h.drilled, h.days, h.rop, h.recovery, h.offPlan, h.stage, APPROVAL[p.demoApproval(h)]?.label ?? '']),
+    ['Hole', 'Project', 'Rig', 'Planned m', 'Drilled m', 'Days on hole', 'Metres an hour', 'Core recovery %', 'Standby days', 'Days stopped, not charged', 'Value at contract rates', 'Started', 'Finished', 'Status'],
+    ...shown.map(h => [h.id, h.project, h.rig, h.planned, h.drilled, h.days, h.rate?.toFixed(2), h.recovery?.toFixed(1), h.standbyDays, h.breakdownDays, Math.round(h.value), h.start, h.end, CLIENT_HOLE[h.status].label]),
   ])
+
+  if (c.projects.length === 0) {
+    return <Page><PageHead question="How is each hole doing?" answer={<>{COMPANY_NAME} has not shown you a project yet.</>} /></Page>
+  }
 
   return (
     <Page>
-      <PageHead
-        question="How is each hole doing?"
-        tone={flagged.length ? 'warn' : 'good'}
+      <PageHead question="How is each hole doing?" tone={waiting.length ? 'warn' : 'good'}
         answer={<>
-          {drilling.length} holes are drilling. {flagged.length
-            ? <>{flagged.length} {flagged.length === 1 ? 'has' : 'have'} a number outside the contract: {flagged.map(h => {
-              const why = [recoveryFlag(h.recovery) ? `recovery ${h.recovery}%` : '', offPlanFlag(h.offPlan) ? `${h.offPlan} m off plan` : ''].filter(Boolean).join(', ')
-              return `${h.id} (${why})`
-            }).join(' and ')}.</>
-            : 'All are inside the contract.'}
+          {count('drilling')} {count('drilling') === 1 ? 'hole is' : 'holes are'} drilling and {touched.length - count('drilling')} {touched.length - count('drilling') === 1 ? 'is' : 'are'} finished. {' '}
+          {waiting.length ? <b style={{ color: T.text }}>{waiting.length} {waiting.length === 1 ? 'is' : 'are'} waiting for your approval, worth {money(waiting.reduce((s, h) => s + h.value, 0))} before tax.</b> : 'None is waiting for your approval.'}
         </>}
-        right={<Btn size="sm" onClick={exportCsv}>Export</Btn>}
-      />
+        right={<Btn size="sm" onClick={exportCsv}>Export</Btn>} />
 
-      <Card pad={false}
-        title="Hole performance"
-        subtitle={`▲ marks core recovery below ${PROGRAMME.contractRecovery}%, or a hole more than ${PROGRAMME.maxOffPlan} m off the planned path. Click a hole for its full history.`}
-        right={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Seg options={VIEWS} value={view} onChange={setView} />
-          <Seg options={CONTRACTOR_FILTER} value={who} onChange={setWho} />
+      <Grid min={180}>
+        <Tile label="Drilling now" value={count('drilling')} note={`${count('planned')} more on the plan`} />
+        <Tile label="Waiting for you" value={waiting.length} tone={waiting.length ? 'warn' : 'good'} note={waiting.length ? money(waiting.reduce((s, h) => s + h.value, 0)) : 'Nothing to approve'} />
+        <Tile label="Metres drilled" value={`${num(metres)} m`} note={`${touched.length} holes`} />
+        <Tile label="Core recovery" value={metres > 0 ? `${((core / metres) * 100).toFixed(1)}%` : '—'} note="Across every hole drilled" />
+        <Tile label="Billed or billable" value={moneyL(touched.reduce((s, h) => s + h.value, 0))} note="At your contract rates, before tax" />
+      </Grid>
+
+      <Card pad={false} title="Holes" subtitle="Click a hole for every shift on it, what stopped it and what it bills."
+        right={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {c.projects.length > 1 && (
+            <select value={project} onChange={e => setProject(e.target.value)} aria-label="Project" style={{ ...inputStyle, width: 'auto', padding: '6px 10px', fontSize: 12.5 }}>
+              <option value="all">All projects</option>
+              {c.projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+            </select>
+          )}
+          <Seg options={VIEWS.filter(v => v.value === 'all' || count(v.value) > 0).map(v => ({ value: v.value, label: `${v.label} · ${count(v.value)}` }))} value={view} onChange={setView} />
         </div>}>
-        <Table>
-          <thead>
-            <tr>
-              <th style={th}>Hole</th><th style={th}>Contractor</th><th style={thR}>Planned</th><th style={thR}>Drilled</th>
-              <th style={thR}>Days</th><th style={thR}>ROP m/hr</th><th style={thR}>Recovery</th><th style={thR}>Off plan</th>
-              <th style={th}>Status</th><th style={th}>Billing approval</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(h => {
-              const ap = APPROVAL[p.demoApproval(h)]
-              return (
-                <tr key={h.id} className="xpl-row" onClick={() => router.push(`/client/holes/${h.id}`)} style={{ borderBottom: rowLine, cursor: 'pointer' }}>
+        {shown.length === 0 ? <Empty>No holes match this filter.</Empty> : (
+          <Table>
+            <thead>
+              <tr>
+                <th style={th}>Hole</th><th style={th}>Project</th><th style={th}>Rig</th><th style={th}>Depth</th>
+                <th style={thR}>Days</th><th style={thR}>Metres an hour</th><th style={thR}>Core recovery</th><th style={thR}>Standby days</th>
+                <th style={thR}>Value</th><th style={th}>Started</th><th style={th}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map(h => (
+                <tr key={h.id} className="xpl-row" onClick={() => router.push(`/client/holes/${encodeURIComponent(h.id)}`)} style={{ borderBottom: rowLine, cursor: 'pointer' }}>
                   <td style={tdStrong}>{h.id}</td>
-                  <td style={td}><Who id={h.contractor} /></td>
-                  <td style={tdR}>{num(h.planned)} m</td>
-                  <td style={{ ...tdR, color: T.text }}>{h.drilled == null ? '—' : `${num(h.drilled)} m`}</td>
-                  <td style={tdR}>{h.days ?? '—'}</td>
-                  <td style={tdR}>{h.rop == null ? '—' : h.rop.toFixed(1)}</td>
-                  <td style={tdR}><Flag on={recoveryFlag(h.recovery)}>{h.recovery == null ? '—' : `${h.recovery}%`}</Flag></td>
-                  <td style={tdR}><Flag on={offPlanFlag(h.offPlan)}>{h.offPlan == null ? '—' : `${h.offPlan.toFixed(1)} m`}</Flag></td>
-                  <td style={td}><Status tone={stageTone[h.stage]}>{h.stage}</Status></td>
-                  <td style={td}>{ap ? <Status tone={ap.tone}>{ap.label}</Status> : <span style={{ color: T.dim }}>—</span>}</td>
+                  <td style={td}>{h.project}</td>
+                  <td style={td}>{h.rig || '—'}</td>
+                  <td style={td}>{h.status === 'planned' ? <span>{h.planned ? `${num(h.planned)} m planned` : '—'}</span> : <DepthBar drilled={h.drilled} planned={h.planned} width={150} />}</td>
+                  <td style={tdR}>{h.days || '—'}</td>
+                  <td style={tdR}>{h.rate == null ? '—' : h.rate.toFixed(2)}</td>
+                  <td style={tdR}>{h.recovery == null ? '—' : `${h.recovery.toFixed(0)}%`}</td>
+                  <td style={{ ...tdR, color: h.standbyDays ? T.text : T.muted }}>{h.standbyDays || '—'}</td>
+                  <td style={{ ...tdR, color: T.text }}>{h.value ? money(h.value) : '—'}</td>
+                  <td style={td}>{h.start ? day(h.start) : '—'}</td>
+                  <td style={td}><Status tone={CLIENT_HOLE[h.status].tone}>{CLIENT_HOLE[h.status].label}</Status></td>
                 </tr>
-              )
-            })}
-            {rows.length === 0 && <tr><td style={{ ...td, padding: 24 }} colSpan={10}>No holes match this filter.</td></tr>}
-          </tbody>
-        </Table>
+              ))}
+            </tbody>
+          </Table>
+        )}
       </Card>
+
+      <div style={{ fontSize: 12.5, color: T.faint, lineHeight: 1.6, maxWidth: 820 }}>
+        Standby days are days a rig was stopped for a reason that is not {COMPANY_NAME}&rsquo;s, charged at the standby rate. A day lost to their own rig or crew is not charged.
+      </div>
     </Page>
   )
 }

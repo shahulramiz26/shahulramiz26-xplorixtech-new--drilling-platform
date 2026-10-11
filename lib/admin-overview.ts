@@ -6,11 +6,11 @@ import {
   type Alert, type Formation,
 } from './inventory-store'
 import {
-  useCosting, BREAKDOWN_REASONS, statusForShifts, monthOf, shiftMonth, isOwnerLinked, isOverdue, outstanding,
-  disputedAmount, money, moneyL, OWNER_NAME, type ShiftLog, type Invoice,
+  useCosting, isOwnStop, clientOf, statusForShifts, monthOf, shiftMonth, isShared, isOverdue, outstanding,
+  disputedAmount, money, moneyL, type ShiftLog, type Invoice,
 } from './costing-store'
 import { computeRigMonth } from './costing-view'
-import { holesFromLogs, type LiveHole } from './owner-portal'
+import { holesFromLogs, type LiveHole } from './client-record'
 import { contractorInbox, projectByName } from './projects'
 import { workOrderFor, contractorName, workOrderProgress, billFigures } from './contracting'
 
@@ -169,7 +169,7 @@ export function useAdminOverview() {
     const lostBy: Record<string, { reason: string; hours: number; own: boolean }> = {}
     logs.filter(l => monthOf(l.date) === month && l.downtimeHours > 0).forEach((l: ShiftLog) => {
       const reason = l.downtimeReason || 'Not stated'
-      const e = (lostBy[reason] ||= { reason, hours: 0, own: BREAKDOWN_REASONS.includes(reason) })
+      const e = (lostBy[reason] ||= { reason, hours: 0, own: isOwnStop(l) })
       e.hours += l.downtimeHours
     })
     const lost = Object.values(lostBy).sort((a, b) => b.hours - a.hours)
@@ -274,11 +274,11 @@ export function useAdminOverview() {
       })),
       ...returned.map(h => ({
         key: `ret_${h.id}`, tone: 'bad' as Tone, action: 'Fix and resend', href: linkFor(h),
-        title: `${OWNER_NAME} returned hole ${h.id}`, detail: h.returnReason ?? '',
+        title: `${clientOf(h.project)} returned hole ${h.id}`, detail: h.returnReason ?? '',
       })),
       ...disputed.map(i => ({
         key: `dis_${i.id}`, tone: 'bad' as Tone, action: 'Open invoice', href: invLink(i),
-        title: `Invoice ${i.number}: ${(i.lineReviews ?? []).filter(r => r?.status === 'disputed').length} line(s) disputed by the mine owner`,
+        title: `Invoice ${i.number}: ${(i.lineReviews ?? []).filter(r => r?.status === 'disputed').length} line(s) disputed by ${clientOf(i.project)}`,
         detail: `${money(disputedAmount(i))} held back before tax · ${i.project}`,
       })),
       ...overdue.map(i => ({
@@ -294,8 +294,8 @@ export function useAdminOverview() {
         key: 'tosend', tone: 'info' as Tone, action: 'Open holes', href: linkFor(toSend[0]),
         title: `${toSend.length} closed ${toSend.length === 1 ? 'hole is' : 'holes are'} not yet approved for billing · ${moneyL(money_.toSendValue)}`,
         detail: [
-          toSend.some(h => isOwnerLinked(h.project)) ? `${toSend.filter(h => isOwnerLinked(h.project)).length} to send to the mine owner` : '',
-          toSend.some(h => !isOwnerLinked(h.project)) ? `${toSend.filter(h => !isOwnerLinked(h.project)).length} for you to approve` : '',
+          toSend.some(h => isShared(h.project)) ? `${toSend.filter(h => isShared(h.project)).length} to send to the client` : '',
+          toSend.some(h => !isShared(h.project)) ? `${toSend.filter(h => !isShared(h.project)).length} for you to approve` : '',
           `${toSend.slice(0, 6).map(h => h.id).join(', ')}${toSend.length > 6 ? ' and more' : ''}`,
         ].filter(Boolean).join(' · '),
       }] : []),

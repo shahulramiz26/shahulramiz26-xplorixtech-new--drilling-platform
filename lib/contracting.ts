@@ -34,9 +34,8 @@ import {
  *    engine that prices a metre for our client prices the same metre for our
  *    contractor.
  *
- * 3. The contractor writes his own drill log, and nothing he reports counts
- *    until someone here has checked it. He writes it in his own XPLORIX if he
- *    has one, or in the contractor login we give him with the work order.
+ * 3. The contractor writes his own drill log, in the contractor login we give
+ *    him, and nothing he reports counts until someone here has checked it.
  *    Nobody retypes or uploads a sheet. Reports wait in one list, and only
  *    checked metres are paid or billed on.
  *
@@ -65,30 +64,14 @@ export function words(w: Wording | undefined) {
 
 // ── who and under what ────────────────────────────────────────────────────
 
-/* The login we give a contractor who has no XPLORIX of his own. It opens only
- * his side of his work orders with us: the drill log, what we said about each
- * shift, his bills and the terms. Nothing of ours, and no other contractor. */
-export interface ContractorLogin {
-  email: string
-  status: 'invited' | 'active'
-  since: string                 // YYYY-MM-DD
-}
-
+/* A company that drills for us under a work order. He signs in with a
+ * contractor login, which is created under Users like every other login. */
 export interface Contractor {
   id: string
   name: string
-  /* Set when the contractor has his own XPLORIX and is connected to us. His
-   * shifts and bills then arrive from there. */
-  xplorixId?: string
-  /* Set when we have given him a contractor login instead. */
-  login?: ContractorLogin
   place?: string
   contact?: string
   email?: string
-}
-/* How this contractor's drill log reaches us. */
-export function reportsVia(c: Contractor | undefined): ReportSource {
-  return c?.xplorixId ? 'xplorix' : 'login'
 }
 
 /* What a contract takes off a bill. Every contract words these differently,
@@ -132,11 +115,11 @@ export function ruleWords(r: DeductionRule): string {
 }
 
 /* Where a shift or a bill came from. A shift is always written by the
- * contractor (his XPLORIX or his login). 'entry' is only for a bill that came
- * on paper and was typed in here. */
-export type ReportSource = 'xplorix' | 'login' | 'entry'
+ * contractor in his login. 'entry' is only for a bill that came on paper and
+ * was typed in here. */
+export type ReportSource = 'login' | 'entry'
 export const SOURCE_LABEL: Record<ReportSource, string> = {
-  xplorix: 'From their XPLORIX', login: 'Contractor login', entry: 'Typed in',
+  login: 'Contractor login', entry: 'Typed in',
 }
 
 export interface WorkOrder {
@@ -153,7 +136,6 @@ export interface WorkOrder {
   rates: ClientRate[]
   rules: DeductionRule[]
   paymentDays: number
-  reportsBy: ReportSource
   status: 'active' | 'closed'
   note?: string
 }
@@ -192,6 +174,10 @@ export interface ContractorReport {
   reason: string
   holeClosed?: boolean
   remarks?: string
+  /* Everything else the drill log form recorded (crew, engine hours, the
+   * downtime lines, equipment, incidents, a second hole). Carried onto the
+   * shift unchanged when the report is accepted. */
+  extra?: Partial<ShiftLog>
   source: ReportSource
   receivedAt: string            // YYYY-MM-DDTHH:MM
   status: ReportStatus
@@ -339,15 +325,20 @@ export function reportToShift(r: ContractorReport, wo: WorkOrder, by: string, at
   if (core !== r.coreRecovery) check.claimedRecovery = r.coreRecovery
   if (a.note?.trim()) check.note = a.note.trim()
   return {
+    ...r.extra,
+    downtime: refused ? r.extra?.downtime?.map(d => ({ ...d, side: 'internal' as const })) : r.extra?.downtime,
     id: `ctr_${r.rig}_${r.date}_${r.shift}`.replace(/\s+/g, ''),
     rig: r.rig, project: r.project, date: r.date, shift: r.shift,
     holeNumber: metres > 0 || r.holeNumber ? r.holeNumber : null,
-    crewCount: 0, shiftHours: r.shiftHours ?? 12,
+    crewCount: r.extra?.crewCount ?? 0, shiftHours: r.shiftHours ?? 12,
     drillingHours: r.drillingHours, downtimeHours: down, downtimeReason: reason,
     metresDrilled: metres, coreRecovery: core,
     holeSize: r.holeSize, formationType: r.formationType,
     holeClosedThisShift: r.holeClosed || undefined,
-    partsUsed: [], fuelLitres: 0, waterLitres: 0, additivesKg: 0,
+    meterStart: r.fromDepth, meterEnd: r.fromDepth != null ? r.fromDepth + metres : undefined,
+    downtimeSide: down <= 0 ? undefined : refused || mostlyOwn ? 'internal' : 'client',
+    // His fuel is his own cost. It is kept on the record if he gave it, and never costed.
+    partsUsed: [], fuelLitres: r.extra?.fuelLitres ?? 0, waterLitres: r.extra?.waterLitres ?? 0, additivesKg: r.extra?.additivesKg ?? 0,
     contractor: wo.contractorId, workOrderId: wo.id, check,
   }
 }
@@ -740,7 +731,7 @@ export function seedBills(state: ContractingState): ContractorBill[] {
   if (p) {
     const bill: ContractorBill = {
       id: 'cb_1', number: 'CP/26-27/041', workOrderId: p.id, project: p.project, contractorId: p.contractorId,
-      periodFrom: '2026-08-01', periodTo: '2026-08-31', receivedAt: '2026-09-03T11:20', source: 'xplorix',
+      periodFrom: '2026-08-01', periodTo: '2026-08-31', receivedAt: '2026-09-03T11:20', source: 'login',
       lines: draftLines({ ...state, contractorBills: [] }, p, '2026-08-01', '2026-08-31'), manual: [], status: 'received',
     }
     const c = checkBill({ ...state, contractorBills: [bill] }, bill)
@@ -790,19 +781,46 @@ export function contractorSide(state: ContractingState, contractorId: string) {
   }
 }
 
-/* What the form must say before a shift can be sent. Plain sentences, the
- * same ones the supervisor's own drill log uses. */
-export function reportProblems(r: Pick<ContractorReport, 'rig' | 'date' | 'holeNumber' | 'metres' | 'coreRecovery' | 'drillingHours' | 'standbyHours' | 'breakdownHours' | 'reason'>, shiftHours: number, today: string): string[] {
-  const out: string[] = []
-  const stopped = r.standbyHours + r.breakdownHours
-  if (!r.rig) out.push('Choose the rig.')
-  if (!r.date) out.push('Choose the date.')
-  if (r.date > today) out.push('The date is in the future.')
-  if (r.metres < 0) out.push('The To depth is less than the From depth.')
-  if (r.metres > 0 && !r.holeNumber) out.push('Metres were drilled, so the hole number is needed.')
-  if (r.coreRecovery > r.metres + 0.001) out.push('Core recovered cannot be more than the metres drilled.')
-  if (Math.abs(r.drillingHours + stopped - shiftHours) > 0.01) out.push(`Drilling ${r.drillingHours} h plus stopped ${stopped} h does not add up to the ${shiftHours} h shift.`)
-  if (stopped > 0 && !r.reason) out.push('Stopped hours need a reason. It decides whether standby is payable.')
-  if (r.metres === 0 && stopped === 0 && r.drillingHours === 0) out.push('Enter the metres drilled or the hours stopped.')
-  return out
+// ── the drill log form, to a report and back ──────────────────────────────
+
+/* The contractor fills in the same drill log form as everyone else. What he
+ * sends is kept as a report until it is checked: the figures the check reads
+ * are lifted out, and everything else the form recorded rides along. */
+export function draftToReport(log: ShiftLog, wo: WorkOrder, id: string, receivedAt: string): ContractorReport {
+  const lines = log.downtime ?? []
+  const standby = sum(lines.filter(l => l.side === 'client'), l => l.hours)
+  const breakdown = sum(lines.filter(l => l.side === 'internal'), l => l.hours)
+  return {
+    id, workOrderId: wo.id, rig: log.rig, project: wo.project, date: log.date, shift: log.shift,
+    holeNumber: log.holeNumber, holeSize: log.holeSize, formationType: log.formationType,
+    fromDepth: log.meterStart, toDepth: log.meterEnd, metres: log.metresDrilled, coreRecovery: log.coreRecovery,
+    shiftHours: log.shiftHours, drillingHours: log.drillingHours, standbyHours: standby, breakdownHours: breakdown,
+    reason: log.downtimeReason, holeClosed: log.holeClosedThisShift, remarks: log.notes,
+    extra: {
+      crewCount: log.crewCount, supervisor: log.supervisor, driller: log.driller, engineHmr: log.engineHmr, engineHours: log.engineHours,
+      lithology: log.lithology, standbyMode: log.standbyMode, downtime: lines, equipmentUsed: log.equipmentUsed, incidents: log.incidents,
+      attachments: log.attachments, notes: log.notes, nextHole: log.nextHole,
+      fuelLitres: log.fuelLitres, waterLitres: log.waterLitres, additivesKg: log.additivesKg,
+      loggedBy: log.loggedBy, loggedAt: log.loggedAt,
+    },
+    source: 'login', receivedAt, status: 'waiting',
+  }
+}
+
+/* A report laid back out as the form reads it, to correct one that came back. */
+export function reportToDraft(r: ContractorReport): ShiftLog {
+  const lines = r.extra?.downtime?.length ? r.extra.downtime : [
+    ...(r.standbyHours > 0 ? [{ reason: r.reason, side: 'client' as const, hours: r.standbyHours }] : []),
+    ...(r.breakdownHours > 0 ? [{ reason: r.reason, side: 'internal' as const, hours: r.breakdownHours }] : []),
+  ]
+  return {
+    ...r.extra,
+    id: r.id, rig: r.rig, project: r.project, date: r.date, shift: r.shift, holeNumber: r.holeNumber,
+    crewCount: r.extra?.crewCount ?? 0, shiftHours: r.shiftHours ?? 12, drillingHours: r.drillingHours,
+    downtimeHours: r.standbyHours + r.breakdownHours, downtimeReason: r.reason, downtime: lines,
+    metresDrilled: r.metres, coreRecovery: r.coreRecovery, holeSize: r.holeSize, formationType: r.formationType,
+    meterStart: r.fromDepth, meterEnd: r.fromDepth != null ? r2(r.fromDepth + r.metres) : undefined,
+    holeClosedThisShift: r.holeClosed, notes: r.remarks ?? r.extra?.notes,
+    fuelLitres: r.extra?.fuelLitres ?? 0, waterLitres: r.extra?.waterLitres ?? 0, additivesKg: r.extra?.additivesKg ?? 0,
+  }
 }

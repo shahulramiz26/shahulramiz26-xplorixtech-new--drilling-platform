@@ -27,19 +27,15 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     await new Promise(r => setTimeout(r, 800))
-    if (formData.role === 'admin') {
-      window.location.href = '/admin/dashboard'
-    } else if (formData.role === 'contractor') {
-      // A contractor working for a company on XPLORIX: the login that company
-      // gave him, for his drill log and his bills.
-      window.location.href = '/contractor'
-    } else if (formData.role === 'owner') {
-      // The mine owner — the client the contractor drills for — lands in the
-      // Client Portal, not in the contractor's console.
-      window.location.href = '/client'
-    } else {
-      window.location.href = '/supervisor/dashboard'
+    // One company account, four kinds of login. The Company Admin creates the
+    // other three from the Users screen.
+    const home: Record<string, string> = {
+      admin: '/admin/dashboard',
+      supervisor: '/supervisor/drilling-log',
+      contractor: '/contractor',
+      client: '/client',
     }
+    window.location.href = home[formData.role] ?? '/admin/dashboard'
   }
 
   const inputBase: React.CSSProperties = {
@@ -128,14 +124,14 @@ export default function LoginPage() {
             {/* Role */}
             <div style={{ marginBottom:18 }}>
               <label style={{ display:'block', fontSize:10, fontWeight:700, color:'#6B7280', letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:6 }}>Login As</label>
-              <select value={formData.role} onChange={e=>setFormData({...formData,role:e.target.value})}
+              <select required value={formData.role} onChange={e=>setFormData({...formData,role:e.target.value})}
                 style={{ ...inputBase, cursor:'pointer', appearance:'none' as const, color:formData.role?'#0B0F17':'#6B7280' }}
                 onFocus={onFocus} onBlur={onBlur}>
                 <option value="" style={{ background:'#FFFFFF' }}>Select Role</option>
                 <option value="admin" style={{ background:'#FFFFFF' }}>Company Admin</option>
                 <option value="supervisor" style={{ background:'#FFFFFF' }}>Supervisor</option>
-                <option value="owner" style={{ background:'#FFFFFF' }}>Mine Owner (Client Portal)</option>
-                <option value="contractor" style={{ background:'#FFFFFF' }}>Contractor (drill log for a client)</option>
+                <option value="contractor" style={{ background:'#FFFFFF' }}>Contractor</option>
+                <option value="client" style={{ background:'#FFFFFF' }}>Client</option>
               </select>
             </div>
 

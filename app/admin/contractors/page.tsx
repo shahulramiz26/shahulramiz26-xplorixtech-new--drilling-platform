@@ -13,7 +13,7 @@ import { T, tint, Page, Head, Card, Tile, Grid, Btn, Note, Seg, Status, Empty, T
 import { ReportsTab } from './reports'
 import { OrdersTab } from './orders'
 import { BillsTab } from './bills'
-import { n0, rs, pc, RunTag, OnXplorix } from './shared'
+import { n0, rs, pc, RunTag, LoginState } from './shared'
 
 /* ==========================================================================
  * CONTRACTORS — rigs that drill for you, next to your own
@@ -203,7 +203,7 @@ function ContractorsScreen() {
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 700, color: T.text }}>{c?.name} <span style={{ fontWeight: 400, color: T.faint }}>· {wo.number}</span></div>
                         <div style={{ fontSize: 12.5, color: T.muted, marginTop: 3 }}>{wo.rigs.join(', ')} · to finish by {day(wo.endDate)}</div>
-                        <div style={{ marginTop: 4 }}><OnXplorix c={c} /></div>
+                        <div style={{ marginTop: 4 }}><LoginState c={c} /></div>
                       </div>
                       <DepthBar drilled={p.metres} planned={wo.plannedMetres} width="100%" />
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>

@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import { ArrowLeft, X } from 'lucide-react'
 import {
   useCosting, blankClientRate, uid, fullDate, monthOf, listOf, FLEET, PEOPLE, HOLE_SIZES, PROJECT_STATUS_LABEL,
-  type ClientRate, type ProjectRecord, type ProjectStatus,
+  type ClientRate, type ProjectRecord, type ProjectStatus, loginOfClient,
 } from '../../../../lib/costing-store'
 import { TODAY, addDays } from '../../../../lib/inventory-store'
 import { projectById, projectStats, holeSeriesStart, contractOf, eventsFor, structureWords, day, whenIn, type ProjectHole } from '../../../../lib/projects'
@@ -188,8 +188,8 @@ export default function ProjectPage() {
     kind: 'status', title: s === 'completed' ? 'Project completed' : s === 'on-hold' ? 'Project put on hold' : 'Project active again',
   })
   const setShared = (v: boolean) => updateProject(p.id, { shared: v }, v
-    ? { kind: 'shared', title: `Shared with ${client}`, detail: 'Contract rates, planned holes, rigs and crew are now visible in the Client Portal.' }
-    : { kind: 'shared', title: `Stopped sharing with ${client}`, detail: 'The project is no longer visible in the Client Portal.' })
+    ? { kind: 'shared', title: `Shared with ${client}`, detail: 'Contract rates, planned holes, rigs and crew are now visible in the client login.' }
+    : { kind: 'shared', title: `Stopped sharing with ${client}`, detail: 'The project is no longer visible in the client login.' })
 
   const holeAction = (h: ProjectHole) => {
     if (h.status === 'planned') return (
@@ -266,11 +266,18 @@ export default function ProjectPage() {
                   </Fact>
                 </div>
               </Card>
-              <Card title="Client portal">
-                <Switch on={p.shared} onChange={setShared} label={`Share this project with ${client}`}
-                  hint={p.shared
-                    ? 'He sees the contract rates, the planned holes, and the rigs and crew on site. He never sees your costs, margin or stock.'
-                    : 'Turn this on when the client is on XPLORIX. Closed holes then go to him for approval and invoices for checking.'} />
+              <Card title="Client login">
+                {loginOfClient(state.users, client)?.active ? (
+                  <Switch on={p.shared} onChange={setShared} label={`Show this project to ${client}`}
+                    hint={p.shared
+                      ? 'He sees the contract rates, the planned holes, the shift record and his invoices. He never sees your costs, margin or stock.'
+                      : 'Turn this on to show the project in his login. Closed holes then go to him for approval and invoices for checking.'} />
+                ) : (
+                  <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.55 }}>
+                    {client} has no client login{loginOfClient(state.users, client) ? ' that is switched on' : ' yet'}, so nobody outside your company sees this project.{' '}
+                    <Link href={`/admin/users?new=client&for=${encodeURIComponent(client)}`} style={{ color: T.orange, fontWeight: 600, textDecoration: 'none' }}>Create it under Users</Link>
+                  </div>
+                )}
               </Card>
             </div>
             <Card title="Latest changes" pad={false} right={<button style={link} onClick={() => setTab('changes')}>See all</button>}>

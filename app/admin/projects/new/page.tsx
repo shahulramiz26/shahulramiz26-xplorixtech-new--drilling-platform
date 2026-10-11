@@ -5,14 +5,13 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
 import {
-  useCosting, blankClientRate, FLEET, PEOPLE, HOLE_SIZES, crewLine, money,
+  useCosting, blankClientRate, loginOfClient, FLEET, PEOPLE, HOLE_SIZES, crewLine, money,
   type ClientRate, type ProjectRecord,
 } from '../../../../lib/costing-store'
 import { TODAY } from '../../../../lib/inventory-store'
 import { nextProjectCode, holeSeriesStart, rateLines, structureWords, day } from '../../../../lib/projects'
 import { Page, Head, Card, Btn, Field, Note, Switch, inputStyle, T, tint } from '../../../components/kit'
 import { RateEditor, ratesUsable } from '../../../components/rate-card'
-import { DIRECTORY, companyByName, connectedClient, mine, useConnections } from '../../../../lib/connect-store'
 import { HoleRowsEditor, holeRowProblems, rowsToHoles, Fact, type HoleRow } from '../../../components/project-ui'
 
 /* NEW PROJECT — the contract, entered once, in the order it is agreed.
@@ -106,16 +105,14 @@ export default function NewProjectPage() {
   const holesOk = holeRowProblems(holes, takenHoles).every(p => !p)
   const done = (i: number) => i === 0 ? step1 : i === 1 ? useRates && ratesUsable(rate) : i === 2 ? rigs.length > 0 : i === 3 ? holes.length > 0 && holesOk : true
   const toggle = (list: string[], set: (v: string[]) => void, v: string) => set(list.includes(v) ? list.filter(x => x !== v) : [...list, v])
-  /* A project can be shared only with a mine owner the company is connected to. */
-  const connections = useConnections()
-  const linked = connectedClient(connections, f.client)
-  const known = companyByName(f.client)?.side === 'owner' ? companyByName(f.client) : undefined
-  const connectedNames = mine(connections, 'contractor').filter(c => c.status === 'connected').map(c => DIRECTORY.find(d => d.id === c.owner)?.name).filter(Boolean) as string[]
-  const clientHint = !f.client.trim() ? 'Pick a mine owner you are connected to, or type any client name.'
-    : linked ? `Connected on XPLORIX as ${linked.id}. You can share this project with him.`
-    : known ? `${known.id} is on XPLORIX but not connected to you yet. The project stays private until he accepts a request.`
-    : 'Not connected on XPLORIX. The project stays private; you can still run it and invoice it.'
-  const willShare = shared && !!linked
+  /* A project is shown to its client through the client's login, which is
+   * created under Users. With no login there is nobody to show it to. */
+  const login = loginOfClient(state.users, f.client)
+  const knownClients = Array.from(new Set([...state.users.filter(u => u.role === 'client').map(u => u.client ?? u.name), ...projects.map(p => p.client)])).filter(Boolean)
+  const clientHint = !f.client.trim() ? 'Who pays for the metres. Pick a client you already have, or type a new name.'
+    : login ? `${f.client.trim()} has a client login (${login.username}). You can show this project in it.`
+    : 'No client login yet. The project stays private until you create one under Users.'
+  const willShare = shared && !!login
   const go = (i: number) => { if (i > 0 && !step1) { setTried(true); setStep(0); return } setStep(i) }
 
   const missing = [
@@ -161,8 +158,8 @@ export default function NewProjectPage() {
               {codeClash && <div style={err}>This code is already used</div>}
             </Field>
             <Field label="Client" hint={clientHint}>
-              <input value={f.client} onChange={e => setF({ ...f, client: e.target.value })} placeholder="Who pays for the metres" style={inputStyle} list="connected-clients" />
-              <datalist id="connected-clients">{connectedNames.map(n => <option key={n} value={n} />)}</datalist>
+              <input value={f.client} onChange={e => setF({ ...f, client: e.target.value })} placeholder="Who pays for the metres" style={inputStyle} list="known-clients" />
+              <datalist id="known-clients">{knownClients.map(n => <option key={n} value={n} />)}</datalist>
               {tried && !f.client.trim() && <div style={err}>Enter the client</div>}
             </Field>
             <Field label="Location">
@@ -243,12 +240,12 @@ export default function NewProjectPage() {
           </Card>
 
           <Card title="Share with the client">
-            {linked
-              ? <Switch on={shared} onChange={setShared} label={`You are connected to ${linked.name} (${linked.id}): share this project`}
-                  hint="The project appears in the client's portal the moment you create it, and every later change reaches him as a notification." />
+            {login
+              ? <Switch on={shared} onChange={setShared} label={`Show this project in ${f.client.trim()}'s client login`}
+                  hint="The project appears in the client's login the moment you create it, and every later change reaches him as a notification." />
               : <Note tone="warn">
-                  {known ? <>{known.name} ({known.id}) is on XPLORIX, but you are not connected yet. </> : <>{f.client.trim() || 'This client'} is not a company you are connected to on XPLORIX. </>}
-                  The project is created private. Send a request under <Link href="/admin/connections" style={{ color: T.orange }}>Connections</Link>, and share the project from there once it is accepted.
+                  {f.client.trim() || 'This client'} has no client login yet, so the project is created private.
+                  Create the login under <Link href="/admin/users?new=client" style={{ color: T.orange }}>Users</Link>, then switch sharing on from the project.
                 </Note>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, marginTop: 12 }}>
               <div style={{ padding: '13px 15px', borderRadius: 10, border: `1px solid ${T.border}`, opacity: willShare ? 1 : 0.55 }}>

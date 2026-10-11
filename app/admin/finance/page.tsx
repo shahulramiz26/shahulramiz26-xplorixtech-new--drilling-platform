@@ -15,7 +15,7 @@ import {
   INVOICE_STATUSES, INVOICE_STATUS_LABEL, isOverdue, outstanding,
   blankOwnership, blankOperating, blankClientRate,
   PROJECT_CLIENTS, ROCK_CATEGORIES, HOLE_SIZES, DAY_STATUS_LABEL,
-  isOwnerLinked, HOLE_STATUS_LABEL, OWNER_INVOICE_LABEL, OWNER_NAME, disputedAmount,
+  isShared, clientOf, HOLE_STATUS_LABEL, OWNER_INVOICE_LABEL, disputedAmount,
   type DayCost, type DayCostMTD, type Rollup, type OwnershipBreakdown,
   type RigOwnership, type OperatingRate, type ClientRate, type HoleStatus,
   type HoleResult, type Invoice, type InvoiceLine, type RateRow, type RateAdjustment,
@@ -1344,11 +1344,12 @@ function Legend({ color, label, line }: { color: string; label: string; line?: b
  * The list is derived from the log, so there is nothing to add here: a hole
  * appears the moment a shift is logged against its number, and the only thing
  * stored is the decision to close, approve or invoice it. */
-function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }: {
+function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onInvoice }: {
   v: RigMonthView
-  // True when this project's mine owner is on XPLORIX: the owner approves the
-  // hole, not the contractor.
+  // True when this project is shown to its client: the client approves the
+  // hole, not the company that drilled it.
   linked: boolean
+  client: string
   onStatus: (holeNumber: string, s: HoleStatus) => void
   onSubmit: (holeNumber: string) => void
   onWithdraw: (holeNumber: string) => void
@@ -1551,14 +1552,14 @@ function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }:
                           {linked && hole.status === 'closed' && hole.returnReason && (
                             <div style={{ marginTop: 16 }}>
                               <Note tone={C.red}>
-                                {OWNER_NAME} returned this hole{hole.decidedAt ? ` on ${fullDate(hole.decidedAt)}` : ''}: {hole.returnReason}
+                                {client} returned this hole{hole.decidedAt ? ` on ${fullDate(hole.decidedAt)}` : ''}: {hole.returnReason}
                               </Note>
                             </div>
                           )}
 
-                          {/* On a project whose mine owner is on XPLORIX the
-                              contractor cannot approve his own hole: he sends it
-                              across and the owner decides. Elsewhere nothing has
+                          {/* On a project shown to its client the company cannot
+                              approve its own hole: it is sent across and the
+                              client decides. Elsewhere nothing has
                               changed. */}
                           <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                             {!linked && hole.status === 'closed' &&
@@ -1574,13 +1575,13 @@ function DrillholesTab({ v, linked, onStatus, onSubmit, onWithdraw, onInvoice }:
                               </Btn>}
                             {linked && hole.status === 'submitted' && <>
                               <span style={{ fontSize: 12, color: C.teal }}>
-                                Waiting for {OWNER_NAME} to approve{hole.submittedAt ? ` · sent ${fullDate(hole.submittedAt)}` : ''}
+                                Waiting for {client} to approve{hole.submittedAt ? ` · sent ${fullDate(hole.submittedAt)}` : ''}
                               </span>
                               <Btn size="sm" onClick={() => onWithdraw(hole.holeNumber)}>Withdraw</Btn>
                             </>}
                             {linked && hole.status === 'approved' && <>
                               <span style={{ fontSize: 12, color: C.green }}>
-                                Approved by {OWNER_NAME}{hole.decidedAt ? ` on ${fullDate(hole.decidedAt)}` : ''}
+                                Approved by {client}{hole.decidedAt ? ` on ${fullDate(hole.decidedAt)}` : ''}
                               </span>
                               <Btn size="sm" tone="primary" onClick={() => onInvoice(h)}>Create invoice</Btn>
                             </>}
@@ -1668,7 +1669,7 @@ function TrackerTab({ invoices, onUpdate }: {
             <thead>
               <tr><th style={th}>Number</th><th style={th}>Date</th><th style={th}>Due</th><th style={th}>Holes</th>
                 <th style={thR}>Total</th><th style={thR}>Received</th><th style={thR}>Outstanding</th>
-                <th style={th}>Mine owner</th><th style={th}>Status</th><th style={th} /></tr>
+                <th style={th}>Client</th><th style={th}>Status</th><th style={th} /></tr>
             </thead>
             <tbody>
               {invoices.map(inv => {
@@ -1715,7 +1716,7 @@ function TrackerTab({ invoices, onUpdate }: {
   )
 }
 
-/* What the mine owner has said about this invoice. Blank on a project whose
+/* What the client has said about this invoice. Blank on a project whose
  * owner is not on XPLORIX — there is nobody on the other side to answer. */
 function OwnerAnswer({ inv }: { inv: Invoice }) {
   if (!inv.ownerStatus) return <span style={{ color: C.dim }}>—</span>
@@ -1809,7 +1810,7 @@ function InvoiceView({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
       <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
         <table style={tableStyle}>
           <thead><tr><th style={th}>Description</th><th style={th}>Depth</th><th style={thR}>Quantity</th><th style={thR}>Rate</th><th style={thR}>Amount</th>
-            {inv.ownerStatus && <th style={th}>Mine owner</th>}</tr></thead>
+            {inv.ownerStatus && <th style={th}>Client</th>}</tr></thead>
           <tbody>
             {inv.lines.map((l, i) => {
               const r = inv.lineReviews?.[i]
@@ -1900,11 +1901,11 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
           id: uid('inv'), number, project, client: PROJECT_CLIENTS[project] ?? '', date,
           holeNumbers: holes.map(h => h.hole.holeNumber), lines, subtotal, taxPercent, total,
           status: 'pending', dueDate,
-          // On a linked project the invoice goes to the mine owner, who checks
+          // On a shared project the invoice goes to the client, who checks
           // it line by line in the Client Portal. Only the lines travel — cost
           // and margin are worked out on this screen and never stored on it.
           ...(linked ? { ownerStatus: 'awaiting' as const, lineReviews: lines.map(() => null), sentAt: date } : {}),
-        })}>{linked ? 'Send to mine owner' : 'Create invoice'}</Btn></>}>
+        })}>{linked ? 'Send to the client' : 'Create invoice'}</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <Grid cols={4}>
           <TextField label="Invoice number" value={number} onChange={setNumber} />
@@ -1975,7 +1976,7 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
         <Note tone={C.amber}>
           Cost and margin are for your own records and never appear on the client&apos;s copy. Once created, these holes are
           stamped as invoiced and cannot be billed again.
-          {linked && <> {OWNER_NAME} will see this invoice in the Client Portal straight away and can approve or dispute each line.</>}
+          {linked && <> {clientOf(project)} will see this invoice in their login straight away and can approve or dispute each line.</>}
         </Note>
       </div>
     </Modal>
@@ -2198,7 +2199,7 @@ function CostingScreen() {
       {tab === 'Performance' && (bought(rig)
         ? <ContractorRigTab v={v} rig={rig} project={project} month={month} />
         : <PerformanceTab v={v} rig={rig} project={project} month={month} />)}
-      {tab === 'Drillholes' && <DrillholesTab v={v} linked={isOwnerLinked(project)} onStatus={setHoleStatus}
+      {tab === 'Drillholes' && <DrillholesTab v={v} linked={isShared(project)} client={clientOf(project)} onStatus={setHoleStatus}
         onSubmit={submitHole} onWithdraw={withdrawHole} onInvoice={h => setQuickInvoice(h)} />}
       {tab === 'Tracker' && <TrackerTab invoices={invoices} onUpdate={updateInvoice} />}
 
@@ -2208,7 +2209,7 @@ function CostingScreen() {
           onClose={() => setShowRates(false)} />
       )}
       {quickInvoice && (
-        <ReviewModal project={project} linked={isOwnerLinked(project)} clientRate={v.clientRate} holes={[quickInvoice]}
+        <ReviewModal project={project} linked={isShared(project)} clientRate={v.clientRate} holes={[quickInvoice]}
           nextNumber={`INV-${String(invoices.length + 1).padStart(4, '0')}`}
           onClose={() => setQuickInvoice(null)}
           onCreate={inv => { addInvoice(inv); setQuickInvoice(null); setTab('Tracker') }} />

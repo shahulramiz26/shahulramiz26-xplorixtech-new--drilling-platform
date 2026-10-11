@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { uid, nowStamp } from '../../../lib/costing-store'
 import { TODAY } from '../../../lib/inventory-store'
-import { downloadCsv } from '../../../lib/owner-portal'
+import { downloadCsv } from '../../../lib/client-record'
 import {
   checkBill, billFigures, billDue, draftLines, unbilled,
   type ContractorBill, type BillLine, type WorkOrder, type BillStatus,

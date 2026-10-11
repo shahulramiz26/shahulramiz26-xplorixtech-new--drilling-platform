@@ -10,6 +10,7 @@ import {
   reportToShift, seedBills,
   type Contractor, type WorkOrder, type ContractorReport, type ContractorBill, type ShiftCheck, type Wording, type BillSnapshot,
 } from './contracting'
+import { seedInvoices } from './client-record'
 
 /* ==========================================================================
  * XPLORIX COSTING
@@ -97,6 +98,84 @@ export interface ShiftLog {
   contractor?: string
   workOrderId?: string
   check?: ShiftCheck
+
+  /* What the drill log form records beyond the figures costing needs. All
+   * optional, so a log written before the form asked for them still reads. */
+  supervisor?: string
+  driller?: string
+  engineHmr?: number          // the engine's hour-meter reading at the end of the shift
+  engineHours?: number        // hours the engine ran this shift
+  meterStart?: number         // depth of the hole at the start of the shift
+  meterEnd?: number
+  lithology?: string
+  standbyMode?: boolean       // the whole shift was on hold for the client
+  /* Whose stop it was. Internal is our own and never billable; client is
+   * standby. When set it decides the day's status; `downtimeReason` then
+   * carries the reason with the most hours. */
+  downtimeSide?: 'internal' | 'client'
+  downtime?: DowntimeLine[]
+  bitRuns?: BitRun[]
+  equipmentUsed?: { name: string; hours: number }[]
+  incidents?: { type: string; severity: string; note: string }[]
+  attachments?: string[]      // file names; the MVP keeps the name, not the file
+  notes?: string
+  /* A second hole started in the same shift after this one was closed. Its
+   * metres are kept as a second row (`segmentOf` points back here) so every
+   * metre sits on the hole it was drilled in. */
+  nextHole?: NextHole
+  segmentOf?: string
+  loggedBy?: string
+  loggedAt?: string           // YYYY-MM-DDTHH:MM
+  editedBy?: string
+  editedAt?: string
+}
+
+export interface DowntimeLine { reason: string; side: 'internal' | 'client'; hours: number }
+export interface BitRun { itemId: string; serialNo?: string; meterStart: number; meterEnd: number; replaced: boolean; notes?: string }
+export interface NextHole {
+  holeNumber: string; holeSize: string
+  started: boolean            // false: opened, no metres yet
+  meterStart: number; meterEnd: number
+  coreRecovery?: number       // metres of core from the new hole
+  formationType: string; lithology?: string
+}
+
+/* The row that carries a second hole's metres. Hours, crew, fuel and parts
+ * stay on the first row: they belong to the shift, not to a hole. */
+export function segmentFor(log: ShiftLog): ShiftLog | null {
+  const n = log.nextHole
+  if (!n || !n.started || !(n.meterEnd > n.meterStart)) return null
+  return {
+    id: `${log.id}_b`, segmentOf: log.id, rig: log.rig, project: log.project, date: log.date, shift: log.shift,
+    holeNumber: n.holeNumber, crewCount: 0, shiftHours: 0, drillingHours: 0, downtimeHours: 0, downtimeReason: '',
+    metresDrilled: Math.round((n.meterEnd - n.meterStart) * 100) / 100,
+    coreRecovery: Math.min(n.coreRecovery ?? 0, Math.round((n.meterEnd - n.meterStart) * 100) / 100),
+    holeSize: n.holeSize, formationType: n.formationType, lithology: n.lithology,
+    meterStart: n.meterStart, meterEnd: n.meterEnd,
+    partsUsed: [], fuelLitres: 0, waterLitres: 0, additivesKg: 0,
+    contractor: log.contractor, workOrderId: log.workOrderId, check: log.check,
+    supervisor: log.supervisor, driller: log.driller,
+  }
+}
+
+/* Shifts in the order they happened: by date, day before night, and a second
+ * hole after the hole that was closed in the same shift. */
+export function shiftOrder(l: { date: string; shift: string; segmentOf?: string }) {
+  return `${l.date}${l.shift === 'Day' ? '0' : '1'}${l.segmentOf ? '1' : '0'}`
+}
+
+/* Where each shift's hole stood when the shift began, worked out from every
+ * shift before it on the same hole. One index for the whole record, so a
+ * hole's depth carries across months and across rigs. */
+export function depthIndex(logs: ShiftLog[]): Record<string, number> {
+  const depth: Record<string, number> = {}
+  const at: Record<string, number> = {}
+  ;[...logs].sort((a, b) => shiftOrder(a).localeCompare(shiftOrder(b))).forEach(l => {
+    if (!l.holeNumber) return
+    at[l.id] = depth[l.holeNumber] ?? 0
+    depth[l.holeNumber] = at[l.id] + l.metresDrilled
+  })
+  return at
 }
 
 export interface MaintenanceLog {
@@ -104,12 +183,33 @@ export interface MaintenanceLog {
   rig: string
   project: string
   date: string
-  maintenanceType: 'Preventive' | 'Breakdown' | 'Scheduled' | 'Component Replacement'
+  maintenanceType: MaintenanceType
   hours: number
-  component: string
+  component: string         // one or more, joined with a comma
   action: string
-  cost: number              // already in rupees, straight from the log
+  cost: number              // service or repair cost only, already in rupees; parts are costed from inventory
+  shift?: ShiftName
+  supervisor?: string
+  partsUsed?: { itemId: string; qty: number }[]
+  engineOilL?: number
+  hydraulicOilL?: number
+  transmissionOilL?: number
+  attachments?: string[]
+  notes?: string
+  // A contractor's rig: his repair, recorded for the downtime, never our cost.
+  contractor?: string
+  workOrderId?: string
+  loggedBy?: string
+  loggedAt?: string
+  editedBy?: string
+  editedAt?: string
 }
+export type MaintenanceType = 'Preventive' | 'Breakdown' | 'Scheduled' | 'Component Replacement'
+export const MAINTENANCE_TYPES: MaintenanceType[] = ['Breakdown', 'Preventive', 'Scheduled', 'Component Replacement']
+export const MAINTENANCE_TYPE_LABEL: Record<MaintenanceType, string> = {
+  Breakdown: 'Breakdown maintenance', Preventive: 'Preventive maintenance', Scheduled: 'Scheduled service', 'Component Replacement': 'Component replacement',
+}
+export const MAINTENANCE_ACTIONS = ['Repair performed', 'Part replaced', 'Inspection', 'Temporary fix', 'Adjustment']
 
 /* A rig is drilling, broken, or standing by. There is no "idle": a day with no
  * drilling is standby — the client stopped work — and standby has its own
@@ -131,9 +231,16 @@ export const BREAKDOWN_REASONS = [
   'Contractor Delay',
 ]
 
+/* Was the stop ours? The form says so directly; an older log is read from
+ * its reason. */
+export function isOwnStop(s: Pick<ShiftLog, 'downtimeSide' | 'downtimeReason' | 'downtimeHours'>) {
+  if (s.downtimeHours <= 0) return false
+  return s.downtimeSide ? s.downtimeSide === 'internal' : BREAKDOWN_REASONS.includes(s.downtimeReason)
+}
+
 export function statusForShifts(shifts: ShiftLog[]): DayStatus {
   if (shifts.some(s => s.drillingHours > 0)) return 'drilling'
-  if (shifts.some(s => BREAKDOWN_REASONS.includes(s.downtimeReason))) return 'breakdown'
+  if (shifts.some(s => isOwnStop(s))) return 'breakdown'
   return 'standby'
 }
 
@@ -317,22 +424,22 @@ export function chargeShift(cr: ClientRate | undefined, log: ShiftLog, fromDepth
 
 // ── HOLE ──────────────────────────────────────────────────────────────────
 
-/* 'submitted' only exists on a project whose mine owner is on XPLORIX: the
+/* 'submitted' only exists on a project shown to its client: the
  * contractor sends the closed hole across, and it is the owner who approves
  * it. On every other project the contractor still approves his own hole and
  * the status goes straight from closed to approved, exactly as before. */
 export type HoleStatus = 'drilling' | 'closed' | 'submitted' | 'approved' | 'invoiced'
 
 export const HOLE_STATUS_LABEL: Record<HoleStatus, string> = {
-  drilling: 'Drilling', closed: 'Closed', submitted: 'With mine owner',
+  drilling: 'Drilling', closed: 'Closed', submitted: 'With the client',
   approved: 'Approved', invoiced: 'Invoiced',
 }
 
 export interface HoleState {
   status: HoleStatus
   invoiceId?: string
-  submittedAt?: string      // when the contractor sent it to the mine owner
-  decidedAt?: string        // when the mine owner approved or returned it
+  submittedAt?: string      // when it was sent to the client
+  decidedAt?: string        // when the client approved or returned it
   returnReason?: string     // set when the owner sent it back; cleared on resend
 }
 
@@ -350,7 +457,7 @@ export interface Hole {
 }
 
 /* What was planned for a hole before the first metre. Planned depth is the one
- * number the mine owner needs to read progress: "planned 400 m, drilled 388 m". */
+ * number the client needs to read progress: "planned 400 m, drilled 388 m". */
 export interface HolePlan {
   plannedDepth: number
   project?: string
@@ -421,13 +528,15 @@ export interface RateProposal {
   ownerNote?: string
 }
 
-// ── MINE OWNER LINK ───────────────────────────────────────────────────────
+// ── PROJECTS THE CLIENT CAN SEE ───────────────────────────────────────────
 /* Mirrors of the project list for the plain functions in this file and others
  * that are not components and cannot read the store. The store keeps them in
  * step with its own list (see syncRegistry), so they are never typed by hand. */
-export const OWNER_NAME = 'Demo Mining Co.'
-export const OWNER_LINKED_PROJECTS: string[] = []
-export function isOwnerLinked(project: string) { return OWNER_LINKED_PROJECTS.includes(project) }
+const DEMO_CLIENT = 'Demo Mining Co.'
+/* Projects shown to their client in his login. On these a finished hole goes
+ * to the client for approval and an invoice goes to him for checking. */
+export const SHARED_PROJECTS: string[] = []
+export function isShared(project: string) { return SHARED_PROJECTS.includes(project) }
 
 // ── INVOICE ───────────────────────────────────────────────────────────────
 export interface InvoiceLine { label: string; qty: string; rate: string; amount: number; depth?: string }
@@ -446,18 +555,18 @@ export interface Invoice {
   dueDate?: string
   paidDate?: string
   paidAmount?: number
-  // Set only on a project whose mine owner is on XPLORIX.
+  // Set only on a project shown to its client.
   ownerStatus?: OwnerInvoiceStatus
   lineReviews?: (LineReview | null)[]   // same order as lines; null = not looked at yet
   sentAt?: string
   reviewedAt?: string
 }
 
-/* The mine owner's answer, kept apart from the contractor's own status so
+/* The client's answer, kept apart from the company's own status so
  * neither side can overwrite the other. */
 export type OwnerInvoiceStatus = 'awaiting' | 'approved' | 'disputed'
 export const OWNER_INVOICE_LABEL: Record<OwnerInvoiceStatus, string> = {
-  awaiting: 'Waiting for mine owner', approved: 'Approved by mine owner', disputed: 'Disputed by mine owner',
+  awaiting: 'Waiting for the client', approved: 'Approved by the client', disputed: 'Disputed by the client',
 }
 export interface LineReview { status: 'approved' | 'disputed'; reason?: string }
 
@@ -641,7 +750,7 @@ export function dayCost(
   date: string, rig: string, project: string,
   shifts: ShiftLog[], maint: MaintenanceLog[],
   op: OperatingRate, own: RigOwnership, ob: OwnershipBreakdown,
-  cr: ClientRate | undefined, tooling: ToolingRates, depthSoFar: number,
+  cr: ClientRate | undefined, tooling: ToolingRates, depthSoFar: number | ((s: ShiftLog) => number),
   pay?: { rate: ClientRate | undefined },
 ): DayCost {
   const outsourced = !!pay
@@ -695,17 +804,22 @@ export function dayCost(
   const ownership = outsourced ? 0 : own.allocationBasis === 'expectedUnit' ? units * ob.perUnit : ob.perDay
 
   const holeNumber = shifts.find(s => s.holeNumber)?.holeNumber ?? null
-  const ordered = [...shifts].sort((a, b) => (a.shift === 'Day' ? -1 : 1) - (b.shift === 'Day' ? -1 : 1))
+  const ordered = [...shifts].sort((a, b) => shiftOrder(a).localeCompare(shiftOrder(b)))
   const charges: Charge[] = []
   const payCharges: Charge[] = []
-  let depth = depthSoFar
+  /* Each shift is priced at the depth its own hole had reached. Given a
+   * number, the day is one hole and the depth runs on from it; given a
+   * function, every shift is looked up, so two holes in a day are each priced
+   * at their own depth. */
+  let depth = typeof depthSoFar === 'number' ? depthSoFar : 0
   ordered.forEach(sh => {
     if (sh.metresDrilled <= 0) return
-    chargeShift(cr, sh, depth).forEach(c => charges.push(c))
+    const at = typeof depthSoFar === 'function' ? depthSoFar(sh) : depth
+    chargeShift(cr, sh, at).forEach(c => charges.push(c))
     /* The same stretch of hole priced a second time, at the work order's
      * rates: a work order is a client rate read from the paying side. */
-    if (pay) chargeShift(pay.rate, sh, depth).forEach(c => payCharges.push(c))
-    depth += sh.metresDrilled
+    if (pay) chargeShift(pay.rate, sh, at).forEach(c => payCharges.push(c))
+    depth = at + sh.metresDrilled
   })
 
   /* What a contractor's day costs us. Metres at his rate; a day the work was
@@ -854,12 +968,51 @@ export function billingLines(days: DayCost[]): BillingLine[] {
   return Object.values(acc).sort((a, b) => a.fromDepth - b.fromDepth)
 }
 
+/* The holes a day's shifts worked on. Usually one; two when a hole was
+ * finished and the next one started before the day was out. */
+function holesOnDay(d: DayCost): string[] {
+  return Array.from(new Set(d.shifts.map(s => s.holeNumber).filter((h): h is string => !!h)))
+}
+
+/* A day's figures as they belong to one hole. A day spent on a single hole
+ * is that hole's whole day. A day shared by two holes is split: metres, core
+ * and billing are each hole's own, taken from its own shifts, and the day's
+ * costs follow the metres, so nothing is counted twice and nothing is lost. */
+function dayForHole(d: DayCost, hole: string): DayCost | null {
+  const mine = d.shifts.filter(s => s.holeNumber === hole)
+  if (mine.length === 0) return null
+  const on = holesOnDay(d)
+  if (on.length <= 1) return d
+  const add = <T,>(list: T[], f: (x: T) => number) => list.reduce((a, x) => a + f(x), 0)
+  const units = add(mine, x => x.metresDrilled)
+  const share = d.units > 0 ? units / d.units : 1 / on.length
+  const k = (n: number) => n * share
+  const charges = d.charges.filter(c => c.holeNumber === hole)
+  const payCharges = d.payCharges.filter(c => c.holeNumber === hole)
+  // Whatever the day earned or was paid that is not metres (standby) follows the same share.
+  const revenue = add(charges, c => c.amount) + k(d.revenue - add(d.charges, c => c.amount))
+  const subcontract = add(payCharges, c => c.amount) + k(d.subcontract - add(d.payCharges, c => c.amount))
+  const total = k(d.total - d.subcontract) + subcontract
+  return {
+    ...d, shifts: mine, holeNumber: hole, units, coreRecovery: add(mine, x => x.coreRecovery),
+    drillingHours: k(d.drillingHours), downtimeHours: k(d.downtimeHours), maintenanceHours: k(d.maintenanceHours),
+    fuelLitres: k(d.fuelLitres), waterLitres: k(d.waterLitres), additivesKg: k(d.additivesKg),
+    fuel: k(d.fuel), water: k(d.water), additives: k(d.additives),
+    labour: { ...d.labour, labour: k(d.labour.labour), lodging: k(d.labour.lodging), transport: k(d.labour.transport), total: k(d.labour.total) },
+    repairs: k(d.repairs), parts: k(d.parts), partsByMetre: k(d.partsByMetre),
+    toolingByFormation: d.toolingByFormation.map(t => ({ ...t, metres: k(t.metres), amount: k(t.amount) })),
+    operating: k(d.operating), ownership: k(d.ownership), subcontract, total,
+    cpu: units > 0 ? total / units : null,
+    revenue, charges, payCharges,
+  }
+}
+
 export function holesFromDays(allDays: DayCost[], statuses: Record<string, HoleState>): Hole[] {
   const byHole: Record<string, DayCost[]> = {}
-  allDays.forEach(d => { if (d.holeNumber) (byHole[d.holeNumber] ||= []).push(d) })
+  allDays.forEach(d => holesOnDay(d).forEach(h => { (byHole[h] ||= []).push(d) }))
   return Object.entries(byHole).map(([holeNumber, ds]) => {
     const sorted = [...ds].sort((a, b) => a.date.localeCompare(b.date))
-    const closingDay = sorted.find(d => d.shifts.some(sh => sh.holeClosedThisShift))
+    const closingDay = sorted.find(d => d.shifts.some(sh => sh.holeNumber === holeNumber && sh.holeClosedThisShift))
     const stored = statuses[holeNumber]?.status
     const st: HoleStatus = stored && stored !== 'drilling' ? stored : (closingDay ? 'closed' : 'drilling')
     return {
@@ -875,7 +1028,7 @@ export function holesFromDays(allDays: DayCost[], statuses: Record<string, HoleS
 }
 
 export function holeResult(hole: Hole, allDays: DayCost[]): HoleResult {
-  const days = allDays.filter(d => d.holeNumber === hole.holeNumber)
+  const days = allDays.map(d => dayForHole(d, hole.holeNumber)).filter((d): d is DayCost => !!d)
   const roll = rollup(days)
   return {
     hole, days, roll, depth: roll.units,
@@ -902,6 +1055,8 @@ export function rigCode(name: string) {
 }
 
 export const PROJECT_CLIENTS: Record<string, string> = {}
+/* The client a project is for, in the words of its own record. */
+export function clientOf(project: string) { return PROJECT_CLIENTS[project] || 'the client' }
 
 /* The company's rigs and people, to pick from when a project is staffed. */
 export const FLEET = [
@@ -915,7 +1070,7 @@ export const PEOPLE = {
 
 export const SEED_PROJECTS: ProjectRecord[] = [
   {
-    id: 'PRJ-001', code: 'PRJ-001', name: 'Site A - North Field', location: 'North Field block', client: OWNER_NAME,
+    id: 'PRJ-001', code: 'PRJ-001', name: 'Site A - North Field', location: 'North Field block', client: DEMO_CLIENT,
     status: 'active', startDate: '2026-06-01', plannedMetres: 2400, holeSize: 'HQ', shared: true,
     rigs: ['RIG-001', 'RIG-002'], supervisors: ['Arun Verma', 'Imran Shaikh'],
     drillers: ['Mahesh Yadav', 'Ravi Kumar', 'Santosh Patil', 'Dinesh Sahu'], createdAt: '2026-05-25',
@@ -941,7 +1096,7 @@ export function syncRegistry(projects: ProjectRecord[]) {
     Object.keys(target).forEach(k => { delete target[k] })
     pairs.forEach(([k, v]) => { target[k] = v })
   }
-  fill(OWNER_LINKED_PROJECTS, projects.filter(p => p.shared).map(p => p.name))
+  fill(SHARED_PROJECTS, projects.filter(p => p.shared).map(p => p.name))
   fill(INV_PROJECTS, projects.map(p => p.name))
   fill(INV_COMPLETED, projects.filter(p => p.status === 'completed').map(p => p.name))
   fill(INV_RIGS, Array.from(new Set([...FLEET.slice(0, 3).map(f => f.rig), ...projects.flatMap(p => p.rigs)])).sort())
@@ -1036,7 +1191,7 @@ export const SEED_HOLE_STATUS: Record<string, HoleState> = {
   'DH-101': { status: 'approved' },
   // Drilled by a contractor, checked by our site, approved: ready to bill the client.
   'DH-131': { status: 'approved' },
-  // Waiting with the mine owner, so the Client Portal has a live approval on first load.
+  // Waiting with the client, so his login has a live approval on first load.
   'DH-002': { status: 'submitted', submittedAt: '2026-09-12' },
 }
 
@@ -1329,7 +1484,7 @@ export const SEED_SHIFT_LOGS_CONTRACTORS: ShiftLog[] = [
       [5, 'DH-142', 6, 5], [6, 'DH-142', 6, 6], [7, 'DH-142', 5, 5, 3, 0, 'Rod Change'], [8, 'DH-142', 6, 6],
       [9, 'DH-142', 6, 5], [10, 'DH-142', 6, 6], [11, 'DH-142', 6, 6], [12, 'DH-142', 6, 5],
     ], HARD_GROUND),
-  ], 'ctr_p', 'wo_b1', 'xplorix'),
+  ], 'ctr_p', 'wo_b1', 'login'),
   ...checked([
     ...expand('CQ-01', SITE_B, '2026-08', 'HQ', [
       [12, 'DH-151', 5, 4], [13, 'DH-151', 5, 5], [14, 'DH-151', 5, 4], [15, 'DH-151', 5, 5],
@@ -1348,12 +1503,49 @@ export const SEED_SHIFT_LOGS_CONTRACTORS: ShiftLog[] = [
   ].filter(l => !(l.date === '2026-09-11' && l.shift === 'Night')), 'ctr_q', 'wo_b2', 'login', { 'DH-151': 0.86 }),
 ]
 
+/* Who was on each rig, and what the form records beyond the figures: crew
+ * names, engine hours, the depths, the ground, the downtime line. Filled in
+ * for the seeded shifts so the Logs screen reads like a real record. */
+const RIG_CREW: Record<string, { supervisor: string; day: string; night: string; hmr: number }> = {
+  'RIG-001': { supervisor: 'Arun Verma', day: 'Mahesh Yadav', night: 'Ravi Kumar', hmr: 6120 },
+  'RIG-002': { supervisor: 'Imran Shaikh', day: 'Santosh Patil', night: 'Dinesh Sahu', hmr: 4380 },
+  'RIG-003': { supervisor: 'Pradeep Rao', day: 'Farid Khan', night: 'Gopal Das', hmr: 8050 },
+  'CP-01': { supervisor: 'Vikas Jadhav', day: 'Anil Thakur', night: 'Rohit Pawar', hmr: 2210 },
+  'CP-02': { supervisor: 'Vikas Jadhav', day: 'Sanjay More', night: 'Kunal Shinde', hmr: 3040 },
+  'CQ-01': { supervisor: 'Manoj Tiwari', day: 'Sunil Kumar', night: 'Deepak Singh', hmr: 5560 },
+}
+export const LITHOLOGIES = ['Overburden', 'Clay', 'Sandstone', 'Shale', 'Limestone', 'Schist', 'Granite gneiss', 'Quartzite', 'Basalt', 'Copper ore', 'Iron ore', 'Coal', 'Other']
+const LITHOLOGY_OF: Record<string, string> = { soft: 'Overburden', medium: 'Sandstone', hard: 'Granite gneiss', 'very hard': 'Quartzite' }
+
+function detailed(logs: ShiftLog[]): ShiftLog[] {
+  const at = depthIndex(logs)
+  const hmr: Record<string, number> = {}
+  return [...logs].sort((a, b) => shiftOrder(a).localeCompare(shiftOrder(b))).map(l => {
+    const crew = RIG_CREW[l.rig] ?? { supervisor: 'Kiran Joshi', day: 'Naveen Reddy', night: 'Lokesh Meena', hmr: 3000 }
+    const engineHours = l.drillingHours > 0 ? Math.min(l.shiftHours, l.drillingHours + 1) : l.downtimeHours >= l.shiftHours ? 0 : 2
+    hmr[l.rig] = (hmr[l.rig] ?? crew.hmr) + engineHours
+    const start = l.holeNumber ? at[l.id] ?? 0 : undefined
+    const own = isOwnStop(l)
+    return {
+      ...l,
+      supervisor: crew.supervisor, driller: l.shift === 'Day' ? crew.day : crew.night,
+      engineHours, engineHmr: hmr[l.rig],
+      meterStart: start, meterEnd: start != null ? +(start + l.metresDrilled).toFixed(2) : undefined,
+      lithology: l.metresDrilled > 0 ? LITHOLOGY_OF[normFormation(l.formationType)] ?? 'Granite gneiss' : undefined,
+      downtimeSide: l.downtimeHours > 0 ? (own ? 'internal' as const : 'client' as const) : undefined,
+      downtime: l.downtimeHours > 0 ? [{ reason: l.downtimeReason || 'Not stated', side: own ? 'internal' as const : 'client' as const, hours: l.downtimeHours }] : [],
+      standbyMode: l.downtimeHours >= l.shiftHours && !own && !l.holeNumber ? true : undefined,
+      loggedBy: crew.supervisor, loggedAt: `${l.date}T${l.shift === 'Day' ? '18:25' : '23:50'}`,
+    }
+  })
+}
+
 export const SEED_SHIFT_LOGS: ShiftLog[] =
-  markClosures(
+  detailed(markClosures(
     [...SEED_SHIFT_LOGS_JUNE, ...SEED_SHIFT_LOGS_JULY, ...SEED_SHIFT_LOGS_A,
      ...SEED_SHIFT_LOGS_B, ...SEED_SHIFT_LOGS_SEP, ...SEED_SHIFT_LOGS_CONTRACTORS],
     ['DH-901', 'DH-902', 'DH-911', 'DH-951', 'DH-952', 'DH-961',
-     'DH-001', 'DH-002', 'DH-011', 'DH-101', 'DH-131', 'DH-141', 'DH-151'])
+     'DH-001', 'DH-002', 'DH-011', 'DH-101', 'DH-131', 'DH-141', 'DH-151']))
 
 /* Planned depth for every seeded hole. A closed hole was planned at what it
  * reached, rounded up to the next 5 m; a hole still drilling has further to go. */
@@ -1387,20 +1579,31 @@ export const SEED_HOLE_PLANS: Record<string, HolePlan> = (() => {
   return out
 })()
 
-export const SEED_MAINTENANCE: MaintenanceLog[] = [
+const RAW_MAINTENANCE: MaintenanceLog[] = [
   { id: 'm1', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-03', maintenanceType: 'Preventive', hours: 3, component: 'Engine', action: 'Inspection', cost: 4500 },
-  { id: 'm2', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-13', maintenanceType: 'Breakdown', hours: 22, component: 'Hydraulic System', action: 'Replace', cost: 68000 },
-  { id: 'm3', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-14', maintenanceType: 'Breakdown', hours: 4, component: 'Hydraulic System', action: 'Repair', cost: 12000 },
+  { id: 'm2', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-13', maintenanceType: 'Breakdown', hours: 22, component: 'Hydraulic System', action: 'Part replaced', cost: 68000 },
+  { id: 'm3', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-14', maintenanceType: 'Breakdown', hours: 4, component: 'Hydraulic System', action: 'Repair performed', cost: 12000 },
   { id: 'm4', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-08-23', maintenanceType: 'Scheduled', hours: 3, component: 'Compressor', action: 'Inspection', cost: 9500 },
-  { id: 'm5', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-08-18', maintenanceType: 'Breakdown', hours: 8, component: 'Electrical', action: 'Repair', cost: 41000 },
-  { id: 'm6', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-06-04', maintenanceType: 'Breakdown', hours: 24, component: 'Engine', action: 'Replace', cost: 118000 },
-  { id: 'm7', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-06-05', maintenanceType: 'Breakdown', hours: 20, component: 'Engine', action: 'Repair', cost: 34000 },
-  { id: 'm8', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-06-15', maintenanceType: 'Breakdown', hours: 6, component: 'Electrical', action: 'Repair', cost: 22000 },
+  { id: 'm5', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-08-18', maintenanceType: 'Breakdown', hours: 8, component: 'Electrical', action: 'Repair performed', cost: 41000 },
+  { id: 'm6', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-06-04', maintenanceType: 'Breakdown', hours: 24, component: 'Engine', action: 'Part replaced', cost: 118000 },
+  { id: 'm7', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-06-05', maintenanceType: 'Breakdown', hours: 20, component: 'Engine', action: 'Repair performed', cost: 34000 },
+  { id: 'm8', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-06-15', maintenanceType: 'Breakdown', hours: 6, component: 'Electrical', action: 'Repair performed', cost: 22000 },
   { id: 'm9', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-07-05', maintenanceType: 'Preventive', hours: 3, component: 'Engine', action: 'Inspection', cost: 4500 },
   { id: 'm10', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-07-12', maintenanceType: 'Preventive', hours: 2, component: 'Compressor', action: 'Inspection', cost: 3800 },
   { id: 'm11', rig: 'RIG-001', project: 'Site A - North Field', date: '2026-09-04', maintenanceType: 'Scheduled', hours: 3, component: 'Mud Pump', action: 'Inspection', cost: 7200 },
-  { id: 'm12', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-09-05', maintenanceType: 'Breakdown', hours: 9, component: 'Hydraulic System', action: 'Repair', cost: 28500 },
+  { id: 'm12', rig: 'RIG-002', project: 'Site A - North Field', date: '2026-09-05', maintenanceType: 'Breakdown', hours: 9, component: 'Hydraulic System', action: 'Repair performed', cost: 28500 },
 ]
+/* The same extra detail for the seeded maintenance logs: who logged it, on
+ * which shift, and the oils a service takes. */
+export const SEED_MAINTENANCE: MaintenanceLog[] = RAW_MAINTENANCE.map(m => {
+  const engine = /engine/i.test(m.component), hyd = /hydraulic/i.test(m.component)
+  const service = m.maintenanceType !== 'Breakdown'
+  return {
+    ...m, shift: 'Day' as ShiftName, supervisor: RIG_CREW[m.rig]?.supervisor ?? 'Kiran Joshi',
+    engineOilL: engine ? (service ? 18 : 6) : 0, hydraulicOilL: hyd ? 40 : 0, transmissionOilL: 0,
+    loggedBy: RIG_CREW[m.rig]?.supervisor ?? 'Kiran Joshi', loggedAt: `${m.date}T17:40`,
+  }
+})
 
 /* ==========================================================================
  * STORE
@@ -1411,7 +1614,7 @@ export const SEED_MAINTENANCE: MaintenanceLog[] = [
  * Portal opens with something to read and something to decide. */
 export const SEED_PROJECT_EVENTS: ProjectEvent[] = [
   { id: 'pe_1', project: 'Site A - North Field', at: '2026-05-25T10:20', kind: 'created', by: 'contractor', title: 'Project created', detail: 'Site A - North Field · North Field block', seenByOwner: true, seenByContractor: true },
-  { id: 'pe_2', project: 'Site A - North Field', at: '2026-05-25T10:24', kind: 'shared', by: 'contractor', title: `Shared with ${OWNER_NAME}`, detail: 'Contract rates, planned holes, rigs and crew are now visible in the Client Portal.', seenByOwner: true, seenByContractor: true },
+  { id: 'pe_2', project: 'Site A - North Field', at: '2026-05-25T10:24', kind: 'shared', by: 'contractor', title: `Shared with ${DEMO_CLIENT}`, detail: 'Contract rates, planned holes, rigs and crew are now visible in the client login.', seenByOwner: true, seenByContractor: true },
   { id: 'pe_3', project: 'Site A - North Field', at: '2026-05-25T10:31', kind: 'rates', by: 'contractor', title: 'Contract rates set, from 1 Jun 2026', detail: 'Tender schedule 2.2.1.1c\u2013e', seenByOwner: true, seenByContractor: true },
   { id: 'pe_4', project: 'Site A - North Field', at: '2026-05-28T09:05', kind: 'rig', by: 'contractor', title: 'RIG-001 and RIG-002 assigned', seenByOwner: true, seenByContractor: true },
   { id: 'pe_5', project: 'Site A - North Field', at: '2026-05-28T09:12', kind: 'crew', by: 'contractor', title: 'Crew assigned', detail: '2 supervisors, 4 drillers', seenByOwner: true, seenByContractor: true },
@@ -1440,9 +1643,8 @@ export const SEED_RATE_PROPOSALS: RateProposal[] = [
 /* ── Contractors, their work orders, and what is waiting to be checked ──── */
 
 export const SEED_CONTRACTORS: Contractor[] = [
-  { id: 'ctr_p', name: 'Contractor P', xplorixId: 'CT-3105', place: 'Demo company', contact: 'Site manager' },
-  // No XPLORIX of his own, so he writes his drill log in the login we gave him.
-  { id: 'ctr_q', name: 'Contractor Q', place: 'Demo company', contact: 'Proprietor', login: { email: 'site@contractor-q.example', status: 'active', since: '2026-08-08' } },
+  { id: 'ctr_p', name: 'Contractor P', place: 'Demo company', contact: 'Site manager' },
+  { id: 'ctr_q', name: 'Contractor Q', place: 'Demo company', contact: 'Proprietor' },
 ]
 
 const payCard = (id: string, from: string, rates: [number, number, number], standby: number, mob: number, demob: number, note: string): ClientRate => ({
@@ -1461,7 +1663,7 @@ const payCard = (id: string, from: string, rates: [number, number, number], stan
 export const SEED_WORK_ORDERS: WorkOrder[] = [
   {
     id: 'wo_b1', number: 'WO-B-01', project: SITE_B, contractorId: 'ctr_p', rigs: ['CP-01', 'CP-02'],
-    startDate: '2026-08-01', endDate: '2026-10-31', plannedMetres: 1100, paymentDays: 30, reportsBy: 'xplorix', status: 'active',
+    startDate: '2026-08-01', endDate: '2026-10-31', plannedMetres: 1100, paymentDays: 30, status: 'active',
     rates: [payCard('wr_p1', '2026-08-01', [5900, 6800, 8000], 9000, 90000, 70000, 'Work order schedule of rates')],
     rules: [
       { id: 'd1', kind: 'coreRecovery', on: true, clause: 'Example clause 9.1', slabs: [{ belowPct: 90, deductPct: 10 }, { belowPct: 80, deductPct: 25 }] },
@@ -1472,7 +1674,7 @@ export const SEED_WORK_ORDERS: WorkOrder[] = [
   },
   {
     id: 'wo_b2', number: 'WO-B-02', project: SITE_B, contractorId: 'ctr_q', rigs: ['CQ-01'],
-    startDate: '2026-08-10', endDate: '2026-08-31', plannedMetres: 400, paymentDays: 45, reportsBy: 'login', status: 'active',
+    startDate: '2026-08-10', endDate: '2026-08-31', plannedMetres: 400, paymentDays: 45, status: 'active',
     rates: [payCard('wr_q1', '2026-08-10', [5700, 6600, 7900], 8500, 80000, 60000, 'Work order schedule of rates')],
     rules: [
       { id: 'd1', kind: 'coreRecovery', on: true, clause: 'Example clause 9.1', slabs: [{ belowPct: 90, deductPct: 10 }, { belowPct: 80, deductPct: 25 }] },
@@ -1504,10 +1706,10 @@ function seededDepth(hole: string) {
 export const SEED_CONTRACTOR_REPORTS: ContractorReport[] = (() => {
   const a = seededDepth('DH-132'), b = seededDepth('DH-142'), c = seededDepth('DH-152')
   return [
-    waiting('rp_1', 'wo_b1', 'CP-01', 'Day', 'DH-132', a, 7, 6.8, [12, 0, 0], '', 'xplorix', '2026-09-13T18:12'),
-    waiting('rp_2', 'wo_b1', 'CP-01', 'Night', 'DH-132', a + 7, 6, 5.8, [12, 0, 0], '', 'xplorix', '2026-09-13T18:12'),
-    waiting('rp_3', 'wo_b1', 'CP-02', 'Day', 'DH-142', b, 6, 5.7, [12, 0, 0], '', 'xplorix', '2026-09-13T18:20'),
-    waiting('rp_4', 'wo_b1', 'CP-02', 'Night', null, undefined, 0, 0, [0, 12, 0], 'Waiting for Instruction', 'xplorix', '2026-09-13T18:20',
+    waiting('rp_1', 'wo_b1', 'CP-01', 'Day', 'DH-132', a, 7, 6.8, [12, 0, 0], '', 'login', '2026-09-13T18:12'),
+    waiting('rp_2', 'wo_b1', 'CP-01', 'Night', 'DH-132', a + 7, 6, 5.8, [12, 0, 0], '', 'login', '2026-09-13T18:12'),
+    waiting('rp_3', 'wo_b1', 'CP-02', 'Day', 'DH-142', b, 6, 5.7, [12, 0, 0], '', 'login', '2026-09-13T18:20'),
+    waiting('rp_4', 'wo_b1', 'CP-02', 'Night', null, undefined, 0, 0, [0, 12, 0], 'Waiting for Instruction', 'login', '2026-09-13T18:20',
       { remarks: 'Told to hold at 20:00 until the next hole location is cleared.' }),
     waiting('rp_5', 'wo_b2', 'CQ-01', 'Day', 'DH-152', c + 4, 5, 4.7, [12, 0, 0], '', 'login', '2026-09-13T18:40'),
     waiting('rp_6', 'wo_b2', 'CQ-01', 'Night', 'DH-152', c + 9, 9, 7.6, [12, 0, 0], '', 'login', '2026-09-13T18:40'),
@@ -1518,6 +1720,55 @@ export const SEED_CONTRACTOR_REPORTS: ContractorReport[] = (() => {
     },
   ]
 })()
+
+/* ── Logins ────────────────────────────────────────────────────────────────
+ *
+ * The company admin creates every other login from one screen, Users:
+ *
+ *   supervisor   our own site staff: the drill log and the maintenance log
+ *   contractor   a company drilling for us: his drill log, his submitted
+ *                logs, a small view of his own performance
+ *   client       the company we drill for: what is happening on his projects
+ *
+ * A login is tied to the thing it may see. A contractor's login to his
+ * contractor record, a client's login to the client named on the projects, a
+ * supervisor to the projects he is assigned to by name. */
+export type UserRole = 'supervisor' | 'contractor' | 'client'
+export const USER_ROLE_LABEL: Record<UserRole, string> = { supervisor: 'Supervisor', contractor: 'Contractor', client: 'Client' }
+export interface AppUser {
+  id: string
+  name: string
+  username: string
+  role: UserRole
+  active: boolean
+  created: string             // YYYY-MM-DD
+  email?: string
+  opened?: boolean            // has signed in at least once
+  contractorId?: string       // role contractor
+  client?: string             // role client: the client's name as written on the project
+}
+export const ADMIN_NAME = 'Admin User'
+export const COMPANY_NAME = 'Apex Drilling Solutions'
+
+export const SEED_USERS: AppUser[] = [
+  { id: 'u_s1', name: 'Arun Verma', username: 'APX_SUP01', role: 'supervisor', active: true, created: '2026-06-01', opened: true },
+  { id: 'u_s2', name: 'Imran Shaikh', username: 'APX_SUP02', role: 'supervisor', active: true, created: '2026-06-01', opened: true },
+  { id: 'u_s3', name: 'Pradeep Rao', username: 'APX_SUP03', role: 'supervisor', active: true, created: '2026-08-01', opened: true },
+  { id: 'u_c1', name: 'Contractor P', username: 'APX_CON01', role: 'contractor', active: true, created: '2026-07-28', opened: true, contractorId: 'ctr_p', email: 'site@contractor-p.example' },
+  { id: 'u_c2', name: 'Contractor Q', username: 'APX_CON02', role: 'contractor', active: true, created: '2026-08-08', opened: true, contractorId: 'ctr_q', email: 'site@contractor-q.example' },
+  { id: 'u_k1', name: 'Demo Mining Co.', username: 'APX_CLI01', role: 'client', active: true, created: '2026-05-25', opened: true, client: 'Demo Mining Co.', email: 'exploration@demo-mining.example' },
+]
+export function loginOfContractor(users: AppUser[] | undefined, contractorId: string | undefined) {
+  return (users ?? []).find(u => u.role === 'contractor' && u.contractorId === contractorId)
+}
+export function loginOfClient(users: AppUser[] | undefined, client: string | undefined) {
+  return (users ?? []).find(u => u.role === 'client' && !!client && u.client?.toLowerCase() === client.toLowerCase())
+}
+export function nextUsername(users: AppUser[], role: UserRole) {
+  const tag = role === 'supervisor' ? 'SUP' : role === 'contractor' ? 'CON' : 'CLI'
+  const n = Math.max(0, ...users.filter(u => u.role === role).map(u => Number(u.username.match(/(\d+)$/)?.[1] ?? 0))) + 1
+  return `APX_${tag}${String(n).padStart(2, '0')}`
+}
 
 interface State {
   shiftLogs: ShiftLog[]
@@ -1537,19 +1788,23 @@ interface State {
   contractorReports: ContractorReport[]
   contractorBills: ContractorBill[]
   wording: Wording
+  users: AppUser[]
 }
 
 function initial(): State {
   const base = {
     shiftLogs: SEED_SHIFT_LOGS, maintenance: SEED_MAINTENANCE,
     ownership: SEED_OWNERSHIP, operating: SEED_OPERATING,
-    clientRates: SEED_CLIENT_RATES, holeStatus: SEED_HOLE_STATUS, invoices: [],
+    clientRates: SEED_CLIENT_RATES, holeStatus: SEED_HOLE_STATUS as Record<string, HoleState>, invoices: [] as Invoice[],
     holePlans: SEED_HOLE_PLANS,
     projects: SEED_PROJECTS, projectEvents: SEED_PROJECT_EVENTS, rateProposals: SEED_RATE_PROPOSALS,
     contractors: SEED_CONTRACTORS, workOrders: SEED_WORK_ORDERS, contractorReports: SEED_CONTRACTOR_REPORTS,
     wording: 'standard' as Wording,
+    users: SEED_USERS,
   }
-  return { ...base, contractorBills: seedBills(base) }
+  const demo = seedInvoices(base, SEED_PROJECTS[0].name, SEED_PROJECTS[0].client)
+  const withInvoices = { ...base, invoices: demo.invoices, holeStatus: { ...base.holeStatus, ...demo.holeStatus } }
+  return { ...withInvoices, contractorBills: seedBills(withInvoices) }
 }
 
 /* A browser that saved its state before a seed plan existed still gets that
@@ -1587,10 +1842,10 @@ interface CtxValue {
   addInvoice: (i: Invoice) => void
   updateInvoice: (i: Invoice) => void
   deleteInvoice: (id: string) => void
-  // Contractor → mine owner
+  // Company → client
   submitHole: (holeNumber: string) => void
   withdrawHole: (holeNumber: string) => void
-  // Mine owner → contractor
+  // Client → company
   ownerDecideHole: (holeNumber: string, approve: boolean, reason?: string) => void
   ownerReviewInvoice: (id: string, reviews: (LineReview | null)[]) => void
   ownerMarkPaid: (id: string) => void
@@ -1604,6 +1859,14 @@ interface CtxValue {
   ownerAnswerRates: (id: string, accept: boolean, note?: string) => void
   markProjectSeen: (project: string, who: 'contractor' | 'owner') => void
   // Contractors working for us
+  // The shift record itself: a drill log or a maintenance log, new or changed.
+  saveShiftLog: (log: ShiftLog) => void
+  deleteShiftLog: (id: string) => void
+  saveMaintenance: (m: MaintenanceLog) => void
+  deleteMaintenance: (id: string) => void
+  // Logins
+  saveUser: (u: AppUser) => void
+  removeUser: (id: string) => void
   saveContractor: (c: Contractor) => void
   saveWorkOrder: (w: WorkOrder) => void
   addReports: (r: ContractorReport[]) => void
@@ -1627,9 +1890,9 @@ interface CtxValue {
 export interface ProjectLog { kind: ProjectEventKind; title: string; detail?: string }
 
 const CostingContext = createContext<CtxValue | null>(null)
-/* v3: contractors, work orders and their shifts joined the record. An older
+/* v4: logins, and the fuller drill and maintenance logs, joined the record. An older
  * saved copy has none of them, so it is left behind rather than merged. */
-const KEY = 'xplorix_costing_v3'
+const KEY = 'xplorix_costing_v5'
 
 /* One store per browser tab. A layout mounts the provider once; a screen that
  * also wraps itself in <CostingProvider> (Finance, Inventory, Projects do, so
@@ -1651,7 +1914,7 @@ function CostingRoot({ children }: { children: ReactNode }) {
   }, [])
   useEffect(() => { if (loaded) try { localStorage.setItem(KEY, JSON.stringify(state)) } catch {} }, [state, loaded])
 
-  /* The contractor and the mine owner are two tabs on the same store. When one
+  /* The company and its client are two tabs on the same store. When one
    * tab saves, the browser tells every other tab; taking that value here is
    * what makes an invoice raised in Finance appear in the Client Portal without
    * a refresh — and stops a tab that loaded earlier from saving its older copy
@@ -1704,7 +1967,8 @@ function CostingRoot({ children }: { children: ReactNode }) {
     return { ...s, invoices: s.invoices.filter(i => i.id !== id), holeStatus: hs }
   })
 
-  const stamp = () => new Date().toISOString().slice(0, 10)
+  /* Decisions are dated on the system's date, like every other record. */
+  const stamp = () => TODAY
 
   const submitHole: CtxValue['submitHole'] = holeNumber => setState(s => ({
     ...s, holeStatus: { ...s.holeStatus, [holeNumber]: { status: 'submitted', submittedAt: stamp() } },
@@ -1722,7 +1986,7 @@ function CostingRoot({ children }: { children: ReactNode }) {
         ...s.holeStatus,
         [holeNumber]: approve
           ? { status: 'approved', submittedAt: prev?.submittedAt, decidedAt: stamp() }
-          : { status: 'closed', submittedAt: prev?.submittedAt, decidedAt: stamp(), returnReason: reason?.trim() || 'Returned by the mine owner' },
+          : { status: 'closed', submittedAt: prev?.submittedAt, decidedAt: stamp(), returnReason: reason?.trim() || 'Returned by the client' },
       },
     }
   })
@@ -1753,7 +2017,7 @@ function CostingRoot({ children }: { children: ReactNode }) {
 
   const createProject: CtxValue['createProject'] = (p, opening) => setState(s => {
     const events: ProjectEvent[] = [event(p.name, 'contractor', { kind: 'created', title: 'Project created', detail: `${p.name} · ${p.location}` })]
-    if (p.shared) events.push(event(p.name, 'contractor', { kind: 'shared', title: `Shared with ${p.client}`, detail: 'Contract rates, planned holes, rigs and crew are now visible in the Client Portal.' }))
+    if (p.shared) events.push(event(p.name, 'contractor', { kind: 'shared', title: `Shared with ${p.client}`, detail: 'Contract rates, planned holes, rigs and crew are now visible in the client login.' }))
     if (opening?.rate) events.push(event(p.name, 'contractor', { kind: 'rates', title: `Contract rates set, from ${fullDate(opening.rate.effectiveFrom)}`, detail: opening.rate.note }))
     if (p.rigs.length) events.push(event(p.name, 'contractor', { kind: 'rig', title: `${listOf(p.rigs)} assigned` }))
     if (p.supervisors.length + p.drillers.length) events.push(event(p.name, 'contractor', { kind: 'crew', title: 'Crew assigned', detail: crewLine(p) }))
@@ -1836,6 +2100,21 @@ function CostingRoot({ children }: { children: ReactNode }) {
     return { ...s, projectEvents: s.projectEvents.map(e => e.project === project && !e[key] ? { ...e, [key]: true } : e) }
   })
 
+  // ── the shift record ─────────────────────────────────────────────────────
+  /* A log and the second-hole row that hangs off it are saved together, so a
+   * change to the log can never leave an old second row behind. */
+  const saveShiftLog: CtxValue['saveShiftLog'] = log => setState(s => {
+    const seg = segmentFor(log)
+    const rest = s.shiftLogs.filter(l => l.id !== log.id && l.segmentOf !== log.id)
+    return { ...s, shiftLogs: [...rest, log, ...(seg ? [seg] : [])] }
+  })
+  const deleteShiftLog: CtxValue['deleteShiftLog'] = id => setState(s => ({ ...s, shiftLogs: s.shiftLogs.filter(l => l.id !== id && l.segmentOf !== id) }))
+  const saveMaintenance: CtxValue['saveMaintenance'] = m => setState(s => ({ ...s, maintenance: upsert(s.maintenance, m) }))
+  const deleteMaintenance: CtxValue['deleteMaintenance'] = id => setState(s => ({ ...s, maintenance: s.maintenance.filter(m => m.id !== id) }))
+
+  const saveUser: CtxValue['saveUser'] = u => setState(s => ({ ...s, users: upsert(s.users, u) }))
+  const removeUser: CtxValue['removeUser'] = id => setState(s => ({ ...s, users: s.users.filter(u => u.id !== id) }))
+
   // ── contractors working for us ───────────────────────────────────────────
   const saveContractor: CtxValue['saveContractor'] = c => setState(s => ({ ...s, contractors: upsert(s.contractors, c) }))
   const saveWorkOrder: CtxValue['saveWorkOrder'] = w => setState(s => ({ ...s, workOrders: upsert(s.workOrders, w) }))
@@ -1848,10 +2127,11 @@ function CostingRoot({ children }: { children: ReactNode }) {
     const wo = r && s.workOrders.find(w => w.id === r.workOrderId)
     if (!r || !wo) return s
     const shift = reportToShift(r, wo, by, nowStamp(), a)
+    const seg = segmentFor(shift)
     return {
       ...s,
       contractorReports: s.contractorReports.filter(x => x.id !== id),
-      shiftLogs: [...s.shiftLogs.filter(l => l.id !== shift.id), shift],
+      shiftLogs: [...s.shiftLogs.filter(l => l.id !== shift.id && l.segmentOf !== shift.id), shift, ...(seg ? [seg] : [])],
     }
   })
   const returnReport: CtxValue['returnReport'] = (id, by, reason) => setState(s => ({
@@ -1889,6 +2169,7 @@ function CostingRoot({ children }: { children: ReactNode }) {
       setHoleStatus, addInvoice, updateInvoice, deleteInvoice,
       submitHole, withdrawHole, ownerDecideHole, ownerReviewInvoice, ownerMarkPaid, setHolePlan,
       createProject, updateProject, planHoles, proposeRates, withdrawProposal, ownerAnswerRates, markProjectSeen,
+      saveShiftLog, deleteShiftLog, saveMaintenance, deleteMaintenance, saveUser, removeUser,
       saveContractor, saveWorkOrder, addReports, saveReport, acceptReport, returnReport, reopenReport, deleteReport,
       saveBill, approveBill, returnBill, reopenBill, markBillPaid, setWording,
       resetAll: () => setState(initial()),

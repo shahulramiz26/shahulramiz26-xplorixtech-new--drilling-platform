@@ -3,14 +3,13 @@
 import { ReactNode } from 'react'
 import Link from 'next/link'
 import { C } from '../../lib/costing-store'
-import { CONTRACTORS, type ContractorId } from '../../lib/owner-portal'
 import { hexA } from '../../lib/theme'
 
 /* ==========================================================================
- * CLIENT PORTAL — shared pieces
+ * XPLORIX UI KIT — the pieces every screen is built from
  *
  * Same surfaces, borders and orange as the rest of XPLORIX, kept deliberately
- * plain: no glow, no gradients on data, no emoji. A mine owner reads this to
+ * plain: no glow, no gradients on data, no emoji. A client reads this to
  * decide whether to pay, so the screen should look like a record.
  *
  * Two rules for anything that carries a number:
@@ -24,7 +23,7 @@ export const T = {
   line: 'color-mix(in srgb, var(--x-border) 60%, transparent)',
   // Series colours for charts (validated on the card surface).
   actual: 'var(--x-actual)', plan: 'var(--x-plan)', forecast: 'var(--x-forecast)',
-  contractorSide: 'var(--x-blue)', ownerSide: 'var(--x-orange-d)',
+    ownSide: 'var(--x-blue)', clientSide: 'var(--x-orange-d)',
   bar: 'var(--x-blue)',
 }
 /* A colour at part strength, for tinted backgrounds and soft borders. Written
@@ -41,7 +40,7 @@ const toneMark: Record<Tone, string> = { good: '✓', warn: '!', bad: '✕', inf
 
 // ── PAGE HEAD ─────────────────────────────────────────────────────────────
 
-/* Every screen is a question the mine owner is asking, with the answer on the
+/* Every screen is a question its reader is asking, with the answer on the
  * line below it. The charts underneath are the evidence. */
 export function PageHead({ question, answer, tone = 'neutral', right }: {
   question: string; answer: ReactNode; tone?: Tone; right?: ReactNode
@@ -131,26 +130,6 @@ export function Status({ tone, children }: { tone: Tone; children: ReactNode }) 
   )
 }
 
-export function Who({ id, rig }: { id: ContractorId; rig?: boolean }) {
-  const c = CONTRACTORS[id]
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
-      <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: c.color, flexShrink: 0 }} />
-      {c.name}{rig ? <span style={{ color: T.faint }}> · {c.rig}</span> : null}
-    </span>
-  )
-}
-
-export function DemoTag({ live }: { live?: boolean }) {
-  return (
-    <span title={live ? 'Read from the contractor’s XPLORIX account' : 'Sample data'} style={{
-      fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 5, letterSpacing: '0.04em',
-      background: live ? 'color-mix(in srgb, var(--x-green) 12%, transparent)' : 'rgba(var(--x-ov),0.05)',
-      color: live ? T.green : T.faint, border: `1px solid ${live ? 'color-mix(in srgb, var(--x-green) 30%, transparent)' : T.border}`,
-    }}>{live ? 'LIVE' : 'DEMO'}</span>
-  )
-}
-
 /* Phase 3 and Phase 4 screens show what is coming, not what is built. */
 export function InDevelopment({ phase, children }: { phase: string; children: ReactNode }) {
   return (
@@ -213,12 +192,6 @@ export function Seg<V extends string>({ options, value, onChange }: {
     </div>
   )
 }
-
-export const CONTRACTOR_FILTER = [
-  { value: 'all' as const, label: 'All contractors' },
-  { value: 'A' as const, label: 'A' }, { value: 'B' as const, label: 'B' }, { value: 'C' as const, label: 'C' },
-]
-export type ContractorFilter = 'all' | ContractorId
 
 // ── TABLE ─────────────────────────────────────────────────────────────────
 

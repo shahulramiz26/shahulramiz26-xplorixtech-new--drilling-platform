@@ -4,7 +4,7 @@ import {
   ANY_FORMATION, money, versionOn, newestFirst,
   type useCosting, type ClientRate, type HoleStatus, type ProjectRecord, type ProjectEvent, type RateProposal,
 } from './costing-store'
-import { holesFromLogs } from './owner-portal'
+import { holesFromLogs } from './client-record'
 import { TODAY } from './inventory-store'
 
 /* ==========================================================================
@@ -203,8 +203,8 @@ export function eventsFor(state: State, project: string): ProjectEvent[] {
 }
 
 /* What the client has not looked at yet, across the projects shared with him. */
-export function ownerInbox(state: State) {
-  const shared = (state.projects ?? []).filter(p => p.shared)
+export function ownerInbox(state: State, client?: string) {
+  const shared = (state.projects ?? []).filter(p => p.shared && (!client || p.client.toLowerCase() === client.toLowerCase()))
   const names = new Set(shared.map(p => p.name))
   const unseen = (state.projectEvents ?? []).filter(e => names.has(e.project) && !e.seenByOwner && e.by === 'contractor')
   const waiting = (state.rateProposals ?? []).filter(r => names.has(r.project) && r.status === 'waiting')

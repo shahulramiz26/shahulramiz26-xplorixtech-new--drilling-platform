@@ -1,62 +1,39 @@
 'use client'
 
-import { useEffect, useMemo, useSyncExternalStore } from 'react'
-import { useCosting } from '../../lib/costing-store'
-import { company, MY_ID } from '../../lib/connect-store'
+import { useMemo } from 'react'
+import { COMPANY_NAME, type ShiftLog } from '../../lib/costing-store'
+import { useSignedIn } from '../../lib/session'
 import { contractorSide, type Contractor, type ContractorReport } from '../../lib/contracting'
-import type { ShiftLog } from '../../lib/costing-store'
+import type { LogScope } from '../components/drill-log-form'
 import { Page, Card, Empty } from '../components/kit'
 
 /* ==========================================================================
- * WHO IS SIGNED IN TO THE CONTRACTOR LOGIN
+ * THE CONTRACTOR WHO IS SIGNED IN
  *
  * A contractor login belongs to one contractor and opens only his own work
- * orders with the company that gave it to him. The MVP has no accounts yet,
- * so the contractor is chosen by the link he arrived on (?as=) and kept in
- * this browser; with real logins it is simply the account that signed in.
+ * orders with the company that gave it to him: nothing of that company's own
+ * rigs, what its client pays, or any other contractor.
  * ========================================================================== */
 
-const KEY = 'xplorix_contractor_as'
-const listeners = new Set<() => void>()
-const read = () => { try { return localStorage.getItem(KEY) ?? '' } catch { return '' } }
-function subscribe(fn: () => void) {
-  listeners.add(fn)
-  const onStorage = (e: StorageEvent) => { if (e.key === KEY) fn() }
-  window.addEventListener('storage', onStorage)
-  return () => { listeners.delete(fn); window.removeEventListener('storage', onStorage) }
-}
-export function signInAs(id: string) {
-  try { localStorage.setItem(KEY, id) } catch { /* private mode: lasts for this visit */ }
-  listeners.forEach(fn => fn())
-}
-
 /* The company that gave the login: the client, from where the contractor sits. */
-export const CLIENT_NAME = company(MY_ID.contractor)?.name ?? 'Your client'
+export const CLIENT_NAME = COMPANY_NAME
 
 export function useMe() {
-  const store = useCosting()
-  const { state } = store
-  const saved = useSyncExternalStore(subscribe, read, () => '')
-  const withLogin = useMemo(() => state.contractors.filter(c => c.login), [state.contractors])
-  const me: Contractor | undefined = withLogin.find(c => c.id === saved) ?? withLogin[0]
+  const store = useSignedIn('contractor')
+  const { state, user } = store
+  const me: Contractor | undefined = state.contractors.find(c => c.id === user?.contractorId)
   const side = useMemo(() => contractorSide(state, me?.id ?? ''), [state, me?.id])
-  return { ...store, me, withLogin, side }
-}
-
-/* Reads ?as= once, so "See what they see" in the Company Admin lands on the
- * right contractor, and marks an invitation as opened the first time. */
-export function useArrival() {
-  const { state, saveContractor } = useCosting()
-  useEffect(() => {
-    const as = new URLSearchParams(window.location.search).get('as')
-    if (as) signInAs(as)
-  }, [])
-  const saved = useSyncExternalStore(subscribe, read, () => '')
-  useEffect(() => {
-    const c = state.contractors.find(x => x.id === saved) ?? state.contractors.find(x => x.login)
-    if (c?.login?.status === 'invited') saveContractor({ ...c, login: { ...c.login, status: 'active' } })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saved, state.contractors])
+  /* What he may log against: each running work order's project, with the
+   * rigs he brought to it. The people are his own, so they are typed. */
+  const scopes: LogScope[] = useMemo(() => {
+    const by: Record<string, LogScope> = {}
+    side.orders.filter(w => w.status === 'active').forEach(w => {
+      const s = (by[w.project] ||= { project: w.project, rigs: [], supervisors: [], drillers: [], workOrderId: w.id })
+      s.rigs = Array.from(new Set([...s.rigs, ...w.rigs]))
+    })
+    return Object.values(by)
+  }, [side.orders])
+  return { ...store, me, side, scopes }
 }
 
 // ── one shift, wherever it stands ─────────────────────────────────────────
@@ -89,17 +66,17 @@ export function myShifts(side: ReturnType<typeof contractorSide>): MyShift[] {
     key: l.id, state: 'checked', rig: l.rig, date: l.date, shift: l.shift, hole: l.holeNumber,
     metres: l.metresDrilled, core: l.coreRecovery, stoppedHours: l.downtimeHours, reason: l.downtimeReason, log: l,
   })
-  return [...side.waiting.map(fromReport), ...side.returned.map(fromReport), ...side.accepted.map(fromLog)]
+  return [...side.waiting.map(fromReport), ...side.returned.map(fromReport), ...side.accepted.filter(l => !l.segmentOf).map(fromLog)]
     .sort((a, b) => order(b).localeCompare(order(a)))
 }
 
-/* Shown on every screen when nobody has been given a login yet. */
+/* Shown when the login has no contractor record behind it. */
 export function NoLogin() {
   return (
     <Page>
       <Card><Empty>
-        No contractor has a login yet.<br />
-        In the Company Admin, open Contractors, then Work orders, and create a login for a contractor.
+        This login is not tied to a contractor yet.<br />
+        In the Company Admin, open Users and create a contractor login.
       </Empty></Card>
     </Page>
   )

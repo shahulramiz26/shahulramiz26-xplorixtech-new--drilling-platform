@@ -3,7 +3,7 @@
 import { toolingRatesFor, type useInventory } from './inventory-store'
 import { workOrderFor, payRateOn, type WorkOrder } from './contracting'
 import {
-  monthOf, daysInMonth, versionOn, ownershipBreakdown, blankOperating, blankOwnership,
+  monthOf, daysInMonth, versionOn, depthIndex, ownershipBreakdown, blankOperating, blankOwnership,
   dayCost, rollup, withCumulative, holesFromDays, holeResult,
   type useCosting, type RigOwnership, type OwnershipBreakdown, type OperatingRate, type ClientRate,
   type DayCost, type DayCostMTD, type Rollup, type HoleResult,
@@ -78,7 +78,9 @@ export function computeRigMonth(state: CostingState, inv: InvState, project: str
   const clientRate = versionOn(crVersions, monthEnd)
 
   const raw: DayCost[] = []
-  const depthByHole: Record<string, number> = {}
+  /* Where every shift's hole stood when the shift began, from the whole
+   * project's record: a hole keeps its depth across months and rigs. */
+  const startAt = depthIndex(state.shiftLogs.filter(l => l.project === project))
 
   /* Our own rig costs money from the first of the month whether it drilled or
    * not, so its month starts on day one. A contractor's rig costs nothing on a
@@ -98,12 +100,8 @@ export function computeRigMonth(state: CostingState, inv: InvState, project: str
      * change a day that was already costed. */
     const tooling = toolingRatesFor(inv.pos, inv.rigKit, inv.catalogue, rig, project, date)
 
-    const hole = shifts.find(s => s.holeNumber)?.holeNumber ?? null
-    const depthSoFar = hole ? (depthByHole[hole] ?? 0) : 0
-
-    const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, tooling, depthSoFar,
+    const d = dayCost(date, rig, project, shifts, maint, op, own, obDay, cr, tooling, s => startAt[s.id] ?? 0,
       workOrder ? { rate: payRateOn(workOrder, date) } : undefined)
-    if (hole) depthByHole[hole] = depthSoFar + d.units
     raw.push(d)
   }
 

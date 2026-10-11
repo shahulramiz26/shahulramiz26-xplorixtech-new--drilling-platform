@@ -8,7 +8,7 @@ import Link from 'next/link'
  *
  * One light theme, the same as the film: warm paper, dark ink, one orange.
  * The page follows the film's story: the two numbers that do not match, the
- * contractor's side, the mine owner's side, how the two connect, and what
+ * drilling company's side, the client's side, the four logins, and what
  * XPLORIX works out ahead of time. Every product picture is a real screen of
  * the demo, on demo data.
  * ========================================================================== */
@@ -38,7 +38,7 @@ function useSeen<T extends HTMLElement>(threshold = 0.5) {
 }
 
 /* The same month, counted twice: the contractor's number is typed, then the
- * mine owner's. It plays once, when the reader reaches it. */
+ * client's. It plays once, when the reader reaches it. */
 function TwoNumbers() {
   const [ref, seen] = useSeen<HTMLDivElement>(0.45)
   const A = '1,240 m', B = '1,180 m'
@@ -63,7 +63,7 @@ function TwoNumbers() {
       </div>
       <div className={'lp-neq' + (done ? ' on' : '')} aria-hidden>&ne;</div>
       <div>
-        <div className="lp-two-who">The mine owner&rsquo;s site report says</div>
+        <div className="lp-two-who">The client&rsquo;s site report says</div>
         <div className="lp-num" aria-label={B}>{B.slice(0, b) || ' '}{typing && a >= A.length && <i className="lp-caret" />}</div>
       </div>
       <p className={'lp-two-end' + (done ? ' on' : '')}>Same holes. Sixty metres apart. Then the invoice arrives.</p>
@@ -72,12 +72,11 @@ function TwoNumbers() {
 }
 
 const SHARED = ['Contract rates', 'Planned and closed holes', 'The shift record', 'Invoices', 'Payments']
-const STEPS = [
-  { t: 'Each company gets an XPLORIX ID', d: 'CT for a contractor, MO for a mine owner.' },
-  { t: 'One side sends a request', d: 'It enters the other company’s ID.' },
-  { t: 'The other side accepts', d: 'Now the two companies are connected.' },
-  { t: 'The contractor shares a project', d: 'Rates, holes, shifts and invoices appear on both screens.' },
-  { t: 'The connection ends with the work', d: 'What was agreed and invoiced stays readable.' },
+const LOGINS = [
+  { t: 'Company Admin', d: 'Runs the account: projects, rates, finance, stock, analysis, and every other login.' },
+  { t: 'Supervisor', d: 'Writes the drill log and the maintenance log for the rig. Nothing else.' },
+  { t: 'Contractor', d: 'A contractor you hire writes his own drill log and sends it to you to check.' },
+  { t: 'Client', d: 'Sees what happened today, approves finished holes and checks each invoice.' },
 ]
 const QUOTES = [
   { q: 'The downtime chart alone changed our Monday review meetings. We could see exactly which rigs had the most idle time and why.', n: 'Vikram Sharma', r: 'HOD Operations, Kartikay Exploration & Mining Services, India' },
@@ -85,12 +84,12 @@ const QUOTES = [
   { q: 'My team was logging live on the platform within two days. I have never seen field supervisors adopt a new system that quickly.', n: 'Piyush Mrig', r: 'Director, Kartikay Exploration & Mining Services, India' },
 ]
 const FAQS = [
-  { q: 'Who is XPLORIX for?', a: 'Two kinds of company. Drilling contractors use it to log shifts, cost every hole and invoice. Mine owners use it to follow the drilling, approve holes and check invoices. Each has its own login and its own screens.' },
-  { q: 'What does the supervisor have to enter?', a: 'One log per shift: the hole, the metres drilled, the core recovered, the hours, any downtime and the parts used. Cost per metre, hole status, billing and stock are worked out from that log.' },
-  { q: 'What can the mine owner see?', a: 'Only what belongs to the shared project: the contract rates, the holes, the shift record, the invoices and the payments. He does not see the contractor’s costs, margin, stock, suppliers or bids.' },
-  { q: 'What can the contractor see of the mine owner?', a: 'His decisions on the shared project: approved or returned holes, accepted or returned rates, and the status of each invoice. The mine owner’s budget and his comparison of contractors stay private.' },
-  { q: 'What do the AI insights do?', a: 'On the analytics dashboards they point out what is unusual, forecast what comes next and suggest an action. Next month’s forecast is worked out from your own shift logs and planned holes.' },
-  { q: 'How does pricing work?', a: 'There is one plan for contractors and one for mine owners, and each company pays for its own login. Ask us for the current plans when you see the demo.' },
+  { q: 'Who is XPLORIX for?', a: 'Companies that drill: exploration drilling contractors, and exploration agencies that run their own rigs and also hire contractors. Their supervisors, their contractors and their clients each get a login made for them.' },
+  { q: 'What does the supervisor have to enter?', a: 'One drill log per shift: the hole, the metres drilled, the core recovered, the hours, any downtime and the parts used. Cost per metre, hole status, billing and stock are worked out from that log.' },
+  { q: 'We hire contractors as well as running our own rigs. Does it handle that?', a: 'Yes. Each contractor gets a login and writes his own drill log and maintenance log. Your site staff check each shift before it counts. Your own rigs and each contractor are then compared on the same measures.' },
+  { q: 'What can the client see?', a: 'Only the projects you choose to show him: the contract rates, the holes, the shift record, the invoices and the payments. He does not see your costs, margin, stock, suppliers or what you pay a contractor.' },
+  { q: 'What do the AI insights do?', a: 'On the analytics dashboards they point out what is unusual, forecast what comes next and suggest an action. The month forecast and the hole finish dates are worked out from your own shift logs and planned holes.' },
+  { q: 'How does pricing work?', a: 'Ask us for the current plans when you see the demo.' },
 ]
 
 export default function LandingPage() {
@@ -115,9 +114,9 @@ export default function LandingPage() {
       <header className={'lp-nav' + (scrolled ? ' scrolled' : '')}>
         <a href="#top" className="lp-brand"><Logo /><span>XPLORIX</span></a>
         <nav className="lp-links" aria-label="Sections">
-          <a href="#contractors">For contractors</a>
-          <a href="#owners">For mine owners</a>
-          <a href="#connect">How they connect</a>
+          <a href="#contractors">For drilling companies</a>
+          <a href="#owners">For clients</a>
+          <a href="#connect">Logins</a>
           <a href="#intelligence">Intelligence</a>
           <a href="#trial">Field trial</a>
         </nav>
@@ -134,8 +133,8 @@ export default function LandingPage() {
             <span className="lp-pill">Drilling Intelligence Platform</span>
             <h1>One platform.<br /><span className="lp-or">Both sides of the contract.</span></h1>
             <p className="lp-lead">
-              XPLORIX keeps one record of the drilling. The contractor logs each shift once.
-              The mine owner checks every metre and every invoice against it.
+              XPLORIX keeps one record of the drilling. Each shift is logged once.
+              The client checks every metre and every invoice against it.
             </p>
             <div className="lp-actions">
               <Link href="/auth/login" className="lp-btn primary big">Open the live demo</Link>
@@ -157,7 +156,7 @@ export default function LandingPage() {
             <h2 className="lp-h2 lp-narrow">Every metre drilled is counted twice.</h2>
             <TwoNumbers />
             <p className="lp-body lp-narrow">
-              The contractor keeps a paper log, a spreadsheet and photos on a phone. The mine owner keeps his own site report.
+              The driller keeps a paper log, a spreadsheet and photos on a phone. The client keeps his own site report.
               Nobody can say which number is right, so the argument starts when the bill does. XPLORIX replaces both with one
               shift record that each side can open.
             </p>
@@ -169,7 +168,7 @@ export default function LandingPage() {
           <div className="lp-wrap">
             <div className="lp-head">
               <h2 className="lp-h2">The whole story in two minutes.</h2>
-              <p className="lp-body">From the supervisor&rsquo;s shift log to the mine owner&rsquo;s approval, with voice-over.</p>
+              <p className="lp-body">From the supervisor&rsquo;s shift log to the client&rsquo;s approval, with voice-over.</p>
             </div>
             <div className="lp-window">
               <video ref={filmRef} src="/landing/xplorix-film.mp4" poster="/landing/film-poster.jpg" controls playsInline preload="none"
@@ -182,68 +181,69 @@ export default function LandingPage() {
         <section className="lp-sec" id="contractors">
           <div className="lp-wrap lp-duo">
             <div>
-              <span className="lp-tag or">Contractor XPLORIX</span>
+              <span className="lp-tag or">For the drilling company</span>
               <h2 className="lp-h2">Get paid without the argument.</h2>
               <ul className="lp-list">
                 <li><b>One shift log.</b> The supervisor enters the hole, the metres and the core once.</li>
                 <li><b>Cost, revenue and margin for every hole,</b> worked out from that log. Nobody types these numbers.</li>
                 <li><b>Invoices built from approved holes</b> at the rates the client agreed.</li>
                 <li><b>Parts and stock tracked,</b> so the order goes out before the rig stops.</li>
+                <li><b>Your own rigs and hired contractors on the same measures.</b> A contractor logs his own shifts; you check them before they count.</li>
               </ul>
             </div>
             <figure className="lp-shot">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/landing/contractor-dashboard.jpg" width={1800} height={1290} loading="lazy" alt="The contractor's dashboard: three things that need attention, and this month's metres, billable value, cost per metre and margin" />
+              <img src="/landing/contractor-dashboard.jpg" width={1800} height={1290} loading="lazy" alt="The company dashboard: what needs attention today, and this month's metres, billable value, cost per metre and margin" />
             </figure>
           </div>
         </section>
 
-        {/* MINE OWNER */}
+        {/* CLIENT */}
         <section className="lp-sec" id="owners">
           <div className="lp-wrap lp-duo flip">
             <div>
-              <span className="lp-tag ink">Mine Owner XPLORIX</span>
+              <span className="lp-tag ink">For the client</span>
               <h2 className="lp-h2">Know before you pay.</h2>
               <ul className="lp-list">
-                <li><b>One screen of what needs a decision today:</b> holes, rates, invoices, standby claims.</li>
-                <li><b>Closed holes approved for billing</b> with the metres, core recovery and shifts in front of you.</li>
+                <li><b>What happened on site today,</b> as each shift is logged: metres, stops, incidents, holes finished.</li>
+                <li><b>Finished holes approved for billing</b> with the metres, core recovery and shifts in front of you.</li>
                 <li><b>Every invoice line checked</b> against the shift record. Anything extra is found before payment.</li>
-                <li><b>Every contractor measured the same way,</b> from the same shift logs.</li>
+                <li><b>Every project, rig and hole in detail,</b> from the same shift logs the drilling company uses.</li>
               </ul>
             </div>
             <figure className="lp-shot">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/landing/owner-billing-check.jpg" width={1800} height={1125} loading="lazy" alt="The mine owner's billing check: metres and standby days claimed on invoices, set against the shift record" />
+              <img src="/landing/client-invoice-check.jpg" width={1800} height={1125} loading="lazy" alt="The client's invoice check: each line of an invoice with the metres claimed beside the metres in the shift record" />
             </figure>
           </div>
         </section>
 
-        {/* HOW THEY CONNECT */}
+        {/* LOGINS */}
         <section className="lp-band" id="connect">
           <div className="lp-wrap">
             <div className="lp-head">
-              <h2 className="lp-h2">Two logins. One shared project.</h2>
-              <p className="lp-body">Each company pays for and keeps its own XPLORIX. They connect by ID, and only the project they share is visible to both.</p>
+              <h2 className="lp-h2">One account. Four logins.</h2>
+              <p className="lp-body">The Company Admin creates every login from one screen. Each person opens only what is theirs, and only the project you show the client is visible to him.</p>
             </div>
             <div className="lp-link">
               <div className="lp-id">
-                <span className="lp-tag or">Contractor</span>
-                <div className="lp-id-code">CT-2210</div>
-                <div className="lp-private">Stays private<b>Costs, margin, stock, suppliers, bids</b></div>
+                <span className="lp-tag or">Your company</span>
+                <div className="lp-id-code">Admin</div>
+                <div className="lp-private">Stays private<b>Costs, margin, stock, suppliers, bids, what you pay a contractor</b></div>
               </div>
-              <ul className="lp-shared" aria-label="Shared between the two companies">
+              <ul className="lp-shared" aria-label="What the client can see">
                 {SHARED.map(s => <li key={s}>{s}</li>)}
               </ul>
               <div className="lp-id">
-                <span className="lp-tag ink">Mine owner</span>
-                <div className="lp-id-code">MO-1042</div>
-                <div className="lp-private">Stays private<b>Budget, comparison of contractors</b></div>
+                <span className="lp-tag ink">Your client</span>
+                <div className="lp-id-code">Client</div>
+                <div className="lp-private">Sees only<b>The projects you choose to show</b></div>
               </div>
             </div>
-            <ol className="lp-steps">
-              {STEPS.map((s, i) => <li key={s.t}><span className="lp-step-n">{i + 1}</span><b>{s.t}</b><span>{s.d}</span></li>)}
+            <ol className="lp-steps four">
+              {LOGINS.map((s, i) => <li key={s.t}><span className="lp-step-n">{i + 1}</span><b>{s.t}</b><span>{s.d}</span></li>)}
             </ol>
-            <p className="lp-note">Connecting by XPLORIX ID is a preview in the demo. <Link href="/admin/connections">Try it as the contractor</Link> or <Link href="/client/connections">as the mine owner</Link>.</p>
+            <p className="lp-note">Try it in the demo: <Link href="/admin/users">create a login as the Company Admin</Link>, then open the <Link href="/client">client login</Link> or the <Link href="/contractor">contractor login</Link>.</p>
           </div>
         </section>
 
@@ -269,10 +269,10 @@ export default function LandingPage() {
               <figure className="lp-shot">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/landing/risk-register.jpg" width={1800} height={1064} loading="lazy" alt="The risk register: each risk with a date, the money at stake, the chance and what to do" />
-                <figcaption><b>Every risk with a date, a value and an action.</b> Next to your strengths, weaknesses, opportunities and threats, in plain words.</figcaption>
+                <figcaption><b>Every risk with a date, a value and an action.</b> Ranked by chance and size, so you know where to start.</figcaption>
               </figure>
             </div>
-            <p className="lp-note">Shown on demo data. The mine owner&rsquo;s own forecast screen is in development.</p>
+            <p className="lp-note">Shown on demo data. Worked out from your own records; prediction that learns from ground and core is in development.</p>
           </div>
         </section>
 
@@ -325,7 +325,7 @@ export default function LandingPage() {
         <section className="lp-close" id="demo">
           <div className="lp-wrap lp-center">
             <h2>See both sides for yourself.</h2>
-            <p className="lp-lead">Open the demo and walk through both sides: log a shift as the contractor, then approve the hole as the mine owner.</p>
+            <p className="lp-lead">Open the demo and walk through both sides: log a shift as the supervisor, then approve the hole as the client.</p>
             <div className="lp-actions">
               <Link href="/auth/login" className="lp-btn primary big">Open the live demo</Link>
               <Link href="/auth/register" className="lp-btn ghost big">Start a free trial</Link>
@@ -338,7 +338,7 @@ export default function LandingPage() {
         <div className="lp-wrap">
           <div className="lp-foot-top">
             <a href="#top" className="lp-brand"><Logo size={30} /><span>XPLORIX</span></a>
-            <p>The drilling intelligence platform for exploration drilling contractors and mine owners.</p>
+            <p>The drilling intelligence platform for exploration drilling companies and their clients.</p>
           </div>
           <div className="lp-foot-bottom">
             <span>&copy; 2026 XPLORIX. ANMAK CONSULTANCY SERVICES PRIVATE LIMITED</span>
@@ -458,6 +458,7 @@ html{scroll-behavior:smooth}
 .lp-shared li::before{right:100%;margin-right:3px}
 .lp-shared li::after{left:100%;margin-left:3px}
 .lp-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:22px;margin-top:52px;counter-reset:s}
+.lp-steps.four{grid-template-columns:repeat(4,minmax(0,1fr))}
 .lp-steps li{display:flex;flex-direction:column;gap:6px;padding-top:18px;border-top:2px solid var(--ink);font-size:15px;color:var(--mut)}
 .lp-steps b{color:var(--ink);font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:600;line-height:1.25}
 .lp-step-n{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:var(--or3)}
@@ -507,7 +508,7 @@ html{scroll-behavior:smooth}
 @media (max-width:1080px){
   .lp-links{display:none}
   .lp-nav-cta{margin-left:auto}
-  .lp-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .lp-steps,.lp-steps.four{grid-template-columns:repeat(2,minmax(0,1fr))}
   .lp-quotes{grid-template-columns:1fr;gap:34px}
 }
 @media (max-width:860px){
@@ -526,7 +527,7 @@ html{scroll-behavior:smooth}
   .lp-link{grid-template-columns:1fr;gap:18px}
   .lp-shared{min-width:0}
   .lp-shared li::before,.lp-shared li::after{display:none}
-  .lp-steps{grid-template-columns:1fr;margin-top:38px}
+  .lp-steps,.lp-steps.four{grid-template-columns:1fr;margin-top:38px}
   .lp-stats div{grid-template-columns:96px 1fr}
   .lp-stats dt{font-size:36px}
   .lp-faq summary{font-size:18px}

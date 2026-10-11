@@ -2,17 +2,17 @@
 
 import { useState } from 'react'
 import {
-  useCosting, uid, blankClientRate, fullDate, type ClientRate,
+  useCosting, uid, blankClientRate, fullDate, loginOfContractor, type ClientRate,
 } from '../../../lib/costing-store'
 import { TODAY } from '../../../lib/inventory-store'
 import {
-  workOrderProgress, currentPayRate, contractorOf, unbilled, words, reportsVia, ruleWords, DEDUCTION_LABEL, SOURCE_LABEL,
+  workOrderProgress, currentPayRate, contractorOf, unbilled, words, ruleWords, DEDUCTION_LABEL,
   type WorkOrder, type DeductionRule, type DeductionKind, type Contractor,
 } from '../../../lib/contracting'
 import { day } from '../../../lib/projects'
 import { T, tint, Card, Btn, Note, Modal, Field, Switch, Status, Empty, Seg, DepthBar, inputStyle } from '../../components/kit'
 import { RateSchedule, RateEditor, ratesUsable } from '../../components/rate-card'
-import { n0, rs, linkBtn, numInput, OnXplorix, Rows } from './shared'
+import { n0, rs, linkBtn, numInput, LoginState, Rows } from './shared'
 
 /* WORK ORDERS — what each contractor is here to do, and on what terms.
  *
@@ -21,12 +21,9 @@ import { n0, rs, linkBtn, numInput, OnXplorix, Rows } from './shared'
  * Everything that happens to his shifts and bills afterwards is read against
  * this one record.
  *
- * It is also where the contractor gets his way in. If he has his own XPLORIX
- * his drill log arrives from there. If he does not, we give him a contractor
- * login, and he writes the drill log and sends his bills in that. */
-
-const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
-const idOk = (v: string) => /^CT-?\d{3,6}$/i.test(v.trim())
+ * The contractor writes his drill log in a contractor login. Logins are
+ * created under Users, like every other login; this screen only shows
+ * whether he has one and takes you there. */
 
 const KINDS: DeductionKind[] = ['coreRecovery', 'lateCompletion', 'shortfall', 'retention']
 
@@ -105,7 +102,7 @@ function OrderModal({ project, projects, existing, onClose }: { project: string;
   const first = existing ? currentPayRate(existing, TODAY) : undefined
   const [f, setF] = useState({
     contractorId: existing?.contractorId ?? state.contractors[0]?.id ?? 'new',
-    newName: '', newId: '', newEmail: '', access: 'login' as 'login' | 'xplorix', loginEmail: '',
+    newName: '',
     project: existing?.project ?? project,
     number: existing?.number ?? `WO-${String(state.workOrders.length + 1).padStart(3, '0')}`,
     rigs: existing?.rigs.join(', ') ?? '',
@@ -125,31 +122,21 @@ function OrderModal({ project, projects, existing, onClose }: { project: string;
   const clash = rigs.filter(r => ownRigNames.has(r) || state.workOrders.some(w => w.id !== existing?.id && w.status === 'active' && w.project === f.project && w.rigs.includes(r)))
   const isNew = f.contractorId === 'new'
   const chosen = contractorOf(state, f.contractorId)
-  const needsLogin = !isNew && !!chosen && !chosen.xplorixId && !chosen.login
-  const wayIn = isNew
-    ? (f.access === 'xplorix' ? idOk(f.newId) : emailOk(f.newEmail))
-    : !needsLogin || f.loginEmail.trim() === '' || emailOk(f.loginEmail)
-  const ok = (isNew ? f.newName.trim().length > 1 : !!chosen) && wayIn && !!f.number.trim() && rigs.length > 0 && !clash.length
+  const ok = (isNew ? f.newName.trim().length > 1 : !!chosen) && !!f.number.trim() && rigs.length > 0 && !clash.length
     && !!f.startDate && !!f.endDate && f.endDate >= f.startDate && parseFloat(f.plannedMetres) > 0 && ratesUsable(rate)
 
   const save = () => {
     let contractorId = f.contractorId
-    let who: Contractor | undefined = chosen
     if (isNew) {
-      who = f.access === 'xplorix'
-        ? { id: uid('ctr'), name: f.newName.trim(), xplorixId: f.newId.trim().toUpperCase().replace(/^CT(\d)/, 'CT-$1') }
-        : { id: uid('ctr'), name: f.newName.trim(), login: { email: f.newEmail.trim().toLowerCase(), status: 'invited', since: TODAY } }
-      saveContractor(who); contractorId = who.id
-    } else if (needsLogin && emailOk(f.loginEmail)) {
-      who = { ...chosen!, login: { email: f.loginEmail.trim().toLowerCase(), status: 'invited', since: TODAY } }
-      saveContractor(who)
+      const c: Contractor = { id: uid('ctr'), name: f.newName.trim() }
+      saveContractor(c); contractorId = c.id
     }
     const version: ClientRate = { ...rate, project: f.project, effectiveFrom: existing ? rateFrom : f.startDate, note: rate.note || 'Work order schedule of rates' }
     const kept = (existing?.rates ?? []).filter(r => r.effectiveFrom !== version.effectiveFrom)
     saveWorkOrder({
       id: existing?.id ?? uid('wo'), number: f.number.trim(), project: f.project, contractorId, rigs,
       startDate: f.startDate, endDate: f.endDate, plannedMetres: parseFloat(f.plannedMetres), paymentDays: parseFloat(f.paymentDays) || 30,
-      reportsBy: reportsVia(who), status: existing?.status ?? 'active',
+      status: existing?.status ?? 'active',
       rates: [...kept, { ...version, id: kept.length || !existing ? uid('wr') : version.id }], rules,
     })
     onClose()
@@ -164,7 +151,7 @@ function OrderModal({ project, projects, existing, onClose }: { project: string;
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             <Field label="Contractor">
               <select value={f.contractorId} disabled={!!existing} onChange={e => u({ contractorId: e.target.value })} style={{ ...inputStyle, cursor: 'pointer' }}>
-                {state.contractors.map(c => <option key={c.id} value={c.id}>{c.name}{c.xplorixId ? ` · ${c.xplorixId}` : ''}</option>)}
+                {state.contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 <option value="new">A contractor not on the list…</option>
               </select>
             </Field>
@@ -180,42 +167,11 @@ function OrderModal({ project, projects, existing, onClose }: { project: string;
               <Field label="Contractor's name"><input value={f.newName} onChange={e => u({ newName: e.target.value })} autoFocus style={inputStyle} /></Field>
             </div>
           )}
-          <div style={{ padding: '14px 16px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.raised, display: 'grid', gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>How the contractor writes the drill log</div>
-              <div style={{ fontSize: 12.5, color: T.faint, marginTop: 3, lineHeight: 1.5 }}>
-                The contractor enters each shift and sends it to you. You check it before it counts. Nobody on your side types it in.
-              </div>
-            </div>
-            {isNew ? (
-              <>
-                <Seg<'login' | 'xplorix'> value={f.access} onChange={v => u({ access: v })}
-                  options={[{ value: 'login', label: 'Give them a contractor login' }, { value: 'xplorix', label: 'They have their own XPLORIX' }]} />
-                {f.access === 'login' ? (
-                  <div style={{ maxWidth: 380 }}>
-                    <Field label="Email for their login" hint={f.newEmail && !emailOk(f.newEmail) ? 'That does not look like an email address.' : 'They get a link to set a password. The login opens only their own work with you.'}>
-                      <input type="email" value={f.newEmail} onChange={e => u({ newEmail: e.target.value })} placeholder="site@contractor.com" style={inputStyle} />
-                    </Field>
-                  </div>
-                ) : (
-                  <div style={{ maxWidth: 380 }}>
-                    <Field label="Their XPLORIX ID" hint={f.newId && !idOk(f.newId) ? 'A contractor’s ID looks like CT-1234.' : 'Their shifts and bills then arrive from their own XPLORIX.'}>
-                      <input value={f.newId} onChange={e => u({ newId: e.target.value })} placeholder="CT-0000" style={inputStyle} />
-                    </Field>
-                  </div>
-                )}
-              </>
-            ) : chosen?.xplorixId ? (
-              <div style={{ fontSize: 13, color: T.muted }}><span aria-hidden style={{ color: T.green, fontWeight: 800 }}>✓ </span>{chosen.name} is on XPLORIX ({chosen.xplorixId}). Their shifts and bills arrive from their own XPLORIX.</div>
-            ) : chosen?.login ? (
-              <div style={{ fontSize: 13, color: T.muted }}><span aria-hidden style={{ color: T.green, fontWeight: 800 }}>✓ </span>{chosen.name} has a contractor login ({chosen.login.email}). The rigs on this work order appear in it.</div>
-            ) : (
-              <div style={{ maxWidth: 380 }}>
-                <Field label={`Email for ${chosen?.name ?? 'their'} login`} hint={f.loginEmail && !emailOk(f.loginEmail) ? 'That does not look like an email address.' : 'They have no login yet. You can also create it later from the work order.'}>
-                  <input type="email" value={f.loginEmail} onChange={e => u({ loginEmail: e.target.value })} placeholder="site@contractor.com" style={inputStyle} />
-                </Field>
-              </div>
-            )}
+          <div style={{ padding: '12px 16px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.raised, fontSize: 13, color: T.muted, lineHeight: 1.55 }}>
+            <b style={{ color: T.text }}>The contractor writes the drill log.</b> They enter each shift in their contractor login and send it to you. You check it before it counts.{' '}
+            {!isNew && loginOfContractor(state.users, chosen?.id)
+              ? <>{chosen?.name} already has a login ({loginOfContractor(state.users, chosen?.id)!.username}); the rigs on this work order will appear in it.</>
+              : <>After saving, create their login under Users.</>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
             <Field label="Their rigs on this job" hint={clash.length ? `${clash.join(', ')} is already on a project.` : 'As the contractor numbers them, separated by commas.'}>
@@ -257,44 +213,33 @@ function OrderModal({ project, projects, existing, onClose }: { project: string;
 
 // ── the contractor's way in ───────────────────────────────────────────────
 
-/* One contractor has one login, however many work orders he holds. A
- * contractor with his own XPLORIX needs none. */
+/* One contractor has one login, however many work orders he holds. It is
+ * created under Users. */
 function LoginStrip({ c }: { c?: Contractor }) {
-  const { saveContractor } = useCosting()
-  const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
+  const { state } = useCosting()
   if (!c) return null
+  const login = loginOfContractor(state.users, c.id)
   const box: React.CSSProperties = { display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', padding: '12px 14px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.raised }
-  if (c.xplorixId) {
+  if (!login) {
     return (
-      <div style={box}>
-        <div style={{ flex: '1 1 320px', fontSize: 13, color: T.muted, lineHeight: 1.5 }}>
-          <b style={{ color: T.text }}>Drill log: from their own XPLORIX.</b> {c.name} ({c.xplorixId}) is connected to you, so their shifts and bills arrive by themselves and wait here to be checked.
-        </div>
-      </div>
-    )
-  }
-  if (!c.login) {
-    return (
-      <form style={{ ...box, borderColor: tint(T.amber, 40), background: tint(T.amber, 5) }} onSubmit={e => { e.preventDefault(); if (emailOk(email)) saveContractor({ ...c, login: { email: email.trim().toLowerCase(), status: 'invited', since: TODAY } }) }}>
+      <div style={{ ...box, borderColor: tint(T.amber, 40), background: tint(T.amber, 5) }}>
         <div style={{ flex: '1 1 300px', fontSize: 13, color: T.muted, lineHeight: 1.5 }}>
           <b style={{ color: T.text }}>{c.name} has no login yet.</b> They cannot send a shift until they have one.
         </div>
-        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="site@contractor.com" aria-label="Email for their login" style={{ ...inputStyle, width: 240 }} />
-        <Btn kind="primary" size="sm" disabled={!emailOk(email)} onClick={() => saveContractor({ ...c, login: { email: email.trim().toLowerCase(), status: 'invited', since: TODAY } })}>Create login</Btn>
-      </form>
+        <Btn kind="primary" size="sm" href={`/admin/users?new=contractor&for=${encodeURIComponent(c.id)}`}>Create login in Users</Btn>
+      </div>
     )
   }
   return (
     <div style={box}>
       <div style={{ flex: '1 1 320px', minWidth: 0, fontSize: 13, color: T.muted, lineHeight: 1.5 }}>
-        <b style={{ color: T.text }}>Drill log: contractor login.</b> {c.name} signs in as <span style={{ color: T.text }}>{c.login.email}</span> to enter each shift, see what you sent back, and send bills.
+        <b style={{ color: T.text }}>Contractor login {login.username}.</b> {c.name} signs in to enter each shift, see what you sent back, and send bills.
         <div style={{ fontSize: 12, color: T.faint, marginTop: 2 }}>
-          {c.login.status === 'active' ? `In use since ${day(c.login.since)}.` : `Invitation sent ${day(c.login.since)}. Not opened yet.`}
+          {!login.active ? 'Switched off. They cannot sign in.' : login.opened ? `In use since ${day(login.created)}.` : `Created ${day(login.created)}. Not opened yet.`}
           {' '}The login shows only their own work orders with you.
         </div>
       </div>
-      {sent ? <Status tone="good">Invitation sent again</Status> : <Btn size="sm" onClick={() => setSent(true)}>Send invitation again</Btn>}
+      <Btn size="sm" href="/admin/users">Manage in Users</Btn>
       <Btn size="sm" href={`/contractor?as=${c.id}`}>See what they see</Btn>
     </div>
   )
@@ -345,9 +290,8 @@ export function OrdersTab({ project, projects, orders, openNew, onOpened, onBill
                     ['Still to drill', `${n0(p.plannedLeft)} m`],
                     ['Metres a rig-day', p.days ? p.perRigDay.toFixed(1) : '—'],
                     ['Core recovery', p.metres ? `${p.recoveryPct.toFixed(1)}%` : '—'],
-                    ['Drill log comes from', SOURCE_LABEL[reportsVia(c)]],
                     ['Bills paid within', `${wo.paymentDays} days`],
-                    ['Contractor', <OnXplorix key="x" c={c} />],
+                    ['Contractor login', <LoginState key="x" c={c} />],
                   ]} />
                 </div>
               </div>

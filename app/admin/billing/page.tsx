@@ -1,6 +1,6 @@
 'use client'
 
-import { downloadCsv } from '../../../lib/owner-portal'
+import { downloadCsv } from '../../../lib/client-record'
 import { useAdminOverview } from '../../../lib/admin-overview'
 import { Page, Head, Card, Tile, Grid, Btn, Table, Status, Note, th, thR, td, tdR, tdStrong, rowLine, T } from '../../components/kit'
 

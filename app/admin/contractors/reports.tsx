@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useCosting } from '../../../lib/costing-store'
+import { useCosting, loginOfContractor } from '../../../lib/costing-store'
 import { TODAY } from '../../../lib/inventory-store'
 import {
   reportFlags, hasProblem, contractorName, contractorOf, workOrderById,
@@ -13,8 +13,7 @@ import { ME, n1, shortDay, linkBtn, numInput, SourceTag } from './shared'
 
 /* DAILY REPORTS — a contractor's shifts, before and after they are checked.
  *
- * The contractor writes his own drill log: in his own XPLORIX, or in the
- * contractor login he was given with the work order. Nobody here retypes it
+ * The contractor writes his own drill log in his contractor login. Nobody here retypes it
  * and no sheet is uploaded. What arrives waits in this list, and nothing in
  * it counts toward progress, payment or the client's invoice until someone on
  * our side accepts it. */
@@ -108,21 +107,17 @@ export function ReportsTab({ project, orders }: { project: string; orders: WorkO
   const changedCount = checked.filter(l => l.check?.claimedMetres != null || l.check?.claimedRecovery != null).length
   const shown = showAll ? checked : checked.slice(0, 12)
   const active = orders.filter(w => w.status === 'active')
-  const people = Array.from(new Set(active.map(w => w.contractorId))).map(id => contractorOf(state, id)).filter((c): c is NonNullable<typeof c> => !!c && !c.xplorixId)
-  const onX = Array.from(new Set(active.map(w => contractorOf(state, w.contractorId)).filter(c => c?.xplorixId).map(c => c!.name)))
-  const list = (names: string[]) => names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
-  const withLogin = people.filter(c => c.login)
-  const noLogin = people.filter(c => !c.login)
+  const people = Array.from(new Set(active.map(w => w.contractorId))).map(id => contractorOf(state, id)).filter((c): c is NonNullable<typeof c> => !!c)
+  const withLogin = people.filter(c => loginOfContractor(state.users, c.id)?.active)
+  const noLogin = people.filter(c => !loginOfContractor(state.users, c.id)?.active)
 
   return (
     <>
       {active.length > 0 && (
         <Note tone="info">
           <b style={{ color: T.text }}>The contractor writes the drill log, you check it.</b>{' '}
-          {onX.length > 0 && <>{list(onX)} {onX.length === 1 ? 'sends' : 'send'} shifts from their own XPLORIX. </>}
-          {people.length > 0 && <>{list(people.map(c => c.name))} {people.length === 1 ? 'sends' : 'send'} shifts from the contractor login. </>}
-          Nothing is typed in here.{' '}
-          {noLogin.length > 0 && <>{noLogin.map(c => c.name).join(', ')} {noLogin.length === 1 ? 'has' : 'have'} no login yet. Create one under Work orders. </>}
+          Each contractor enters shifts in their contractor login and sends them.           Nothing is typed in here.{' '}
+          {noLogin.length > 0 && <>{noLogin.map(c => c.name).join(', ')} {noLogin.length === 1 ? 'has' : 'have'} no working login. Create one under Users. </>}
           {withLogin.length > 0 && <a href={`/contractor?as=${withLogin[0].id}`} target="_blank" rel="noreferrer" style={{ color: T.orange, fontWeight: 600, textDecoration: 'none' }}>See what {withLogin[0].name} sees</a>}
         </Note>
       )}

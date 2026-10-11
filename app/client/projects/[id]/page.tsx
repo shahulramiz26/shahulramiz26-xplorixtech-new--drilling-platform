@@ -4,19 +4,19 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
-import { useCosting, fullDate } from '../../../../lib/costing-store'
+import { fullDate, COMPANY_NAME } from '../../../../lib/costing-store'
+import { useClient } from '../../../../lib/client-view'
 import { TODAY } from '../../../../lib/inventory-store'
-import { LIVE_CONTRACTOR, CONTRACTORS } from '../../../../lib/owner-portal'
 import { projectById, projectStats, holeSeriesStart, contractOf, eventsFor, structureWords, day, whenIn, type ProjectHole } from '../../../../lib/projects'
-import { Page, PageHead, Card, Tile, Grid, Split, Seg, Btn, Note, Modal, Field, Status, Empty, DemoTag, inputStyle, T } from '../../ui'
+import { Page, PageHead, Card, Tile, Grid, Split, Seg, Btn, Note, Modal, Field, Status, Empty, inputStyle, T } from '../../ui'
 import { RateSchedule } from '../../../components/rate-card'
 import { ProjectStatusTag, ChangeList, HolesTable, AddHolesModal, Fact } from '../../../components/project-ui'
 
-/* ONE SHARED PROJECT — the contract as the mine owner reads it.
+/* ONE PROJECT — the contract as the client reads it.
  *
  *   Contract rates   what is agreed; a change the contractor proposes waits
- *                    here until the owner accepts it or sends it back
- *   Holes            the plan and its progress; the owner can release holes
+ *                    here until the client accepts it or sends it back
+ *   Holes            the plan and its progress; the client can release holes
  *   Rigs and crew    who is on his site
  *   Changes          everything that changed, newest first
  *
@@ -27,9 +27,9 @@ const n0 = (v: number) => Math.round(v).toLocaleString('en-IN')
 
 export default function ClientProjectPage() {
   const { id } = useParams<{ id: string }>()
-  const { state, ownerAnswerRates, planHoles, markProjectSeen } = useCosting()
+  const { state, names, ownerAnswerRates, planHoles, markProjectSeen } = useClient()
   const found = projectById(state, decodeURIComponent(id))
-  const p = found?.shared ? found : undefined
+  const p = found && names.has(found.name) ? found : undefined
   const [tab, setTab] = useState<Tab>('rates')
   const [fresh, setFresh] = useState<Set<string>>(new Set())
   const [release, setRelease] = useState(false)
@@ -62,7 +62,7 @@ export default function ClientProjectPage() {
 
   const stats = projectStats(state, p)
   const c = contractOf(state, p.name)
-  const contractor = CONTRACTORS[LIVE_CONTRACTOR].name
+  const contractor = COMPANY_NAME
   const news = events.filter(e => fresh.has(e.id) && e.by === 'contractor')
   const holeLink = (h: ProjectHole) => h.status === 'planned' ? undefined : `/client/holes/${h.id}`
 
@@ -81,7 +81,7 @@ export default function ClientProjectPage() {
             : news.length ? `${news.length} ${news.length === 1 ? 'change' : 'changes'} since you last looked. ` : 'Nothing has changed since you last looked. '}
           {n0(stats.drilled)} m drilled{stats.target ? ` of ${n0(stats.target)} m` : ''}.
         </>}
-        right={<><DemoTag live /><ProjectStatusTag status={p.status} /></>}
+        right={<ProjectStatusTag status={p.status} />}
       />
 
       <Grid min={200}>
@@ -89,7 +89,7 @@ export default function ClientProjectPage() {
         <Tile label="Holes" value={stats.holes.length} note={`${stats.counts.drilling} drilling · ${stats.counts.planned} planned · ${stats.counts.done} finished`} />
         <Tile label="On your site" value={p.rigs.length ? p.rigs.join(', ') : 'No rig'} note={`${p.supervisors.length} supervisors, ${p.drillers.length} drillers`} />
         <Tile label="Contract rates" value={c.current ? structureWords(c.current) : 'Not set'} tone={c.waiting ? 'warn' : undefined}
-          note={c.waiting ? 'A change is waiting for you' : c.current ? `In force since ${fullDate(c.current.effectiveFrom)}` : 'The contractor has not entered rates yet'} />
+          note={c.waiting ? 'A change is waiting for you' : c.current ? `In force since ${fullDate(c.current.effectiveFrom)}` : `${contractor} has not entered rates yet`} />
       </Grid>
 
       <div><Seg<Tab> value={tab} onChange={setTab} options={[
@@ -121,7 +121,7 @@ export default function ClientProjectPage() {
 
           <Card title={c.current ? 'In force' : 'Contract rates'} pad={false}
             subtitle={c.current ? `${structureWords(c.current)} · since ${fullDate(c.current.effectiveFrom)}${c.current.note ? ` · ${c.current.note}` : ''}` : undefined}>
-            {c.current ? <RateSchedule rate={c.current} /> : <Empty>The contractor has not entered the contract rates yet.</Empty>}
+            {c.current ? <RateSchedule rate={c.current} /> : <Empty>{contractor} has not entered the contract rates yet.</Empty>}
           </Card>
 
           {c.upcoming.map(u => (
@@ -144,7 +144,7 @@ export default function ClientProjectPage() {
             </Card>
           )}
           <div style={{ fontSize: 13, color: T.faint, lineHeight: 1.6, maxWidth: 820 }}>
-            The contractor cannot change these rates alone. A change reaches you as a proposal, with the old and new rates side by side, and starts only if you accept it.
+            {contractor} cannot change these rates alone. A change reaches you as a proposal, with the old and new rates side by side, and starts only if you accept it.
           </div>
         </>
       )}
@@ -155,7 +155,7 @@ export default function ClientProjectPage() {
           right={<Btn kind="primary" size="sm" onClick={() => setRelease(true)}>Release holes</Btn>}>
           <HolesTable holes={stats.holes} client="You" contractor={contractor} href={holeLink} />
           <div style={{ padding: '11px 18px', fontSize: 12.5, color: T.faint, borderTop: `1px solid ${T.line}`, lineHeight: 1.5 }}>
-            A hole you release goes on the contractor&rsquo;s plan at once, with the planned depth you set. He is told the moment you add it.
+            A hole you release goes on {contractor}&rsquo;s plan at once, with the planned depth you set. They are told the moment you add it.
           </div>
         </Card>
       )}
@@ -183,7 +183,7 @@ export default function ClientProjectPage() {
       )}
 
       {tab === 'changes' && (
-        <Card title="Changes" subtitle="Everything that changed on this project, newest first. The contractor reads the same list." pad={false}>
+        <Card title="Changes" subtitle={`Everything that changed on this project, newest first. ${contractor} reads the same list.`} pad={false}>
           <ChangeList events={events} viewer="owner" otherSide={contractor} fresh={fresh} />
         </Card>
       )}
@@ -203,7 +203,7 @@ export default function ClientProjectPage() {
 
       {sendBack && c.waiting && (
         <Modal title="Send the new rates back" width={520} onClose={() => setSendBack(false)}
-          subtitle="The rates in force stay as they are. The contractor sees your reason and can send a changed proposal."
+          subtitle={`The rates in force stay as they are. ${contractor} sees your reason and can send a changed proposal.`}
           footer={<><Btn onClick={() => setSendBack(false)}>Cancel</Btn>
             <Btn kind="danger" disabled={!reason.trim()} onClick={() => { ownerAnswerRates(c.waiting!.id, false, reason); setSendBack(false) }}>Send back</Btn></>}>
           <Field label="Reason">
@@ -212,7 +212,7 @@ export default function ClientProjectPage() {
           </Field>
         </Modal>
       )}
-      {!c.waiting && c.versions.length === 0 && tab === 'rates' && <Note tone="info">Rates will appear here as soon as the contractor enters them.</Note>}
+      {!c.waiting && c.versions.length === 0 && tab === 'rates' && <Note tone="info">Rates will appear here as soon as {contractor} enters them.</Note>}
     </Page>
   )
 }

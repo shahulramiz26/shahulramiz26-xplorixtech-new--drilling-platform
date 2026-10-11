@@ -5,12 +5,12 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, Settings, Truck, CreditCard, BarChart3, LogOut, Menu, Search,
-  DollarSign, X, Boxes, FileText, Brain, Store, HardHat, Target, Bell, CornerDownLeft, Link2, Handshake,
+  DollarSign, X, Boxes, FileText, Store, HardHat, Target, Bell, CornerDownLeft, Handshake,
+  Activity, Wrench, GitCompare, Flag, CalendarRange, ShieldAlert,
 } from 'lucide-react'
 import { CurrencyProvider } from '../components/currency-context'
 import { CostingProvider, monthOf, projectCode } from '../../lib/costing-store'
 import { useAdminOverview, financeLink, type Tone } from '../../lib/admin-overview'
-import { useConnections, waitingForMe } from '../../lib/connect-store'
 import { T, display, toneColor } from '../components/kit'
 import { ThemeScope, ThemeToggle } from '../components/theme'
 
@@ -18,7 +18,8 @@ import { ThemeScope, ThemeToggle } from '../components/theme'
  * COMPANY ADMIN — the shell around every screen
  *
  * The menu is grouped by the job in hand rather than listed flat: run the
- * rigs, win and bill the work, keep the stock, then the account itself.
+ * rigs, read the logs, win and bill the work, keep the stock, look ahead,
+ * then the account itself.
  *
  * Three things here used to be decoration and now do something:
  *   - search opens a jump list of every page, rig, project and hole (Ctrl K);
@@ -29,7 +30,7 @@ import { ThemeScope, ThemeToggle } from '../components/theme'
  * copy and the badges stay true as work is done.
  * ========================================================================== */
 
-type NavItem = { href: string; label: string; icon: React.ElementType; badge?: 'finance' | 'inventory' | 'projects' | 'connections' | 'contractors' | number }
+type NavItem = { href: string; label: string; icon: React.ElementType; badge?: 'finance' | 'inventory' | 'projects' | 'contractors' | number }
 const NAV: { title: string | null; items: NavItem[] }[] = [
   { title: null, items: [{ href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
   {
@@ -37,10 +38,16 @@ const NAV: { title: string | null; items: NavItem[] }[] = [
     items: [
       { href: '/admin/projects', label: 'Projects', icon: FolderOpen, badge: 'projects' },
       { href: '/admin/contractors', label: 'Contractors', icon: Handshake, badge: 'contractors' },
-      { href: '/admin/connections', label: 'Connections', icon: Link2, badge: 'connections' },
       { href: '/admin/rigs', label: 'Rigs & equipment', icon: Truck },
       { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
       { href: '/admin/reports', label: 'Performance reports', icon: FileText },
+    ],
+  },
+  {
+    title: 'Logs',
+    items: [
+      { href: '/admin/logs/drill', label: 'Drill logs', icon: Activity },
+      { href: '/admin/logs/maintenance', label: 'Maintenance logs', icon: Wrench },
     ],
   },
   {
@@ -55,8 +62,13 @@ const NAV: { title: string | null; items: NavItem[] }[] = [
     items: [{ href: '/admin/inventory', label: 'Parts & inventory', icon: Boxes, badge: 'inventory' }],
   },
   {
-    title: 'Insight',
-    items: [{ href: '/admin/xplorix-intelligence', label: 'XPLORIX Intelligence', icon: Brain }],
+    title: 'XPLORIX Intelligence',
+    items: [
+      { href: '/admin/intelligence/contractors', label: 'Contractor comparison', icon: GitCompare },
+      { href: '/admin/intelligence/holes', label: 'Hole finish prediction', icon: Flag },
+      { href: '/admin/intelligence/months', label: 'This month and next', icon: CalendarRange },
+      { href: '/admin/intelligence/risks', label: 'Risk analysis', icon: ShieldAlert },
+    ],
   },
   {
     title: 'Exchange',
@@ -102,8 +114,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     .find(n => pathname === n.href || pathname.startsWith(n.href + '/'))
 
   const financeCount = o.money.returned.length + o.money.disputed.length
-  const requests = waitingForMe(useConnections(), 'contractor').length
-  const badge = (b: NavItem['badge']) => b === 'finance' ? financeCount : b === 'inventory' ? o.urgentAlerts.length : b === 'projects' ? o.projectNews : b === 'connections' ? requests : b === 'contractors' ? o.contractorWork : b ?? 0
+  const badge = (b: NavItem['badge']) => b === 'finance' ? financeCount : b === 'inventory' ? o.urgentAlerts.length : b === 'projects' ? o.projectNews : b === 'contractors' ? o.contractorWork : b ?? 0
   const badgeTone = (b: NavItem['badge']) => (b === 'finance' && financeCount) || (b === 'inventory' && o.urgentAlerts.length) ? T.red : T.orange
 
   // Ctrl K or ⌘ K opens search from anywhere; so does "/" when not typing.

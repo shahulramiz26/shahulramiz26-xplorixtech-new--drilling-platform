@@ -5,7 +5,7 @@ import { ChevronRight } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts'
 import { moneyL, perUnit, monthLabel, shiftMonth, projectCode, monthOf } from '../../../lib/costing-store'
 import { useAdminOverview, financeLink, RIG_STATUS_LABEL, type RigStatus, type Attention } from '../../../lib/admin-overview'
-import { num } from '../../../lib/owner-portal'
+import { num } from '../../../lib/client-record'
 import {
   Page, Head, Card, Split, Btn, Table, Status, Legend, Tip, DepthBar, Spark, Delta, Empty,
   th, thR, td, tdR, rowLine, T, display, toneColor, axisTick, gridStroke, type Tone,
@@ -144,14 +144,14 @@ export default function AdminDashboard() {
         <Card title="Hours lost this month" subtitle={`${lostOwn} h on your side (not billable) · ${lostClient} h client-side (billable standby)`}>
           {o.lost.length === 0 ? <Empty>No stoppages logged this month.</Empty> : <>
             <div style={{ marginBottom: 14 }}>
-              <Legend items={[{ color: T.contractorSide, label: 'Your side' }, { color: T.ownerSide, label: 'Client side' }]} />
+              <Legend items={[{ color: T.ownSide, label: 'Your side' }, { color: T.clientSide, label: 'Client side' }]} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
               {o.lost.map(l => (
                 <div key={l.reason} title={`${l.reason}: ${l.hours} hours`} style={{ display: 'grid', gridTemplateColumns: '150px minmax(0,1fr) 40px', alignItems: 'center', gap: 12 }}>
                   <span style={{ fontSize: 12.5, color: T.muted, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.reason}</span>
                   <div style={{ height: 16 }}>
-                    <div style={{ width: `${(l.hours / lostMax) * 100}%`, minWidth: 3, height: '100%', background: l.own ? T.contractorSide : T.ownerSide, borderRadius: '0 4px 4px 0' }} />
+                    <div style={{ width: `${(l.hours / lostMax) * 100}%`, minWidth: 3, height: '100%', background: l.own ? T.ownSide : T.clientSide, borderRadius: '0 4px 4px 0' }} />
                   </div>
                   <span style={{ fontSize: 12.5, color: T.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{l.hours} h</span>
                 </div>
@@ -165,7 +165,7 @@ export default function AdminDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 0 }}>
           <Stage n={o.money.toSend.length} label="Closed, not yet approved" value={o.money.toSendValue}
             href={o.money.toSend[0] ? financeLink({ project: o.money.toSend[0].project, rig: o.money.toSend[0].rig, month: monthOf(o.money.toSend[0].end ?? o.money.toSend[0].start), tab: 'Drillholes' }) : '/admin/finance'} unit="holes" />
-          <Stage n={o.money.waitingOwner.length} label="With the mine owner" value={o.money.waitingOwner.reduce((s, h) => s + h.value, 0)} href="/admin/finance" unit="holes" />
+          <Stage n={o.money.waitingOwner.length} label="With the client" value={o.money.waitingOwner.reduce((s, h) => s + h.value, 0)} href="/admin/finance" unit="holes" />
           <Stage n={o.money.readyToInvoice.length} label="Approved, ready to invoice" value={o.money.readyValue}
             href={o.money.readyToInvoice[0] ? financeLink({ project: o.money.readyToInvoice[0].project, rig: o.money.readyToInvoice[0].rig, month: monthOf(o.money.readyToInvoice[0].end ?? o.money.readyToInvoice[0].start), tab: 'Drillholes' }) : '/admin/finance'} unit="holes" />
           <Stage n={o.money.unpaid.length} label="Invoiced, not yet paid" value={o.money.outstanding} href="/admin/finance?tab=Tracker" unit="invoices"

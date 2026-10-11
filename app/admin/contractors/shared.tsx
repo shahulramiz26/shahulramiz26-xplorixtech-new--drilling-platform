@@ -3,12 +3,13 @@
 import { ReactNode } from 'react'
 import { T, tint, mono } from '../../components/kit'
 import { SOURCE_LABEL, type ReportSource, type Contractor } from '../../../lib/contracting'
+import { useCosting, loginOfContractor, ADMIN_NAME } from '../../../lib/costing-store'
 
 /* Small pieces the four Contractors tabs share. */
 
 /* Who is signed in. The MVP has no accounts yet, so every check and approval
  * is stamped with this name; with real logins it becomes the user's own. */
-export const ME = 'Admin User'
+export const ME = ADMIN_NAME
 
 export const n0 = (v: number) => Math.round(v).toLocaleString('en-IN')
 export const n1 = (v: number) => (Math.round(v * 10) / 10).toLocaleString('en-IN', { maximumFractionDigits: 1 })
@@ -29,15 +30,15 @@ export const linkBtn: React.CSSProperties = {
 }
 export const numInput: React.CSSProperties = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
 
-/* How a report reached us. A word and a mark, never colour alone. */
+/* How a bill reached us. A word and a mark, never colour alone. */
 export function SourceTag({ source }: { source: ReportSource }) {
-  const live = source === 'xplorix'
+  const live = source === 'login'
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, padding: '2px 8px', borderRadius: 6, whiteSpace: 'nowrap',
       background: live ? tint(T.green, 10) : 'rgba(var(--x-ov),0.05)', border: `1px solid ${live ? tint(T.green, 30) : T.border}`, color: T.muted,
     }}>
-      <span aria-hidden style={{ fontSize: 10, color: live ? T.green : T.faint }}>{live ? '⇄' : source === 'login' ? '◉' : '✎'}</span>
+      <span aria-hidden style={{ fontSize: 10, color: live ? T.green : T.faint }}>{live ? '◉' : '✎'}</span>
       {SOURCE_LABEL[source]}
     </span>
   )
@@ -53,13 +54,19 @@ export function RunTag({ own, label }: { own: boolean; label: string }) {
   )
 }
 
-export function OnXplorix({ c }: { c?: Contractor }) {
+/* Whether the contractor can sign in. */
+export function LoginState({ c }: { c?: Contractor }) {
+  const { state } = useCosting()
   if (!c) return null
-  return c.xplorixId
-    ? <span style={{ fontSize: 12, color: T.muted }}><span aria-hidden style={{ color: T.green, fontWeight: 800 }}>✓ </span>On XPLORIX <span style={{ fontFamily: mono, color: T.faint }}>{c.xplorixId}</span></span>
-    : c.login
-      ? <span style={{ fontSize: 12, color: T.muted }}><span aria-hidden style={{ color: c.login.status === 'active' ? T.green : T.amber, fontWeight: 800 }}>{c.login.status === 'active' ? '✓ ' : '• '}</span>Contractor login {c.login.status === 'active' ? 'in use' : 'sent, not opened yet'}</span>
-      : <span style={{ fontSize: 12, color: T.faint }}>No login yet</span>
+  const login = loginOfContractor(state.users, c.id)
+  if (!login) return <span style={{ fontSize: 12, color: T.faint }}>No login yet</span>
+  const ok = login.active
+  return (
+    <span style={{ fontSize: 12, color: T.muted }}>
+      <span aria-hidden style={{ color: ok ? T.green : T.faint, fontWeight: 800 }}>{ok ? '✓ ' : '• '}</span>
+      {ok ? (login.opened ? 'Login in use' : 'Login created, not opened yet') : 'Login switched off'} <span style={{ fontFamily: mono, color: T.faint }}>{login.username}</span>
+    </span>
+  )
 }
 
 export function Rows({ items }: { items: [ReactNode, ReactNode][] }) {
