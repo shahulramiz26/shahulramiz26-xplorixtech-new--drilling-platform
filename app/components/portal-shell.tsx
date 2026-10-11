@@ -3,10 +3,12 @@
 import { ReactNode, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogOut, Menu, X, ChevronRight } from 'lucide-react'
+import { LogOut, Menu, X, ChevronRight, KeyRound } from 'lucide-react'
 import { COMPANY_NAME, type UserRole } from '../../lib/costing-store'
 import { useSignedIn, useArrival, signInAs } from '../../lib/session'
 import { useSession, signOut } from '../../lib/backend'
+import { IS_DEMO } from '../../lib/company'
+import { ChangePasswordModal } from './change-password'
 import { Guard, SavedState } from './guard'
 import { T, display, Page, Card, Empty } from './kit'
 import { ThemeToggle } from './theme'
@@ -38,6 +40,7 @@ function Shell({ role, label, home, nav, group, children }: {
   role: UserRole; label: string; home: string; nav: ShellItem[]; group?: string; children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState(false)
   const pathname = usePathname()
   useArrival(role)
   const { user, all } = useSignedIn(role)
@@ -105,6 +108,9 @@ function Shell({ role, label, home, nav, group, children }: {
               <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name ?? 'No login'}</div>
               <div style={{ fontSize: 11, color: T.faint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.username ?? ''}</div>
             </div>
+            {real && !adminLooking && (
+              <button type="button" onClick={() => setPassword(true)} aria-label="Change your password" title="Change your password" style={{ padding: 6, color: T.faint, borderRadius: 8, display: 'flex', background: 'none', border: 'none', cursor: 'pointer' }}><KeyRound size={15} /></button>
+            )}
             {adminLooking
               ? <Link href="/admin/users" aria-label="Back to Users" title="Back to Users" style={{ padding: 6, color: T.faint, borderRadius: 8, display: 'flex' }}><LogOut size={15} /></Link>
               : real
@@ -137,10 +143,10 @@ function Shell({ role, label, home, nav, group, children }: {
               )}
               <SavedState />
               <ThemeToggle />
-              <span style={{
+              {IS_DEMO && <span style={{
                 fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', padding: '4px 10px', borderRadius: 6,
                 background: 'color-mix(in srgb, var(--x-amber) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--x-amber) 35%, transparent)', color: T.amber, whiteSpace: 'nowrap',
-              }}>DEMO DATA</span>
+              }}>DEMO DATA</span>}
             </div>
           </div>
         </header>
@@ -153,6 +159,7 @@ function Shell({ role, label, home, nav, group, children }: {
           )}
         </div>
       </main>
+      {password && <ChangePasswordModal onClose={() => setPassword(false)} />}
     </div>
   )
 }

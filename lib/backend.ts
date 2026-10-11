@@ -5,6 +5,7 @@ import {
   MAY_SEND, applyChange, diffStates, fromRecords,
   type Change, type Role, type StoreName,
 } from './sync-spec'
+import { applyCompany } from './company'
 
 /* ==========================================================================
  * THE BROWSER'S SIDE OF THE SERVER
@@ -24,7 +25,8 @@ import {
 
 export interface SessionUser {
   role: Role; name: string; username: string; userRef: string | null
-  company: { id: string; name: string; demo: boolean; seeded: boolean }
+  company: { id: string; name: string; code?: string | null; demo: boolean; seeded: boolean }
+  owner?: boolean
 }
 export type Session =
   | { status: 'loading' }
@@ -64,6 +66,8 @@ export async function loadSession(force = false): Promise<Session> {
     // Offline while opening the app. A page that is already open keeps working; a fresh one cannot know who you are.
     session = { status: 'error', message: 'No connection. Check the network and try again.' }
   }
+  // Which company, and what day it is there, before any screen reads either.
+  applyCompany(session.status === 'in' ? session.user.company : null)
   tell(sessionListeners)
   if (session.status === 'in') engine.start(session.user)
   return session

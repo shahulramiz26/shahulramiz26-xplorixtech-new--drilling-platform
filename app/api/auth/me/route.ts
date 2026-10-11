@@ -12,7 +12,7 @@ export async function GET() {
   try {
     await ensureSchema()
     const who = await whoIs()
-    if (who) return json({ backend: true, user: { role: who.role, name: who.name, username: who.username, userRef: who.userRef, company: who.company } })
+    if (who) return json({ backend: true, user: { role: who.role, name: who.name, username: who.username, userRef: who.userRef, company: who.company, owner: who.owner } })
     const n = Number((await db().query('select count(*) as n from xp_companies')).rows[0].n)
     return json({ backend: true, setup: n === 0, user: null })
   } catch (e) {

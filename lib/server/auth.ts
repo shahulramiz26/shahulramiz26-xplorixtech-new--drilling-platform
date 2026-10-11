@@ -12,6 +12,10 @@ import type { Role } from '../sync-spec'
  * that was removed or switched off stops working at once.
  * ========================================================================== */
 
+/* The first company, and the account made with it at set-up. */
+export const HOME_COMPANY = 'c1'
+export const OWNER_ACCOUNT = `acc_admin_${HOME_COMPANY}`
+
 const COOKIE = 'xp_session'
 const DAYS = 14
 
@@ -56,7 +60,9 @@ export const clearedCookie = () => ({ name: COOKIE, value: '', httpOnly: true, s
 export interface Who {
   accountId: string
   companyId: string
-  company: { id: string; name: string; demo: boolean; seeded: boolean }
+  company: { id: string; name: string; code: string | null; demo: boolean; seeded: boolean }
+  /* The account that set XPLORIX up. It alone may add companies. */
+  owner: boolean
   role: Role
   userRef: string | null      // the login's own record in Users; null for the Company Admin
   name: string
@@ -77,7 +83,7 @@ export async function whoIs(): Promise<Who | null> {
   if (!claim?.a || !(claim.x > Date.now())) return null
   await ensureSchema()
   const { rows } = await db().query(
-    `select a.id, a.company_id, a.username, a.role, a.user_ref, a.name, c.name as company_name, c.demo, c.seeded,
+    `select a.id, a.company_id, a.username, a.role, a.user_ref, a.name, c.name as company_name, c.code, c.demo, c.seeded,
             (select r.data from xp_records r where r.company_id = a.company_id and r.store = 'costing' and r.coll = 'users' and r.id = a.user_ref and not r.deleted) as user_rec
        from xp_accounts a join xp_companies c on c.id = a.company_id where a.id = $1`, [claim.a])
   const a = rows[0]
@@ -86,7 +92,8 @@ export async function whoIs(): Promise<Who | null> {
   if (a.role !== 'admin' && (!a.user_rec || a.user_rec.active === false)) return null
   return {
     accountId: a.id, companyId: a.company_id, role: a.role, userRef: a.user_ref, name: a.user_rec?.name ?? a.name, username: a.username,
-    company: { id: a.company_id, name: a.company_name, demo: a.demo, seeded: a.seeded },
+    company: { id: a.company_id, name: a.company_name, code: a.code, demo: a.demo, seeded: a.seeded },
+    owner: a.id === OWNER_ACCOUNT,
   }
 }
 

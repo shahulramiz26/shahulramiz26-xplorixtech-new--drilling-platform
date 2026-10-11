@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCosting, monthLabel, monthShort, projectCode } from '../../../lib/costing-store'
+import { IS_DEMO } from '../../../lib/company'
 import { useInventory, TODAY } from '../../../lib/inventory-store'
 import { financeLink } from '../../../lib/admin-overview'
 import { words, workOrderProgress, unbilled, contractorOf, type Wording } from '../../../lib/contracting'
@@ -223,9 +224,11 @@ function ContractorsScreen() {
       {tab === 'orders' && <OrdersTab project={project} projects={projects} orders={orders} openNew={newOrder} onOpened={() => setNewOrder(false)} onBills={() => go('bills')} />}
       {tab === 'bills' && <BillsTab project={project} orders={orders} />}
 
-      <div style={{ fontSize: 12.5, color: T.faint, lineHeight: 1.6, maxWidth: 860 }}>
-        <span style={{ color: tint(T.amber, 100), fontWeight: 700 }}>Demo data.</span> Contractor P and Contractor Q are sample companies. The deduction figures on their work orders are examples; set them to what your own contracts say.
-      </div>
+      {IS_DEMO && (
+        <div style={{ fontSize: 12.5, color: T.faint, lineHeight: 1.6, maxWidth: 860 }}>
+          <span style={{ color: tint(T.amber, 100), fontWeight: 700 }}>Demo data.</span> Contractor P and Contractor Q are sample companies. The deduction figures on their work orders are examples; set them to what your own contracts say.
+        </div>
+      )}
     </Page>
   )
 }

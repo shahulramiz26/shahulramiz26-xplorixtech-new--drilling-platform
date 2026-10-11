@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
 import {
-  useCosting, blankClientRate, loginOfClient, FLEET, PEOPLE, HOLE_SIZES, crewLine, money,
+  useCosting, blankClientRate, loginOfClient, rigPool, peoplePool, HOLE_SIZES, crewLine, money,
   type ClientRate, type ProjectRecord,
 } from '../../../../lib/costing-store'
 import { TODAY } from '../../../../lib/inventory-store'
@@ -68,6 +68,24 @@ function Pick({ on, label, sub, disabled, onClick }: { on: boolean; label: strin
   )
 }
 
+/* Type a rig or a person that is not on record yet. */
+function AddName({ hint, empty, taken, onAdd }: { hint: string; empty?: string; taken: string[]; onAdd: (v: string) => void }) {
+  const [v, setV] = useState('')
+  const name = v.trim()
+  const clash = !!name && taken.some(t => t.toLowerCase() === name.toLowerCase())
+  const add = () => { if (name && !clash) { onAdd(name); setV('') } }
+  return (
+    <div style={{ marginTop: 12 }}>
+      {empty && <div style={{ fontSize: 13, color: T.faint, marginBottom: 8 }}>{empty}</div>}
+      <form onSubmit={e => { e.preventDefault(); add() }} style={{ display: 'flex', gap: 8, maxWidth: 440 }}>
+        <input value={v} onChange={e => setV(e.target.value)} placeholder={hint} aria-label={hint} style={inputStyle} />
+        <Btn size="sm" disabled={!name || clash} onClick={add}>Add</Btn>
+      </form>
+      {clash && <div style={{ fontSize: 12, color: T.faint, marginTop: 5 }}>{name} is already on the list.</div>}
+    </div>
+  )
+}
+
 export default function NewProjectPage() {
   const router = useRouter()
   const { state, createProject } = useCosting()
@@ -85,6 +103,14 @@ export default function NewProjectPage() {
   const [holes, setHoles] = useState<HoleRow[]>([])
   const [shared, setShared] = useState(true)
   const [tried, setTried] = useState(false)
+  // Rigs and people typed in on this screen, on top of the ones already on record.
+  const [extraRigs, setExtraRigs] = useState<string[]>([])
+  const [extraSup, setExtraSup] = useState<string[]>([])
+  const [extraDrill, setExtraDrill] = useState<string[]>([])
+  const pool = useMemo(() => peoplePool(state), [state])
+  const rigChoices = useMemo(() => [...rigPool(state), ...extraRigs.map(rig => ({ rig, type: 'Core' }))], [state, extraRigs])
+  const supervisorChoices = [...pool.supervisors, ...extraSup.filter(n => !pool.supervisors.includes(n))]
+  const drillerChoices = [...pool.drillers, ...extraDrill.filter(n => !pool.drillers.includes(n))]
 
   // Rigs and people already on another running project cannot be in two places.
   const busy = useMemo(() => {
@@ -194,21 +220,27 @@ export default function NewProjectPage() {
         <>
           <Card title="Rigs" subtitle="A rig can be on one running project at a time.">
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {FLEET.map(r => <Pick key={r.rig} on={rigs.includes(r.rig)} label={r.rig} disabled={!!busy.rig[r.rig]}
+              {rigChoices.map(r => <Pick key={r.rig} on={rigs.includes(r.rig)} label={r.rig} disabled={!!busy.rig[r.rig]}
                 sub={busy.rig[r.rig] ? `On ${busy.rig[r.rig]}` : `${r.type} rig · free`} onClick={() => toggle(rigs, setRigs, r.rig)} />)}
             </div>
+            <AddName hint="Add a rig by its name or number, e.g. RIG-01" empty={rigChoices.length === 0 ? 'No rigs on record yet. Type the first one.' : undefined}
+              taken={rigChoices.map(r => r.rig)} onAdd={v => { setExtraRigs(x => [...x, v]); setRigs(x => [...x, v]) }} />
           </Card>
           <Card title="Supervisors">
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {PEOPLE.supervisors.map(n => <Pick key={n} on={supervisors.includes(n)} label={n} disabled={!!busy.person[n]}
+              {supervisorChoices.map(n => <Pick key={n} on={supervisors.includes(n)} label={n} disabled={!!busy.person[n]}
                 sub={busy.person[n] ? `On ${busy.person[n]}` : 'Free'} onClick={() => toggle(supervisors, setSupervisors, n)} />)}
             </div>
+            <AddName hint="Add a supervisor by name" empty={supervisorChoices.length === 0 ? 'No supervisors on record yet. Type the first one.' : undefined}
+              taken={supervisorChoices} onAdd={v => { setExtraSup(x => [...x, v]); setSupervisors(x => [...x, v]) }} />
           </Card>
           <Card title="Drillers">
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {PEOPLE.drillers.map(n => <Pick key={n} on={drillers.includes(n)} label={n} disabled={!!busy.person[n]}
+              {drillerChoices.map(n => <Pick key={n} on={drillers.includes(n)} label={n} disabled={!!busy.person[n]}
                 sub={busy.person[n] ? `On ${busy.person[n]}` : 'Free'} onClick={() => toggle(drillers, setDrillers, n)} />)}
             </div>
+            <AddName hint="Add a driller by name" empty={drillerChoices.length === 0 ? 'No drillers on record yet. Type the first one.' : undefined}
+              taken={drillerChoices} onAdd={v => { setExtraDrill(x => [...x, v]); setDrillers(x => [...x, v]) }} />
           </Card>
         </>
       )}

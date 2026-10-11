@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft, X } from 'lucide-react'
 import {
-  useCosting, blankClientRate, uid, fullDate, monthOf, listOf, FLEET, PEOPLE, HOLE_SIZES, PROJECT_STATUS_LABEL,
+  useCosting, blankClientRate, uid, fullDate, monthOf, listOf, rigPool, peoplePool, HOLE_SIZES, PROJECT_STATUS_LABEL,
   type ClientRate, type ProjectRecord, type ProjectStatus, loginOfClient,
 } from '../../../../lib/costing-store'
 import { TODAY, addDays } from '../../../../lib/inventory-store'
@@ -74,9 +74,9 @@ function RatesModal({ project, current, minDate, onClose, onSave }: {
 
 // ── pick rigs or people ───────────────────────────────────────────────────
 
-function Roster({ title, subtitle, items, pool, busy, addLabel, allowNew, onChange }: {
+function Roster({ title, subtitle, items, pool, busy, addLabel, allowNew, newHint = 'Or type a new name', onChange }: {
   title: string; subtitle?: string; items: string[]; pool: string[]; busy: Record<string, string>
-  addLabel: string; allowNew?: boolean; onChange: (next: string[], what: { added?: string; removed?: string }) => void
+  addLabel: string; allowNew?: boolean; newHint?: string; onChange: (next: string[], what: { added?: string; removed?: string }) => void
 }) {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
@@ -97,7 +97,7 @@ function Roster({ title, subtitle, items, pool, busy, addLabel, allowNew, onChan
       {adding && (
         <div style={{ padding: '14px 18px', borderTop: `1px solid ${T.line}`, background: T.raised }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {free.length === 0 && <span style={{ fontSize: 13, color: T.faint }}>Everyone on the list is already here.</span>}
+            {free.length === 0 && <span style={{ fontSize: 13, color: T.faint }}>{pool.length === 0 ? 'None on record yet. Type the first one below.' : 'Everything on the list is already here.'}</span>}
             {free.map(x => (
               <button key={x} type="button" disabled={!!busy[x]} onClick={() => onChange([...items, x], { added: x })} style={{
                 padding: '7px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: busy[x] ? 'not-allowed' : 'pointer',
@@ -110,7 +110,7 @@ function Roster({ title, subtitle, items, pool, busy, addLabel, allowNew, onChan
           {allowNew && (
             <form onSubmit={e => { e.preventDefault(); const v = name.trim(); if (v && !items.includes(v)) { onChange([...items, v], { added: v }); setName('') } }}
               style={{ display: 'flex', gap: 8, marginTop: 12, maxWidth: 420 }}>
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="Or type a new name" style={inputStyle} />
+              <input value={name} onChange={e => setName(e.target.value)} placeholder={newHint} style={inputStyle} />
               <Btn size="sm" disabled={!name.trim()} onClick={() => { const v = name.trim(); if (v && !items.includes(v)) { onChange([...items, v], { added: v }); setName('') } }}>Add</Btn>
             </form>
           )}
@@ -348,8 +348,8 @@ export default function ProjectPage() {
 
       {tab === 'team' && (
         <>
-          <Roster title={orders.length ? w.ownRigs : 'Rigs'} subtitle="A rig can be on one running project at a time." items={p.rigs} pool={FLEET.map(r => r.rig)} busy={busy.rig}
-            addLabel="Assign a rig" onChange={roster('rigs', 'rig', 'rig')} />
+          <Roster title={orders.length ? w.ownRigs : 'Rigs'} subtitle="A rig can be on one running project at a time." items={p.rigs} pool={rigPool(state).map(r => r.rig)} busy={busy.rig}
+            addLabel="Assign a rig" allowNew newHint="Or type a new rig's name or number" onChange={roster('rigs', 'rig', 'rig')} />
           <Card title={w.outRigs} pad={false}
             subtitle="Rigs a contractor brings under a work order. Their checked shifts count in the same record as your own."
             right={<Btn size="sm" href={contractorsLink}>{orders.length ? 'Open work orders' : 'Bring in a contractor'}</Btn>}>
@@ -368,8 +368,8 @@ export default function ProjectPage() {
             })}
           </Card>
           <Split>
-            <Roster title="Supervisors" items={p.supervisors} pool={PEOPLE.supervisors} busy={busy.person} addLabel="Add a supervisor" allowNew onChange={roster('supervisors', 'crew', 'supervisor')} />
-            <Roster title="Drillers" items={p.drillers} pool={PEOPLE.drillers} busy={busy.person} addLabel="Add a driller" allowNew onChange={roster('drillers', 'crew', 'driller')} />
+            <Roster title="Supervisors" items={p.supervisors} pool={peoplePool(state).supervisors} busy={busy.person} addLabel="Add a supervisor" allowNew onChange={roster('supervisors', 'crew', 'supervisor')} />
+            <Roster title="Drillers" items={p.drillers} pool={peoplePool(state).drillers} busy={busy.person} addLabel="Add a driller" allowNew onChange={roster('drillers', 'crew', 'driller')} />
           </Split>
           <div style={{ fontSize: 12.5, color: T.faint, lineHeight: 1.6, maxWidth: 820 }}>
             Bits, rods and other parts are not listed on the project. They are issued to each rig in <Link href="/admin/inventory" style={{ color: T.orange, fontWeight: 600, textDecoration: 'none' }}>Parts &amp; inventory</Link>.
