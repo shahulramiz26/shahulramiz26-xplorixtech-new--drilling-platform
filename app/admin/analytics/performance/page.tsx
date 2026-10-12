@@ -1,327 +1,100 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts'
+import { holeShifts, type Insight } from '../../../../lib/analytics'
+import { projectHoles } from '../../../../lib/projects'
+import { useInventory } from '../../../../lib/inventory-store'
+import { Page, PageHead, Card, Tile, Grid, Table, Empty, Status, Tip, inputStyle, axisTick, gridStroke, th, thR, td, tdR, tdStrong, rowLine, T } from '../../../components/kit'
+import { useAnalytics, BoardTabs, FilterBar, InsightsCard, n1 } from '../shared'
 
-// ── TYPES ─────────────────────────────────────────────────────────────────────
-interface BitEntry {
-  serial: string; bitType: string
-  meterStart: number; meterEnd: number
-  replaced: boolean
-}
-interface Shift {
-  date: string; shift: 'Day' | 'Night'
-  depthFrom: number; depthTo: number; meters: number
-  bits: BitEntry[]
-  downtime: number
-}
-interface Hole { status: 'OPEN' | 'CLOSED'; start: string; end: string; shifts: Shift[] }
-interface RigData { holes: Record<string, Hole> }
-interface ProjectData { name: string; rigs: Record<string, RigData> }
+/* HOLE BY HOLE — what happened in this hole, shift by shift?
+ * Depth against plan, every shift's metres, stops and parts, read from the
+ * drill logs of whichever rigs worked the hole. */
 
-// ── MOCK DATA ─────────────────────────────────────────────────────────────────
-const DATA: Record<string, ProjectData> = {
-  GMA: {
-    name: 'Gold Mine Project A',
-    rigs: {
-      'KEM-14': {
-        holes: {
-          'H1': { status: 'CLOSED', start: 'Jun 1', end: 'Jun 6',
-            shifts: [
-              { date:'Jun 1', shift:'Day',   depthFrom:0,   depthTo:28,  meters:28, downtime:0,   bits:[{ serial:'SN-001', bitType:'CB-NQ-06', meterStart:0,   meterEnd:28,  replaced:false }] },
-              { date:'Jun 1', shift:'Night', depthFrom:28,  depthTo:50,  meters:22, downtime:1.5, bits:[{ serial:'SN-001', bitType:'CB-NQ-06', meterStart:28,  meterEnd:50,  replaced:false }] },
-              { date:'Jun 2', shift:'Day',   depthFrom:50,  depthTo:81,  meters:31, downtime:0,   bits:[{ serial:'SN-001', bitType:'CB-NQ-06', meterStart:50,  meterEnd:81,  replaced:false }] },
-              { date:'Jun 2', shift:'Night', depthFrom:81,  depthTo:106, meters:25, downtime:0,   bits:[{ serial:'SN-001', bitType:'CB-NQ-06', meterStart:81,  meterEnd:106, replaced:false }] },
-              { date:'Jun 3', shift:'Day',   depthFrom:106, depthTo:124, meters:18, downtime:2,   bits:[
-                { serial:'SN-001', bitType:'CB-NQ-06', meterStart:106, meterEnd:115, replaced:true  },
-                { serial:'SN-002', bitType:'CB-HQ-14', meterStart:115, meterEnd:124, replaced:false },
-              ]},
-              { date:'Jun 3', shift:'Night', depthFrom:124, depthTo:153, meters:29, downtime:0,   bits:[{ serial:'SN-002', bitType:'CB-HQ-14', meterStart:124, meterEnd:153, replaced:false }] },
-              { date:'Jun 4', shift:'Day',   depthFrom:153, depthTo:186, meters:33, downtime:0,   bits:[{ serial:'SN-002', bitType:'CB-HQ-14', meterStart:153, meterEnd:186, replaced:false }] },
-              { date:'Jun 4', shift:'Night', depthFrom:186, depthTo:213, meters:27, downtime:1,   bits:[{ serial:'SN-002', bitType:'CB-HQ-14', meterStart:186, meterEnd:213, replaced:false }] },
-              { date:'Jun 5', shift:'Day',   depthFrom:213, depthTo:248, meters:35, downtime:0,   bits:[{ serial:'SN-002', bitType:'CB-HQ-14', meterStart:213, meterEnd:248, replaced:false }] },
-              { date:'Jun 5', shift:'Night', depthFrom:248, depthTo:278, meters:30, downtime:0,   bits:[{ serial:'SN-002', bitType:'CB-HQ-14', meterStart:248, meterEnd:278, replaced:false }] },
-              { date:'Jun 6', shift:'Day',   depthFrom:278, depthTo:312, meters:34, downtime:0,   bits:[{ serial:'SN-002', bitType:'CB-HQ-14', meterStart:278, meterEnd:312, replaced:false }] },
-            ]
-          },
-          'H2': { status: 'OPEN', start: 'Jun 6', end: '—',
-            shifts: [
-              { date:'Jun 6',  shift:'Night', depthFrom:0,   depthTo:15,  meters:15, downtime:0, bits:[{ serial:'SN-003', bitType:'SS-NQ-15', meterStart:0,   meterEnd:15,  replaced:false }] },
-              { date:'Jun 7',  shift:'Day',   depthFrom:15,  depthTo:47,  meters:32, downtime:0, bits:[{ serial:'SN-003', bitType:'SS-NQ-15', meterStart:15,  meterEnd:47,  replaced:false }] },
-              { date:'Jun 7',  shift:'Night', depthFrom:47,  depthTo:75,  meters:28, downtime:1, bits:[{ serial:'SN-003', bitType:'SS-NQ-15', meterStart:47,  meterEnd:75,  replaced:false }] },
-              { date:'Jun 8',  shift:'Day',   depthFrom:75,  depthTo:110, meters:35, downtime:0, bits:[{ serial:'SN-003', bitType:'SS-NQ-15', meterStart:75,  meterEnd:110, replaced:false }] },
-              { date:'Jun 8',  shift:'Night', depthFrom:110, depthTo:132, meters:22, downtime:1, bits:[
-                { serial:'SN-003', bitType:'SS-NQ-15', meterStart:110, meterEnd:120, replaced:true  },
-                { serial:'SN-004', bitType:'CB-NQ-07', meterStart:120, meterEnd:132, replaced:false },
-              ]},
-              { date:'Jun 9',  shift:'Day',   depthFrom:132, depthTo:162, meters:30, downtime:0, bits:[{ serial:'SN-004', bitType:'CB-NQ-07', meterStart:132, meterEnd:162, replaced:false }] },
-              { date:'Jun 9',  shift:'Night', depthFrom:162, depthTo:187, meters:25, downtime:0, bits:[{ serial:'SN-004', bitType:'CB-NQ-07', meterStart:162, meterEnd:187, replaced:false }] },
-            ]
-          },
-          'H3': { status: 'OPEN', start: 'Jun 10', end: '—',
-            shifts: [
-              { date:'Jun 10', shift:'Day',   depthFrom:0,  depthTo:20, meters:20, downtime:0, bits:[{ serial:'SN-004', bitType:'CB-NQ-07', meterStart:0,  meterEnd:20, replaced:false }] },
-              { date:'Jun 10', shift:'Night', depthFrom:20, depthTo:48, meters:28, downtime:0, bits:[{ serial:'SN-004', bitType:'CB-NQ-07', meterStart:20, meterEnd:48, replaced:false }] },
-            ]
-          },
-        }
-      },
-      'KEM-13': {
-        holes: {
-          'BH-01': { status: 'CLOSED', start: 'Jun 1', end: 'Jun 8',
-            shifts: [
-              { date:'Jun 1', shift:'Day',   depthFrom:0,  depthTo:25,  meters:25, downtime:0, bits:[{ serial:'SN-010', bitType:'CB-NQ-06', meterStart:0,  meterEnd:25,  replaced:false }] },
-              { date:'Jun 1', shift:'Night', depthFrom:25, depthTo:45,  meters:20, downtime:2, bits:[{ serial:'SN-010', bitType:'CB-NQ-06', meterStart:25, meterEnd:45,  replaced:false }] },
-              { date:'Jun 2', shift:'Day',   depthFrom:45, depthTo:75,  meters:30, downtime:0, bits:[{ serial:'SN-010', bitType:'CB-NQ-06', meterStart:45, meterEnd:75,  replaced:false }] },
-              { date:'Jun 2', shift:'Night', depthFrom:75, depthTo:100, meters:25, downtime:3, bits:[
-                { serial:'SN-010', bitType:'CB-NQ-06', meterStart:75, meterEnd:82,  replaced:true  },
-                { serial:'SN-011', bitType:'SS-HQ-15', meterStart:82, meterEnd:100, replaced:false },
-              ]},
-            ]
-          },
-          'BH-02': { status: 'OPEN', start: 'Jun 9', end: '—',
-            shifts: [
-              { date:'Jun 9', shift:'Day',   depthFrom:0,  depthTo:48, meters:48, downtime:0, bits:[{ serial:'SN-011', bitType:'SS-HQ-15', meterStart:0,  meterEnd:48, replaced:false }] },
-              { date:'Jun 9', shift:'Night', depthFrom:48, depthTo:95, meters:47, downtime:1, bits:[{ serial:'SN-011', bitType:'SS-HQ-15', meterStart:48, meterEnd:95, replaced:false }] },
-            ]
-          },
-        }
-      }
-    }
-  },
-  CES: {
-    name: 'Copper Exploration Site',
-    rigs: {
-      'KEM-02': {
-        holes: {
-          'P-01': { status: 'CLOSED', start: 'Jun 1', end: 'Jun 5',
-            shifts: [
-              { date:'Jun 1', shift:'Day',   depthFrom:0,   depthTo:30,  meters:30, downtime:0, bits:[{ serial:'SN-020', bitType:'CB-HQ-14', meterStart:0,   meterEnd:30,  replaced:false }] },
-              { date:'Jun 1', shift:'Night', depthFrom:30,  depthTo:55,  meters:25, downtime:1, bits:[{ serial:'SN-020', bitType:'CB-HQ-14', meterStart:30,  meterEnd:55,  replaced:false }] },
-              { date:'Jun 2', shift:'Day',   depthFrom:55,  depthTo:90,  meters:35, downtime:0, bits:[{ serial:'SN-020', bitType:'CB-HQ-14', meterStart:55,  meterEnd:90,  replaced:false }] },
-              { date:'Jun 2', shift:'Night', depthFrom:90,  depthTo:120, meters:30, downtime:0, bits:[{ serial:'SN-020', bitType:'CB-HQ-14', meterStart:90,  meterEnd:120, replaced:false }] },
-              { date:'Jun 3', shift:'Day',   depthFrom:120, depthTo:155, meters:35, downtime:2, bits:[
-                { serial:'SN-020', bitType:'CB-HQ-14', meterStart:120, meterEnd:135, replaced:true  },
-                { serial:'SN-021', bitType:'CB-HQ-14', meterStart:135, meterEnd:155, replaced:false },
-              ]},
-              { date:'Jun 3', shift:'Night', depthFrom:155, depthTo:185, meters:30, downtime:0, bits:[{ serial:'SN-021', bitType:'CB-HQ-14', meterStart:155, meterEnd:185, replaced:false }] },
-              { date:'Jun 4', shift:'Day',   depthFrom:185, depthTo:220, meters:35, downtime:0, bits:[{ serial:'SN-021', bitType:'CB-HQ-14', meterStart:185, meterEnd:220, replaced:false }] },
-              { date:'Jun 4', shift:'Night', depthFrom:220, depthTo:250, meters:30, downtime:0, bits:[{ serial:'SN-021', bitType:'CB-HQ-14', meterStart:220, meterEnd:250, replaced:false }] },
-              { date:'Jun 5', shift:'Day',   depthFrom:250, depthTo:280, meters:30, downtime:0, bits:[{ serial:'SN-021', bitType:'CB-HQ-14', meterStart:250, meterEnd:280, replaced:false }] },
-            ]
-          },
-          'P-02': { status: 'OPEN', start: 'Jun 6', end: '—',
-            shifts: [
-              { date:'Jun 6', shift:'Day',   depthFrom:0,  depthTo:55,  meters:55, downtime:0,   bits:[{ serial:'SN-022', bitType:'SS-NQ-15', meterStart:0,  meterEnd:55,  replaced:false }] },
-              { date:'Jun 6', shift:'Night', depthFrom:55, depthTo:110, meters:55, downtime:1.5, bits:[{ serial:'SN-022', bitType:'SS-NQ-15', meterStart:55, meterEnd:110, replaced:false }] },
-            ]
-          },
-        }
-      }
-    }
+export default function HoleByHole() {
+  const { state, f } = useAnalytics()
+  const { state: inv } = useInventory()
+  const projects = (state.projects ?? []).filter(p => f.project === 'all' || p.name === f.project)
+  const holes = useMemo(() => projects.flatMap(p => projectHoles(state, p.name).filter(h => h.status !== 'planned').map(h => ({ ...h, project: p.name }))), [state, projects])
+  const [pick, setPick] = useState('')
+  const hole = holes.find(h => h.id === pick) ?? holes[0]
+  const rows = useMemo(() => hole ? holeShifts(state, hole.id) : [], [state, hole])
+  const partName = (id: string) => inv.catalogue.find(p => p.id === id)?.name ?? 'Part'
+
+  const metres = rows.reduce((s, r) => s + r.l.metresDrilled, 0)
+  const core = rows.reduce((s, r) => s + r.l.coreRecovery, 0)
+  const hours = rows.filter(r => !r.l.segmentOf).reduce((s, r) => s + r.l.drillingHours, 0)
+  const own = rows.reduce((s, r) => s + r.own, 0), client = rows.reduce((s, r) => s + r.client, 0)
+  const days = new Set(rows.map(r => r.l.date)).size
+  const switchAt = rows.find((r, i) => i > 0 && r.l.metresDrilled > 0 && r.l.holeSize !== rows[i - 1].l.holeSize)
+  const chart = rows.filter(r => !r.l.segmentOf || r.l.metresDrilled > 0).map(r => ({ label: r.label, depth: r.to }))
+
+  const insights: Insight[] = []
+  if (rows.length) {
+    const drilled = rows.filter(r => r.l.metresDrilled > 0)
+    const best = [...drilled].sort((a, b) => b.l.metresDrilled - a.l.metresDrilled)[0]
+    if (best) insights.push({ id: 'best', tone: 'good', title: `Best shift: ${n1(best.l.metresDrilled)} m on ${best.label}`, detail: `${best.l.driller ?? 'Driller not named'} on ${best.l.rig}, ${best.l.holeSize} in ${best.l.formationType.toLowerCase()}. The hole averaged ${n1(metres / Math.max(1, drilled.length))} m a drilling shift.` })
+    const longest = [...rows].sort((a, b) => (b.own + b.client) - (a.own + a.client))[0]
+    if (longest && longest.own + longest.client > 0) insights.push({ id: 'stop', tone: longest.own ? 'warn' : 'info', title: `Longest stop: ${n1(longest.own + longest.client)} h on ${longest.label}`, detail: `${longest.reasons.join(', ')}. ${n1(own)} h of the hole's stops were your own, ${n1(client)} h the client's.` })
+    const bits = rows.flatMap(r => (r.l.partsUsed ?? []).filter(u => /bit/i.test(partName(u.itemId))))
+    insights.push({ id: 'bits', tone: 'info', title: bits.length ? `${bits.length} bit ${bits.length === 1 ? 'change' : 'changes'} logged` : 'No bit change logged', detail: bits.length ? `${n1(metres / bits.length)} m a bit on this hole.` : 'If a bit was changed, the driller should add it under Accessories, so stock and bit life stay right.' })
+    if (hole?.planned && metres < hole.planned && hole.status === 'drilling') insights.push({ id: 'left', tone: 'info', title: `${n1(hole.planned - metres)} m to planned depth`, detail: `At this hole's ${n1(metres / Math.max(1, days))} m a day, about ${Math.ceil((hole.planned - metres) / Math.max(0.1, metres / Math.max(1, days)))} more days.` })
   }
-}
-
-const rigsByProject: Record<string, string[]> = { GMA: ['KEM-14', 'KEM-13'], CES: ['KEM-02'] }
-
-// ── STYLES ────────────────────────────────────────────────────────────────────
-const selectCls = "w-full px-4 py-2.5 bg-[var(--x-card)] border border-[color:var(--x-border)] rounded-xl text-[color:var(--x-text)] text-sm appearance-none outline-none focus:border-[color:var(--x-blue)] transition-colors cursor-pointer"
-const sectionCls = "rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)] overflow-hidden"
-
-export default function PerformanceDashboard() {
-  const [project, setProject] = useState('')
-  const [rig,     setRig]     = useState('')
-  const [hole,    setHole]    = useState('')
-
-  const onProject = (p: string) => { setProject(p); setRig(''); setHole('') }
-  const onRig     = (r: string) => { setRig(r); setHole('') }
-
-  const rigs  = project ? rigsByProject[project] || [] : []
-  const holes = project && rig ? Object.keys(DATA[project]?.rigs[rig]?.holes || {}) : []
-  const holeData: Hole | null = project && rig && hole ? DATA[project]?.rigs[rig]?.holes[hole] || null : null
-
-  const maxMeters  = holeData ? Math.max(...holeData.shifts.map(s => s.meters)) : 1
-  const totalMeters = holeData ? holeData.shifts.reduce((s, r) => s + r.meters, 0) : 0
-  const totalDt     = holeData ? holeData.shifts.reduce((s, r) => s + r.downtime, 0) : 0
-  const bitsUsed    = holeData ? Array.from(new Set(holeData.shifts.flatMap(s => s.bits.map(b => b.serial)))).length : 0
-  const finalDepth  = holeData ? holeData.shifts[holeData.shifts.length - 1].depthTo : 0
 
   return (
-    <div className="space-y-6 pb-8 max-w-7xl mx-auto">
-
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-[color:var(--x-text)]">Performance Dashboard</h1>
-        <p className="text-[color:var(--x-faint)] mt-1">Select a hole to see the full shift-by-shift breakdown</p>
-      </div>
-
-      {/* Filter bar */}
-      <div className="p-5 rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)]">
-        <div className="flex items-center gap-3 flex-wrap">
-
-          {/* Project */}
-          <div className="flex-1 min-w-[160px]">
-            <label className="block text-xs text-[color:var(--x-faint)] mb-1.5">Project</label>
-            <div className="relative">
-              <select className={selectCls} value={project} onChange={e => onProject(e.target.value)}>
-                <option value="">Select project...</option>
-                {Object.entries(DATA).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <ChevronRight className="w-4 h-4 text-[color:var(--x-dim)] flex-shrink-0 mt-4" />
-
-          {/* Rig */}
-          <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs text-[color:var(--x-faint)] mb-1.5">Rig</label>
-            <select className={selectCls} value={rig} onChange={e => onRig(e.target.value)} disabled={!project}>
-              <option value="">{project ? 'Select rig...' : '— select project first'}</option>
-              {rigs.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
-
-          <ChevronRight className="w-4 h-4 text-[color:var(--x-dim)] flex-shrink-0 mt-4" />
-
-          {/* Hole */}
-          <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs text-[color:var(--x-faint)] mb-1.5">Hole Number</label>
-            <select className={selectCls} value={hole} onChange={e => setHole(e.target.value)} disabled={!rig}>
-              <option value="">{rig ? 'Select hole...' : '— select rig first'}</option>
-              {holes.map(h => <option key={h} value={h}>{h}</option>)}
-            </select>
-          </div>
-
-          {/* Reset */}
-          {(project || rig || hole) && (
-            <button
-              onClick={() => { setProject(''); setRig(''); setHole('') }}
-              className="mt-4 px-4 py-2.5 text-sm text-[color:var(--x-faint)] border border-[color:var(--x-border)] rounded-xl hover:text-[color:var(--x-text)] hover:border-[color:var(--x-dim)] transition-colors"
-            >
-              Reset
-            </button>
-          )}
+    <Page>
+      <PageHead question="What happened in this hole, shift by shift?"
+        answer={hole ? <>{hole.id}: {n1(metres)} m of {hole.planned ? `${hole.planned} m planned` : 'no planned depth'}, in {days} days on {Array.from(new Set(rows.map(r => r.l.rig))).join(' and ')}.</> : <>No hole has been drilled for these filters.</>}
+        right={<FilterBar withPeriod={false} />} />
+      <BoardTabs />
+      {!hole ? <Card><Empty>No hole drilled yet for these filters.</Empty></Card> : <>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select aria-label="Hole" value={hole.id} onChange={e => setPick(e.target.value)} style={{ ...inputStyle, width: 'auto', padding: '6px 10px', fontSize: 12.5, cursor: 'pointer' }}>
+            {holes.map(h => <option key={h.id} value={h.id}>{h.id} · {h.project} · {h.status === 'drilling' ? 'drilling' : 'finished'}</option>)}
+          </select>
+          <Status tone={hole.status === 'drilling' ? 'info' : 'good'}>{hole.status === 'drilling' ? 'Drilling' : 'Finished'}</Status>
         </div>
-      </div>
-
-      {/* Prompt state */}
-      {!holeData && (
-        <div className="flex flex-col items-center justify-center py-20 rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)]">
-          <div className="w-14 h-14 rounded-2xl bg-[color-mix(in_srgb,var(--x-blue)_10%,transparent)] border border-[color:color-mix(in_srgb,var(--x-blue)_20%,transparent)] flex items-center justify-center mb-4">
-            <ChevronRight className="w-6 h-6 text-[color:var(--x-blue)]" />
-          </div>
-          <p className="text-[color:var(--x-text)] font-semibold mb-2">
-            {!project ? 'Select a project to begin' : !rig ? 'Now select a rig' : 'Now select a hole'}
-          </p>
-          <p className="text-sm text-[color:var(--x-faint)]">
-            {!hole ? "You'll see a full shift-by-shift breakdown of the selected hole" : ''}
-          </p>
-        </div>
-      )}
-
-      {/* Hole view */}
-      {holeData && (
-        <>
-          {/* Hole header */}
-          <div className="p-5 rounded-2xl bg-[var(--x-raised)] border border-[color:var(--x-border)]">
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
-              <h2 className="text-xl font-bold text-[color:var(--x-text)]">{hole}</h2>
-              <span className="text-[color:var(--x-faint)] text-sm">·</span>
-              <span className="text-[color:var(--x-muted)] text-sm">{rig}</span>
-              <span className="text-[color:var(--x-faint)] text-sm">·</span>
-              <span className="text-[color:var(--x-muted)] text-sm">{DATA[project].name}</span>
-              <span className={`ml-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                holeData.status === 'OPEN'
-                  ? 'bg-[color-mix(in_srgb,var(--x-green)_20%,transparent)] text-[color:var(--x-green)] border border-[color:color-mix(in_srgb,var(--x-green)_30%,transparent)]'
-                  : 'bg-[color-mix(in_srgb,var(--x-faint)_20%,transparent)] text-[color:var(--x-faint)] border border-[color:color-mix(in_srgb,var(--x-faint)_30%,transparent)]'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${holeData.status === 'OPEN' ? 'bg-[var(--x-green)]' : 'bg-[var(--x-faint)]'}`} />
-                {holeData.status}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {[
-                { label: 'Started',      val: holeData.start },
-                { label: 'Ended',        val: holeData.end },
-                { label: 'Final Depth',  val: `${finalDepth}m` },
-                { label: 'Total Meters', val: `${totalMeters}m` },
-                { label: 'Total Downtime', val: `${totalDt} hrs` },
-              ].map(item => (
-                <div key={item.label} className="p-3 rounded-xl bg-[var(--x-card)] border border-[color:var(--x-border)]">
-                  <p className="text-xs text-[color:var(--x-faint)] mb-1">{item.label}</p>
-                  <p className="text-sm font-bold text-[color:var(--x-text)]">{item.val}</p>
-                </div>
+        <InsightsCard insights={insights} />
+        <Grid min={160}>
+          <Tile label="Depth" value={`${n1(metres)} m`} note={hole.planned ? `of ${hole.planned} m planned` : 'No planned depth'} />
+          <Tile label="Days on the hole" value={days} note={`${rows.filter(r => !r.l.segmentOf).length} shifts`} />
+          <Tile label="Metres an hour" value={hours ? (metres / hours).toFixed(2) : '—'} note={`${n1(hours)} h on bottom`} />
+          <Tile label="Core recovery" value={metres ? `${((core / metres) * 100).toFixed(1)}%` : '—'} />
+          <Tile label="Stopped" value={`${n1(own + client)} h`} note={`${n1(own)} h yours · ${n1(client)} h client`} />
+        </Grid>
+        <Card title="Depth, shift by shift" subtitle={switchAt ? `The size changed to ${switchAt.l.holeSize} at ${n1(switchAt.from)} m, on ${switchAt.label}.` : 'Depth at the end of each shift.'}>
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={chart} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
+              <CartesianGrid stroke={gridStroke} vertical={false} />
+              <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: T.border }} interval="preserveStartEnd" minTickGap={24} />
+              <YAxis tick={axisTick} tickLine={false} axisLine={false} width={44} tickFormatter={(v: number) => `${v} m`} />
+              <Tooltip content={<Tip unit=" m" names={{ depth: "Depth" }} />} />
+              {hole.planned ? <ReferenceLine y={hole.planned} stroke={T.muted} strokeDasharray="4 3" label={{ value: `${hole.planned} m planned`, fill: T.faint, fontSize: 11, position: 'insideTopLeft' }} /> : null}
+              {switchAt && <ReferenceLine y={switchAt.from} stroke={T.orangeD} strokeDasharray="2 3" label={{ value: `${switchAt.l.holeSize} from ${n1(switchAt.from)} m`, fill: T.orangeD, fontSize: 11, position: 'insideBottomRight' }} />}
+              <Line dataKey="depth" stroke={T.bar} strokeWidth={2} dot={false} isAnimationActive={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card title="Every shift" pad={false}>
+          <Table>
+            <thead><tr><th style={th}>Shift</th><th style={th}>Rig</th><th style={th}>Driller</th><th style={th}>Size</th><th style={th}>Ground</th><th style={thR}>From</th><th style={thR}>To</th><th style={thR}>Metres</th><th style={thR}>Core</th><th style={thR}>Drilling h</th><th style={th}>Stops</th><th style={th}>Parts used</th></tr></thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.l.id} style={{ borderBottom: rowLine }}>
+                  <td style={tdStrong}>{r.label}</td><td style={td}>{r.l.rig}</td><td style={td}>{r.l.driller ?? '—'}</td><td style={td}>{r.l.holeSize}</td>
+                  <td style={td}>{r.l.formationType.replace(' Formation', '')}</td><td style={tdR}>{r.from}</td><td style={tdR}>{r.to}</td>
+                  <td style={{ ...tdR, color: T.text }}>{r.l.metresDrilled ? n1(r.l.metresDrilled) : '—'}</td>
+                  <td style={tdR}>{r.l.metresDrilled ? `${Math.round((r.l.coreRecovery / r.l.metresDrilled) * 100)}%` : '—'}</td>
+                  <td style={tdR}>{r.l.segmentOf ? '—' : r.l.drillingHours}</td>
+                  <td style={{ ...td, whiteSpace: 'normal', minWidth: 140 }}>{r.own + r.client ? `${n1(r.own + r.client)} h · ${r.reasons.join(', ')}` : '—'}</td>
+                  <td style={{ ...td, whiteSpace: 'normal', minWidth: 120 }}>{(r.l.partsUsed ?? []).map(u => `${u.qty} × ${partName(u.itemId)}`).join(', ') || '—'}</td>
+                </tr>
               ))}
-            </div>
-          </div>
-
-          {/* Shift-by-shift table */}
-          <div className={sectionCls}>
-            <div className="px-5 py-4 border-b border-[color:var(--x-border)]">
-              <h3 className="text-sm font-semibold text-[color:var(--x-text)]">Shift-by-shift log</h3>
-              <p className="text-xs text-[color:var(--x-faint)] mt-0.5">{holeData.shifts.length} shifts · {bitsUsed} bit{bitsUsed > 1 ? 's' : ''} used</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left border-b border-[color:var(--x-border)] bg-[var(--x-card)]">
-                    {['Date', 'Shift', 'Depth From', 'Depth To', 'Meters Drilled', 'Bit(s)', 'Downtime'].map(h => (
-                      <th key={h} className="px-5 py-3 text-xs font-semibold text-[color:var(--x-faint)] uppercase tracking-wider whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[color:var(--x-border)]">
-                  {holeData.shifts.map((s, i) => {
-                    return (
-                      <tr key={i} className="hover:bg-[color-mix(in_srgb,var(--x-raised2)_50%,transparent)] transition">
-                        <td className="px-5 py-3 text-sm text-[color:var(--x-muted)] whitespace-nowrap">{s.date}</td>
-                        <td className="px-5 py-3">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            s.shift === 'Day'
-                              ? 'bg-[color-mix(in_srgb,var(--x-blue)_10%,transparent)] text-[color:var(--x-blue-b)] border border-[color:color-mix(in_srgb,var(--x-blue)_20%,transparent)]'
-                              : 'bg-[color-mix(in_srgb,var(--x-purple)_10%,transparent)] text-[color:var(--x-purple-b)] border border-[color:color-mix(in_srgb,var(--x-purple)_20%,transparent)]'
-                          }`}>
-                            {s.shift === 'Day' ? '☀ Day' : '🌙 Night'}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3 text-sm font-mono text-[color:var(--x-muted)]">{s.depthFrom}m</td>
-                        <td className="px-5 py-3 text-sm font-mono font-bold text-[color:var(--x-text)]">{s.depthTo}m</td>
-                        <td className="px-5 py-3 text-sm font-bold text-[color:var(--x-text)]">{s.meters}m</td>
-                        <td className="px-5 py-3">
-                          <div className="space-y-1">
-                            {s.bits.map((b, bi) => (
-                              <div key={bi} className="flex items-center gap-1.5">
-                                {b.replaced ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-[color-mix(in_srgb,var(--x-red)_10%,transparent)] text-[color:var(--x-red)] border border-[color:color-mix(in_srgb,var(--x-red)_20%,transparent)]">
-                                    ✕ {b.serial} · {b.bitType}
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-[color-mix(in_srgb,var(--x-green)_10%,transparent)] text-[color:var(--x-green)] border border-[color:color-mix(in_srgb,var(--x-green)_20%,transparent)]">
-                                    ✓ {b.serial} · {b.bitType}
-                                  </span>
-                                )}
-                                <span className="text-xs text-[color:var(--x-faint)] font-mono">{b.meterStart}→{b.meterEnd}m</span>
-                              </div>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-5 py-3">
-                          {s.downtime > 0 ? (
-                            <span className="text-sm font-bold text-[color:var(--x-red)]">{s.downtime} hrs</span>
-                          ) : (
-                            <span className="text-sm text-[color:var(--x-dim)]">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+            </tbody>
+          </Table>
+        </Card>
+      </>}
+    </Page>
   )
 }
-

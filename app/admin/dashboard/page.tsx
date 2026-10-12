@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts'
@@ -8,6 +9,9 @@ import { useInventory } from '../../../lib/inventory-store'
 import { IS_DEMO } from '../../../lib/company'
 import { useAdminOverview, financeLink, RIG_STATUS_LABEL, type RigStatus, type Attention } from '../../../lib/admin-overview'
 import { num } from '../../../lib/client-record'
+import { buildScorecard } from '../../../lib/intelligence'
+import { dashboardInsights } from '../../../lib/analytics'
+import { InsightsCard } from '../../components/insights-card'
 import {
   Page, Head, Card, Split, Btn, Table, Status, Legend, Tip, DepthBar, Spark, Delta, Empty,
   th, thR, td, tdR, rowLine, T, display, toneColor, axisTick, gridStroke, type Tone,
@@ -63,6 +67,13 @@ function StartHere() {
 
 export default function AdminDashboard() {
   const o = useAdminOverview()
+  const { state: costing } = useCosting()
+  const { state: inv } = useInventory()
+  // The money questions, across every project since the start, from the same scorecard as Intelligence.
+  const insights = useMemo(() => dashboardInsights({ rigs: buildScorecard(costing, inv, 'all', 'all').rigs.map(r => ({
+    name: r.name, kind: r.kind, metres: r.metres, days: r.days, cost: r.cost, revenue: r.revenue, costPerMetre: r.costPerMetre,
+    marginPerMetre: r.marginPerMetre, ratePerMetre: r.ratePerMetre, onTargetDays: r.onTargetDays, targetDays: r.targetDays,
+  })) }), [costing, inv])
   const drilling = o.rigs.filter(r => r.status === 'drilling').length
   const working = o.rigs.filter(r => r.project).length
   const todayMetres = o.rigs.reduce((s, r) => s + (r.day ?? 0) + (r.night ?? 0), 0)
@@ -108,6 +119,8 @@ export default function AdminDashboard() {
             note={<>{moneyL(o.now.margin)} · <Delta now={o.now.marginPct} before={o.prev.marginPct} unit="pts" /></>} />
         </Card>
       </Split>
+
+      {insights.length > 0 && <InsightsCard insights={insights} subtitle="Worked out from your own logs, every project since the start. Each one opens the screen behind it." />}
 
       <Card title="Rigs today" subtitle="Where each rig is, how deep its hole has gone, and what it did on today's two shifts" pad={false}
         right={<Link href="/admin/rigs" style={{ fontSize: 12.5, color: T.muted, textDecoration: 'none' }}>All rigs</Link>}>

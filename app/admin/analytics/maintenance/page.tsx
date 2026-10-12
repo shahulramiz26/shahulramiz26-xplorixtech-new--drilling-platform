@@ -1,308 +1,120 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area,
-  ComposedChart, Line, ReferenceLine
-} from 'recharts'
-import { Wrench, Clock, AlertTriangle, TrendingUp, ArrowUpRight, ArrowDownRight, Filter } from 'lucide-react'
-import AIInsights from '../../../components/AIInsights'
-import DualMetricList from '../../../components/DualMetricList'
-import { hexA } from '../../../../lib/theme'
+import { useMemo } from 'react'
+import { ResponsiveContainer, BarChart, Bar, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
+import { maintenance, maintenanceInsights } from '../../../../lib/analytics'
+import { money } from '../../../../lib/costing-store'
+import { Page, PageHead, Card, Tile, Grid, Split, Table, Meter, Empty, Legend, Tip, axisTick, gridStroke, th, thR, td, tdR, tdStrong, rowLine, T } from '../../../components/kit'
+import { useAnalytics, BoardTabs, FilterBar, InsightsCard, n0, n1 } from '../shared'
 
-// KpiCard component
-function KpiCard({ label, value, unit, icon: Icon, color, trend, trendUp }: { label: string; value: string; unit?: string; icon: any; color: string; trend?: string; trendUp?: boolean }) {
+/* MAINTENANCE — what keeps breaking, and what does it cost?
+ * From the maintenance logs, set beside the hours each rig stood for its
+ * own mechanical stops in the drill logs. */
+
+export default function MaintenanceDashboard() {
+  const { state, f } = useAnalytics()
+  const x = useMemo(() => maintenance(state, f), [state, f])
+  const insights = useMemo(() => maintenanceInsights(x), [x])
+  const topComp = Math.max(1, ...x.components.map(c => c.count))
+  const oil = x.byRig.filter(r => r.engineOil + r.hydraulicOil + r.transmissionOil > 0)
+
   return (
-    <div style={{ padding:20, borderRadius:16, background:'var(--x-card)', border:'1px solid var(--x-border)', transition:'border-color 0.2s' }}
-      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${hexA(color, 0x40)}`}
-      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-        <div style={{ width:40, height:40, borderRadius:10, background:`${hexA(color, 0x18)}`, border:`1px solid ${hexA(color, 0x30)}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <Icon style={{ width:18, height:18, color }} />
-        </div>
-        {trend && (
-          <span style={{ fontSize:11, fontWeight:700, color: trendUp ? 'var(--x-green)' : 'var(--x-red)' }}>
-            {trendUp ? '↑' : '↓'} {trend}
-          </span>
-        )}
-      </div>
-      <div style={{ fontSize:26, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>
-        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'var(--x-faint)', marginLeft:4 }}>{unit}</span>}
-      </div>
-      <div style={{ fontSize:13, color:'var(--x-muted)', marginTop:4 }}>{label}</div>
-    </div>
-  )
-}
+    <Page>
+      <PageHead question="What keeps breaking, and what does it cost?"
+        answer={x.m.length
+          ? <>{x.m.length} maintenance {x.m.length === 1 ? 'log' : 'logs'} {x.s.label}: {n0(x.hours)} hours and {money(x.cost)} in service cost, {x.breakdowns} of {x.m.length === 1 ? 'it a breakdown' : 'them breakdowns'}.</>
+          : <>No maintenance logged for these filters.</>}
+        right={<FilterBar />} />
+      <BoardTabs />
+      <InsightsCard insights={insights} />
 
-const COLORS_UNUSED = {
-  primary: 'var(--x-blue)', accent: 'var(--x-green)', purple: 'var(--x-purple)',
-  warning: 'var(--x-amber)', danger: 'var(--x-red)', cyan: 'var(--x-cyan)', pink: 'var(--x-pink)'
-}
-const PIE_COLORS = ['var(--x-blue)', 'var(--x-red)', 'var(--x-amber)', 'var(--x-green)']
+      <Grid min={170}>
+        <Tile label="Maintenance logs" value={x.m.length} note={`${x.breakdowns} ${x.breakdowns === 1 ? "breakdown" : "breakdowns"}`} tone={x.breakdowns && x.breakdowns === x.m.length ? 'warn' : undefined} />
+        <Tile label="Hours in the workshop" value={`${n0(x.hours)} h`} />
+        <Tile label="Service cost" value={money(x.cost)} note="Parts are costed from inventory" />
+        <Tile label="Own mechanical stops" value={`${n0(x.byRig.reduce((s, r) => s + r.stopHours, 0))} h`} note="From the drill logs" />
+      </Grid>
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl p-4 shadow-[0_16px_64px_rgba(var(--x-shadow),0.8)]">
-        <p className="text-[color:var(--x-muted)] text-sm mb-2">{label}</p>
-        {payload.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-2 mb-1 last:mb-0">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-            <span className="text-[color:var(--x-muted)] text-sm">{entry.name}:</span>
-            <span className="text-[color:var(--x-text)] font-bold">{entry.value}</span>
-          </div>
-        ))}
-      </div>
-    )
-  }
-  return null
-}
-
-const maintenanceTypeData = [
-  { name: 'Preventive', value: 45, cost: 4500 },
-  { name: 'Breakdown',  value: 25, cost: 8500 },
-  { name: 'Scheduled',  value: 20, cost: 3200 },
-  { name: 'Component',  value: 10, cost: 1800 },
-]
-
-const maintenanceHoursData = [
-  { date: 'Feb 20', hours: 8,  rigs: 2, cost: 800  },
-  { date: 'Feb 21', hours: 4,  rigs: 1, cost: 400  },
-  { date: 'Feb 22', hours: 12, rigs: 3, cost: 1200 },
-  { date: 'Feb 23', hours: 6,  rigs: 2, cost: 600  },
-  { date: 'Feb 24', hours: 10, rigs: 3, cost: 1000 },
-  { date: 'Feb 25', hours: 5,  rigs: 1, cost: 500  },
-  { date: 'Feb 26', hours: 7,  rigs: 2, cost: 700  },
-]
-
-// ── COMPONENT FAILURE DATA — supports unlimited components ─────────────────
-const componentFailureItems = [
-  { label: 'Hydraulic',    metric1: 12, metric2: 72, metric1Unit: 'x', metric2Unit: 'hrs' },
-  { label: 'Engine',       metric1: 8,  metric2: 48, metric1Unit: 'x', metric2Unit: 'hrs' },
-  { label: 'Transmission', metric1: 5,  metric2: 40, metric1Unit: 'x', metric2Unit: 'hrs' },
-  { label: 'Mud Pump',     metric1: 7,  metric2: 35, metric1Unit: 'x', metric2Unit: 'hrs' },
-  { label: 'Electrical',   metric1: 6,  metric2: 24, metric1Unit: 'x', metric2Unit: 'hrs' },
-  { label: 'Compressor',   metric1: 4,  metric2: 20, metric1Unit: 'x', metric2Unit: 'hrs' },
-  { label: 'Gearbox',      metric1: 3,  metric2: 18, metric1Unit: 'x', metric2Unit: 'hrs' },
-  { label: 'Cooling',      metric1: 2,  metric2: 10, metric1Unit: 'x', metric2Unit: 'hrs' },
-]
-
-const actionData = [
-  { action: 'Repair',    count: 28, cost: 15000 },
-  { action: 'Replace',   count: 15, cost: 35000 },
-  { action: 'Temporary', count: 8,  cost: 2000  },
-]
-
-const oilData = [
-  { date: 'Feb 20', engine: 15, hydraulic: 25, transmission: 10, total: 50 },
-  { date: 'Feb 21', engine: 8,  hydraulic: 12, transmission: 5,  total: 25 },
-  { date: 'Feb 22', engine: 20, hydraulic: 35, transmission: 15, total: 70 },
-  { date: 'Feb 23', engine: 10, hydraulic: 18, transmission: 8,  total: 36 },
-  { date: 'Feb 24', engine: 18, hydraulic: 30, transmission: 12, total: 60 },
-  { date: 'Feb 25', engine: 12, hydraulic: 20, transmission: 9,  total: 41 },
-  { date: 'Feb 26', engine: 14, hydraulic: 22, transmission: 11, total: 47 },
-]
-
-const mtbfData = [
-  { rig: 'RIG-001', mtbf: 450, target: 400 },
-  { rig: 'RIG-002', mtbf: 380, target: 400 },
-  { rig: 'RIG-003', mtbf: 520, target: 400 },
-  { rig: 'RIG-004', mtbf: 290, target: 400 },
-  { rig: 'RIG-005', mtbf: 410, target: 400 },
-]
-
-const maintenanceInsights = [
-  { id:'1', type:'anomaly' as const,       severity:'critical' as const, title:'Hydraulic System Issues',   description:'Hydraulic failures up 60% this month',        metric:'Hydraulic Failures', change:'+60% vs avg',       recommendation:'Inspect hydraulic fluid quality and filter replacement schedule' },
-  { id:'2', type:'prediction' as const,    severity:'warning' as const,  title:'Engine Maintenance Due',    description:'RIG-002 engine showing signs of degradation', metric:'Engine Health',      change:'Service needed in 5 days', recommendation:'Schedule preventive engine service immediately' },
-  { id:'3', type:'recommendation' as const,severity:'info' as const,     title:'Oil Change Optimization',   description:'AI suggests extending oil change interval',   metric:'Oil Change Interval',change:'+10% extension possible',  recommendation:'Monitor oil analysis reports before extending' },
-  { id:'4', type:'anomaly' as const,       severity:'warning' as const,  title:'Mud Pump Pressure Drop',    description:'Unusual pressure fluctuations in RIG-001',    metric:'Mud Pump Pressure', change:'-15% from baseline',       recommendation:'Check seals and valves for wear' },
-]
-
-export default function AdminMaintenanceDashboard() {
-  return (
-    <div className="space-y-8 pb-8">
-      <AIInsights dashboardType="maintenance" insights={maintenanceInsights} />
-
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-[color:var(--x-text)]">Maintenance Dashboard</h2>
-          <p className="text-[color:var(--x-muted)] mt-1">Rig maintenance and component health metrics</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl">
-            <Filter className="w-4 h-4 text-[color:var(--x-faint)]" />
-            <select className="bg-transparent text-[color:var(--x-text)] text-sm outline-none">
-              <option className="bg-[var(--x-raised2)]">Last 7 Days</option>
-              <option className="bg-[var(--x-raised2)]">Last 30 Days</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Total Maint. Logs" value="28"  icon={Wrench}       color="var(--x-amber)" trend="+12%" trendUp={true}  />
-        <KpiCard label="Maint. Hours"      value="84"  unit="hrs" icon={Clock} color="var(--x-red)" trend="+8%"  trendUp={false} />
-        <KpiCard label="Pending Service"   value="5"   icon={AlertTriangle} color="var(--x-orange)" trend="-2"   trendUp={true}  />
-        <KpiCard label="Avg MTBF"          value="410" unit="hrs" icon={TrendingUp} color="var(--x-green)" trend="+5%" trendUp={true} />
-      </div>
-
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Maintenance Type Donut */}
-        <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }}
-          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Maintenance Type Distribution</h3>
-          <div className="h-72 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={maintenanceTypeData} cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={4} dataKey="value">
-                  {maintenanceTypeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="var(--x-raised)" strokeWidth={3} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-[color:var(--x-text)]">100</p>
-                <p className="text-xs text-[color:var(--x-muted)]">Total</p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Maintenance Hours Trend */}
-        <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1 }}
-          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Maintenance Hours & Cost Trend</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={maintenanceHoursData}>
-                <defs>
-                  <linearGradient id="maintGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--x-amber)" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="var(--x-amber)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
-                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <YAxis yAxisId="left"  stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <YAxis yAxisId="right" orientation="right" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Area yAxisId="left" type="monotone" dataKey="hours" name="Hours" stroke="var(--x-amber)" strokeWidth={3} fill="url(#maintGradient)" />
-                <Line yAxisId="right" type="monotone" dataKey="cost" name="Cost ($)" stroke="var(--x-red)" strokeWidth={3} dot={{ fill:'var(--x-red)', r:4 }} />
+      {x.m.length === 0 && x.byRig.every(r => r.stopHours === 0) ? <Card><Empty>Nothing to show for these filters.</Empty></Card> : <>
+        <Split>
+          <Card title="By type" subtitle="How many, how long, and what it cost.">
+            {x.types.length === 0 ? <Empty>No maintenance logged.</Empty> : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={x.types} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
+                  <CartesianGrid stroke={gridStroke} vertical={false} />
+                  <XAxis dataKey="type" tick={axisTick} tickLine={false} axisLine={{ stroke: T.border }} />
+                  <YAxis tick={axisTick} tickLine={false} axisLine={false} width={40} tickFormatter={(v: number) => `${v} h`} />
+                  <Tooltip content={<Tip unit=" h" names={{ hours: 'Hours' }} />} />
+                  <Bar dataKey="hours" fill={T.bar} maxBarSize={44} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </Card>
+          <Card title="Hours and cost, week by week" subtitle="Bars are hours; the line is service cost.">
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={x.trend} margin={{ top: 10, right: 6, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={gridStroke} vertical={false} />
+                <XAxis dataKey="week" tick={axisTick} tickLine={false} axisLine={{ stroke: T.border }} />
+                <YAxis yAxisId="h" tick={axisTick} tickLine={false} axisLine={false} width={36} />
+                <YAxis yAxisId="c" orientation="right" tick={axisTick} tickLine={false} axisLine={false} width={56} tickFormatter={(v: number) => `₹${Math.round(v / 1000)}k`} />
+                <Tooltip content={<Tip names={{ hours: 'Hours', cost: 'Cost ₹' }} />} />
+                <Bar yAxisId="h" dataKey="hours" fill={T.bar} maxBarSize={30} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                <Line yAxisId="c" dataKey="cost" stroke={T.orangeD} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
               </ComposedChart>
             </ResponsiveContainer>
-          </div>
-        </motion.div>
+            <Legend items={[{ color: T.bar, label: 'Hours' }, { color: T.orangeD, label: 'Service cost', line: true }]} />
+          </Card>
+        </Split>
 
-        {/* ── COMPONENT FAILURE ANALYSIS — REPLACED WITH DualMetricList ── */}
-        <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2 }}
-          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold text-[color:var(--x-text)]">Component Failure Analysis</h3>
-            <span className="text-xs text-[color:var(--x-faint)] bg-[var(--x-raised2)] px-3 py-1 rounded-full border border-[color:var(--x-border)]">
-              {componentFailureItems.reduce((s,i) => s+i.metric2, 0)} hrs total downtime
-            </span>
-          </div>
-          <p className="text-xs text-[color:var(--x-faint)] mb-4">Ranked by downtime hours — tap legend to sort by failures</p>
-          <DualMetricList
-            items={componentFailureItems}
-            metric1Label="Failures"
-            metric2Label="Downtime"
-            metric1Color="var(--x-blue)"
-            metric2Color="var(--x-red)"
-            maxVisible={6}
-            searchable={true}
-            alertThreshold={40}
-            sortBy="metric2"
-          />
-        </motion.div>
-
-        {/* Action Taken Distribution */}
-        <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.3 }}
-          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Action Taken Distribution</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={actionData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
-                <XAxis dataKey="action" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="count" name="Count" fill="var(--x-purple)" radius={[4,4,0,0]}>
-                  {actionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={['var(--x-blue)','var(--x-green)','var(--x-amber)'][index]} />
+        <Split>
+          <Card title="What failed" subtitle="Each component named on a maintenance log." pad={false}>
+            {x.components.length === 0 ? <Empty>No components logged.</Empty> : (
+              <Table>
+                <thead><tr><th style={th}>Component</th><th style={thR}>Times</th><th style={thR}>Hours</th><th style={thR}>Cost</th><th style={{ ...th, width: 120 }} /></tr></thead>
+                <tbody>
+                  {x.components.map(c => (
+                    <tr key={c.component} style={{ borderBottom: rowLine }}>
+                      <td style={tdStrong}>{c.component}</td><td style={tdR}>{c.count}</td><td style={tdR}>{n1(c.hours)}</td><td style={tdR}>{money(c.cost)}</td>
+                      <td style={td}><Meter value={c.count} max={topComp} color={T.red} /></td>
+                    </tr>
                   ))}
-                </Bar>
+                </tbody>
+              </Table>
+            )}
+          </Card>
+          <Card title="Rig by rig" subtitle="Days between breakdowns counts each run of breakdown days once." pad={false}>
+            <Table>
+              <thead><tr><th style={th}>Rig</th><th style={thR}>Logs</th><th style={thR}>Workshop h</th><th style={thR}>Own stops h</th><th style={thR}>Service cost</th><th style={thR}>Days between breakdowns</th></tr></thead>
+              <tbody>
+                {x.byRig.map(r => (
+                  <tr key={r.rig} style={{ borderBottom: rowLine }}>
+                    <td style={tdStrong}>{r.rig}{r.owner !== 'Own' && <span style={{ color: T.faint, fontWeight: 400 }}> · {r.owner}</span>}</td>
+                    <td style={tdR}>{r.logs}</td><td style={tdR}>{n1(r.hours)}</td><td style={tdR}>{n1(r.stopHours)}</td><td style={tdR}>{money(r.cost)}</td>
+                    <td style={tdR}>{r.mtbfDays != null ? n1(r.mtbfDays) : 'None logged'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </Card>
+        </Split>
+
+        <Card title="Oil used" subtitle="Litres from the maintenance logs.">
+          {oil.length === 0 ? <Empty>No oil logged.</Empty> : <>
+            <ResponsiveContainer width="100%" height={Math.max(140, oil.length * 44 + 40)}>
+              <BarChart data={oil} layout="vertical" margin={{ top: 4, right: 12, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={gridStroke} horizontal={false} />
+                <XAxis type="number" tick={axisTick} tickLine={false} axisLine={{ stroke: T.border }} tickFormatter={(v: number) => `${v} L`} />
+                <YAxis type="category" dataKey="rig" tick={axisTick} tickLine={false} axisLine={false} width={58} />
+                <Tooltip content={<Tip unit=" L" names={{ engineOil: 'Engine', hydraulicOil: 'Hydraulic', transmissionOil: 'Transmission' }} />} />
+                <Bar dataKey="engineOil" stackId="o" fill={T.bar} isAnimationActive={false} />
+                <Bar dataKey="hydraulicOil" stackId="o" fill={T.orangeD} isAnimationActive={false} />
+                <Bar dataKey="transmissionOil" stackId="o" fill={T.faint} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Oil Consumption */}
-        <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.4 }}
-          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }} className="lg:col-span-2">
-          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Oil Consumption Breakdown</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={oilData}>
-                <defs>
-                  <linearGradient id="engineGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--x-blue)" stopOpacity={0.4}/><stop offset="95%" stopColor="var(--x-blue)" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="hydraulicGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--x-red)" stopOpacity={0.4}/><stop offset="95%" stopColor="var(--x-red)" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="transmissionGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--x-amber)" stopOpacity={0.4}/><stop offset="95%" stopColor="var(--x-amber)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
-                <XAxis dataKey="date" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Area type="monotone" dataKey="engine"       name="Engine Oil"       stackId="1" stroke="var(--x-blue)" strokeWidth={2} fill="url(#engineGradient)"       />
-                <Area type="monotone" dataKey="hydraulic"    name="Hydraulic Oil"    stackId="1" stroke="var(--x-red)" strokeWidth={2} fill="url(#hydraulicGradient)"    />
-                <Area type="monotone" dataKey="transmission" name="Transmission Oil" stackId="1" stroke="var(--x-amber)" strokeWidth={2} fill="url(#transmissionGradient)" />
-                <Line type="monotone" dataKey="total" name="Total" stroke="var(--x-green)" strokeWidth={3} strokeDasharray="5 5" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* MTBF by Rig */}
-        <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.5 }}
-          style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }} className="lg:col-span-2">
-          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Mean Time Between Failures (MTBF) by Rig</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={mtbfData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
-                <XAxis dataKey="rig" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine y={400} stroke="var(--x-amber)" strokeDasharray="5 5" label={{ value:'Target: 400h', fill:'var(--x-amber)', fontSize:12 }} />
-                <Bar dataKey="mtbf" name="MTBF (hours)" fill="var(--x-cyan)" radius={[4,4,0,0]}>
-                  {mtbfData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.mtbf >= 400 ? 'var(--x-green)' : 'var(--x-red)'} />
-                  ))}
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-      </div>
-    </div>
+            <Legend items={[{ color: T.bar, label: 'Engine' }, { color: T.orangeD, label: 'Hydraulic' }, { color: T.faint, label: 'Transmission' }]} />
+          </>}
+        </Card>
+      </>}
+    </Page>
   )
 }
-
