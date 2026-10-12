@@ -44,7 +44,7 @@ const NAV: { title: string | null; items: NavItem[] }[] = [
       { href: '/admin/projects', label: 'Projects', icon: FolderOpen, badge: 'projects' },
       { href: '/admin/contractors', label: 'Contractors', icon: Handshake, badge: 'contractors' },
       { href: '/admin/rigs', label: 'Rigs & equipment', icon: Truck },
-      { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, sample: true },
+      { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
       { href: '/admin/reports', label: 'Performance reports', icon: FileText, sample: true },
     ],
   },

@@ -1,288 +1,100 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, LineChart, Line, RadarChart, PolarGrid,
-  PolarAngleAxis, PolarRadiusAxis, Radar, ScatterChart, Scatter,
-  ZAxis, ComposedChart, Area, Cell
-} from 'recharts'
-import { Users, Clock, TrendingUp, Award, Filter, ArrowUpRight, ArrowDownRight } from 'lucide-react'
-import AIInsights from '../../../components/AIInsights'
-import LeaderboardTable from '../../../components/LeaderboardTable'
-import { hexA } from '../../../../lib/theme'
+import { useMemo, useState } from 'react'
+import { ResponsiveContainer, ScatterChart, Scatter, ComposedChart, Bar, Line, XAxis, YAxis, ZAxis, CartesianGrid, Tooltip } from 'recharts'
+import { crew, crewInsights } from '../../../../lib/analytics'
+import { Page, PageHead, Card, Tile, Grid, Split, Table, Empty, Legend, Tip, axisTick, gridStroke, th, thR, td, tdR, tdStrong, rowLine, T } from '../../../components/kit'
+import { useAnalytics, BoardTabs, FilterBar, InsightsCard, rigColour, n0, n1 } from '../shared'
 
-function KpiCard({ label, value, unit, icon: Icon, color, trend, trendUp }: {
-  label: string; value: string; unit?: string; icon: any
-  color: string; trend?: string; trendUp?: boolean
-}) {
-  return (
-    <div style={{ padding:20, borderRadius:16, background:'var(--x-card)', border:'1px solid var(--x-border)', transition:'border-color 0.2s' }}
-      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.borderColor=`${hexA(color, 0x40)}`}
-      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.borderColor='var(--x-border)'}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-        <div style={{ width:40, height:40, borderRadius:10, background:`${hexA(color, 0x18)}`, border:`1px solid ${hexA(color, 0x30)}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <Icon style={{ width:18, height:18, color }} />
-        </div>
-        {trend && (
-          <span style={{ fontSize:11, fontWeight:700, color: trendUp ? 'var(--x-green)' : 'var(--x-red)' }}>
-            {trendUp ? '↑' : '↓'} {trend}
-          </span>
-        )}
-      </div>
-      <div style={{ fontSize:26, fontWeight:800, color:'var(--x-text)', fontFamily:"'Space Grotesk',sans-serif" }}>
-        {value}{unit && <span style={{ fontSize:13, fontWeight:400, color:'var(--x-faint)', marginLeft:4 }}>{unit}</span>}
-      </div>
-      <div style={{ fontSize:13, color:'var(--x-muted)', marginTop:4 }}>{label}</div>
-    </div>
+/* DRILLERS AND CREW — who is drilling well, and who needs help?
+ * Every driller named on a log, on the same measures, and the crew's hours
+ * against the hours the bit was turning. */
+
+type Sort = 'metres' | 'rop' | 'perShift' | 'own'
+
+export default function DrillersDashboard() {
+  const { state, f } = useAnalytics()
+  const c = useMemo(() => crew(state, f), [state, f])
+  const insights = useMemo(() => crewInsights(c), [c])
+  const [sort, setSort] = useState<Sort>('metres')
+  const rows = [...c.drillers].sort((a, b) => sort === 'own' ? a.own / Math.max(1, a.shifts) - b.own / Math.max(1, b.shifts) : b[sort] - a[sort])
+  const owners = Array.from(new Set(c.drillers.map(d => d.owner)))
+  const util = c.shiftHours ? (c.drillHours / c.shiftHours) * 100 : 0
+  const head = (key: Sort, label: string) => (
+    <th style={{ ...thR, cursor: 'pointer', color: sort === key ? T.text : undefined }} onClick={() => setSort(key)} aria-sort={sort === key ? 'descending' : undefined}>{label}{sort === key ? ' ↓' : ''}</th>
   )
-}
 
-const COLORS = {
-  primary: 'var(--x-blue)', accent: 'var(--x-green)', purple: 'var(--x-purple)',
-  warning: 'var(--x-amber)', danger: 'var(--x-red)', cyan: 'var(--x-cyan)', pink: 'var(--x-pink)'
-}
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl p-4 shadow-[0_16px_64px_rgba(var(--x-shadow),0.8)]">
-        <p className="text-[color:var(--x-muted)] text-sm mb-2">{label}</p>
-        {payload.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-2 mb-1 last:mb-0">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
-            <span className="text-[color:var(--x-muted)] text-sm">{entry.name}:</span>
-            <span className="text-[color:var(--x-text)] font-bold">{entry.value}</span>
-          </div>
-        ))}
-      </div>
-    )
-  }
-  return null
-}
-
-// ── DRILLER LEADERBOARD DATA — supports 70+ drillers ──────────────────────
-const drillerLeaderboardRows = [
-  { id:'1', name:'Chris Williams', sublabel:'RIG-003 · Site A', meters:1320, rop:58, downtime:12, efficiency:96, shifts:26, trend:'up'   as const },
-  { id:'2', name:'Mike Johnson',   sublabel:'RIG-001 · Site A', meters:1245, rop:52, downtime:18, efficiency:92, shifts:24, trend:'up'   as const },
-  { id:'3', name:'Sam Torres',     sublabel:'RIG-005 · Site B', meters:1150, rop:50, downtime:20, efficiency:90, shifts:23, trend:'flat' as const },
-  { id:'4', name:'David Brown',    sublabel:'RIG-002 · Site A', meters:1180, rop:48, downtime:24, efficiency:88, shifts:22, trend:'up'   as const },
-  { id:'5', name:'Alex Roberts',   sublabel:'RIG-004 · Site C', meters:1050, rop:45, downtime:32, efficiency:78, shifts:20, trend:'down' as const, alert:true },
-]
-
-const drillerLeaderboardColumns = [
-  { key:'meters',    label:'Meters',     unit:'m',   sortable:true, highlight:true, lowerIsBetter:false },
-  { key:'rop',       label:'ROP',        unit:'m/hr',sortable:true, highlight:true, lowerIsBetter:false },
-  { key:'efficiency',label:'Efficiency', format:'percent' as const, sortable:true, highlight:true, lowerIsBetter:false },
-  { key:'downtime',  label:'Downtime',   unit:'hrs', sortable:true, highlight:true, lowerIsBetter:true  },
-  { key:'shifts',    label:'Shifts',     sortable:true, highlight:false },
-]
-
-const crewHoursData = [
-  { date:'Feb 20', hours:336, target:350, utilization:96  },
-  { date:'Feb 21', hours:384, target:350, utilization:110 },
-  { date:'Feb 22', hours:352, target:350, utilization:101 },
-  { date:'Feb 23', hours:400, target:350, utilization:114 },
-  { date:'Feb 24', hours:368, target:350, utilization:105 },
-  { date:'Feb 25', hours:392, target:350, utilization:112 },
-  { date:'Feb 26', hours:416, target:350, utilization:119 },
-]
-
-const shiftDistribution = [
-  { shift:'Day',   drillers:8, supervisors:3, hours:720 },
-  { shift:'Night', drillers:4, supervisors:1, hours:360 },
-]
-
-const experienceData = [
-  { experience:'0-2 years',  count:3, avgROP:42 },
-  { experience:'2-5 years',  count:5, avgROP:50 },
-  { experience:'5-10 years', count:3, avgROP:56 },
-  { experience:'10+ years',  count:1, avgROP:60 },
-]
-
-const performanceRadar = [
-  { subject:'ROP',        A:92, B:88, fullMark:100 },
-  { subject:'Safety',     A:98, B:95, fullMark:100 },
-  { subject:'Attendance', A:95, B:90, fullMark:100 },
-  { subject:'Efficiency', A:96, B:85, fullMark:100 },
-  { subject:'Quality',    A:90, B:88, fullMark:100 },
-  { subject:'Teamwork',   A:94, B:92, fullMark:100 },
-]
-
-const productivityScatter = [
-  { x:52, y:1245, z:18, name:'Mike J.'   },
-  { x:48, y:1180, z:24, name:'David B.'  },
-  { x:58, y:1320, z:12, name:'Chris W.'  },
-  { x:45, y:1050, z:32, name:'Alex R.'   },
-  { x:50, y:1150, z:20, name:'Sam T.'    },
-]
-
-const drillerInsights = [
-  { id:'1', type:'anomaly' as const,    severity:'warning' as const,  title:'Low ROP Alert',          description:'Alex R. showing ROP 20% below team average',   metric:'ROP Performance', change:'-20% vs avg',     recommendation:'Provide additional training on drilling parameters'      },
-  { id:'2', type:'trend' as const,      severity:'info' as const,     title:'Top Performer',          description:'Chris W. consistently achieving highest ROP',   metric:'Best ROP',        change:'58 m/hr avg',     recommendation:'Document best practices from Chris for team training'    },
-  { id:'3', type:'anomaly' as const,    severity:'critical' as const, title:'High Downtime Pattern',  description:'Alex R. has 78% more downtime than others',     metric:'Downtime',        change:'+78% vs avg',     recommendation:'Review equipment handling procedures with Alex'          },
-  { id:'4', type:'prediction' as const, severity:'info' as const,     title:'Crew Efficiency Forecast',description:'Team efficiency projected to increase 8% next week',metric:'Efficiency',  change:'+8% projected',   recommendation:'Maintain current crew assignments'                      },
-]
-
-export default function AdminDrillerCrewDashboard() {
   return (
-    <div className="space-y-8 pb-8">
-      <AIInsights dashboardType="driller" insights={drillerInsights} />
+    <Page>
+      <PageHead question="Who is drilling well, and who needs help?"
+        answer={c.drillers.length
+          ? <>{c.drillers.length} drillers {c.s.label}. The bit was on bottom {Math.round(util)}% of shift time.</>
+          : <>No driller named on the logs for these filters.</>}
+        right={<FilterBar />} />
+      <BoardTabs />
+      <InsightsCard insights={insights} />
 
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-[color:var(--x-text)]">Driller & Crew Dashboard</h2>
-          <p className="text-[color:var(--x-muted)] mt-1">Personnel performance and workforce analytics</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 bg-[var(--x-raised2)] border border-[color:var(--x-border)] rounded-xl">
-            <Filter className="w-4 h-4 text-[color:var(--x-faint)]" />
-            <select className="bg-transparent text-[color:var(--x-text)] text-sm outline-none">
-              <option className="bg-[var(--x-raised2)]">All Projects</option>
-              <option className="bg-[var(--x-raised2)]">Gold Mine Project A</option>
-              <option className="bg-[var(--x-raised2)]">Copper Exploration</option>
-            </select>
-          </div>
-        </div>
-      </div>
+      <Grid min={170}>
+        <Tile label="Drillers" value={c.drillers.length} note={`${c.s.whole.length} shifts`} />
+        <Tile label="Crew-shifts" value={n0(c.heads)} note="People on the rig, shift by shift" />
+        <Tile label="Shift hours" value={`${n0(c.shiftHours)} h`} />
+        <Tile label="Bit on bottom" value={`${Math.round(util)}%`} tone={util < 65 ? 'warn' : 'good'} note={`${n0(c.drillHours)} drilling hours`} />
+      </Grid>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Total Drillers" value="12"       icon={Users}     color="var(--x-blue)" trend="+2"   trendUp={true}  />
-        <KpiCard label="Avg ROP"        value="50.6"     unit="m/hr" icon={TrendingUp} color="var(--x-green)" trend="+5%" trendUp={true} />
-        <KpiCard label="Total Hours"    value="2,448"    unit="hrs"  icon={Clock}     color="var(--x-cyan)" trend="+12%" trendUp={true} />
-        <KpiCard label="Top Performer"  value="Chris W." icon={Award}     color="var(--x-orange)" trend="96%"  trendUp={true}  />
-      </div>
+      {c.drillers.length === 0 ? <Card><Empty>Nothing to show for these filters.</Empty></Card> : <>
+        <Card title="Drillers" subtitle="Click a heading to sort. Own stops are hours lost on that driller's shifts to your side's causes." pad={false}>
+          <Table>
+            <thead><tr>
+              <th style={th}>Driller</th><th style={th}>Rig</th><th style={thR}>Shifts</th>
+              {head('metres', 'Metres')}{head('rop', 'm an hour')}{head('perShift', 'm a shift')}<th style={thR}>Core</th>{head('own', 'Own stops')}
+            </tr></thead>
+            <tbody>
+              {rows.map(d => (
+                <tr key={d.name} style={{ borderBottom: rowLine }}>
+                  <td style={tdStrong}>{d.name}</td>
+                  <td style={td}>{d.rigs.join(', ')}{d.owner !== 'Own' && <span style={{ color: T.faint }}> · {d.owner}</span>}</td>
+                  <td style={tdR}>{d.shifts}</td><td style={tdR}>{n1(d.metres)}</td><td style={tdR}>{d.rop.toFixed(2)}</td><td style={tdR}>{n1(d.perShift)}</td>
+                  <td style={tdR}>{d.metres ? `${d.recovery.toFixed(1)}%` : '—'}</td><td style={tdR}>{d.own ? `${n1(d.own)} h` : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* ── DRILLER PERFORMANCE — REPLACED WITH LeaderboardTable ── */}
-        <motion.div style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }} className="lg:col-span-2">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold text-[color:var(--x-text)]">Driller Performance Leaderboard</h3>
-            <span className="text-xs text-[color:var(--x-faint)] bg-[var(--x-raised2)] px-3 py-1 rounded-full border border-[color:var(--x-border)]">
-              Search · Sort · Paginate — handles 70+ drillers
-            </span>
-          </div>
-          <p className="text-xs text-[color:var(--x-faint)] mb-4">Click any column header to sort · 🥇🥈🥉 for top 3 · 🔴 alert for high downtime</p>
-          <LeaderboardTable
-            rows={drillerLeaderboardRows}
-            columns={drillerLeaderboardColumns}
-            pageSize={10}
-            searchable={true}
-            searchPlaceholder="Search driller name or rig..."
-            defaultSortKey="meters"
-            defaultSortDir="desc"
-            showRank={true}
-            highlightTopN={3}
-          />
-        </motion.div>
-
-        {/* ROP vs Meters Scatter */}
-        <motion.div style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">ROP vs Meters (Bubble = Downtime)</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" />
-                <XAxis type="number" dataKey="x" name="ROP"    stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <YAxis type="number" dataKey="y" name="Meters" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <ZAxis type="number" dataKey="z" range={[100, 500]} />
-                <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray:'3 3' }} />
-                <Scatter name="Drillers" data={productivityScatter} fill="var(--x-purple)">
-                  {productivityScatter.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.z > 25 ? 'var(--x-red)' : entry.z > 15 ? 'var(--x-amber)' : 'var(--x-green)'} />
-                  ))}
-                </Scatter>
+        <Split>
+          <Card title="Speed against metres" subtitle="Each dot is a driller. Bigger dot: more hours lost to own stops.">
+            <ResponsiveContainer width="100%" height={260}>
+              <ScatterChart margin={{ top: 10, right: 16, bottom: 10, left: 0 }}>
+                <CartesianGrid stroke={gridStroke} />
+                <XAxis type="number" dataKey="metres" name="Metres" tick={axisTick} tickLine={false} axisLine={{ stroke: T.border }} tickFormatter={(v: number) => `${v} m`} />
+                <YAxis type="number" dataKey="rop" name="m an hour" tick={axisTick} tickLine={false} axisLine={false} width={40} />
+                <ZAxis type="number" dataKey="own" range={[60, 420]} />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
+                  const d = active && payload?.[0]?.payload as (typeof rows)[number] | undefined
+                  return d ? <div style={{ background: 'var(--x-side)', border: `1px solid ${T.border}`, borderRadius: 9, padding: '9px 12px', fontSize: 12.5, color: T.text }}>
+                    <b>{d.name}</b> · {d.rigs.join(', ')}<br />{n1(d.metres)} m · {d.rop.toFixed(2)} m an hour · {n1(d.own)} h own stops</div> : null
+                }} />
+                {owners.map((o, i) => <Scatter key={o} name={o} data={c.drillers.filter(d => d.owner === o)} fill={rigColour(i)} fillOpacity={0.75} isAnimationActive={false} />)}
               </ScatterChart>
             </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Crew Hours Trend */}
-        <motion.div style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Crew Hours & Utilization</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={crewHoursData}>
-                <defs>
-                  <linearGradient id="hoursGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--x-cyan)" stopOpacity={0.3}/><stop offset="95%" stopColor="var(--x-cyan)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
-                <XAxis dataKey="date"   stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <YAxis yAxisId="left"  stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <YAxis yAxisId="right" orientation="right" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Area  yAxisId="left"  type="monotone" dataKey="hours"       name="Hours Worked"  stroke="var(--x-cyan)" strokeWidth={3} fill="url(#hoursGradient)" />
-                <Line  yAxisId="left"  type="monotone" dataKey="target"      name="Target"        stroke="var(--x-faint)" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                <Line  yAxisId="right" type="monotone" dataKey="utilization" name="Utilization %" stroke="var(--x-pink)" strokeWidth={3} dot={{ fill:'var(--x-pink)', r:4 }} />
+            <Legend items={owners.map((o, i) => ({ color: rigColour(i), label: o === 'Own' ? 'Your drillers' : o }))} />
+          </Card>
+          <Card title="Crew hours, week by week" subtitle="Bars are hours on bottom; the line is the share of shift time drilling.">
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={c.hours} margin={{ top: 10, right: 6, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={gridStroke} vertical={false} />
+                <XAxis dataKey="week" tick={axisTick} tickLine={false} axisLine={{ stroke: T.border }} />
+                <YAxis yAxisId="h" tick={axisTick} tickLine={false} axisLine={false} width={40} tickFormatter={(v: number) => `${v} h`} />
+                <YAxis yAxisId="p" orientation="right" domain={[0, 100]} tick={axisTick} tickLine={false} axisLine={false} width={34} tickFormatter={(v: number) => `${v}%`} />
+                <Tooltip content={<Tip names={{ drilling: 'Drilling hours', utilisation: 'On bottom %' }} />} />
+                <Bar yAxisId="h" dataKey="drilling" fill={T.bar} maxBarSize={30} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                <Line yAxisId="p" dataKey="utilisation" stroke={T.orangeD} strokeWidth={2} dot={{ r: 3 }} connectNulls isAnimationActive={false} />
               </ComposedChart>
             </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Shift Distribution */}
-        <motion.div style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Shift Distribution</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={shiftDistribution}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
-                <XAxis dataKey="shift" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <YAxis stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar dataKey="drillers"    name="Drillers"     fill="var(--x-blue)" radius={[4,4,0,0]} />
-                <Bar dataKey="supervisors" name="Supervisors"  fill="var(--x-green)" radius={[4,4,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Experience vs ROP */}
-        <motion.div style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Experience vs Average ROP</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={experienceData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--x-border)" vertical={false} />
-                <XAxis dataKey="experience" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <YAxis yAxisId="left"  stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <YAxis yAxisId="right" orientation="right" stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'var(--x-border)' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Bar  yAxisId="left"  dataKey="count"  name="Driller Count" fill="var(--x-purple)" radius={[4,4,0,0]} />
-                <Line yAxisId="right" type="monotone" dataKey="avgROP" name="Avg ROP" stroke="var(--x-amber)" strokeWidth={3} dot={{ fill:'var(--x-amber)', r:6 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Performance Radar */}
-        <motion.div style={{ background:'var(--x-card)', border:'1px solid var(--x-border)', borderRadius:16, padding:24 }}>
-          <h3 className="text-lg font-semibold text-[color:var(--x-text)] mb-6">Performance Comparison (Top 2)</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={performanceRadar}>
-                <PolarGrid stroke="var(--x-border)" />
-                <PolarAngleAxis dataKey="subject" stroke="var(--x-muted)" tick={{ fill:'var(--x-muted)', fontSize:12 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="var(--x-faint)" tick={{ fill:'var(--x-faint)', fontSize:10 }} />
-                <Radar name="Chris W." dataKey="A" stroke="var(--x-green)" strokeWidth={3} fill="var(--x-green)" fillOpacity={0.3} />
-                <Radar name="Mike J."  dataKey="B" stroke="var(--x-blue)" strokeWidth={3} fill="var(--x-blue)" fillOpacity={0.3} />
-                <Legend wrapperStyle={{ paddingTop:'20px' }} />
-                <Tooltip content={<CustomTooltip />} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-      </div>
-    </div>
+            <Legend items={[{ color: T.bar, label: 'Drilling hours' }, { color: T.orangeD, label: 'Share of shift time on bottom', line: true }]} />
+          </Card>
+        </Split>
+      </>}
+    </Page>
   )
 }
-
