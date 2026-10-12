@@ -62,6 +62,8 @@ export interface ScoreRow {
   cost: number; revenue: number; margin: number
   costPerMetre: number; ratePerMetre: number; marginPerMetre: number; marginPct: number
   incidents: number
+  // Days on a project with a daily target, and how many met it.
+  targetDays: number; onTargetDays: number
   reporting?: Reporting
   billing?: Billing
 }
@@ -70,6 +72,7 @@ const blank = (key: string, kind: ScoreRow['kind'], name: string): ScoreRow => (
   key, kind, name, rigNames: [], projects: [], rigs: 0, days: 0, drillDays: 0, standbyDays: 0, breakdownDays: 0,
   metres: 0, core: 0, recoveryPct: 0, perRigDay: 0, drillingHours: 0, perHour: 0, shiftHours: 0, ownStopHours: 0, standbyHours: 0,
   availabilityPct: 0, cost: 0, revenue: 0, margin: 0, costPerMetre: 0, ratePerMetre: 0, marginPerMetre: 0, marginPct: 0, incidents: 0,
+  targetDays: 0, onTargetDays: 0,
 })
 function finish(r: ScoreRow) {
   r.rigs = r.rigNames.length
@@ -140,6 +143,7 @@ export function buildScorecard(state: CostingState, inv: InvState, project: stri
       if (!r.rigNames.includes(rig)) r.rigNames.push(rig)
       if (!r.projects.includes(p)) r.projects.push(p)
     })
+    const target = (state.projects ?? []).find(x => x.name === p)?.dailyTarget
     use.forEach(m => {
       const t = ((trendAcc[m] ||= {})[who.key] ||= { metres: 0, days: 0, core: 0 })
       computeRigMonth(state, inv, p, rig, m).days.forEach(d => {
@@ -150,6 +154,7 @@ export function buildScorecard(state: CostingState, inv: InvState, project: stri
           if (d.status === 'standby') r.standbyDays += 1
           if (d.status === 'breakdown') r.breakdownDays += 1
           r.metres += d.units; r.core += d.coreRecovery; r.cost += d.total; r.revenue += d.revenue
+          if (target) { r.targetDays += 1; if (d.units >= target - 1e-6) r.onTargetDays += 1 }
         })
         t.metres += d.units; t.days += 1; t.core += d.coreRecovery
       })
@@ -430,7 +435,7 @@ export function buildRiskRegister(f: Forecast, state: CostingState, today: strin
       detail: `${serious.length ? `${plural(serious.length, 'serious one')}. ` : ''}${worst[0]} has the most: ${worst[1]}. The latest was ${incidents.sort((a, b) => b.date.localeCompare(a.date))[0].type.toLowerCase()} on ${shortDate(incidents[0].date)}.`,
       when: 'Now', impact: null, impactNote: 'people, and the client’s confidence',
       action: `Review each one with the supervisor on ${worst[0]} and record what was changed.`,
-      href: '/admin/analytics/hsc', linkLabel: 'Open safety analytics',
+      href: '/admin/logs/drill', linkLabel: 'Open drill logs',
     })
   }
 

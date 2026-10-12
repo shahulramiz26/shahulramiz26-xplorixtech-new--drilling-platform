@@ -93,7 +93,7 @@ export default function NewProjectPage() {
 
   const [step, setStep] = useState(0)
   const [f, setF] = useState({
-    name: '', code: nextProjectCode(projects), location: '', client: '', startDate: TODAY, plannedMetres: '', holeSize: 'HQ',
+    name: '', code: nextProjectCode(projects), location: '', client: '', startDate: TODAY, plannedMetres: '', holeSize: 'HQ', dailyTarget: '',
   })
   const [useRates, setUseRates] = useState(true)
   const [rate, setRate] = useState<ClientRate>(() => blankClientRate('', TODAY))
@@ -153,6 +153,7 @@ export default function NewProjectPage() {
     const project: ProjectRecord = {
       id: f.code.trim().toUpperCase(), code: f.code.trim().toUpperCase(), name, location: f.location.trim(), client: f.client.trim(),
       status: 'active', startDate: f.startDate, plannedMetres: parseFloat(f.plannedMetres) || undefined, holeSize: f.holeSize,
+      dailyTarget: parseFloat(f.dailyTarget) || undefined,
       shared: willShare, rigs, supervisors, drillers, createdAt: TODAY,
     }
     createProject(project, {
@@ -202,6 +203,9 @@ export default function NewProjectPage() {
               <select value={f.holeSize} onChange={e => setF({ ...f, holeSize: e.target.value })} style={{ ...inputStyle, cursor: 'pointer' }}>
                 {HOLE_SIZES.map(h => <option key={h} value={h}>{h}</option>)}
               </select>
+            </Field>
+            <Field label="Daily target, metres per rig" hint="Your KPI. The Dashboard flags a rig that falls under it. The client never sees it.">
+              <input type="number" min={0} value={f.dailyTarget} onChange={e => setF({ ...f, dailyTarget: e.target.value })} placeholder="e.g. 18" style={{ ...inputStyle, textAlign: 'right' }} />
             </Field>
           </div>
         </Card>

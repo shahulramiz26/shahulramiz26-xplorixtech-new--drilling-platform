@@ -8,7 +8,7 @@ import {
   poHasSomethingToReorder, poHasSomethingToReceive, rateOfLine,
   openReorders, REORDER_STATUS_LABEL, REORDER_OPEN_STATUSES, DELAY_REASONS,
   stockInStore, buildAlerts, supplierPerformance, supplierInsight,
-  rigHoldings, toolingRatesFor, terrainRows, groundMix, TERRAIN_MIN_SAMPLE,
+  rigHoldings, toolingRatesFor, toolingFor, terrainRows, groundMix, TERRAIN_MIN_SAMPLE,
   formationUse, FORMATION_USES, FORMATION_USE_LABEL,
   daysBetween, addDays, projectCode, isLiveProject, money, moneyL, perMetre,
   dayLabel, fullDate, uid,
@@ -127,16 +127,20 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
+const PART_SIZES = ['HQ', 'NQ', 'PQ', 'BQ', 'AQ']
+/* Where a part wears: its ground, and its core size when it has one. */
+const useLabel = (p: Part) => `${FORMATION_USE_LABEL[formationUse(p)]}${p.holeSize ? ` · ${p.holeSize} only` : ''}`
+
 function Modal({ title, subtitle, width = 760, onClose, children, footer }: { title: string; subtitle?: string; width?: number; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(var(--x-shadow),0.82)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, width, maxWidth: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+      <div role="dialog" aria-modal="true" aria-label={title} onClick={e => e.stopPropagation()} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, width, maxWidth: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 20px 13px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{title}</div>
             {subtitle && <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>{subtitle}</div>}
           </div>
-          <button onClick={onClose} style={{ padding: 7, borderRadius: 8, background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0, fontFamily: 'inherit' }}>✕</button>
+          <button onClick={onClose} aria-label="Close" style={{ padding: 7, borderRadius: 8, background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0, fontFamily: 'inherit' }}>✕</button>
         </div>
         <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>{children}</div>
         {footer && <div style={{ padding: '13px 20px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>{footer}</div>}
@@ -327,7 +331,7 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
                   </td>
                   <td style={{ ...tdMono, color: p.serialNumber ? C.muted : C.dim }}>{p.serialNumber || '—'}</td>
                   <td style={td}><Tag tone={C.dim}>{p.category}</Tag></td>
-                  <td style={{ ...td, color: C.muted }}>{FORMATION_USE_LABEL[formationUse(p)]}</td>
+                  <td style={{ ...td, color: C.muted }}>{useLabel(p)}</td>
                   <td style={tdN}>{money(p.rate)}</td>
                   <td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td>
                   <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(costPerMetre(p))}</td>
@@ -397,6 +401,12 @@ function PartModal({ part, onSave, onClose }: { part: Part; onSave: (p: Part) =>
           <Field label="Lead time" hint="days"><input type="number" value={f.leadTimeDays} onChange={e => u({ leadTimeDays: parseFloat(e.target.value) || 0 })} style={numStyle} /></Field>
         </Grid>
         <Grid cols={2}>
+          <Field label="Core size" hint="An HQ bit wears only on HQ metres. Leave on Any size for parts every size uses.">
+            <select value={f.holeSize ?? ''} onChange={e => u({ holeSize: e.target.value || undefined })} style={{ ...iStyle, cursor: 'pointer' }}>
+              <option value="">Any size</option>
+              {PART_SIZES.map(z => <option key={z} value={z}>{z} only</option>)}
+            </select>
+          </Field>
           <Field label="Supplier">
             <select value={f.supplier} onChange={e => u({ supplier: e.target.value })} style={{ ...iStyle, cursor: 'pointer' }}>
               {state.suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
@@ -416,7 +426,7 @@ function PartModal({ part, onSave, onClose }: { part: Part; onSave: (p: Part) =>
 function ImportModal({ onClose }: { onClose: () => void }) {
   const { state, importParts } = useInventory()
   const [text, setText] = useState('')
-  const TEMPLATE = 'part_number,name,serial_number,category,rate,life_metres,used_in,supplier,lead_days,min_stock\nHQ-BIT-IMP,HQ Impregnated Bit,,Bit,22000,100,hard+,Sandvik Mining,18,3\nHQ-ROD-30,HQ Wire Line Drill Rod 3.0 m,,Rod & Casing,7840,5000,all,Boart Longyear India,21,6\n'
+  const TEMPLATE = 'part_number,name,serial_number,category,rate,life_metres,used_in,size,supplier,lead_days,min_stock\nHQ-BIT-IMP,HQ Impregnated Bit,,Bit,22000,100,hard+,HQ,Sandvik Mining,18,3\nHQ-ROD-30,HQ Wire Line Drill Rod 3.0 m,,Rod & Casing,7840,5000,all,HQ,Boart Longyear India,21,6\n'
 
   const parsed = useMemo<Part[]>(() => {
     if (!text.trim()) return []
@@ -436,6 +446,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
         category: (CATEGORIES as string[]).includes(at('category')) ? at('category') as PartCategory : 'Accessory',
         formation: rawUse || 'all',
         rate: num('rate'), lifeMetres: num('life_metres') || num('life'),
+        holeSize: PART_SIZES.includes(at('size').toUpperCase()) ? at('size').toUpperCase() : undefined,
         supplier: at('supplier') || (state.suppliers[0]?.name ?? ''),
         leadTimeDays: num('lead_days', 14), minStock: num('min_stock', 1), active: true,
       })
@@ -459,7 +470,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
                 {parsed.map((p, k) => (
                   <tr key={k} style={{ borderBottom: rowBorder }}>
                     <td style={{ ...td, color: C.text }}>{p.name}</td>
-                    <td style={{ ...td, color: C.muted }}>{FORMATION_USE_LABEL[formationUse(p)]}</td>
+                    <td style={{ ...td, color: C.muted }}>{useLabel(p)}</td>
                     <td style={tdN}>{money(p.rate)}</td>
                     <td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td>
                     <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{p.lifeMetres > 0 ? perMetre(p.rate / p.lifeMetres) : '—'}</td>
@@ -846,7 +857,10 @@ function StoreTab() {
              * consume surface casing, so adding every part's rate together
              * produces a figure no metre is ever charged. What a rig costs per
              * metre is a range across the ground it is equipped for. */
-            const charged = FORMATIONS.map(f => tooling.byFormation[f]).filter(x => x > 0)
+            // A rig carrying HQ and NQ parts has a rate for each size: never the two added together.
+            const sizes = Array.from(new Set(tooling.lines.map(l => l.size).filter(Boolean))) as string[]
+            const rateAt = (f: Formation) => sizes.length ? sizes.map(z => ({ z, r: toolingFor(tooling, f, z) })) : [{ z: '', r: tooling.byFormation[f] }]
+            const charged = FORMATIONS.flatMap(f => rateAt(f).map(x => x.r)).filter(x => x > 0)
             const lowRate = charged.length ? Math.min(...charged) : 0
             const highRate = charged.length ? Math.max(...charged) : 0
             const rateRange = charged.length === 0 ? '—'
@@ -870,7 +884,7 @@ function StoreTab() {
                   {FORMATIONS.map(f => (
                     <span key={f} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7, padding: '4px 10px', borderRadius: 7, background: `${hexA(FORMATION_TONE[f], 0x14)}`, border: `1px solid ${hexA(FORMATION_TONE[f], 0x33)}` }}>
                       <span style={{ fontSize: 11, color: FORMATION_TONE[f], fontWeight: 700 }}>{f}</span>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: C.text, fontFamily: 'ui-monospace, monospace' }}>{perMetre(tooling.byFormation[f])}</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: C.text, fontFamily: 'ui-monospace, monospace' }}>{rateAt(f).map(x => `${x.z ? `${x.z} ` : ''}${perMetre(x.r)}`).join(' · ')}</span>
                     </span>
                   ))}
                   {tooling.fellBack.length > 0 && (
@@ -899,7 +913,7 @@ function StoreTab() {
                         <tr key={l.itemId} style={{ borderBottom: rowBorder }}>
                           <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{l.partNumber || '—'}</td>
                           <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 190 }}>{l.name}</td>
-                          <td style={{ ...td, color: C.muted }}>{FORMATION_USE_LABEL[l.use]}</td>
+                          <td style={{ ...td, color: C.muted }}>{FORMATION_USE_LABEL[l.use]}{l.size ? ` · ${l.size} only` : ''}</td>
                           <td style={{ ...tdN, color: C.faint }}>{l.lifeMetres.toLocaleString('en-IN')} m</td>
                           <td style={{ ...tdN, color: l.kitQty > 0 ? C.purple : C.dim }}>{l.kitQty > 0 ? l.kitQty : '—'}</td>
                           <td style={{ ...tdN, color: l.issuedQty > 0 ? C.amber : C.dim, fontWeight: l.issuedQty > 0 ? 700 : 400 }}>{l.issuedQty > 0 ? l.issuedQty : '—'}</td>
@@ -1055,7 +1069,7 @@ function PickPartsModal({ title, subtitle, tone, note, qtyLabel, withRig, confir
                       <tr key={p.id} style={{ borderBottom: rowBorder, background: on ? `${hexA(tone, 0x12)}` : undefined }}>
                         <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber}</td>
                         <td style={{ ...td, color: on ? C.text : C.muted, fontWeight: on ? 700 : 400, whiteSpace: 'normal', maxWidth: 190 }}>{p.name}</td>
-                        <td style={{ ...td, color: C.muted }}>{FORMATION_USE_LABEL[formationUse(p)]}</td>
+                        <td style={{ ...td, color: C.muted }}>{useLabel(p)}</td>
                         <td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td>
                         <td style={tdN}>{money(p.rate)}</td>
                         <td style={{ padding: '4px 8px', width: 92 }}>
@@ -1165,7 +1179,7 @@ function InsightsTab() {
       .filter(l => l.project === project && (rig === 'All' || l.rig === rig))
       .map(l => ({
         rig: l.rig, project: l.project, date: l.date,
-        metres: l.metresDrilled, formation: normFormation(l.formationType),
+        metres: l.metresDrilled, formation: normFormation(l.formationType), holeSize: l.holeSize,
         used: (l.partsUsed ?? []).map(u => ({ itemId: u.itemId, qty: u.qty ?? 0 })),
       })),
   [cost.shiftLogs, project, rig])

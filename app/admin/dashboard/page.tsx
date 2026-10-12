@@ -23,7 +23,7 @@ import {
  * It is laid out in the order an owner asks his questions each morning:
  * what needs me, are the rigs turning, are we making money. */
 
-const statusTone: Record<RigStatus, Tone> = { drilling: 'good', standby: 'warn', breakdown: 'bad', 'no-shift': 'neutral', 'to-check': 'warn' }
+const statusTone: Record<RigStatus, Tone> = { drilling: 'good', standby: 'warn', breakdown: 'bad', 'no-shift': 'neutral', 'to-check': 'warn', idle: 'neutral' }
 
 /* A new company opens on an empty Dashboard. This says what to do first, in
  * the order it has to be done, and ticks each step off from the record
@@ -143,6 +143,9 @@ export default function AdminDashboard() {
                 <td style={tdR}>
                   <div style={{ color: T.text, fontWeight: 600 }}>{num(r.monthMetres)} m</div>
                   <div style={{ fontSize: 11.5, color: T.faint, marginTop: 3 }}>{r.monthDays ? (r.monthMetres / r.monthDays).toFixed(1) : '0'} m a day</div>
+                  {r.target && r.monthDays > 0 && (
+                    <div style={{ fontSize: 11.5, marginTop: 2, color: r.monthOnTarget < r.monthDays ? T.amber : T.green }}>{r.monthOnTarget} of {r.monthDays} days at {r.target} m</div>
+                  )}
                 </td>
                 <td style={tdR}>{r.monthLostHours ? `${r.monthLostHours} h` : <span style={{ color: T.dim }}>0</span>}</td>
                 <td style={td}><Spark values={r.last14} /></td>

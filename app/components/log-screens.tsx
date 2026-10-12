@@ -190,8 +190,8 @@ export function DrillLogsScreen({ who, supervisor }: { who: string; supervisor?:
                     <td style={{ ...td, color: T.text, fontWeight: 600 }}>{l.driller || '—'}</td>
                     <td style={{ ...td, color: T.text, fontWeight: 600 }}>{l.supervisor || '—'}</td>
                     <td style={tdM}>{l.holeNumber ?? '—'}{second && <div style={{ color: T.faint }}>+ {second.holeNumber}</div>}</td>
-                    <td style={tdM}>{l.meterStart ?? '—'}</td>
-                    <td style={tdM}>{l.meterEnd ?? '—'}</td>
+                    <td style={tdM}>{l.meterStart != null ? +l.meterStart.toFixed(2) : '—'}</td>
+                    <td style={tdM}>{l.meterEnd != null ? +l.meterEnd.toFixed(2) : '—'}</td>
                     <td style={tdM}>{l.standbyMode ? <Status tone="warn">Standby</Status> : `${l.metresDrilled} m`}{second && <div style={{ color: T.faint }}>+ {second.metresDrilled} m</div>}</td>
                     <td style={{ ...td, whiteSpace: 'normal', minWidth: 110 }}>{l.lithology || '—'}</td>
                     <td style={tdM}>{l.engineHmr ?? '—'}</td>

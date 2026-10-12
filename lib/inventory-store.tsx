@@ -115,6 +115,9 @@ export interface Part {
   formation?: string      // legacy tag, read by formationUse()
   formationUse?: FormationUse
   lifeMetres: number      // metres before replacement
+  /* The core size it belongs to: an HQ bit wears only on HQ metres. Blank for
+   * a part used whatever the size, such as a water swivel. */
+  holeSize?: string
   supplier: string
   leadTimeDays: number
   minStock: number
@@ -554,6 +557,7 @@ export interface ToolingRateLine {
   name: string
   category: PartCategory
   use: FormationUse
+  size?: string
   qty: number
   avgRate: number
   catalogueRate: number
@@ -596,6 +600,7 @@ export function toolingRatesFor(
       name: part.name,
       category: part.category,
       use: formationUse(part),
+      size: part.holeSize || undefined,
       qty: u.qty,
       avgRate,
       catalogueRate: part.rate,
@@ -626,6 +631,17 @@ export function toolingRatesFor(
   }
 }
 
+/* What a metre of this ground, at this core size, wears out. A part tagged
+ * with a size counts only on metres of that size, so a hole that changes from
+ * HQ to NQ is not charged for both sets of bits. Ground with no part of its
+ * own falls back to everything carried at that size, as byFormation does. */
+export function toolingFor(t: ToolingRates, f: Formation, size?: string): number {
+  const atSize = t.lines.filter(l => !l.size || !size || l.size === size)
+  if (atSize.length === 0) return 0
+  const mine = atSize.filter(l => USE_COVERS[l.use].includes(f))
+  return (mine.length ? mine : atSize).reduce((s, l) => s + l.perMetre, 0)
+}
+
 /* ── What a rig is carrying, for the screen ───────────────────────────── */
 
 export interface RigHoldingLine {
@@ -634,6 +650,7 @@ export interface RigHoldingLine {
   name: string
   category: PartCategory
   use: FormationUse
+  size?: string
   lifeMetres: number
   kitQty: number           // from "Assign starting kit" — no purchase order
   issuedQty: number        // handed over from the store shelf
@@ -669,7 +686,7 @@ export function rigHoldings(
         partNumber: part.partNumber,
         name: part.name,
         category: part.category,
-        use: formationUse(part),
+        use: formationUse(part), size: part.holeSize || undefined,
         lifeMetres: part.lifeMetres,
         kitQty: u.kitQty,
         issuedQty: u.issuedQty,
@@ -730,6 +747,7 @@ export interface ShiftFact {
   date: string
   metres: number
   formation: Formation
+  holeSize?: string
   used: { itemId: string; qty: number }[]
 }
 
@@ -827,14 +845,15 @@ export interface GroundBand {
 
 export function groundMix(facts: ShiftFact[], tooling: ToolingRates): GroundBand[] {
   const metres: Record<Formation, number> = { Soft: 0, Medium: 0, Hard: 0, 'Very Hard': 0 }
-  facts.forEach(f => { metres[f.formation] += f.metres })
+  const spend: Record<Formation, number> = { Soft: 0, Medium: 0, Hard: 0, 'Very Hard': 0 }
+  facts.forEach(f => { metres[f.formation] += f.metres; spend[f.formation] += f.metres * toolingFor(tooling, f.formation, f.holeSize) })
   const total = FORMATIONS.reduce((s, f) => s + metres[f], 0)
   return FORMATIONS.map(f => ({
     formation: f,
     metres: metres[f],
     sharePct: total > 0 ? (metres[f] / total) * 100 : 0,
-    toolingPerMetre: tooling.byFormation[f],
-    toolingSpend: metres[f] * tooling.byFormation[f],
+    toolingPerMetre: metres[f] > 0 ? spend[f] / metres[f] : tooling.byFormation[f],
+    toolingSpend: spend[f],
   })).filter(b => b.metres > 0)
 }
 

@@ -18,7 +18,7 @@ import {
  * is off costs nothing and cannot. */
 
 const DAILY_RATE = 10   // USD per active rig per day — XPLORIX's own charge
-const statusTone: Record<RigStatus, Tone> = { drilling: 'good', standby: 'warn', breakdown: 'bad', 'no-shift': 'neutral', 'to-check': 'warn' }
+const statusTone: Record<RigStatus, Tone> = { drilling: 'good', standby: 'warn', breakdown: 'bad', 'no-shift': 'neutral', 'to-check': 'warn', idle: 'neutral' }
 const SPARE = [{ rig: 'RIG-004', type: 'Core' }, { rig: 'RIG-005', type: 'Core' }]
 
 export default function RigsPage() {

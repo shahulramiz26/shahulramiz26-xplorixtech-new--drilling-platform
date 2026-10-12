@@ -154,17 +154,18 @@ export function holesFromLogs(state: CostingStateLike): LiveHole[] {
     const project = logs[0].project
     const rates = state.clientRates.filter(c => c.project === project)
     let depth = 0
-    const lines: Record<string, { label: string; metres: number; rate: number; amount: number }> = {}
+    const lines: Record<string, { label: string; metres: number; rate: number; amount: number; from: number; to: number; slab: boolean }> = {}
     const shifts: HoleShift[] = logs.map(l => {
       const from = depth
       const cr = versionOn(rates, l.date)
       if (l.metresDrilled > 0) {
         chargeShift(cr, l, depth).forEach(c => {
-          const flat = cr?.structure !== 'slab'
-          const label = flat ? `${c.holeSize} · ${c.formation}` : `${c.holeSize} · ${c.fromDepth}–${c.toDepth} m`
-          const k = `${c.holeSize}|${c.formation}|${Math.round(c.rate)}`
-          const e = (lines[k] ||= { label, metres: 0, rate: c.rate, amount: 0 })
+          // By depth: one line per band, whatever the ground. By ground: one per ground.
+          const slab = cr?.structure === 'slab'
+          const k = slab ? `${c.holeSize}|${Math.round(c.rate)}|${c.matched}` : `${c.holeSize}|${c.formation}|${Math.round(c.rate)}`
+          const e = (lines[k] ||= { label: `${c.holeSize} · ${c.formation}`, metres: 0, rate: c.rate, amount: 0, from: c.fromDepth, to: c.toDepth, slab })
           e.metres += c.metres; e.amount += c.amount
+          e.from = Math.min(e.from, c.fromDepth); e.to = Math.max(e.to, c.toDepth)
         })
         depth += l.metresDrilled
       }
@@ -197,7 +198,9 @@ export function holesFromLogs(state: CostingStateLike): LiveHole[] {
     const status: HoleStatus = st?.status && st.status !== 'drilling' ? st.status : closing ? 'closed' : 'drilling'
     const drilled = depth
     const core = logs.reduce((s, l) => s + l.coreRecovery, 0)
-    const billing = Object.values(lines)
+    const billing = Object.values(lines).sort((a, b) => a.from - b.from).map(({ label, metres, rate, amount, from, to, slab }) => ({
+      label: slab ? `${label.split(' · ')[0]} · ${+from.toFixed(1)}–${+to.toFixed(1)} m` : label, metres, rate, amount,
+    }))
     return {
       id, project, rig: logs[0].rig,
       planned: state.holePlans?.[id]?.plannedDepth, drilled,

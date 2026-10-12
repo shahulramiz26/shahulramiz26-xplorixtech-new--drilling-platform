@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import {
-  normFormation as groundOf, TODAY,
+  normFormation as groundOf, TODAY, toolingFor,
   PROJECTS as INV_PROJECTS, COMPLETED_PROJECTS as INV_COMPLETED, RIGS as INV_RIGS, PROJECT_CODES as INV_CODES,
 } from './inventory-store'
 import type { ToolingRates, Formation } from './inventory-store'
@@ -229,6 +229,7 @@ export const DAY_STATUS_LABEL: Record<DayStatus, string> = {
 export const BREAKDOWN_REASONS = [
   'Mechanical Breakdown', 'Hydraulic Issue', 'Electrical Fault',
   'Bit Change', 'Rod Change', 'Fuel Shortage', 'Operator Delay',
+  'Rig Move', 'Hole Problem',
   // A contractor's stoppage that our site staff did not accept as standby.
   'Contractor Delay',
 ]
@@ -399,12 +400,19 @@ export interface Charge {
   adjustmentPct: number
   amount: number
   matched: boolean
+  /* Priced by depth band: the ground is still recorded but does not split the
+   * bill, so all the metres in one band make one invoice line. */
+  slab?: boolean
 }
 
 export function chargeShift(cr: ClientRate | undefined, log: ShiftLog, fromDepth: number): Charge[] {
   const out: Charge[] = []
-  const to = fromDepth + log.metresDrilled
-  let d = fromDepth
+  /* Depths to the centimetre. Depth is a running sum of logged metres, and a
+   * sum like 90.1 + 9.9 lands a hair past 100 m — which would leave a sliver
+   * of hole outside every rate band and raise a false "no rate" warning. */
+  const cm = (x: number) => Math.round(x * 100) / 100
+  const to = cm(fromDepth + log.metresDrilled)
+  let d = cm(fromDepth)
   let guard = 0
   while (d < to && guard++ < 50) {
     const row = rateRowFor(cr, log.holeSize, log.formationType, d)
@@ -418,6 +426,7 @@ export function chargeShift(cr: ClientRate | undefined, log: ShiftLog, fromDepth
       holeSize: log.holeSize, formation: log.formationType,
       fromDepth: d, toDepth: hi, metres: hi - d,
       rate, adjustmentPct, amount: (hi - d) * rate, matched: !!row,
+      slab: cr?.structure === 'slab' || undefined,
     })
     d = hi
   }
@@ -492,6 +501,9 @@ export interface ProjectRecord {
   status: ProjectStatus
   startDate: string
   plannedMetres?: number
+  /* The metres a rig should make in a day on this project: the KPI. Your own
+   * figure, never shown to the client or the contractor. */
+  dailyTarget?: number
   holeSize: string
   shared: boolean
   rigs: string[]
@@ -789,11 +801,13 @@ export function dayCost(
     if (sh.metresDrilled <= 0) return
     const formation = groundOf(sh.formationType)
     // The contractor's bits and rods are his own; the ground is still recorded.
-    const rate = outsourced ? 0 : tooling.byFormation[formation] ?? tooling.blended
+    const rate = outsourced ? 0 : toolingFor(tooling, formation, sh.holeSize)
     const existing = toolingByFormation.find(x => x.formation === formation)
     if (existing) {
       existing.metres += sh.metresDrilled
       existing.amount += sh.metresDrilled * rate
+      // Two sizes in the same ground on one day: the rate shown is what the metres averaged.
+      existing.rate = existing.metres > 0 ? existing.amount / existing.metres : rate
     } else {
       toolingByFormation.push({ formation, metres: sh.metresDrilled, rate, amount: sh.metresDrilled * rate })
     }
@@ -952,7 +966,7 @@ export interface BillingLine {
 export function billingLines(days: DayCost[]): BillingLine[] {
   const acc: Record<string, BillingLine> = {}
   days.forEach(d => d.charges.forEach(c => {
-    const k = `${c.holeSize}|${c.formation}|${Math.round(c.rate)}`
+    const k = c.slab ? `${c.holeSize}|${Math.round(c.rate)}|${c.matched}` : `${c.holeSize}|${c.formation}|${Math.round(c.rate)}`
     const e = acc[k]
     if (!e) {
       acc[k] = {
@@ -2326,7 +2340,7 @@ export function moneyL(n: number) {
   return money(n)
 }
 export function perUnit(n: number | null) {
-  return n == null ? '—' : `₹${Math.round(n).toLocaleString('en-IN')}/m`
+  return n == null ? '—' : `${n < -0.5 ? '−' : ''}₹${Math.abs(Math.round(n)).toLocaleString('en-IN')}/m`
 }
 export function pct(n: number) { return `${n.toFixed(1)}%` }
 

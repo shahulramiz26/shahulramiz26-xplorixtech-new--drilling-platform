@@ -10,8 +10,8 @@ import {
   disputedAmount, money, moneyL, type ShiftLog, type Invoice,
 } from './costing-store'
 import { computeRigMonth } from './costing-view'
-import { holesFromLogs, type LiveHole } from './client-record'
-import { contractorInbox, projectByName } from './projects'
+import { holesFromLogs, shortDate as shortDay, type LiveHole } from './client-record'
+import { contractorInbox, projectByName, projectHoles } from './projects'
 import { workOrderFor, contractorName, workOrderProgress, billFigures } from './contracting'
 
 /* ==========================================================================
@@ -25,9 +25,11 @@ import { workOrderFor, contractorName, workOrderProgress, billFigures } from './
 
 /* 'to-check' is a contractor's rig whose shift for today has come in but has
  * not been checked by us yet, so it is not in the record. */
-export type RigStatus = 'drilling' | 'standby' | 'breakdown' | 'no-shift' | 'to-check'
+/* 'idle' is a rig with no shift today and no hole left to drill on its
+ * project: waiting for the client to release more holes, or to be moved. */
+export type RigStatus = 'drilling' | 'standby' | 'breakdown' | 'no-shift' | 'to-check' | 'idle'
 export const RIG_STATUS_LABEL: Record<RigStatus, string> = {
-  drilling: 'Drilling', standby: 'Standby', breakdown: 'Breakdown', 'no-shift': 'No shift received', 'to-check': 'Reported, to check',
+  drilling: 'Drilling', standby: 'Standby', breakdown: 'Breakdown', 'no-shift': 'No shift received', 'to-check': 'Reported, to check', idle: 'Idle, no hole left',
 }
 
 export interface RigRow {
@@ -44,6 +46,11 @@ export interface RigRow {
   monthMetres: number
   monthDays: number           // days this rig has a log for, this month
   monthLostHours: number
+  /* The project's daily target and how the rig stands against it: days this
+   * month at or over it, and its average over the last seven logged days. */
+  target?: number
+  monthOnTarget: number
+  last7PerDay: number | null
   last14: { date: string; metres: number }[]
   // Set when the rig is a contractor's, working for us under a work order.
   contractor?: string
@@ -131,14 +138,22 @@ export function useAdminOverview() {
       const inMonth = mine.filter(l => monthOf(l.date) === month)
       const wo = latest ? workOrderFor(costing, latest.project, rig) : undefined
       const unchecked = (costing.contractorReports ?? []).filter(r => r.rig === rig && r.status === 'waiting' && r.date === today)
-      const status: RigStatus = todays.length === 0 ? (unchecked.length ? 'to-check' : 'no-shift') : statusForShifts(todays)
+      const project = latest ? projectByName(costing, latest.project) : undefined
+      // Nothing logged today and nothing left to drill on its project: idle, not missing.
+      const nothingLeft = !!latest && !projectHoles(costing, latest.project).some(h => h.status === 'drilling' || h.status === 'planned')
+      const status: RigStatus = todays.length === 0 ? (unchecked.length ? 'to-check' : nothingLeft ? 'idle' : 'no-shift') : statusForShifts(todays)
+      const target = project?.dailyTarget || undefined
+      const byDay = new Map<string, number>()
+      mine.forEach(l => byDay.set(l.date, (byDay.get(l.date) ?? 0) + l.metresDrilled))
+      const last7 = Array.from(byDay.keys()).sort().slice(-7)
       const lost = todays.filter(l => l.downtimeHours > 0)
       const shift = (name: 'Day' | 'Night') => todays.find(l => l.shift === name)?.metresDrilled ?? null
       return {
         rig, project: latest?.project ?? null, hole: hole?.id ?? null, status,
         contractor: wo ? contractorName(costing, wo.contractorId) : undefined,
         note: status === 'to-check' ? `${unchecked.length} ${unchecked.length === 1 ? 'shift' : 'shifts'} reported today, ${unchecked.reduce((s, r) => s + r.metres, 0)} m, not checked yet`
-          : status === 'no-shift' ? (latest ? `Last shift received ${latest.date}` : 'No shifts logged yet')
+          : status === 'no-shift' ? (latest ? `Last shift received ${shortDay(latest.date)}` : 'No shifts logged yet')
+          : status === 'idle' ? `Every hole on ${latest!.project} is finished · last shift ${shortDay(latest!.date)}`
           : lost.length ? lost.map(l => `${l.downtimeReason || 'Stoppage'}, ${l.downtimeHours} h`).join(' · ')
           : 'No stoppages today',
         holeDrilled: hole?.drilled ?? 0, holePlanned: hole?.planned,
@@ -147,6 +162,9 @@ export function useAdminOverview() {
         monthMetres: inMonth.reduce((s, l) => s + l.metresDrilled, 0),
         monthDays: new Set(inMonth.map(l => l.date)).size,
         monthLostHours: inMonth.reduce((s, l) => s + l.downtimeHours, 0),
+        target,
+        monthOnTarget: target ? Array.from(byDay.entries()).filter(([d, m]) => monthOf(d) === month && m >= target - 1e-6).length : 0,
+        last7PerDay: last7.length ? last7.reduce((s, d) => s + (byDay.get(d) ?? 0), 0) / last7.length : null,
         last14: Array.from({ length: 14 }, (_, i) => {
           const date = addDays(today, i - 13)
           return { date, metres: mine.filter(l => l.date === date).reduce((s, l) => s + l.metresDrilled, 0) }
@@ -281,6 +299,15 @@ export function useAdminOverview() {
       ...rigs.filter(r => r.status === 'breakdown').map(r => ({
         key: `bd_${r.rig}`, tone: 'bad' as Tone, action: 'Open rig', href: '/admin/rigs',
         title: `${r.rig} is broken down today`, detail: `${r.project ?? ''} · ${r.note}`,
+      })),
+      ...rigs.filter(r => r.status === 'idle' && r.project && projectByName(costing, r.project)?.status !== 'completed').map(r => ({
+        key: `idle_${r.rig}`, tone: 'info' as Tone, action: 'Open project', href: `/admin/projects/${idOf(r.project!)}`,
+        title: `${r.rig} has no hole left to drill`, detail: `${r.note}. Add the next holes, move the rig, or mark the project completed.`,
+      })),
+      ...rigs.filter(r => r.target && r.last7PerDay != null && r.status !== 'idle' && r.last7PerDay < r.target - 1e-6).map(r => ({
+        key: `kpi_${r.rig}`, tone: 'warn' as Tone, action: 'Open costing', href: financeLink({ project: r.project ?? '', rig: r.rig, month }),
+        title: `${r.rig} is under its ${r.target} m a day target`,
+        detail: `${r.last7PerDay!.toFixed(1)} m a day over its last 7 logged days · ${r.monthOnTarget} of ${r.monthDays} days on target this month`,
       })),
       ...rigs.filter(r => r.status === 'no-shift' && r.project && !COMPLETED_PROJECTS.includes(r.project)).map(r => ({
         key: `ns_${r.rig}`, tone: 'warn' as Tone, action: 'Open rig', href: '/admin/rigs',

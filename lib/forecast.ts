@@ -677,7 +677,7 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
   if (ownHours > 0 && worstOwn) weaknesses.push({
     title: `${round(ownHours)} hours lost to your own stoppages in 30 days`,
     detail: `Bit and rod changes, hydraulic, mechanical and electrical faults. ${worstOwn.rig} lost the most: ${round(worstOwn.ownHours)} hours over ${plural(worstOwn.ownEvents, 'shift')}. These are not billable.`,
-    figure: `${round(ownMetresLost)} m`, href: '/admin/analytics',
+    figure: `${round(ownMetresLost)} m`, href: '/admin/intelligence/contractors',
   })
   if (cash.notApproved > 0) weaknesses.push({
     title: `${plural(cash.notApprovedCount, 'closed hole')} not yet approved for billing`,
@@ -706,13 +706,13 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
   if ((ownMetresLost / 2) * next.ratePerMetre >= 50000) opportunities.push({
     title: `Halve your own stoppages`,
     detail: `Half of the ${round(ownHours)} hours lost in the last 30 days, at the metres each rig makes in a drilling hour.`,
-    figure: `+${moneyL((ownMetresLost / 2) * next.ratePerMetre)}`, href: '/admin/analytics',
+    figure: `+${moneyL((ownMetresLost / 2) * next.ratePerMetre)}`, href: '/admin/intelligence/contractors',
   })
   const bestGap = sum(fastRows.filter(inNext), r => r.metres) - next.metres
   if (idleDays === 0 && bestGap > 5) opportunities.push({
     title: `Drill like your best month`,
     detail: `Each rig at its best month on record adds ${round(bestGap)} m in ${nextName}.`,
-    figure: `+${moneyL(bestGap * next.ratePerMetre)}`, href: '/admin/analytics',
+    figure: `+${moneyL(bestGap * next.ratePerMetre)}`, href: '/admin/intelligence/contractors',
   })
 
   if (idleDays > 0) threats.push({
@@ -733,7 +733,7 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
   if (next.revenue - slowRevenue > 0) threats.push({
     title: `A slow month`,
     detail: `If every rig drills like its slowest month on record, ${nextName} makes ${round(sum(slowRows.filter(inNext), r => r.metres))} m instead of ${round(next.metres)} m.`,
-    figure: `−${moneyL(next.revenue - slowRevenue)}`, href: '/admin/analytics',
+    figure: `−${moneyL(next.revenue - slowRevenue)}`, href: '/admin/intelligence/contractors',
   })
   if (cash.overdue + cash.disputed > 0) threats.push({
     title: `Money already late or disputed`,
@@ -754,7 +754,10 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
       when: shortDate(first),
       impact: cost, impactNote: 'crew and ownership cost with nothing billed',
       likelihood: 'High',
-      action: `Ask ${clientOf(p.project)} to release the next holes by ${shortDate(addDays(first, -10))}, and add them under Projects.`,
+      // Ten days' notice when there is time for it; otherwise now, never a date already gone.
+      action: addDays(first, -10) > today
+        ? `Ask ${clientOf(p.project)} to release the next holes by ${shortDate(addDays(first, -10))}, and add them under Projects.`
+        : `Ask ${clientOf(p.project)} to release the next holes now, and add them under Projects. If there are none, move the rig or close the project.`,
       href: '/admin/projects', linkLabel: 'Open projects',
     })
   })
@@ -837,7 +840,7 @@ export function buildForecast(costing: CostingState, inv: InvState, today: strin
     action: worstOwn && worstOwn.ownHours > 0
       ? `Watch ${worstOwn.rig}: ${round(worstOwn.ownHours)} hours of its own stoppages in 30 days. Service it before ${nextName}.`
       : 'Keep the daily metres in view on the Dashboard.',
-    href: '/admin/analytics', linkLabel: 'Open analytics',
+    href: '/admin/intelligence/contractors', linkLabel: 'Open rig by rig',
   })
   const rank: Record<Likelihood, number> = { High: 0, Medium: 1, Low: 2 }
   risks.sort((a, b) => rank[a.likelihood] - rank[b.likelihood] || (b.impact ?? 0) - (a.impact ?? 0))

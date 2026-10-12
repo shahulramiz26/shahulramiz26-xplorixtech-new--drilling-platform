@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, Fragment, ReactNode, Suspense } from 'react'
+import { useState, useMemo, useEffect, useCallback, Fragment, ReactNode, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useInventory, toolingRatesFor } from '../../../lib/inventory-store'
 import {
@@ -251,18 +251,22 @@ const tdN: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'ui-mo
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse' }
 const rowBorder = '1px solid color-mix(in srgb, var(--x-border) 50%, transparent)'
 
+/* Metres to one decimal: a day's metres are a sum of shifts, and a sum of
+ * decimals carries float noise (6.300000000000001) that must never reach the screen. */
+const fm = (m: number) => String(Math.round(m * 10) / 10)
+
 function Modal({ title, subtitle, width = 760, onClose, children, footer }: {
   title: string; subtitle?: string; width?: number; onClose: () => void; children: ReactNode; footer?: ReactNode
 }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(var(--x-shadow),0.82)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, width, maxWidth: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+      <div role="dialog" aria-modal="true" aria-label={title} onClick={e => e.stopPropagation()} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, width, maxWidth: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 20px 13px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{title}</div>
             {subtitle && <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>{subtitle}</div>}
           </div>
-          <button onClick={onClose} style={{ padding: 7, borderRadius: 8, background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0, fontFamily: 'inherit' }}>✕</button>
+          <button onClick={onClose} aria-label="Close" style={{ padding: 7, borderRadius: 8, background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.faint, cursor: 'pointer', lineHeight: 0, fontFamily: 'inherit' }}>✕</button>
         </div>
         <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>{children}</div>
         {footer && <div style={{ padding: '13px 20px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>{footer}</div>}
@@ -330,12 +334,17 @@ type Section = 'rig' | 'operating'
 
 /* Effective dates are forward-only: a new set of rates can start today or
  * later, never before the last one. That is what makes history trustworthy —
- * nothing already costed can be rewritten from behind. */
+ * nothing already costed can be rewritten from behind.
+ *
+ * The first set is different: nothing was costed before it, so it may start on
+ * any day, and it starts by default on the day the rig began work. Costs typed
+ * a week into a project then cover that first week too. */
 function nextAllowedDate(latest: string | undefined): string {
-  const today = new Date().toISOString().slice(0, 10)
-  if (!latest) return today
-  const d = new Date(latest + 'T00:00:00')
-  d.setDate(d.getDate() + 1)
+  const today = TODAY
+  if (!latest) return ''
+  // In UTC on purpose: a local midnight is the day before in UTC east of Greenwich.
+  const d = new Date(latest + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + 1)
   const after = d.toISOString().slice(0, 10)
   return after > today ? after : today
 }
@@ -352,6 +361,12 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
   const [project, setProject] = useState(initialProject)
   const [rig, setRig] = useState(initialRig)
   const [confirmed, setConfirmed] = useState(false)
+  // The first day this rig worked on this project: where a first set of costs starts.
+  const firstDay = useMemo(() => {
+    const logged = state.shiftLogs.filter(l => l.rig === rig && l.project === project).map(l => l.date).sort()[0]
+    const start = (state.projects ?? []).find(p => p.name === project)?.startDate
+    return [logged, start].filter(Boolean).sort()[0] ?? TODAY
+  }, [state.shiftLogs, state.projects, rig, project])
   const [section, setSection] = useState<Section>('operating')
 
   const rigs = rigsForProject(project)
@@ -390,7 +405,7 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
 
   const ownVersions = newestFirst(state.ownership.filter(o => o.rig === rig))
   const opVersions = newestFirst(state.operating.filter(o => o.rig === rig && o.project === project))
-  const contract = versionOn(state.clientRates.filter(c => c.project === project), new Date().toISOString().slice(0, 10))
+  const contract = versionOn(state.clientRates.filter(c => c.project === project), TODAY)
   const projectId = (state.projects ?? []).find(p => p.name === project)?.id
 
   const scope = section === 'rig' ? `${rig} · every project` : `${rig} · ${project}`
@@ -427,9 +442,9 @@ function SetRatesModal({ projects, initialProject, initialRig, rigsForProject, m
 
         {/* Panel */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {section === 'rig' && <RigCostPanel rig={rig} month={month} versions={ownVersions}
+          {section === 'rig' && <RigCostPanel rig={rig} month={month} versions={ownVersions} firstDay={firstDay}
             onSave={(o, from, why) => saveOwnership({ ...o, effectiveFrom: from, note: why })} />}
-          {section === 'operating' && <OperatingPanel rig={rig} project={project} versions={opVersions}
+          {section === 'operating' && <OperatingPanel rig={rig} project={project} versions={opVersions} firstDay={firstDay}
             onSave={(o, from, why) => saveOperating({ ...o, effectiveFrom: from, note: why })} />}
         </div>
       </div>
@@ -457,12 +472,12 @@ function SaveRow({ onSave, label }: { onSave: () => void; label: string }) {
   )
 }
 
-function RigCostPanel({ rig, month, versions, onSave }: {
-  rig: string; month: string; versions: RigOwnership[]; onSave: (o: RigOwnership, from: string, why: string) => void
+function RigCostPanel({ rig, month, versions, firstDay, onSave }: {
+  rig: string; month: string; versions: RigOwnership[]; firstDay: string; onSave: (o: RigOwnership, from: string, why: string) => void
 }) {
   const latest = versions[0]
   const minDate = nextAllowedDate(latest?.effectiveFrom)
-  const [f, setF] = useState<RigOwnership>(() => latest ? { ...latest, id: uid('own') } : blankOwnership(rig, minDate))
+  const [f, setF] = useState<RigOwnership>(() => latest ? { ...latest, id: uid('own') } : blankOwnership(rig, minDate || firstDay))
   const [confirm, setConfirm] = useState(false)
   const u = (p: Partial<RigOwnership>) => setF(x => ({ ...x, ...p }))
   const b = ownershipBreakdown(f, month)
@@ -543,7 +558,7 @@ function RigCostPanel({ rig, month, versions, onSave }: {
         answer={f.allocationBasis === 'expectedUnit' ? perUnit(b.perUnit) : `${money(b.perDay)}/day`} />
 
       <SaveRow label="Save rig cost" onSave={() => setConfirm(true)} />
-      {confirm && <SaveDialog minDate={minDate} replacing={latest ? `${money(ownershipBreakdown(latest, month).perDay)}/day` : 'nothing'}
+      {confirm && <SaveDialog minDate={minDate} defaultFrom={firstDay} replacing={latest ? `${money(ownershipBreakdown(latest, month).perDay)}/day` : 'nothing'}
         onCancel={() => setConfirm(false)} onSave={(from, why) => { onSave(f, from, why); setConfirm(false) }} />}
     </div>
   )
@@ -586,34 +601,38 @@ function Result({ title, tag, pairs, total, basis, answer }: {
 /* Date and reason are asked at the moment of saving, not while you are
  * entering numbers. Forward-only: a new set of rates starts today or later,
  * never before the last one, so nothing already costed can be rewritten. */
-function SaveDialog({ minDate, replacing, onCancel, onSave }: {
-  minDate: string; replacing: string; onCancel: () => void; onSave: (from: string, why: string) => void
+function SaveDialog({ minDate, defaultFrom, replacing, onCancel, onSave }: {
+  minDate: string; defaultFrom: string; replacing: string; onCancel: () => void; onSave: (from: string, why: string) => void
 }) {
-  const [from, setFrom] = useState(minDate)
-  const [why, setWhy] = useState('')
-  const tooEarly = from < minDate
+  const [from, setFrom] = useState(minDate || defaultFrom)
+  const [why, setWhy] = useState(minDate ? '' : 'First costs for this rig')
+  const tooEarly = !from || (!!minDate && from < minDate)
   return (
-    <Modal title="When do these rates start?" subtitle={`Replacing ${replacing}`} width={520} onClose={onCancel}
+    <Modal title="When do these rates start?" subtitle={minDate ? `Replacing ${replacing}` : 'The first costs for this rig'} width={520} onClose={onCancel}
       footer={<><Btn onClick={onCancel}>Cancel</Btn>
         <Btn tone="primary" disabled={tooEarly || !why.trim()} onClick={() => onSave(from, why.trim())}>Save rates</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <DateField label="New rates start" value={from} onChange={setFrom} />
         <TextField label="Why" value={why} onChange={setWhy} placeholder="e.g. committee reclassification, fuel revision"
           hint="Shows in Rates history, so a year from now the change explains itself." />
-        {tooEarly
+        {!from
+          ? <Note tone={C.red}>Choose the day these rates start.</Note>
+          : tooEarly
           ? <Note tone={C.red}>Rates can only start on {fullDate(minDate)} or later — earlier work keeps the rate it was done under.</Note>
+          : !minDate
+          ? <Note tone={C.dim}>These are the first costs for this rig. Every shift from {fullDate(from)} on is costed at them; anything before carries no cost.</Note>
           : <Note tone={C.dim}>Work before {fullDate(from)} keeps the rate it was done under. Nothing already costed changes.</Note>}
       </div>
     </Modal>
   )
 }
 
-function OperatingPanel({ rig, project, versions, onSave }: {
-  rig: string; project: string; versions: OperatingRate[]; onSave: (o: OperatingRate, from: string, why: string) => void
+function OperatingPanel({ rig, project, versions, firstDay, onSave }: {
+  rig: string; project: string; versions: OperatingRate[]; firstDay: string; onSave: (o: OperatingRate, from: string, why: string) => void
 }) {
   const latest = versions[0]
   const minDate = nextAllowedDate(latest?.effectiveFrom)
-  const [f, setF] = useState<OperatingRate>(() => latest ? { ...latest, id: uid('op') } : blankOperating(rig, project, minDate))
+  const [f, setF] = useState<OperatingRate>(() => latest ? { ...latest, id: uid('op') } : blankOperating(rig, project, minDate || firstDay))
   const [confirm, setConfirm] = useState(false)
   const u = (p: Partial<OperatingRate>) => setF(x => ({ ...x, ...p }))
   const per = f.chargePerMetre ? '₹/m' : ''
@@ -664,7 +683,7 @@ function OperatingPanel({ rig, project, versions, onSave }: {
       </div>
 
       <SaveRow label="Save operating cost" onSave={() => setConfirm(true)} />
-      {confirm && <SaveDialog minDate={minDate} replacing={latest ? `fuel ₹${latest.fuelPricePerLitre}/L` : 'nothing'}
+      {confirm && <SaveDialog minDate={minDate} defaultFrom={firstDay} replacing={latest ? `fuel ₹${latest.fuelPricePerLitre}/L` : 'nothing'}
         onCancel={() => setConfirm(false)} onSave={(from, why) => { onSave(f, from, why); setConfirm(false) }} />}
     </div>
   )
@@ -900,7 +919,7 @@ function PerformanceTab({ v, rig, project, month }: {
           </div>
           <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>
             {live && live.rate > 0
-              ? `${dominantGround(live) ?? 'ground'} at ${perUnit(live.rate)} billed, ${perUnit(live.rate - live.cpu!)} a metre`
+              ? `${dominantGround(live) ?? 'ground'} billed at ${perUnit(live.rate)}: ${live.rate - live.cpu! >= 0 ? `${perUnit(live.rate - live.cpu!)} left on a metre` : `a loss of ${perUnit(live.cpu! - live.rate)} on a metre`}`
               : live
               ? 'no client rate matched this ground'
               : 'the last logged day drilled nothing'}
@@ -958,7 +977,7 @@ function PerformanceTab({ v, rig, project, month }: {
                       <td style={tdN}>{d.labour.heads || '—'}</td>
                       <td style={tdN}>{d.drillingHours || '—'}</td>
                       <td style={{ ...tdN, color: d.downtimeHours ? C.red : C.dim }}>{d.downtimeHours || '—'}</td>
-                      <td style={{ ...tdN, color: d.units ? C.text : C.dim, fontWeight: 700 }}>{d.units || '—'}</td>
+                      <td style={{ ...tdN, color: d.units ? C.text : C.dim, fontWeight: 700 }}>{d.units ? fm(d.units) : '—'}</td>
                       <td style={tdN}>{d.maintenanceHours || '—'}</td>
                       <td style={{ ...tdN, color: d.repairs ? C.purple : C.dim }}>{d.repairs ? money(d.repairs) : '—'}</td>
                       <td style={{ ...tdN, color: d.parts ? C.muted : C.dim }}>{d.parts ? money(d.parts) : '—'}</td>
@@ -1078,7 +1097,7 @@ function PerformanceTab({ v, rig, project, month }: {
                 <td style={tdN} />
                 <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{r.drillingHours}</td>
                 <td style={{ ...tdN, fontWeight: 800, color: C.red }}>{r.downtimeHours}</td>
-                <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{r.units}</td>
+                <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{fm(r.units)}</td>
                 <td style={{ ...tdN, fontWeight: 800 }}>{r.maintenanceHours || '—'}</td>
                 <td style={{ ...tdN, fontWeight: 800, color: C.purple }}>{money(r.repairs)}</td>
                 <td style={{ ...tdN, fontWeight: 800 }}>{money(r.parts)}</td>
@@ -1296,7 +1315,7 @@ function ChartTip({ d, rate, left }: { d: DayCostMTD; rate: number; left: number
       ]
     : [
         ['Cost per metre', perUnit(d.cpu), rate ? cpuColor(d.cpu, rate) : C.text],
-        ['Metres', `${d.units} m`],
+        ['Metres', `${fm(d.units)} m`],
         ['Tooling', perUnit(d.toolingRate)],
         ['Full cost', money(d.total)],
         ['Client rate', d.rate > 0 ? perUnit(d.rate) : '—'],
@@ -1414,7 +1433,7 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
                         {hole.status === 'closed' && hole.returnReason && <span style={{ color: C.red, marginLeft: 7, fontSize: 11 }}>returned</span>}
                       </td>
                       <td style={tdN}>{h.roll.days}</td>
-                      <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{h.roll.units}</td>
+                      <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{fm(h.roll.units)}</td>
                       <td style={{ ...tdN, color: C.faint }}>{pct(h.coreRecoveryPct)}</td>
                       <td style={{ ...tdN, color: LAYER.full }}>{money(h.roll.total)}</td>
                       <td style={{ ...tdN, color: LAYER.full, fontWeight: 700 }}>{perUnit(h.roll.cpu)}</td>
@@ -1520,7 +1539,7 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
                                 <tfoot>
                                   <tr style={{ borderTop: `2px solid ${C.border}` }}>
                                     <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={isFlat ? 3 : 2}>Revenue</td>
-                                    <td style={{ ...tdN, fontWeight: 800 }}>{h.roll.units}</td>
+                                    <td style={{ ...tdN, fontWeight: 800 }}>{fm(h.roll.units)}</td>
                                     <td style={tdN} />
                                     <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue, fontSize: 13 }}>{money(h.roll.revenue)}</td>
                                   </tr>
@@ -1534,7 +1553,7 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
                                   <Res k="Profit" v={money(h.roll.margin)} tone={marginColor(h.roll.margin)} big />
                                 </Grid>
                                 <div style={{ marginTop: 12, fontSize: 11, color: C.faint, lineHeight: 1.7 }}>
-                                  {h.roll.units} {unit} at {perUnit(h.roll.revenuePerUnit)} against {perUnit(h.roll.cpu)} —
+                                  {fm(h.roll.units)} {unit} at {perUnit(h.roll.revenuePerUnit)} against {perUnit(h.roll.cpu)} —
                                   a margin of {perUnit(h.roll.revenuePerUnit - h.roll.cpu)}, or {pct(h.roll.marginPct)}.
                                 </div>
                               </div>
@@ -1598,7 +1617,7 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
             <tfoot>
               <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
                 <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={4}>{finished.length} holes</td>
-                <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{t.units}</td>
+                <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{fm(t.units)}</td>
                 <td style={tdN} />
                 <td style={{ ...tdN, fontWeight: 800, color: LAYER.full }}>{money(t.cost)}</td>
                 <td style={{ ...tdN, fontWeight: 800, color: LAYER.full }}>{t.units > 0 ? perUnit(t.cost / t.units) : '—'}</td>
@@ -1641,7 +1660,7 @@ function TrackerTab({ invoices, onUpdate }: {
   invoices: Invoice[]; onUpdate: (i: Invoice) => void
 }) {
   const [viewing, setViewing] = useState<Invoice | null>(null)
-  const today = new Date().toISOString().slice(0, 10)
+  const today = TODAY
 
   if (invoices.length === 0) {
     return <Card><Empty>No invoices yet.<br />Approve a hole in Drillholes and raise one from there.</Empty></Card>
@@ -1855,10 +1874,10 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
   nextNumber: string; onClose: () => void; onCreate: (i: Invoice) => void
 }) {
   const [number, setNumber] = useState(nextNumber)
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(TODAY)
   const [taxPercent, setTax] = useState(18)
   const [dueDate, setDueDate] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10)
+    const d = new Date(TODAY + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + 30); return d.toISOString().slice(0, 10)
   })
   // Anything billable that isn't metres — mobilisation, demobilisation, a
   // one-off the contract allows — is added here rather than tracked as a cost.
@@ -1875,11 +1894,11 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
     h.billing.forEach(l => lines.push({
       label: isFlat
         ? `${h.hole.holeNumber} · ${l.holeSize} · ${l.formation}`
-        : `${h.hole.holeNumber} · ${l.holeSize} · ${l.fromDepth}–${l.toDepth} m`,
-      qty: `${l.metres} m`,
+        : `${h.hole.holeNumber} · ${l.holeSize} · ${fm(l.fromDepth)}–${fm(l.toDepth)} m`,
+      qty: `${fm(l.metres)} m`,
       rate: perUnit(l.rate),
       amount: l.amount,
-      depth: `${l.fromDepth}–${l.toDepth} m`,
+      depth: `${fm(l.fromDepth)}–${fm(l.toDepth)} m`,
     }))
     const sb = h.days.filter(d => d.status === 'standby' && d.revenue > 0)
     if (sb.length) lines.push({
@@ -2039,7 +2058,7 @@ function ContractorRigTab({ v, rig, project, month }: { v: RigMonthView; rig: st
       </Note>
       {noRate && <Note tone={C.red}>Some metres have no matching line in the work order&apos;s rates, so they are costed at nil. Add the size or depth band to the work order.</Note>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
-        <Stat label="Metres, checked" value={`${r.units} m`} note={`${r.drillingDays} drilling days · core ${pct(r.coreRecoveryPct)}`} />
+        <Stat label="Metres, checked" value={`${fm(r.units)} m`} note={`${r.drillingDays} drilling days · core ${pct(r.coreRecoveryPct)}`} />
         <Stat label="You pay the contractor" value={money(r.subcontract)} note={`${perUnit(r.cpu)} · ${r.standbyDays} standby ${r.standbyDays === 1 ? 'day' : 'days'} paid`} color={LAYER.operating} />
         <Stat label="Your client pays" value={money(r.revenue)} note={perUnit(r.revenuePerUnit)} color={LAYER.revenue} />
         <Stat label="Leaves you" value={money(r.margin)} note={`${r.revenue > 0 ? pct(r.marginPct) : '—'} · ${r.units ? perUnit(r.margin / r.units) : '—'}`} color={marginColor(r.margin)} />
@@ -2063,7 +2082,7 @@ function ContractorRigTab({ v, rig, project, month }: { v: RigMonthView; rig: st
                   <td style={td}>{DAY_STATUS_LABEL[d.status]}{d.status !== 'drilling' && d.shifts[0]?.downtimeReason ? ` · ${d.shifts[0].downtimeReason}` : ''}</td>
                   <td style={tdN}>{d.drillingHours || '—'}</td>
                   <td style={{ ...tdN, color: d.downtimeHours ? C.red : C.dim }}>{d.downtimeHours ? `${d.downtimeHours} h` : '—'}</td>
-                  <td style={{ ...tdN, color: d.units ? C.text : C.dim, fontWeight: 700 }}>{d.units || '—'}</td>
+                  <td style={{ ...tdN, color: d.units ? C.text : C.dim, fontWeight: 700 }}>{d.units ? fm(d.units) : '—'}</td>
                   <td style={tdN}>{d.units ? pct((d.coreRecovery / d.units) * 100) : '—'}</td>
                   <td style={tdN}>{d.units ? perUnit(d.payRate) : '—'}</td>
                   <td style={{ ...tdN, color: LAYER.operating }}>{d.subcontract ? money(d.subcontract) : '—'}</td>
@@ -2075,7 +2094,7 @@ function ContractorRigTab({ v, rig, project, month }: { v: RigMonthView; rig: st
             <tfoot>
               <tr style={{ borderTop: `2px solid ${C.border}` }}>
                 <td style={{ ...td, color: C.text, fontWeight: 800 }} colSpan={5}>{monthLabel(month)}</td>
-                <td style={{ ...tdN, color: C.text, fontWeight: 800 }}>{r.units}</td>
+                <td style={{ ...tdN, color: C.text, fontWeight: 800 }}>{fm(r.units)}</td>
                 <td style={tdN}>{pct(r.coreRecoveryPct)}</td>
                 <td style={tdN}>{perUnit(r.cpu)}</td>
                 <td style={{ ...tdN, color: LAYER.operating, fontWeight: 800 }}>{money(r.subcontract)}</td>
@@ -2106,10 +2125,21 @@ function CostingScreen() {
   const projects: string[] = useMemo(() => (state.projects ?? []).map(p => p.name), [state.projects])
   const [project, setProject] = useState(projects[0] ?? '')
 
-  const rigs = useMemo(() => rigsFor(state.shiftLogs, project), [state.shiftLogs, project])
+  /* Rigs on the project as well as rigs that have logged, so costs can be set
+   * before the first shift, and a contractor's rig shows from its work order. */
+  const rigsOf = useCallback((p: string) => Array.from(new Set([
+    ...rigsFor(state.shiftLogs, p),
+    ...((state.projects ?? []).find(x => x.name === p)?.rigs ?? []),
+    ...(state.workOrders ?? []).filter(w => w.project === p).flatMap(w => w.rigs),
+  ])).sort(), [state.shiftLogs, state.projects, state.workOrders])
+  const rigs = useMemo(() => rigsOf(project), [rigsOf, project])
 
   const [rig, setRig] = useState(rigs[0] ?? '')
-  const months = useMemo(() => monthsFor(state.shiftLogs, rig, project), [state.shiftLogs, rig, project])
+  // With nothing logged yet, the screen opens on this month rather than on no month at all.
+  const months = useMemo(() => {
+    const m = monthsFor(state.shiftLogs, rig, project)
+    return m.length ? m : [monthOf(TODAY)]
+  }, [state.shiftLogs, rig, project])
   const [month, setMonth] = useState(months[months.length - 1] ?? '')
   const [tab, setTab] = useState<Tab>('Performance')
 
@@ -2141,7 +2171,7 @@ function CostingScreen() {
   /* A rig named on a work order for this project is a contractor's. It is
    * costed at what the work order pays, and has no costs of its own to set. */
   const bought = (r: string) => !!workOrderFor(state, project, r)
-  const ownRigs = (p: string) => rigsFor(state.shiftLogs, p).filter(r => !workOrderFor(state, p, r))
+  const ownRigs = (p: string) => rigsOf(p).filter(r => !workOrderFor(state, p, r))
 
   if (!project) {
     return <div style={{ padding: 24 }}><Card><Empty>No projects yet. Create one in Projects to start costing.</Empty></Card></div>
