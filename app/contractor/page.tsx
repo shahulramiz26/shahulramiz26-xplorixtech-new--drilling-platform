@@ -105,8 +105,8 @@ export default function ContractorDashboard() {
       <Card title="Metres a day, last 14 days" subtitle="Checked metres, with metres still waiting to be checked shown lighter on top.">
         <div role="img" aria-label={`Metres a day for the last 14 days. Highest day ${n0(top)} metres.`} style={{ display: 'grid', gridTemplateColumns: `repeat(${bars.length}, minmax(0, 1fr))`, gap: 6, alignItems: 'end', height: 150 }}>
           {bars.map(b => (
-            <div key={b.d} title={`${shortDay(b.d)}: ${b.checked} m checked${b.waiting ? `, ${b.waiting} m waiting` : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%', gap: 2 }}>
-              <div style={{ fontSize: 11, color: T.faint, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{b.checked + b.waiting || ''}</div>
+            <div key={b.d} title={`${shortDay(b.d)}: ${+b.checked.toFixed(1)} m checked${b.waiting ? `, ${+b.waiting.toFixed(1)} m waiting` : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%', gap: 2 }}>
+              <div style={{ fontSize: 11, color: T.faint, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{+(b.checked + b.waiting).toFixed(1) || ''}</div>
               {b.waiting > 0 && <div style={{ height: `${(b.waiting / top) * 100}%`, background: tint(T.blue, 35), borderRadius: '4px 4px 0 0', minHeight: 3 }} />}
               <div style={{ height: `${(b.checked / top) * 100}%`, background: T.bar, borderRadius: b.waiting ? 0 : '4px 4px 0 0', minHeight: b.checked ? 3 : 0 }} />
             </div>
@@ -154,7 +154,7 @@ export default function ContractorDashboard() {
                   <div key={d + sh} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 10px', borderRadius: 9, border: `1px solid ${T.border}`, background: T.raised }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 12.5, color: T.text, fontWeight: 600 }}>{d === TODAY ? 'Today' : shortDay(d)} · {sh.toLowerCase()}</div>
-                      <div style={{ fontSize: 12, color: T.faint, marginTop: 2 }}>{s ? (s.metres > 0 ? `${s.metres} m on ${s.hole}` : 'No metres') : 'Nothing sent'}</div>
+                      <div style={{ fontSize: 12, color: T.faint, marginTop: 2 }}>{s ? (s.metres > 0 ? `${+s.metres.toFixed(1)} m on ${s.hole}` : 'No metres') : 'Nothing sent'}</div>
                     </div>
                     {s ? <Status tone={STATE_TONE[st]}>{STATE_WORD[st]}</Status>
                       : <Btn size="sm" href={`/contractor/drill-log?rig=${encodeURIComponent(rig)}&date=${d}&shift=${sh}`}>Add</Btn>}

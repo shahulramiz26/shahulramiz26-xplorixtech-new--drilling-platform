@@ -316,10 +316,13 @@ export function reportToShift(r: ContractorReport, wo: WorkOrder, by: string, at
   const down = r.standbyHours + r.breakdownHours
   const mostlyOwn = r.breakdownHours > 0 && r.breakdownHours >= r.standbyHours
   const refused = r.standbyHours > 0 && a.standbyPayable === false
+  /* The reason he gave on his own downtime lines is kept: a crew shortage stays
+   * a crew shortage instead of being filed as a mechanical breakdown. */
+  const longest = (side: 'internal' | 'client') => (r.extra?.downtime ?? []).filter(d => d.side === side && d.hours > 0).sort((x, y) => y.hours - x.hours)[0]?.reason
   const reason = down <= 0 ? ''
     : refused ? 'Contractor Delay'
-    : mostlyOwn ? (BREAKDOWN_REASONS.includes(r.reason) ? r.reason : 'Mechanical Breakdown')
-    : (r.reason && !BREAKDOWN_REASONS.includes(r.reason) ? r.reason : 'Waiting for Instruction')
+    : mostlyOwn ? (longest('internal') ?? (BREAKDOWN_REASONS.includes(r.reason) ? r.reason : 'Mechanical Breakdown'))
+    : (longest('client') ?? (r.reason && !BREAKDOWN_REASONS.includes(r.reason) ? r.reason : 'Waiting for Instruction'))
   const check: ShiftCheck = { by, at, source: r.source }
   if (metres !== r.metres) check.claimedMetres = r.metres
   if (core !== r.coreRecovery) check.claimedRecovery = r.coreRecovery
@@ -335,7 +338,7 @@ export function reportToShift(r: ContractorReport, wo: WorkOrder, by: string, at
     metresDrilled: metres, coreRecovery: core,
     holeSize: r.holeSize, formationType: r.formationType,
     holeClosedThisShift: r.holeClosed || undefined,
-    meterStart: r.fromDepth, meterEnd: r.fromDepth != null ? r.fromDepth + metres : undefined,
+    meterStart: r.fromDepth, meterEnd: r.fromDepth != null ? Math.round((r.fromDepth + metres) * 100) / 100 : undefined,
     downtimeSide: down <= 0 ? undefined : refused || mostlyOwn ? 'internal' : 'client',
     // His fuel is his own cost. It is kept on the record if he gave it, and never costed.
     partsUsed: [], fuelLitres: r.extra?.fuelLitres ?? 0, waterLitres: r.extra?.waterLitres ?? 0, additivesKg: r.extra?.additivesKg ?? 0,

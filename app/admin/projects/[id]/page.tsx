@@ -258,6 +258,7 @@ export default function ProjectPage() {
                   <Fact label="Started">{day(p.startDate)}</Fact>
                   <Fact label="Metres in the contract">{p.plannedMetres ? `${n0(p.plannedMetres)} m` : 'Not fixed'}</Fact>
                   <Fact label="Main core size">{p.holeSize}</Fact>
+                  <Fact label="Daily target per rig">{p.dailyTarget ? `${n0(p.dailyTarget)} m` : 'Not set'}</Fact>
                   <Fact label="Status">
                     <select value={p.status} onChange={e => setStatus(e.target.value as ProjectStatus)} aria-label="Project status"
                       style={{ ...inputStyle, padding: '5px 8px', width: 'auto', cursor: 'pointer' }}>
@@ -426,20 +427,22 @@ export default function ProjectPage() {
 }
 
 function DetailsModal({ p, onClose, onSave }: { p: ProjectRecord; onClose: () => void; onSave: (patch: Partial<ProjectRecord>, detail: string) => void }) {
-  const [f, setF] = useState({ location: p.location, client: p.client, plannedMetres: p.plannedMetres ? String(p.plannedMetres) : '', holeSize: p.holeSize })
+  const [f, setF] = useState({ location: p.location, client: p.client, plannedMetres: p.plannedMetres ? String(p.plannedMetres) : '', holeSize: p.holeSize, dailyTarget: p.dailyTarget ? String(p.dailyTarget) : '' })
   const metres = parseFloat(f.plannedMetres) || undefined
+  const target = parseFloat(f.dailyTarget) || undefined
   const changes = [
     f.client.trim() !== p.client && `client ${p.client} → ${f.client.trim()}`,
     f.location.trim() !== p.location && `location ${p.location} → ${f.location.trim()}`,
     metres !== p.plannedMetres && `metres in the contract ${p.plannedMetres ?? 'not fixed'} → ${metres ?? 'not fixed'}`,
     f.holeSize !== p.holeSize && `main core size ${p.holeSize} → ${f.holeSize}`,
+    target !== p.dailyTarget && `daily target ${p.dailyTarget ? `${p.dailyTarget} m` : 'none'} → ${target ? `${target} m` : 'none'}`,
   ].filter(Boolean) as string[]
   return (
     <Modal title="Project details" width={560} onClose={onClose}
       subtitle="The project name cannot be changed: shifts, rates and invoices are filed under it."
       footer={<><Btn onClick={onClose}>Cancel</Btn>
         <Btn kind="primary" disabled={!changes.length || !f.client.trim() || !f.location.trim()}
-          onClick={() => onSave({ client: f.client.trim(), location: f.location.trim(), plannedMetres: metres, holeSize: f.holeSize }, listOf(changes))}>Save</Btn></>}>
+          onClick={() => onSave({ client: f.client.trim(), location: f.location.trim(), plannedMetres: metres, holeSize: f.holeSize, dailyTarget: target }, listOf(changes))}>Save</Btn></>}>
       <div style={{ display: 'grid', gap: 14 }}>
         <Field label="Client"><input value={f.client} onChange={e => setF({ ...f, client: e.target.value })} style={inputStyle} /></Field>
         <Field label="Location"><input value={f.location} onChange={e => setF({ ...f, location: e.target.value })} style={inputStyle} /></Field>
@@ -451,6 +454,9 @@ function DetailsModal({ p, onClose, onSave }: { p: ProjectRecord; onClose: () =>
             </select>
           </Field>
         </div>
+        <Field label="Daily target, metres per rig" hint="Your KPI. The Dashboard flags a rig that falls under it. The client never sees it.">
+          <input type="number" min={0} value={f.dailyTarget} onChange={e => setF({ ...f, dailyTarget: e.target.value })} placeholder="e.g. 18" style={{ ...inputStyle, textAlign: 'right' }} />
+        </Field>
       </div>
     </Modal>
   )

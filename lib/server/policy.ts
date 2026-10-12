@@ -65,6 +65,9 @@ function shiftForClient(l: Any) {
   void contractor; void workOrderId; void check; void engineHmr; void engineHours; void loggedBy; void editedBy; void editedAt
   return { ...keep, fuelLitres: 0, waterLitres: 0, additivesKg: 0, partsUsed: [] }
 }
+/* The client reads the project as agreed with him; the daily target is the
+ * contractor's own KPI and stays behind. */
+const projectForClient = (p: Any) => { const { dailyTarget, ...rest } = p; void dailyTarget; return rest }
 const projectStub = (p: Any) => ({
   id: p.id, name: p.name, code: p.code, location: p.location, client: '', status: p.status, startDate: p.startDate,
   holeSize: p.holeSize, shared: false, rigs: [], supervisors: [], drillers: [], createdAt: p.createdAt,
@@ -120,7 +123,7 @@ export function visible(who: Who, all: Rec[]): Rec[] {
   }
 
   if (who.role === 'client') {
-    keep(s.projects, r => s.names.has(r.data.name))
+    keep(s.projects, r => s.names.has(r.data.name), projectForClient)
     keep(s.logs, inMine, shiftForClient)
     keep(of(all, 'clientRates'), inMine)
     keep(of(all, 'invoices'), r => inMine(r) && !!r.data.ownerStatus && r.data.status !== 'draft' && r.data.status !== 'cancelled')

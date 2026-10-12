@@ -30,7 +30,7 @@ import { T, tint, Btn, Seg, inputStyle } from './kit'
 
 export const INTERNAL_REASONS = [
   'Mechanical Breakdown', 'Hydraulic Issue', 'Electrical Fault', 'Bit Change', 'Rod Change',
-  'Fuel Shortage', 'Operator Delay', 'Crew Shortage', 'Other internal',
+  'Rig Move', 'Hole Problem', 'Fuel Shortage', 'Operator Delay', 'Crew Shortage', 'Other internal',
 ]
 export const CLIENT_REASONS = [
   'Waiting for Instruction', 'Geologist Standby', 'Site Access Issue', 'Water Shortage',

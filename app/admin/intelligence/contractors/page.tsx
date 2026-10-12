@@ -257,7 +257,7 @@ export default function ContractorComparison() {
           <Table>
             <thead><tr>
               <th style={th}>Rig</th><th style={th}>Whose</th><th style={thR}>Rig-days</th><th style={thR}>Metres</th><th style={th}>Metres a rig-day</th><th style={thR}>m a drilling hour</th>
-              <th style={thR}>Core</th><th style={thR}>Availability</th><th style={thR}>Own stops</th><th style={thR}>Costs you / m</th><th style={thR}>Leaves you / m</th>
+              <th style={thR}>Core</th><th style={thR}>Availability</th><th style={thR}>Own stops</th><th style={thR}>Days on target</th><th style={thR}>Costs you / m</th><th style={thR}>Leaves you / m</th>
             </tr></thead>
             <tbody>
               {sc.rigs.map(r => {
@@ -279,6 +279,7 @@ export default function ContractorComparison() {
                     <td style={tdR}>{r.metres ? pc(r.recoveryPct) : '—'}</td>
                     <td style={tdR}>{pc(r.availabilityPct)}</td>
                     <td style={tdR}>{r.ownStopHours ? `${n0(r.ownStopHours)} h` : '—'}</td>
+                    <td style={{ ...tdR, color: r.targetDays && r.onTargetDays < r.targetDays / 2 ? T.amber : undefined }}>{r.targetDays ? `${r.onTargetDays} of ${r.targetDays}` : '—'}</td>
                     <td style={tdR}>{r.metres ? money(r.costPerMetre) : '—'}</td>
                     <td style={{ ...tdR, color: T.text, fontWeight: 600 }}>{r.metres ? money(r.marginPerMetre) : '—'}</td>
                   </tr>
