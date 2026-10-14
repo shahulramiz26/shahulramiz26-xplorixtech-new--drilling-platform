@@ -36,6 +36,11 @@ export async function pull(who: Who, since: number): Promise<Pulled> {
   return { rev: top, snapshot: visible(who, await loadAll(db(), who.companyId)) }
 }
 
+/* Everything this login may read, as records. */
+export async function visibleRecords(who: Who): Promise<Rec[]> {
+  return visible(who, await loadAll(db(), who.companyId))
+}
+
 const BATCH = 400
 async function write(c: PoolClient, who: Who, list: Change[]) {
   for (let i = 0; i < list.length; i += BATCH) {

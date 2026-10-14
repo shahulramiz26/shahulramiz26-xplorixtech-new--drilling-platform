@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Trash2, Paperclip, Upload } from 'lucide-react'
+import { Plus, Trash2, Paperclip, Upload, Compass, Camera } from 'lucide-react'
 import {
   useCosting, uid, nowStamp, shiftOrder, isOwnStop, HOLE_SIZES, LITHOLOGIES,
   type ShiftLog, type ShiftName, type DowntimeLine,
@@ -10,6 +10,9 @@ import { useInventory, rigHoldings, TODAY } from '../../lib/inventory-store'
 import { equipment as EQUIPMENT, incidentTypes, severityTypes } from '../../lib/mock-data'
 import { projectHoles } from '../../lib/projects'
 import { T, tint, Btn, Seg, inputStyle } from './kit'
+import { SURVEY_TOOLS } from '../../lib/survey'
+import { putPhoto, useMediaMode } from '../../lib/media'
+import { PhotoThumb } from './survey-panel'
 
 /* ==========================================================================
  * THE DRILL LOG FORM
@@ -127,6 +130,8 @@ interface BitRow { id: string; itemId: string; serial: string; mStart: string; m
 interface EquipRow { id: string; name: string; hours: string }
 interface AccRow { id: string; itemId: string; qty: string }
 interface IncidentRow { id: string; type: string; severity: string; note: string }
+interface SurveyRow { id: string; depth: string; az: string; dip: string; tool: string }
+interface PhotoRow { id: string; from: string; to: string; media: string; name: string }
 
 interface F {
   shiftHours: number; standby: boolean; standbyReason: string
@@ -138,6 +143,7 @@ interface F {
   downRows: DownRow[]; bits: BitRow[]; equip: EquipRow[]; acc: AccRow[]; incidents: IncidentRow[]
   fuel: string; water: string; additives: string
   files: string[]; notes: string
+  surveys: SurveyRow[]; photos: PhotoRow[]
 }
 
 function fromLog(l: ShiftLog | undefined, scopes: LogScope[], start: Partial<Pick<F, 'project' | 'rig' | 'date' | 'shift' | 'supervisor'>>): F {
@@ -166,6 +172,8 @@ function fromLog(l: ShiftLog | undefined, scopes: LogScope[], start: Partial<Pic
     incidents: (l?.incidents ?? []).map(i => ({ id: rid(), ...i })),
     fuel: l ? str(l.fuelLitres) : '', water: l ? str(l.waterLitres) : '', additives: l ? str(l.additivesKg) : '',
     files: l?.attachments ?? [], notes: l?.notes ?? '',
+    surveys: (l?.surveys ?? []).map(x => ({ id: rid(), depth: str(x.depth), az: str(x.azimuth), dip: str(x.dip), tool: x.tool ?? '' })),
+    photos: (l?.corePhotos ?? []).map(x => ({ id: x.id, from: str(x.from), to: str(x.to), media: x.media, name: x.name ?? '' })),
   }
 }
 
@@ -189,6 +197,10 @@ export function DrillLogForm({ variant, scopes, existing, start = {}, lockSuperv
   const [f, setF] = useState<F>(() => fromLog(existing, scopes, { ...start, supervisor: lockSupervisor ?? start.supervisor }))
   const [tried, setTried] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
+  const photoInput = useRef<HTMLInputElement>(null)
+  const mediaMode = useMediaMode()
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [photoError, setPhotoError] = useState('')
   const u = (p: Partial<F>) => setF(x => ({ ...x, ...p }))
   const contractor = variant === 'contractor'
 
@@ -335,6 +347,21 @@ export function DrillLogForm({ variant, scopes, existing, start = {}, lockSuperv
   if (blank(f.additives)) problems.push('Enter the additives used (0 if none).')
   if (f.equip.some(e => !e.name || !(num(e.hours) > 0))) problems.push('Every equipment line needs the equipment and its hours.')
   if (f.incidents.some(i => !i.type || !i.severity)) problems.push('Every incident needs a type and a severity.')
+  if (!contractor && !f.standby) {
+    const deepest = Math.max(mEnd, f.closed && f.nhStarted ? num(f.nhEnd) : 0)
+    f.surveys.forEach((x, i) => {
+      const d = parseFloat(x.depth), a = parseFloat(x.az), p = parseFloat(x.dip)
+      if (!(d >= 0)) problems.push(`Survey reading ${i + 1}: enter the depth.`)
+      else if (deepest > 0 && d > deepest + 0.5) problems.push(`Survey reading ${i + 1}: ${d} m is deeper than the hole at the end of the shift.`)
+      if (!(a >= 0 && a <= 360)) problems.push(`Survey reading ${i + 1}: azimuth is 0 to 360.`)
+      if (!(p >= -90 && p <= 90)) problems.push(`Survey reading ${i + 1}: dip is −90 (straight down) to 90.`)
+    })
+    f.photos.forEach((x, i) => {
+      const a = parseFloat(x.from), b = parseFloat(x.to)
+      if (!(a >= 0) || !(b > a)) problems.push(`Core photo ${i + 1}: the "to" depth must be deeper than the "from" depth.`)
+    })
+  }
+  if (photoBusy) problems.push('Wait for the photos to finish saving.')
 
   const submit = () => {
     setTried(true)
@@ -375,6 +402,8 @@ export function DrillLogForm({ variant, scopes, existing, start = {}, lockSuperv
       equipmentUsed: f.equip.map(e => ({ name: e.name, hours: num(e.hours) })),
       incidents: f.incidents.map(i => ({ type: i.type, severity: i.severity, note: i.note.trim() })),
       attachments: f.files, notes: f.notes.trim() || undefined,
+      surveys: contractor || f.standby || !f.surveys.length ? undefined : f.surveys.map(x => ({ depth: r2(num(x.depth)), azimuth: num(x.az), dip: num(x.dip), tool: x.tool || undefined })),
+      corePhotos: contractor || f.standby || !f.photos.length ? undefined : f.photos.map(x => ({ id: x.id, from: r2(num(x.from)), to: r2(num(x.to)), media: x.media, name: x.name || undefined })),
       fuelLitres: num(f.fuel), waterLitres: num(f.water), additivesKg: num(f.additives),
       supervisor: f.supervisor.trim(), driller: f.driller.trim(),
       loggedBy: existing?.loggedBy ?? by, loggedAt: existing?.loggedAt ?? nowStamp(),
@@ -685,6 +714,76 @@ export function DrillLogForm({ variant, scopes, existing, start = {}, lockSuperv
                   </div>
                   <div style={{ width: 90 }}><input type="number" min={0} value={a.qty} aria-label="Quantity" onChange={e => set({ qty: e.target.value })} placeholder="Qty" style={numIn} /></div>
                   <Bin label="Remove this accessory" onClick={() => u({ acc: f.acc.filter(x => x.id !== a.id) })} />
+                </div>
+              )
+            })}
+          </div>
+        </Panel>
+      )}
+
+      {/* ── downhole survey and core photos ────────────────────────────────── */}
+      {!contractor && !f.standby && (
+        <Panel title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14 }}><Compass size={15} style={{ color: T.faint }} /> Downhole survey</span>}
+          hint="Only if a survey was taken this shift. Dip is the angle from flat, negative going down: −60 means 60° below flat. The office checks each reading before it draws the hole."
+          right={<AddBtn onClick={() => u({ surveys: [...f.surveys, { id: rid(), depth: f.mEnd || '', az: f.surveys[f.surveys.length - 1]?.az ?? '', dip: f.surveys[f.surveys.length - 1]?.dip ?? '', tool: f.surveys[f.surveys.length - 1]?.tool ?? '' }] })} />}>
+          {f.surveys.length === 0 && <div style={{ fontSize: 13, color: T.faint }}>No survey this shift.</div>}
+          <div style={{ display: 'grid', gap: 10 }}>
+            {f.surveys.map((x, i) => {
+              const set = (p: Partial<SurveyRow>) => u({ surveys: f.surveys.map(y => y.id === x.id ? { ...y, ...p } : y) })
+              return (
+                <div key={x.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <RowNo n={i + 1} />
+                  <div style={{ flex: '1 1 110px' }}><L label="Depth, m"><input type="number" value={x.depth} onChange={e => set({ depth: e.target.value })} style={numIn} aria-label={`Survey ${i + 1} depth`} /></L></div>
+                  <div style={{ flex: '1 1 110px' }}><L label="Azimuth, °"><input type="number" value={x.az} onChange={e => set({ az: e.target.value })} placeholder="e.g. 60" style={numIn} aria-label={`Survey ${i + 1} azimuth`} /></L></div>
+                  <div style={{ flex: '1 1 110px' }}><L label="Dip, °"><input type="number" value={x.dip} onChange={e => set({ dip: e.target.value })} placeholder="e.g. −60" style={numIn} aria-label={`Survey ${i + 1} dip`} /></L></div>
+                  <div style={{ flex: '2 1 180px' }}><L label="Tool">
+                    <select value={x.tool} onChange={e => set({ tool: e.target.value })} style={sel} aria-label={`Survey ${i + 1} tool`}>
+                      <option value="">Not stated</option>{SURVEY_TOOLS.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select></L></div>
+                  <Bin label="Remove this survey reading" onClick={() => u({ surveys: f.surveys.filter(y => y.id !== x.id) })} />
+                </div>
+              )
+            })}
+          </div>
+        </Panel>
+      )}
+      {!contractor && !f.standby && (
+        <Panel title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14 }}><Camera size={15} style={{ color: T.faint }} /> Core photos</span>}
+          hint="A photo of each core tray filled this shift, with the depths it holds. Photos are made smaller before they are saved."
+          right={<>
+            <input ref={photoInput} type="file" accept="image/*" multiple style={{ display: 'none' }} aria-label="Core photos"
+              onChange={async e => {
+                const files = Array.from(e.target.files ?? []).filter(x => /^image\//.test(x.type)); e.target.value = ''
+                if (!files.length || mediaMode === 'loading') return
+                setPhotoBusy(true); setPhotoError('')
+                try {
+                  let at = f.photos.length ? num(f.photos[f.photos.length - 1].to) : num(f.mStart)
+                  const step = files.length ? Math.max(0.5, r2((mEnd - at) / files.length)) : 3
+                  const added: PhotoRow[] = []
+                  for (const file of files) {
+                    const media = await putPhoto(file, mediaMode)
+                    const to = r2(at + step)
+                    added.push({ id: uid('cp'), from: str(r2(at)), to: str(to), media, name: file.name }); at = to
+                  }
+                  setF(x => ({ ...x, photos: [...x.photos, ...added] }))
+                } catch (err) { setPhotoError(err instanceof Error ? err.message : 'The photos could not be saved.') } finally { setPhotoBusy(false) }
+              }} />
+            <button type="button" disabled={photoBusy} onClick={() => photoInput.current?.click()} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 8, border: `1px solid ${tint(T.orange, 35)}`, background: tint(T.orange, 10), color: T.orange, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <Camera size={14} /> {photoBusy ? 'Saving…' : 'Add photos'}
+            </button>
+          </>}>
+          {f.photos.length === 0 && <div style={{ fontSize: 13, color: T.faint }}>No core photos this shift.</div>}
+          {photoError && <div style={{ fontSize: 12.5, color: T.red, marginBottom: 8 }}>{photoError}</div>}
+          <div style={{ display: 'grid', gap: 10 }}>
+            {f.photos.map((x, i) => {
+              const set = (p: Partial<PhotoRow>) => u({ photos: f.photos.map(y => y.id === x.id ? { ...y, ...p } : y) })
+              return (
+                <div key={x.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <PhotoThumb media={x.media} size={96} />
+                  <div style={{ flex: '1 1 110px' }}><L label="From, m"><input type="number" value={x.from} onChange={e => set({ from: e.target.value })} style={numIn} aria-label={`Photo ${i + 1} from`} /></L></div>
+                  <div style={{ flex: '1 1 110px' }}><L label="To, m"><input type="number" value={x.to} onChange={e => set({ to: e.target.value })} style={numIn} aria-label={`Photo ${i + 1} to`} /></L></div>
+                  <div style={{ flex: '2 1 160px', fontSize: 12, color: T.faint, paddingBottom: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.name}</div>
+                  <Bin label="Remove this photo" onClick={() => u({ photos: f.photos.filter(y => y.id !== x.id) })} />
                 </div>
               )
             })}
