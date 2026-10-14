@@ -27,6 +27,9 @@ import { TODAY } from '../../../lib/inventory-store'
 import Link from 'next/link'
 import { hexA } from '../../../lib/theme'
 import { projectBudget } from '../../../lib/plan'
+import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
+import { PageHead, Seg as KSeg, Tip as KTip, Legend as KLegend, Status as KStatus, axisTick, gridStroke, T } from '../../components/kit'
+import { BudgetCard } from '../../components/plan-cards'
 
 /* ==========================================================================
  * XPLORIX COSTING — one screen.
@@ -48,16 +51,19 @@ import { projectBudget } from '../../../lib/plan'
  * 1  UI primitives
  * ========================================================================== */
 
+const LINE = 'color-mix(in srgb, var(--x-border) 60%, transparent)'
+const DISPLAY = "'Space Grotesk', 'Inter', sans-serif"
+
 function Card({ title, subtitle, right, children, pad = true, accent }: {
   title?: string; subtitle?: string; right?: ReactNode; children: ReactNode; pad?: boolean; accent?: string
 }) {
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', borderLeft: accent ? `3px solid ${accent}` : undefined }}>
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', borderLeft: accent ? `3px solid ${accent}` : undefined, boxShadow: 'var(--x-card-shadow)' }}>
       {title && (
-        <div style={{ padding: '11px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ padding: '13px 18px', borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{title}</div>
-            {subtitle && <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>{subtitle}</div>}
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: C.text }}>{title}</div>
+            {subtitle && <div style={{ fontSize: 12, color: C.faint, marginTop: 3, lineHeight: 1.45 }}>{subtitle}</div>}
           </div>
           {right}
         </div>
@@ -71,10 +77,10 @@ function Stat({ label, value, note, color = C.text, big }: {
   label: string; value: string; note?: string; color?: string; big?: boolean
 }) {
   return (
-    <div style={{ padding: '12px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 5 }}>{label}</div>
-      <div style={{ fontSize: big ? 21 : 17, fontWeight: 900, color, fontFamily: 'ui-monospace, monospace', lineHeight: 1.15 }}>{value}</div>
-      {note && <div style={{ fontSize: 10, color: C.faint, marginTop: 5 }}>{note}</div>}
+    <div style={{ padding: '14px 16px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: 'var(--x-card-shadow)' }}>
+      <div style={{ fontSize: 11.5, fontWeight: 600, color: C.faint, marginBottom: 7 }}>{label}</div>
+      <div style={{ fontSize: big ? 23 : 19, fontWeight: 700, color, fontFamily: DISPLAY, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{value}</div>
+      {note && <div style={{ fontSize: 12, color: C.faint, marginTop: 6 }}>{note}</div>}
     </div>
   )
 }
@@ -82,7 +88,7 @@ function Stat({ label, value, note, color = C.text, big }: {
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, height: 15 }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, marginBottom: 5, minHeight: 15 }}>{label}</div>
       {children}
       {hint && <div style={{ fontSize: 10, color: C.dim, marginTop: 4, lineHeight: 1.5 }}>{hint}</div>}
     </div>
@@ -97,7 +103,7 @@ function NumField({ label, value, onChange, hint, color = C.text, suffix }: {
       <div style={{ position: 'relative' }}>
         <input type="number" value={Number.isFinite(value) ? value : 0}
           onChange={e => onChange(parseFloat(e.target.value) || 0)}
-          style={{ ...iStyle, color, fontWeight: 700, fontFamily: 'ui-monospace, monospace', paddingRight: suffix ? 42 : 10 }} />
+          style={{ ...iStyle, color, fontWeight: 700, fontVariantNumeric: 'tabular-nums', paddingRight: suffix ? 42 : 10 }} />
         {suffix && <span style={{ position: 'absolute', right: 9, top: 7, fontSize: 10.5, color: C.dim, pointerEvents: 'none' }}>{suffix}</span>}
       </div>
     </Field>
@@ -133,13 +139,13 @@ function Derived({ label, value, hint, color = C.text, overridden, onOverride, o
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: C.faint, letterSpacing: '0' }}>{label}</span>
         <Tag tone={manual ? C.amber : C.dim}>{manual ? 'manual' : 'auto'}</Tag>
       </div>
       {manual && onOverride ? (
         <div style={{ display: 'flex', gap: 6 }}>
           <input type="number" value={overridden} onChange={e => onOverride(parseFloat(e.target.value) || 0)}
-            style={{ ...iStyle, color: C.amber, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }} />
+            style={{ ...iStyle, color: C.amber, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }} />
           <button onClick={onClear} title="Back to the calculated value"
             style={{ padding: '0 12px', borderRadius: 8, background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.faint, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>Reset</button>
         </div>
@@ -160,8 +166,8 @@ function Derived({ label, value, hint, color = C.text, overridden, onOverride, o
 function Tag({ children, tone = C.faint }: { children: ReactNode; tone?: string }) {
   return (
     <span style={{
-      fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-      padding: '2px 7px', borderRadius: 5, color: tone,
+      fontSize: 11, fontWeight: 600,
+      padding: '2px 8px', borderRadius: 999, color: tone,
       background: `${hexA(tone, 0x1A)}`, border: `1px solid ${hexA(tone, 0x33)}`, whiteSpace: 'nowrap',
     }}>{children}</span>
   )
@@ -215,15 +221,15 @@ function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md' }: {
   children: ReactNode; onClick?: () => void; tone?: 'primary' | 'ghost' | 'danger'; disabled?: boolean; size?: 'sm' | 'md'
 }) {
   const tones: Record<string, React.CSSProperties> = {
-    primary: { background: `linear-gradient(135deg, ${C.orange}, ${C.orangeD})`, color: '#fff', border: 'none' },
+    primary: { background: C.orange, color: '#fff', border: `1px solid ${C.orange}` },
     ghost: { background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.muted },
     danger: { background: 'color-mix(in srgb, var(--x-red) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--x-red) 22%, transparent)', color: C.red },
   }
   return (
     <button onClick={onClick} disabled={disabled} style={{
       display: 'inline-flex', alignItems: 'center', gap: 6, cursor: disabled ? 'not-allowed' : 'pointer',
-      borderRadius: 9, fontWeight: 700, fontFamily: 'inherit', opacity: disabled ? 0.45 : 1,
-      padding: size === 'sm' ? '5px 11px' : '8px 15px', fontSize: size === 'sm' ? 11.5 : 12.5,
+      borderRadius: 9, fontWeight: 600, fontFamily: 'inherit', opacity: disabled ? 0.45 : 1,
+      padding: size === 'sm' ? '6px 12px' : '9px 16px', fontSize: size === 'sm' ? 12.5 : 13.5,
       whiteSpace: 'nowrap', ...tones[tone],
     }}>{children}</button>
   )
@@ -242,15 +248,14 @@ function Empty({ children }: { children: ReactNode }) {
 /* Dense financial tables: numerals monospace and right aligned, so a column
  * reads as a column of figures rather than of words. */
 const th: React.CSSProperties = {
-  padding: '7px 12px', textAlign: 'left', fontSize: 10, color: C.faint, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap',
-  borderBottom: `1px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)',
+  padding: '9px 12px', textAlign: 'left', fontSize: 11.5, color: C.faint, fontWeight: 600,
+  whiteSpace: 'nowrap', borderBottom: `1px solid ${LINE}`,
 }
 const thR: React.CSSProperties = { ...th, textAlign: 'right' }
-const td: React.CSSProperties = { padding: '7px 12px', fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }
-const tdN: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }
+const td: React.CSSProperties = { padding: '9px 12px', fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }
+const tdN: React.CSSProperties = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse' }
-const rowBorder = '1px solid color-mix(in srgb, var(--x-border) 50%, transparent)'
+const rowBorder = `1px solid ${LINE}`
 
 /* Metres to one decimal: a day's metres are a sum of shifts, and a sum of
  * decimals carries float noise (6.300000000000001) that must never reach the screen. */
@@ -568,7 +573,7 @@ function RigCostPanel({ rig, month, versions, firstDay, onSave }: {
 function InForce({ text }: { text: string }) {
   return (
     <div style={{ fontSize: 11, color: C.faint }}>
-      Currently in force: <span style={{ color: C.text, fontFamily: 'ui-monospace, monospace' }}>{text}</span>
+      Currently in force: <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>{text}</span>
     </div>
   )
 }
@@ -586,12 +591,12 @@ function Result({ title, tag, pairs, total, basis, answer }: {
         {pairs.map(([k, v, dim]) => (
           <div key={k} style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
             <span style={{ fontSize: 11, color: C.faint }}>{k}</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: dim ? C.dim : C.text, fontFamily: 'ui-monospace, monospace' }}>{v}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: dim ? C.dim : C.text, fontVariantNumeric: 'tabular-nums' }}>{v}</span>
           </div>
         ))}
       </div>
       <div style={{ height: 1, background: C.border, margin: '13px 0' }} />
-      <div style={{ fontSize: 13, color: C.muted, fontFamily: 'ui-monospace, monospace', display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
         <span>{total}</span><span style={{ color: C.dim }}>{basis}</span><span style={{ color: C.dim }}>=</span>
         <span style={{ color: C.purple, fontWeight: 900, fontSize: 18 }}>{answer}</span>
       </div>
@@ -784,7 +789,7 @@ function RatesHistoryModal({ project, rig, onClose }: { project: string; rig: st
                 {rows.map(r => (
                   <tr key={r.id} style={{ borderBottom: rowBorder, verticalAlign: 'top' }}>
                     <td style={{ ...td, color: C.text, fontWeight: 700 }}>{fullDate(r.from)}</td>
-                    <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{r.rigs}</td>
+                    <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{r.rigs}</td>
                     <td style={td}><Tag tone={r.tone}>{r.what}</Tag></td>
                     <td style={{ ...td, whiteSpace: 'normal', maxWidth: 300, color: C.muted, lineHeight: 1.7 }}>
                       {r.changed.map((c, k) => <div key={k}>{c}</div>)}
@@ -848,6 +853,8 @@ function PerformanceTab({ v, rig, project, month }: {
 }) {
   const [open, setOpen] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
+  // Every cost column, or the few that answer "did this day pay?"
+  const [full, setFull] = useState(false)
   const trend = useMonthTrend(project, rig)
 
   if (!v.hasLogs) {
@@ -878,7 +885,7 @@ function PerformanceTab({ v, rig, project, month }: {
         justifyContent: 'space-between', gap: 20, flexWrap: 'wrap',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em', marginRight: 4 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: C.faint, marginRight: 4 }}>
             Cost per metre by month
           </span>
           {trend.length === 0 && <span style={{ fontSize: 12, color: C.faint }}>No costed months yet.</span>}
@@ -895,11 +902,11 @@ function PerformanceTab({ v, rig, project, month }: {
                 <div style={{ fontSize: 10, color: on ? C.orange : C.faint, fontWeight: 700 }}>
                   {monthShort(t.month)}
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: t.rate ? cpuColor(t.cpu, t.rate) : C.text, fontFamily: 'ui-monospace, monospace', marginTop: 2 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: t.rate ? cpuColor(t.cpu, t.rate) : C.text, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
                   {perUnit(t.cpu)}
                 </div>
                 {move != null && (
-                  <div style={{ fontSize: 10, color: move > 0 ? C.red : C.green, marginTop: 2, fontFamily: 'ui-monospace, monospace' }}>
+                  <div style={{ fontSize: 10, color: move > 0 ? C.red : C.green, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
                     {move > 0 ? '▲' : '▼'} {Math.abs(move).toFixed(1)}%
                   </div>
                 )}
@@ -908,26 +915,19 @@ function PerformanceTab({ v, rig, project, month }: {
           })}
         </div>
 
-        {/* The rate as it stands right now — the most recent day that actually
-            drilled. The month-to-date figure lives in the strip on the left,
-            where it can be read against the months before it. */}
+        {/* The month so far: what a metre cost against what it billed. One
+            figure, so it can be read against the months on the left. */}
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            {live ? `Today's rate · ${fullDate(live.date)}` : 'No metres drilled yet'}
+          <div style={{ fontSize: 12, fontWeight: 600, color: C.faint }}>{monthLabel(month)} so far</div>
+          <div style={{ fontSize: 26, fontWeight: 700, fontFamily: DISPLAY, fontVariantNumeric: 'tabular-nums', lineHeight: 1.15, color: rate ? cpuColor(r.cpu, rate) : C.text }}>
+            {r.units ? perUnit(r.cpu) : '—'}
           </div>
-          <div style={{ fontSize: 27, fontWeight: 900, fontFamily: 'ui-monospace, monospace', lineHeight: 1.15, color: live && live.rate ? cpuColor(live.cpu!, live.rate) : C.text }}>
-            {live ? perUnit(live.cpu) : '—'}
+          <div style={{ fontSize: 12, color: C.faint, marginTop: 3 }}>
+            {r.units && rate > 0
+              ? `cost a metre · billed ${perUnit(rate)} · ${rate - r.cpu >= 0 ? `${perUnit(rate - r.cpu)} left on each metre` : `${perUnit(r.cpu - rate)} lost on each metre`}`
+              : r.units ? 'cost a metre · no client rate matched yet' : 'nothing drilled yet'}
           </div>
-          <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>
-            {live && live.rate > 0
-              ? `${dominantGround(live) ?? 'ground'} billed at ${perUnit(live.rate)}: ${live.rate - live.cpu! >= 0 ? `${perUnit(live.rate - live.cpu!)} left on a metre` : `a loss of ${perUnit(live.cpu! - live.rate)} on a metre`}`
-              : live
-              ? 'no client rate matched this ground'
-              : 'the last logged day drilled nothing'}
-          </div>
-          <div style={{ fontSize: 10.5, color: C.dim, marginTop: 4 }}>
-            {monthLabel(month)} to date {perUnit(r.cpu)}
-          </div>
+          {live && <div style={{ fontSize: 11.5, color: C.dim, marginTop: 4 }}>Last drilling day, {fullDate(live.date)}: {perUnit(live.cpu)}</div>}
         </div>
       </div>
 
@@ -936,19 +936,20 @@ function PerformanceTab({ v, rig, project, month }: {
           ? `${rigCode(rig)} · ${monthLabel(month)} · every day · click a day for the full breakdown`
           : `${rigCode(rig)} · the last ${days.length} logged days · click a day for the full breakdown`}
         pad={false}
-        right={hidden > 0 || showAll
-          ? <Btn size="sm" onClick={() => setShowAll(!showAll)}>{showAll ? `Show last ${WINDOW} days` : 'Show whole month'}</Btn>
-          : undefined}>
+        right={<span style={{ display: 'inline-flex', gap: 8 }}>
+          <Btn size="sm" onClick={() => setFull(!full)}>{full ? 'Fewer columns' : 'Every cost column'}</Btn>
+          {(hidden > 0 || showAll) && <Btn size="sm" onClick={() => setShowAll(!showAll)}>{showAll ? `Show last ${WINDOW} days` : 'Show whole month'}</Btn>}
+        </span>}>
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead>
               <tr>
                 <th style={th}>Date</th><th style={th}>Hole</th>
-                <th style={th}>Size</th><th style={th}>Ground</th><th style={thR}>Crew</th><th style={thR}>Drill hrs</th><th style={thR}>Downtime</th><th style={thR}>Metres</th>
-                <th style={thR}>Maint hrs</th><th style={thR}>Service</th><th style={thR}>Tooling</th><th style={thR}>Tooling/m</th>
+                {full && <th style={th}>Size</th>}<th style={th}>Ground</th>{full && <th style={thR}>Crew</th>}<th style={thR}>Drill hrs</th><th style={thR}>Stopped</th><th style={thR}>Metres</th>
+                {full && <><th style={thR}>Maint hrs</th><th style={thR}>Service</th><th style={thR}>Tooling</th><th style={thR}>Tooling/m</th>
                 <th style={thR}>Fuel</th><th style={thR}>Labour</th>
-                <th style={thR}>Operating</th><th style={thR}>Ownership</th><th style={thR}>Total</th>
-                <th style={thR}>CPM</th><th style={thR}>Revenue</th>
+                <th style={thR}>Operating</th><th style={thR}>Ownership</th></>}<th style={thR}>Cost</th>
+                <th style={thR}>Cost a metre</th><th style={thR}>Revenue</th>{!full && <th style={thR}>Left</th>}
               </tr>
             </thead>
             <tbody>
@@ -971,31 +972,34 @@ function PerformanceTab({ v, rig, project, month }: {
                         {!d.submitted && <span style={{ marginLeft: 6 }}><Tag tone={C.red}>no log</Tag></span>}
                       </td>
                       <td style={{ ...td, color: d.holeNumber ? C.muted : C.dim }}>{d.holeNumber || '—'}</td>
-                      <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{d.shifts[0]?.holeSize ?? '—'}</td>
+                      {full && <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{d.shifts[0]?.holeSize ?? '—'}</td>}
                       <td style={{ ...td, color: d.units ? C.muted : C.dim }}>
-                        {d.toolingByFormation.length ? d.toolingByFormation.map(x => x.formation).join(' → ') : '—'}
+                        {d.toolingByFormation.length ? d.toolingByFormation.map(x => x.formation).join(' → ') : DAY_STATUS_LABEL[d.status]}
                       </td>
-                      <td style={tdN}>{d.labour.heads || '—'}</td>
+                      {full && <td style={tdN}>{d.labour.heads || '—'}</td>}
                       <td style={tdN}>{d.drillingHours || '—'}</td>
-                      <td style={{ ...tdN, color: d.downtimeHours ? C.red : C.dim }}>{d.downtimeHours || '—'}</td>
+                      <td style={{ ...tdN, color: d.downtimeHours ? C.amber : C.dim }}>{d.downtimeHours ? `${d.downtimeHours} h` : '—'}</td>
                       <td style={{ ...tdN, color: d.units ? C.text : C.dim, fontWeight: 700 }}>{d.units ? fm(d.units) : '—'}</td>
+                      {full && <>
                       <td style={tdN}>{d.maintenanceHours || '—'}</td>
-                      <td style={{ ...tdN, color: d.repairs ? C.purple : C.dim }}>{d.repairs ? money(d.repairs) : '—'}</td>
+                      <td style={{ ...tdN, color: d.repairs ? C.text : C.dim }}>{d.repairs ? money(d.repairs) : '—'}</td>
                       <td style={{ ...tdN, color: d.parts ? C.muted : C.dim }}>{d.parts ? money(d.parts) : '—'}</td>
-                      <td style={{ ...tdN, color: d.units ? C.orange : C.dim }}>{d.units ? perUnit(d.toolingRate) : '—'}</td>
+                      <td style={{ ...tdN, color: d.units ? C.muted : C.dim }}>{d.units ? perUnit(d.toolingRate) : '—'}</td>
                       <td style={tdN}>{money(d.fuel)}</td>
                       <td style={tdN}>{money(d.labour.total)}</td>
-                      <td style={{ ...tdN, color: LAYER.operating }}>{money(d.operating)}</td>
-                      <td style={{ ...tdN, color: LAYER.ownership }}>{d.ownership > 0 ? money(d.ownership) : '—'}</td>
-                      <td style={{ ...tdN, color: C.text, fontWeight: 800 }}>{money(d.total)}</td>
-                      <td style={{ ...tdN, fontWeight: 800, color: d.cpu == null ? C.dim : rate ? cpuColor(d.cpu, rate) : C.text }}>
+                      <td style={tdN}>{money(d.operating)}</td>
+                      <td style={tdN}>{d.ownership > 0 ? money(d.ownership) : '—'}</td>
+                      </>}
+                      <td style={{ ...tdN, color: C.text, fontWeight: 600 }}>{money(d.total)}</td>
+                      <td style={{ ...tdN, fontWeight: 700, color: d.cpu == null ? C.dim : rate ? cpuColor(d.cpu, rate) : C.text }}>
                         {d.cpu == null ? '—' : perUnit(d.cpu)}
                       </td>
-                      <td style={{ ...tdN, color: d.revenue > 0 ? LAYER.revenue : C.dim }}>{d.revenue > 0 ? money(d.revenue) : '—'}</td>
+                      <td style={{ ...tdN, color: d.revenue > 0 ? C.text : C.dim }}>{d.revenue > 0 ? money(d.revenue) : '—'}</td>
+                      {!full && <td style={{ ...tdN, fontWeight: 700, color: d.revenue - d.total >= 0 ? C.green : C.red }}>{money(d.revenue - d.total)}</td>}
                     </tr>
                     {isOpen && (
                       <tr style={{ borderBottom: rowBorder, background: 'color-mix(in srgb, var(--x-orange) 3%, transparent)' }}>
-                        <td colSpan={19} style={{ padding: '16px 18px' }}>
+                        <td colSpan={full ? 19 : 11} style={{ padding: '16px 18px' }}>
                           <div style={{ display: 'flex', gap: 44, flexWrap: 'wrap' }}>
                             <Detail title="From the log" tone={C.blue} rows={[
                               ['Status', DAY_STATUS_LABEL[d.status]],
@@ -1028,7 +1032,7 @@ function PerformanceTab({ v, rig, project, month }: {
                               so the day shows which ground it charged and at what. */}
                           {d.toolingByFormation.length > 0 && (
                             <div style={{ marginTop: 14 }}>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: C.orange, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: C.orange, letterSpacing: '0', marginBottom: 8 }}>
                                 What the parts cost this day
                               </div>
                               <table style={tableStyle}>
@@ -1053,7 +1057,7 @@ function PerformanceTab({ v, rig, project, month }: {
 
                           {d.charges.length > 0 && (
                             <div style={{ marginTop: 14 }}>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: LAYER.revenue, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: LAYER.revenue, letterSpacing: '0', marginBottom: 8 }}>
                                 How this day billed
                               </div>
                               <table style={tableStyle}>
@@ -1062,9 +1066,9 @@ function PerformanceTab({ v, rig, project, month }: {
                                   {d.charges.map((c, k) => (
                                     <tr key={k} style={{ borderBottom: rowBorder }}>
                                       <td style={td}>{c.shift}</td>
-                                      <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{c.holeSize}</td>
+                                      <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{c.holeSize}</td>
                                       <td style={{ ...td, color: C.text }}>{c.formation}</td>
-                                      <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{c.fromDepth}–{c.toDepth} m</td>
+                                      <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{c.fromDepth}–{c.toDepth} m</td>
                                       <td style={tdN}>{c.metres}</td>
                                       <td style={{ ...tdN, color: c.matched ? C.orange : C.red }}>{c.matched ? perUnit(c.rate) : 'no rate'}</td>
                                       <td style={{ ...tdN, color: LAYER.revenue, fontWeight: 700 }}>{money(c.amount)}</td>
@@ -1091,25 +1095,28 @@ function PerformanceTab({ v, rig, project, month }: {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
-                <td style={{ ...td, color: C.text, fontWeight: 800 }} colSpan={4}>
+                <td style={{ ...td, color: C.text, fontWeight: 700 }} colSpan={full ? 4 : 3}>
                   {monthLabel(month)}, all {r.days} days
                   {hidden > 0 && <span style={{ fontWeight: 400, color: C.faint, marginLeft: 8 }}>{hidden} not shown above</span>}
                 </td>
-                <td style={tdN} />
-                <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{r.drillingHours}</td>
-                <td style={{ ...tdN, fontWeight: 800, color: C.red }}>{r.downtimeHours}</td>
-                <td style={{ ...tdN, fontWeight: 800, color: C.text }}>{fm(r.units)}</td>
-                <td style={{ ...tdN, fontWeight: 800 }}>{r.maintenanceHours || '—'}</td>
-                <td style={{ ...tdN, fontWeight: 800, color: C.purple }}>{money(r.repairs)}</td>
-                <td style={{ ...tdN, fontWeight: 800 }}>{money(r.parts)}</td>
-                <td style={{ ...tdN, fontWeight: 800, color: C.orange }}>{perUnit(r.toolingPerUnit)}</td>
-                <td style={{ ...tdN, fontWeight: 800 }}>{money(r.fuel)}</td>
-                <td style={{ ...tdN, fontWeight: 800 }}>{money(r.labour)}</td>
-                <td style={{ ...tdN, fontWeight: 800, color: LAYER.operating }}>{money(r.operating)}</td>
-                <td style={{ ...tdN, fontWeight: 800, color: LAYER.ownership }}>{money(r.ownership)}</td>
-                <td style={{ ...tdN, fontWeight: 900, color: C.text }}>{money(r.total)}</td>
-                <td style={{ ...tdN, fontWeight: 900, color: LAYER.full }}>{perUnit(r.cpu)}</td>
-                <td style={{ ...tdN, fontWeight: 900, color: LAYER.revenue }}>{money(r.revenue)}</td>
+                {full && <td style={tdN} />}
+                <td style={{ ...tdN, fontWeight: 700, color: C.text }}>{r.drillingHours}</td>
+                <td style={{ ...tdN, fontWeight: 700, color: C.amber }}>{r.downtimeHours} h</td>
+                <td style={{ ...tdN, fontWeight: 700, color: C.text }}>{fm(r.units)}</td>
+                {full && <>
+                <td style={{ ...tdN, fontWeight: 700 }}>{r.maintenanceHours || '—'}</td>
+                <td style={{ ...tdN, fontWeight: 700 }}>{money(r.repairs)}</td>
+                <td style={{ ...tdN, fontWeight: 700 }}>{money(r.parts)}</td>
+                <td style={{ ...tdN, fontWeight: 700 }}>{perUnit(r.toolingPerUnit)}</td>
+                <td style={{ ...tdN, fontWeight: 700 }}>{money(r.fuel)}</td>
+                <td style={{ ...tdN, fontWeight: 700 }}>{money(r.labour)}</td>
+                <td style={{ ...tdN, fontWeight: 700 }}>{money(r.operating)}</td>
+                <td style={{ ...tdN, fontWeight: 700 }}>{money(r.ownership)}</td>
+                </>}
+                <td style={{ ...tdN, fontWeight: 700, color: C.text }}>{money(r.total)}</td>
+                <td style={{ ...tdN, fontWeight: 700, color: rate ? cpuColor(r.cpu, rate) : C.text }}>{perUnit(r.cpu)}</td>
+                <td style={{ ...tdN, fontWeight: 700, color: C.text }}>{money(r.revenue)}</td>
+                {!full && <td style={{ ...tdN, fontWeight: 700, color: r.margin >= 0 ? C.green : C.red }}>{money(r.margin)}</td>}
               </tr>
             </tfoot>
           </table>
@@ -1129,12 +1136,12 @@ function PerformanceTab({ v, rig, project, month }: {
 function Detail({ title, tone, rows }: { title: string; tone: string; rows: string[][] }) {
   return (
     <div style={{ minWidth: 210, maxWidth: 270 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: tone, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>{title}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: tone, letterSpacing: '0', marginBottom: 10 }}>{title}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {rows.map((r, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
             <span style={{ fontSize: 11, color: C.faint }}>{r[0]}</span>
-            <span style={{ fontSize: 12, color: C.text, fontFamily: 'ui-monospace, monospace', fontWeight: 600 }}>{r[1]}</span>
+            <span style={{ fontSize: 12, color: C.text, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{r[1]}</span>
           </div>
         ))}
       </div>
@@ -1230,7 +1237,7 @@ function CPUChart({ days, rate, clientRate, month }: {
             return (
               <g key={fr}>
                 <line x1={PL} x2={W - PR} y1={y(val)} y2={y(val)} stroke={C.border} strokeWidth={1} opacity={0.45} />
-                <text x={PL - 10} y={y(val) + 4} textAnchor="end" fill={C.dim} fontSize={10.5} fontFamily="ui-monospace, monospace">
+                <text x={PL - 10} y={y(val) + 4} textAnchor="end" fill={C.dim} fontSize={10.5}>
                   {Math.round(val / 1000)}k
                 </text>
               </g>
@@ -1243,7 +1250,7 @@ function CPUChart({ days, rate, clientRate, month }: {
             <g key={c.label}>
               <line x1={PL} x2={W - PR} y1={y(c.rate)} y2={y(c.rate)} stroke={c.tone} strokeWidth={1.5} strokeDasharray="7 6" opacity={0.85} />
               <text x={W - PR + 9} y={y(c.rate) + 3} fill={c.tone} fontSize={10.5} fontWeight={700}>{c.label}</text>
-              <text x={W - PR + 9} y={y(c.rate) + 15} fill={c.tone} fontSize={10} opacity={0.7} fontFamily="ui-monospace, monospace">
+              <text x={W - PR + 9} y={y(c.rate) + 15} fill={c.tone} fontSize={10} opacity={0.7}>
                 {Math.round(c.rate).toLocaleString('en-IN')}
               </text>
             </g>
@@ -1340,7 +1347,7 @@ function ChartTip({ d, rate, left }: { d: DayCostMTD; rate: number; left: number
         {rows.map(([k, v, tone], i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 18 }}>
             <span style={{ fontSize: 11, color: C.faint }}>{k}</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: tone ?? C.text, fontFamily: 'ui-monospace, monospace' }}>{v}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: tone ?? C.text, fontVariantNumeric: 'tabular-nums' }}>{v}</span>
           </div>
         ))}
       </div>
@@ -1384,13 +1391,11 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
   const finished = v.holes.filter(h => isFinished(h.hole))
   const stillDrilling = v.holes.length - finished.length
 
+  const drilling = v.holes.filter(h => !isFinished(h.hole))
+  void stillDrilling
   if (finished.length === 0) {
-    return (
-      <Card><Empty>
-        No closed holes for this rig this month.
-        {stillDrilling > 0 && <><br />{stillDrilling} {stillDrilling === 1 ? 'hole is' : 'holes are'} still being drilled — they appear here once the driller ticks &quot;Hole Closed This Shift&quot; in the log.</>}
-      </Empty></Card>
-    )
+    return drilling.length ? <DrillingHoles holes={drilling} note="No hole was closed on this rig this month. These are still being drilled; each moves to the list above once the driller ticks Hole Closed This Shift." />
+      : <Card><Empty>No hole was drilled on this rig this month.</Empty></Card>
   }
 
   const t = finished.reduce((a, h) => ({
@@ -1448,7 +1453,7 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
                         <td colSpan={12} style={{ padding: '20px 22px' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 26 }}>
                             <div>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: LAYER.full, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: LAYER.full, letterSpacing: '0', marginBottom: 12 }}>
                                 What {hole.holeNumber} cost
                               </div>
                               <table style={tableStyle}>
@@ -1500,7 +1505,7 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
                             </div>
 
                             <div>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: LAYER.revenue, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: LAYER.revenue, letterSpacing: '0', marginBottom: 12 }}>
                                 What {hole.holeNumber} bills
                               </div>
                               {/* The measurement book: one line per size, formation
@@ -1517,9 +1522,9 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
                                 <tbody>
                                   {h.billing.map((l, k) => (
                                     <tr key={k} style={{ borderBottom: rowBorder }}>
-                                      <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{l.holeSize}</td>
+                                      <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{l.holeSize}</td>
                                       {isFlat && <td style={{ ...td, color: C.text }}>{l.formation}</td>}
-                                      <td style={{ ...td, fontFamily: 'ui-monospace, monospace' }}>{l.fromDepth}–{l.toDepth} m</td>
+                                      <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{l.fromDepth}–{l.toDepth} m</td>
                                       <td style={tdN}>{l.metres}</td>
                                       <td style={{ ...tdN, color: l.matched ? C.orange : C.red }}>{l.matched ? perUnit(l.rate) : 'no rate'}</td>
                                       <td style={{ ...tdN, color: LAYER.revenue, fontWeight: 700 }}>{money(l.amount)}</td>
@@ -1631,7 +1636,36 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
           </table>
         </div>
       </Card>
+      {drilling.length > 0 && <DrillingHoles holes={drilling} note="Still being drilled on this rig. Each moves to the list above once the driller ticks Hole Closed This Shift." />}
     </div>
+  )
+}
+
+/* Holes this rig is still drilling: what they have cost and earned so far,
+ * so the tab is never empty while work is going on. */
+function DrillingHoles({ holes, note }: { holes: HoleResult[]; note: string }) {
+  return (
+    <Card title="Still being drilled" subtitle={note} pad={false}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={tableStyle}>
+          <thead><tr><th style={th}>Hole</th><th style={th}>Started</th><th style={thR}>Days</th><th style={thR}>Metres so far</th><th style={thR}>Cost so far</th><th style={thR}>Cost a metre</th><th style={thR}>Earned so far</th><th style={thR}>Left</th></tr></thead>
+          <tbody>
+            {holes.map(h => (
+              <tr key={h.hole.holeNumber} style={{ borderBottom: rowBorder }}>
+                <td style={{ ...td, color: C.text, fontWeight: 700 }}>{h.hole.holeNumber}</td>
+                <td style={td}>{dayLabel(h.hole.startDate)}</td>
+                <td style={tdN}>{h.roll.days}</td>
+                <td style={{ ...tdN, color: C.text, fontWeight: 600 }}>{fm(h.roll.units)}</td>
+                <td style={tdN}>{money(h.roll.total)}</td>
+                <td style={{ ...tdN, fontWeight: 700, color: C.text }}>{h.roll.units ? perUnit(h.roll.cpu) : '—'}</td>
+                <td style={tdN}>{money(h.roll.revenue)}</td>
+                <td style={{ ...tdN, fontWeight: 700, color: marginColor(h.roll.margin) }}>{money(h.roll.margin)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   )
 }
 
@@ -1639,7 +1673,7 @@ function Mini({ k, v }: { k: string; v: string }) {
   return (
     <div>
       <div style={{ fontSize: 10, color: C.dim, marginBottom: 3 }}>{k}</div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, fontFamily: 'ui-monospace, monospace' }}>{v}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{v}</div>
     </div>
   )
 }
@@ -1647,7 +1681,7 @@ function Res({ k, v, tone, big }: { k: string; v: string; tone: string; big?: bo
   return (
     <div>
       <div style={{ fontSize: 10, color: C.faint, marginBottom: 5 }}>{k}</div>
-      <div style={{ fontSize: big ? 19 : 15, fontWeight: 900, color: tone, fontFamily: 'ui-monospace, monospace' }}>{v}</div>
+      <div style={{ fontSize: big ? 19 : 15, fontWeight: 900, color: tone, fontVariantNumeric: 'tabular-nums' }}>{v}</div>
     </div>
   )
 }
@@ -1776,7 +1810,7 @@ function StatusPill({ inv, overdue, onChange }: {
       <button onClick={openMenu} style={{
         display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit',
         padding: '4px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-        textTransform: 'uppercase', letterSpacing: '0.06em',
+        letterSpacing: '0',
         color: tone, background: `${hexA(tone, 0x1A)}`, border: `1px solid ${hexA(tone, 0x44)}`,
       }}>
         {overdue ? 'Overdue' : INVOICE_STATUS_LABEL[inv.status]}
@@ -1837,7 +1871,7 @@ function InvoiceView({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
               return (
                 <tr key={i} style={{ borderBottom: rowBorder, background: r?.status === 'disputed' ? 'color-mix(in srgb, var(--x-red) 5%, transparent)' : undefined }}>
                   <td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{l.label}</td>
-                  <td style={{ ...td, fontFamily: 'ui-monospace, monospace', color: C.faint }}>{l.depth ?? '—'}</td>
+                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums', color: C.faint }}>{l.depth ?? '—'}</td>
                   <td style={tdN}>{l.qty}</td><td style={tdN}>{l.rate}</td>
                   <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{money(l.amount)}</td>
                   {inv.ownerStatus && (
@@ -1941,7 +1975,7 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
               {lines.map((l, i) => (
                 <tr key={i} style={{ borderBottom: rowBorder }}>
                   <td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{l.label}</td>
-                  <td style={{ ...td, fontFamily: 'ui-monospace, monospace', color: C.faint }}>{l.depth ?? '—'}</td>
+                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums', color: C.faint }}>{l.depth ?? '—'}</td>
                   <td style={tdN}>{l.qty}</td><td style={tdN}>{l.rate}</td>
                   <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{money(l.amount)}</td>
                 </tr>
@@ -1970,7 +2004,7 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
                   style={{ ...iStyle, flex: 2 }} />
                 <input type="number" value={e.amount}
                   onChange={ev => setExtras(x => x.map((y, j) => j === i ? { ...y, amount: parseFloat(ev.target.value) || 0 } : y))}
-                  style={{ ...iStyle, flex: 1, fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: LAYER.revenue }} />
+                  style={{ ...iStyle, flex: 1, fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: LAYER.revenue }} />
                 <Btn size="sm" tone="danger" onClick={() => setExtras(x => x.filter((_, j) => j !== i))}>Remove</Btn>
               </div>
             ))}
@@ -2117,7 +2151,8 @@ function ContractorRigTab({ v, rig, project, month }: { v: RigMonthView; rig: st
  * 6  The screen
  * ========================================================================== */
 
-const TABS = ['Performance', 'Drillholes', 'Tracker'] as const
+const TABS = ['Overview', 'Performance', 'Drillholes', 'Tracker'] as const
+const TAB_LABEL: Record<string, string> = { Overview: 'Project overview', Performance: 'Rig day by day', Drillholes: 'Drillholes', Tracker: 'Invoices' }
 type Tab = typeof TABS[number]
 
 function CostingScreen() {
@@ -2142,7 +2177,7 @@ function CostingScreen() {
     return m.length ? m : [monthOf(TODAY)]
   }, [state.shiftLogs, rig, project])
   const [month, setMonth] = useState(months[months.length - 1] ?? '')
-  const [tab, setTab] = useState<Tab>('Performance')
+  const [tab, setTab] = useState<Tab>('Overview')
 
   useEffect(() => { if (!rigs.includes(rig)) setRig(rigs[0] ?? '') }, [rigs, rig])
   useEffect(() => { if (!months.includes(month)) setMonth(months[months.length - 1] ?? '') }, [months, month])
@@ -2179,57 +2214,39 @@ function CostingScreen() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: 20, paddingBottom: 56 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ fontSize: 26, fontWeight: 900, color: C.text, margin: 0 }}>Costing</h1>
-          <p style={{ fontSize: 13, color: C.faint, marginTop: 5, maxWidth: 660, lineHeight: 1.6 }}>
-            What each hole cost, what it can be billed for, and what it made. Metres, hours, crew and fuel come from the
-            driller&apos;s log, repairs from the maintenance log, tooling from what each rig is carrying — the only things
-            set here are rates.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Btn size="sm" onClick={() => setShowRates(true)}>⚙ Set costs</Btn>
-          <Btn size="sm" onClick={() => setShowHistory(true)}>↺ Rates history</Btn>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18, paddingBottom: 56, maxWidth: 1280 }}>
+      <PageHead question="Is each project making money?"
+        answer={<OverviewAnswer project={project} />}
+        right={<>
+          <Btn size="sm" onClick={() => setShowRates(true)}>Set costs</Btn>
+          <Btn size="sm" onClick={() => setShowHistory(true)}>Rates history</Btn>
+        </>} />
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <select aria-label="Project" value={project} onChange={e => setProject(e.target.value)}
+          style={{ ...iStyle, width: 'auto', minWidth: 260, padding: '8px 12px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', background: C.card }}>
+          {projects.map(p => <option key={p} value={p}>{projectCode(p)} · {p}</option>)}
+        </select>
+        <KSeg<Tab> options={TABS.map(t => ({ value: t, label: TAB_LABEL[t] }))} value={tab} onChange={setTab} />
       </div>
 
-      <div style={{
-        background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
-        padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap',
-      }}>
-        <Chain label="Project">
-          {projects.map(p => <Chip key={p} on={project === p} onClick={() => setProject(p)} label={projectCode(p)} />)}
-        </Chain>
-        <span style={{ width: 1, height: 22, background: C.border }} />
-        <Chain label="Rig">
-          {rigs.map(r => <Chip key={r} on={rig === r} onClick={() => setRig(r)} label={bought(r) ? `${rigCode(r)} · contractor` : rigCode(r)} />)}
-        </Chain>
-        <div style={{ flex: 1 }} />
-        {/* Any month is reachable, not just ones with logs — a month with none
-            simply shows an empty table rather than being hidden. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Arrow dir="◀" onClick={() => setMonth(shiftMonth(month, -1))} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: C.text, minWidth: 128, textAlign: 'center', fontFamily: 'inherit' }}>
-            {monthLabel(month)}
-          </span>
-          <Arrow dir="▶" onClick={() => setMonth(shiftMonth(month, 1))} />
+      {(tab === 'Performance' || tab === 'Drillholes') && (
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: C.faint }}>Rig</span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {rigs.map(r => <Chip key={r} on={rig === r} onClick={() => setRig(r)} label={bought(r) ? `${rigCode(r)} · contractor` : rigCode(r)} />)}
+          </div>
+          <div style={{ flex: 1 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Arrow dir="◀" onClick={() => setMonth(shiftMonth(month, -1))} />
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: C.text, minWidth: 128, textAlign: 'center' }}>{monthLabel(month)}</span>
+            <Arrow dir="▶" onClick={() => setMonth(shiftMonth(month, 1))} />
+          </div>
         </div>
-      </div>
+      )}
 
-      <BudgetStrip project={project} />
-
-      <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 4, alignSelf: 'flex-start' }}>
-        {TABS.map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            padding: '7px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-            border: 'none', fontFamily: 'inherit',
-            background: tab === t ? C.orange : 'transparent', color: tab === t ? '#fff' : C.muted,
-          }}>{t}</button>
-        ))}
-      </div>
-
+      {tab === 'Overview' && <ProjectOverview project={project} rigs={rigs} bought={bought}
+        onOpenRig={(r, m) => { setRig(r); if (m) setMonth(m); setTab('Performance') }} />}
       {tab === 'Performance' && (bought(rig)
         ? <ContractorRigTab v={v} rig={rig} project={project} month={month} />
         : <PerformanceTab v={v} rig={rig} project={project} month={month} />)}
@@ -2253,41 +2270,152 @@ function CostingScreen() {
   )
 }
 
-/* The whole project against its budget, above the rig-by-rig detail: every
- * rig and every month, from the same costed days as the tables below. */
-function BudgetStrip({ project }: { project: string }) {
+/* ==========================================================================
+ * 7  Project overview: every rig, every month
+ *
+ * The question an owner asks first: is this project making money, and which
+ * rig is not. Every figure is the sum of the same costed days the rig tables
+ * show, so the overview and the detail cannot disagree.
+ * ========================================================================== */
+
+interface RigSum { rig: string; contractor: boolean; metres: number; cost: number; revenue: number; days: number; last: string; lastMonth: string }
+interface MonthSum { month: string; metres: number; cost: number; revenue: number }
+
+function useProjectSums(project: string, rigs: string[]) {
   const { state } = useCosting()
   const { state: inv } = useInventory()
+  return useMemo(() => {
+    const byRig: RigSum[] = []
+    const byMonth: Record<string, MonthSum> = {}
+    rigs.forEach(rig => {
+      const months = monthsFor(state.shiftLogs, rig, project)
+      const sum: RigSum = { rig, contractor: !!workOrderFor(state, project, rig), metres: 0, cost: 0, revenue: 0, days: 0, last: '', lastMonth: months[months.length - 1] ?? '' }
+      months.forEach(m => {
+        const v = computeRigMonth(state, inv, project, rig, m)
+        sum.metres += v.roll.units; sum.cost += v.roll.total; sum.revenue += v.roll.revenue; sum.days += v.roll.days
+        const last = v.days.filter(d => d.submitted).map(d => d.date).sort().pop()
+        if (last && last > sum.last) sum.last = last
+        const e = (byMonth[m] ||= { month: m, metres: 0, cost: 0, revenue: 0 })
+        e.metres += v.roll.units; e.cost += v.roll.total; e.revenue += v.roll.revenue
+      })
+      byRig.push(sum)
+    })
+    const months = Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month))
+    const t = byRig.reduce((a, r) => ({ metres: a.metres + r.metres, cost: a.cost + r.cost, revenue: a.revenue + r.revenue }), { metres: 0, cost: 0, revenue: 0 })
+    return { byRig, months, total: t }
+  }, [state, inv, project, rigs])
+}
+
+/* The one-line answer under the page title. */
+function OverviewAnswer({ project }: { project: string }) {
+  const { state } = useCosting()
+  const rigs = useMemo(() => Array.from(new Set([
+    ...rigsFor(state.shiftLogs, project),
+    ...(state.workOrders ?? []).filter(w => w.project === project).flatMap(w => w.rigs),
+  ])).sort(), [state.shiftLogs, state.workOrders, project])
+  const { total, byRig } = useProjectSums(project, rigs)
+  if (!total.metres && !total.cost) return <>Nothing logged on {projectCode(project)} yet. Costs appear here as soon as shifts are recorded.</>
+  const left = total.revenue - total.cost
+  const losing = byRig.filter(r => r.metres > 0 && r.revenue - r.cost < 0)
+  return <>
+    {projectCode(project)} has billed {money(total.revenue)} against {money(total.cost)} of cost since it started: {left >= 0 ? `${money(left)} left` : `${money(-left)} lost`}
+    {total.revenue > 0 ? ` (${((left / total.revenue) * 100).toFixed(1)}%)` : ''}.
+    {losing.length ? ` ${losing.map(r => rigCode(r.rig)).join(' and ')} ${losing.length === 1 ? 'is' : 'are'} costing more than ${losing.length === 1 ? 'it bills' : 'they bill'}.` : ' Every rig is paying its way.'}
+  </>
+}
+
+function ProjectOverview({ project, rigs, bought, onOpenRig }: {
+  project: string; rigs: string[]; bought: (r: string) => boolean; onOpenRig: (rig: string, month?: string) => void
+}) {
+  const { state } = useCosting()
+  const { state: inv } = useInventory()
+  const { byRig, months, total } = useProjectSums(project, rigs)
   const p = (state.projects ?? []).find(x => x.name === project)
-  const b = useMemo(() => p ? projectBudget(state, inv, p) : null, [state, inv, p])
-  if (!p || !b) return null
-  const link = <Link href={`/admin/projects/${encodeURIComponent(p.id)}`} style={{ color: C.orange, fontWeight: 700, textDecoration: 'none', fontSize: 12 }}>{b.set ? 'Change the budget' : 'Set a budget'}</Link>
-  if (!b.set) {
-    return (
-      <div style={{ background: C.card, border: `1px dashed ${C.border}`, borderRadius: 12, padding: '10px 14px', display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, color: C.muted }}>
-        <span><b style={{ color: C.text }}>{projectCode(project)}</b> has no budget. So far {money(b.spent)} on {Math.round(b.metres).toLocaleString('en-IN')} m{b.metres ? `, ${money(b.cpm)} a metre` : ''}.</span>
-        {link}
-      </div>
-    )
+  const budget = useMemo(() => p ? projectBudget(state, inv, p) : null, [state, inv, p])
+  const left = total.revenue - total.cost
+  const cpm = total.metres ? total.cost / total.metres : 0
+  const rpm = total.metres ? total.revenue / total.metres : 0
+  const chart = months.map(m => ({ month: monthShort(m.month), Billed: Math.round(m.revenue), Cost: Math.round(m.cost) }))
+  const link = p ? `/admin/projects/${encodeURIComponent(p.id)}` : '/admin/projects'
+
+  if (!total.metres && !total.cost) {
+    return <Card><Empty>No shift has been logged on this project yet. Set each rig&apos;s costs with Set costs; the figures appear here with the first shift.</Empty></Card>
   }
-  const over = b.overPerMetre ?? 0
-  const perColor = !b.metres || !b.budgetPerMetre ? C.text : over > 0 ? (over / b.budgetPerMetre > 0.1 ? C.red : C.amber) : C.green
-  const cell = (label: string, value: string, sub: string, color: string = C.text) => (
-    <div style={{ minWidth: 150 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 800, color, marginTop: 3, fontFamily: 'ui-monospace, monospace' }}>{value}</div>
-      <div style={{ fontSize: 11.5, color: C.faint, marginTop: 2 }}>{sub}</div>
-    </div>
-  )
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 16px', display: 'flex', gap: 26, alignItems: 'center', flexWrap: 'wrap' }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: C.text, minWidth: 120 }}>{projectCode(project)} budget<div style={{ fontSize: 11, fontWeight: 400, color: C.faint, marginTop: 2 }}>every rig, since the start</div></div>
-      {cell('Cost per metre', b.metres ? money(b.cpm) : '—', b.budgetPerMetre ? `budget ${money(b.budgetPerMetre)}${b.metres ? ` · ${over > 0 ? `${money(over)} over` : `${money(-over)} under`}` : ''}` : 'no budget per metre', perColor)}
-      {cell('Spent', money(b.spent), b.budgetTotal ? `of ${money(b.budgetTotal)} · ${(b.spentPct ?? 0).toFixed(1)}%` : 'no total budget')}
-      {cell('Drilled', `${Math.round(b.metres).toLocaleString('en-IN')} m`, b.target ? `of ${Math.round(b.target).toLocaleString('en-IN')} m · ${(b.donePct ?? 0).toFixed(1)}%` : '')}
-      {b.atCompletion && b.budgetTotal ? cell('At this rate, the whole project', money(b.atCompletion), b.atCompletion > b.budgetTotal ? `${money(b.atCompletion - b.budgetTotal)} over budget` : `${money(b.budgetTotal - b.atCompletion)} under budget`, b.atCompletion > b.budgetTotal * 1.1 ? C.red : b.atCompletion > b.budgetTotal ? C.amber : C.green) : null}
-      <div style={{ flex: 1 }} />
-      {link}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
+        <Stat label="Billed so far" value={money(total.revenue)} note={`${fm(total.metres)} m at ${perUnit(rpm)} on average`} big />
+        <Stat label="Cost so far" value={money(total.cost)} note={`${perUnit(cpm)} a metre${budget?.budgetPerMetre ? ` · budget ${perUnit(budget.budgetPerMetre)}` : ''}`} big />
+        <Stat label="Left after cost" value={money(left)} color={left >= 0 ? C.green : C.red} note={total.revenue > 0 ? `${((left / total.revenue) * 100).toFixed(1)}% of what was billed` : 'nothing billed yet'} big />
+        <Stat label="Left on each metre" value={total.metres ? perUnit(rpm - cpm) : '—'} color={rpm - cpm >= 0 ? C.green : C.red} note={`billed ${perUnit(rpm)} · cost ${perUnit(cpm)}`} big />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)', gap: 16 }}>
+        <Card title="Month by month" subtitle="What the project billed against what it cost, every rig together.">
+          <ResponsiveContainer width="100%" height={250}>
+            <ComposedChart data={chart} margin={{ top: 10, right: 8, bottom: 0, left: 0 }}>
+              <CartesianGrid stroke={gridStroke} vertical={false} />
+              <XAxis dataKey="month" tick={axisTick} tickLine={false} axisLine={{ stroke: T.border }} />
+              <YAxis tick={axisTick} tickLine={false} axisLine={false} width={56} tickFormatter={(v: number) => v >= 100000 ? `₹${(v / 100000).toFixed(1)}L` : `₹${Math.round(v / 1000)}k`} />
+              <Tooltip content={<KTip unit="" names={{ Billed: 'Billed ₹', Cost: 'Cost ₹' }} />} />
+              <Bar dataKey="Billed" fill={T.bar} maxBarSize={34} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+              <Bar dataKey="Cost" fill={C.orange} maxBarSize={34} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+              <Line dataKey="Cost" stroke="transparent" dot={false} legendType="none" isAnimationActive={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+          <KLegend items={[{ color: T.bar, label: 'Billed' }, { color: C.orange, label: 'Cost' }]} />
+        </Card>
+        {budget && <BudgetCard b={budget} onSet={() => { window.location.href = link }} />}
+      </div>
+
+      <Card title="Rig by rig" subtitle="Since the project started. Click a rig for its days." pad={false}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={tableStyle}>
+            <thead><tr>
+              <th style={th}>Rig</th><th style={thR}>Days</th><th style={thR}>Metres</th><th style={thR}>Cost a metre</th><th style={thR}>Billed a metre</th>
+              <th style={thR}>Cost</th><th style={thR}>Billed</th><th style={thR}>Left</th><th style={th}>How it stands</th><th style={th} />
+            </tr></thead>
+            <tbody>
+              {byRig.map(r => {
+                const l = r.revenue - r.cost
+                const c = r.metres ? r.cost / r.metres : 0, b = r.metres ? r.revenue / r.metres : 0
+                const tone = !r.metres ? 'neutral' : l < 0 ? 'bad' : r.revenue > 0 && l / r.revenue < 0.1 ? 'warn' : 'good'
+                return (
+                  <tr key={r.rig} onClick={() => onOpenRig(r.rig, r.lastMonth || undefined)} className="xpl-row" style={{ borderBottom: rowBorder, cursor: 'pointer' }}>
+                    <td style={{ ...td, color: C.text, fontWeight: 700 }}>{rigCode(r.rig)}{(r.contractor || bought(r.rig)) && <span style={{ fontWeight: 400, color: C.faint }}> · {contractorName(state, workOrderFor(state, project, r.rig)?.contractorId)}</span>}</td>
+                    <td style={tdN}>{r.days}</td>
+                    <td style={{ ...tdN, color: C.text, fontWeight: 600 }}>{fm(r.metres)}</td>
+                    <td style={{ ...tdN, color: C.text }}>{r.metres ? perUnit(c) : '—'}</td>
+                    <td style={tdN}>{r.metres ? perUnit(b) : '—'}</td>
+                    <td style={tdN}>{money(r.cost)}</td>
+                    <td style={tdN}>{money(r.revenue)}</td>
+                    <td style={{ ...tdN, fontWeight: 700, color: l >= 0 ? C.green : C.red }}>{money(l)}</td>
+                    <td style={td}><KStatus tone={tone}>{tone === 'bad' ? `Losing ${perUnit(c - b)} a metre` : tone === 'warn' ? 'Thin margin' : tone === 'good' ? `${perUnit(b - c)} left a metre` : 'Nothing drilled'}</KStatus></td>
+                    <td style={{ ...td, color: C.orange, fontWeight: 600 }}>Open →</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: `2px solid ${C.border}` }}>
+                <td style={{ ...td, color: C.text, fontWeight: 700 }}>All rigs</td>
+                <td style={tdN} />
+                <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{fm(total.metres)}</td>
+                <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{total.metres ? perUnit(cpm) : '—'}</td>
+                <td style={{ ...tdN, fontWeight: 700 }}>{total.metres ? perUnit(rpm) : '—'}</td>
+                <td style={{ ...tdN, fontWeight: 700 }}>{money(total.cost)}</td>
+                <td style={{ ...tdN, fontWeight: 700 }}>{money(total.revenue)}</td>
+                <td style={{ ...tdN, fontWeight: 700, color: left >= 0 ? C.green : C.red }}>{money(left)}</td>
+                <td style={td} colSpan={2} />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </Card>
+      <div style={{ fontSize: 12, color: C.faint, lineHeight: 1.6 }}>
+        How a metre&apos;s cost is worked out: each rig-day&apos;s fuel, crew, repairs, the parts the rig is carrying and its ownership cost, divided by the metres drilled that day.
+        A contractor&apos;s rig costs what his work order pays. Billed is the metres at the contract rates in force each day.
+      </div>
     </div>
   )
 }
@@ -2299,7 +2427,7 @@ function Pick({ on, onClick, title, sub }: { on: boolean; onClick: () => void; t
       background: on ? `linear-gradient(135deg, ${C.orange}, ${C.orangeD})` : 'rgba(var(--x-ov),0.03)',
       border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted,
     }}>
-      <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{title}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{title}</div>
       <div style={{ fontSize: 10, opacity: 0.75, marginTop: 2 }}>{sub}</div>
     </button>
   )
@@ -2308,7 +2436,7 @@ function Pick({ on, onClick, title, sub }: { on: boolean; onClick: () => void; t
 function Chain({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-      <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</span>
+      <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: '0' }}>{label}</span>
       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>{children}</div>
     </div>
   )
@@ -2317,7 +2445,7 @@ function Chain({ label, children }: { label: string; children: ReactNode }) {
 function Chip({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
     <button onClick={onClick} style={{
-      padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'ui-monospace, monospace',
+      padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontVariantNumeric: 'tabular-nums',
       fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
       background: on ? C.orange : 'rgba(var(--x-ov),0.03)',
       border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted,

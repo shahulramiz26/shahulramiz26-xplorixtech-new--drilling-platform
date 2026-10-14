@@ -22,6 +22,7 @@ import {
 import { useCosting, monthOf } from '../../../lib/costing-store'
 import { ownLogs } from '../../../lib/contracting'
 import { hexA } from '../../../lib/theme'
+import { PageHead, Seg as KSeg } from '../../components/kit'
 
 /* Parts are ours only on our own rigs. A contractor's rig wears the
  * contractor's bits and rods, so its shifts are left out of everything this
@@ -40,22 +41,24 @@ const C = {
   text: 'var(--x-text)', muted: 'var(--x-muted)', faint: 'var(--x-faint)', dim: 'var(--x-dim)',
 }
 
+const LINE = 'color-mix(in srgb, var(--x-border) 60%, transparent)'
+const DISPLAY = "'Space Grotesk', 'Inter', sans-serif"
+
 const iStyle: React.CSSProperties = {
-  padding: '6px 10px', background: C.bg, border: `1px solid ${C.border}`,
-  borderRadius: 7, color: C.text, fontSize: 12.5, outline: 'none', fontFamily: 'inherit', width: '100%',
+  padding: '7px 10px', background: C.bg, border: `1px solid ${C.border}`,
+  borderRadius: 8, color: C.text, fontSize: 13, outline: 'none', fontFamily: 'inherit', width: '100%',
 }
-const numStyle: React.CSSProperties = { ...iStyle, textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontWeight: 700 }
+const numStyle: React.CSSProperties = { ...iStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }
 const th: React.CSSProperties = {
-  padding: '7px 12px', textAlign: 'left', fontSize: 10, color: C.faint, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap',
-  borderBottom: `1px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)',
+  padding: '9px 12px', textAlign: 'left', fontSize: 11.5, color: C.faint, fontWeight: 600,
+  whiteSpace: 'nowrap', borderBottom: `1px solid ${LINE}`,
 }
 const thR: React.CSSProperties = { ...th, textAlign: 'right' }
-const td: React.CSSProperties = { padding: '7px 12px', fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }
-const tdN: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }
-const tdMono: React.CSSProperties = { ...td, fontFamily: 'ui-monospace, monospace' }
+const td: React.CSSProperties = { padding: '9px 12px', fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }
+const tdN: React.CSSProperties = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+const tdMono: React.CSSProperties = { ...td, fontVariantNumeric: 'tabular-nums' }
 const tableStyle: React.CSSProperties = { width: '100%', borderCollapse: 'collapse' }
-const rowBorder = '1px solid color-mix(in srgb, var(--x-border) 50%, transparent)'
+const rowBorder = `1px solid ${LINE}`
 
 /* ── primitives ─────────────────────────────────────────────────────────── */
 
@@ -63,12 +66,12 @@ function Card({ title, subtitle, right, children, pad = true, accent }: {
   title?: string; subtitle?: string; right?: ReactNode; children: ReactNode; pad?: boolean; accent?: string
 }) {
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', borderLeft: accent ? `3px solid ${accent}` : undefined }}>
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', borderLeft: accent ? `3px solid ${accent}` : undefined, boxShadow: 'var(--x-card-shadow)' }}>
       {title && (
-        <div style={{ padding: '11px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ padding: '13px 18px', borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{title}</div>
-            {subtitle && <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>{subtitle}</div>}
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: C.text }}>{title}</div>
+            {subtitle && <div style={{ fontSize: 12, color: C.faint, marginTop: 3, lineHeight: 1.45 }}>{subtitle}</div>}
           </div>
           {right}
         </div>
@@ -80,17 +83,17 @@ function Card({ title, subtitle, right, children, pad = true, accent }: {
 
 function Stat({ label, value, note, color = C.text, big }: { label: string; value: string; note?: string; color?: string; big?: boolean }) {
   return (
-    <div style={{ padding: '12px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 5 }}>{label}</div>
-      <div style={{ fontSize: big ? 21 : 17, fontWeight: 900, color, fontFamily: 'ui-monospace, monospace', lineHeight: 1.15 }}>{value}</div>
-      {note && <div style={{ fontSize: 10, color: C.faint, marginTop: 5 }}>{note}</div>}
+    <div style={{ padding: '14px 16px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: 'var(--x-card-shadow)' }}>
+      <div style={{ fontSize: 11.5, fontWeight: 600, color: C.faint, marginBottom: 7 }}>{label}</div>
+      <div style={{ fontSize: big ? 23 : 19, fontWeight: 700, color, fontFamily: DISPLAY, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{value}</div>
+      {note && <div style={{ fontSize: 12, color: C.faint, marginTop: 6 }}>{note}</div>}
     </div>
   )
 }
 
 function Tag({ children, tone = C.faint }: { children: ReactNode; tone?: string }) {
   return (
-    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 5, color: tone, background: `${hexA(tone, 0x1A)}`, border: `1px solid ${hexA(tone, 0x33)}`, whiteSpace: 'nowrap' }}>
+    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, color: tone, background: `${hexA(tone, 0x1A)}`, border: `1px solid ${hexA(tone, 0x33)}`, whiteSpace: 'nowrap' }}>
       {children}
     </span>
   )
@@ -98,31 +101,31 @@ function Tag({ children, tone = C.faint }: { children: ReactNode; tone?: string 
 
 function Btn({ children, onClick, tone = 'ghost', disabled, size = 'md' }: { children: ReactNode; onClick?: () => void; tone?: 'primary' | 'ghost' | 'danger'; disabled?: boolean; size?: 'sm' | 'md' }) {
   const tones: Record<string, React.CSSProperties> = {
-    primary: { background: `linear-gradient(135deg, ${C.orange}, ${C.orangeD})`, color: '#fff', border: 'none' },
+    primary: { background: C.orange, color: '#fff', border: `1px solid ${C.orange}` },
     ghost: { background: 'rgba(var(--x-ov),0.04)', border: `1px solid ${C.border}`, color: C.muted },
     danger: { background: 'color-mix(in srgb, var(--x-red) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--x-red) 22%, transparent)', color: C.red },
   }
   return (
-    <button onClick={onClick} disabled={disabled} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: disabled ? 'not-allowed' : 'pointer', borderRadius: 8, fontWeight: 700, fontFamily: 'inherit', opacity: disabled ? 0.45 : 1, padding: size === 'sm' ? '5px 11px' : '8px 15px', fontSize: size === 'sm' ? 11.5 : 12.5, whiteSpace: 'nowrap', ...tones[tone] }}>
+    <button onClick={onClick} disabled={disabled} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: disabled ? 'not-allowed' : 'pointer', borderRadius: 9, fontWeight: 600, fontFamily: 'inherit', opacity: disabled ? 0.45 : 1, padding: size === 'sm' ? '6px 12px' : '9px 16px', fontSize: size === 'sm' ? 12.5 : 13.5, whiteSpace: 'nowrap', ...tones[tone] }}>
       {children}
     </button>
   )
 }
 
 function Note({ tone = C.blue, children }: { tone?: string; children: ReactNode }) {
-  return <div style={{ padding: '9px 13px', borderRadius: 9, background: `${hexA(tone, 0x0F)}`, border: `1px solid ${hexA(tone, 0x33)}`, fontSize: 11.5, color: tone, lineHeight: 1.55 }}>{children}</div>
+  return <div style={{ padding: '10px 14px', borderRadius: 10, background: `${hexA(tone, 0x0F)}`, border: `1px solid ${hexA(tone, 0x33)}`, fontSize: 12.5, color: tone === C.dim ? C.muted : tone, lineHeight: 1.55 }}>{children}</div>
 }
 
 function Empty({ children }: { children: ReactNode }) {
-  return <div style={{ padding: '34px 20px', textAlign: 'center', color: C.faint, fontSize: 12.5, lineHeight: 1.7 }}>{children}</div>
+  return <div style={{ padding: '34px 20px', textAlign: 'center', color: C.faint, fontSize: 13, lineHeight: 1.7 }}>{children}</div>
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, height: 15 }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, marginBottom: 5, minHeight: 15 }}>{label}</div>
       {children}
-      {hint && <div style={{ fontSize: 10, color: C.dim, marginTop: 4, lineHeight: 1.5 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 11, color: C.dim, marginTop: 4, lineHeight: 1.5 }}>{hint}</div>}
     </div>
   )
 }
@@ -153,13 +156,13 @@ const Grid = ({ cols, children }: { cols: number; children: ReactNode }) =>
   <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gap: 12 }}>{children}</div>
 
 function SubHead({ children, tone }: { children: ReactNode; tone: string }) {
-  return <div style={{ fontSize: 10, fontWeight: 700, color: tone, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>{children}</div>
+  return <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}><span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: tone }} />{children}</div>
 }
 
 function Chain({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-      <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: C.faint }}>{label}</span>
       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>{children}</div>
     </div>
   )
@@ -167,7 +170,7 @@ function Chain({ label, children }: { label: string; children: ReactNode }) {
 
 function Chip({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
-    <button onClick={onClick} style={{ padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'ui-monospace, monospace', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', background: on ? C.orange : 'rgba(var(--x-ov),0.03)', border: `1px solid ${on ? 'transparent' : C.border}`, color: on ? '#fff' : C.muted }}>
+    <button onClick={onClick} style={{ padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', background: on ? 'color-mix(in srgb, var(--x-orange) 16%, transparent)' : 'rgba(var(--x-ov),0.03)', border: `1px solid ${on ? 'color-mix(in srgb, var(--x-orange) 45%, transparent)' : C.border}`, color: on ? C.text : C.muted }}>
       {label}
     </button>
   )
@@ -196,57 +199,83 @@ const FORMATION_TONE: Record<Formation, string> = {
 
 const LEVEL_TONE: Record<AlertLevel, string> = { urgent: C.red, warn: C.amber, info: C.blue }
 const KIND_LABEL: Record<AlertKind, string> = { runningOut: 'Running out', overdue: 'Late delivery', dueSoon: 'Arriving soon', replacement: 'Replacement owed', idle: 'Idle stock', stranded: 'Stranded', lowStock: 'Low stock' }
-const KIND_ORDER: AlertKind[] = ['runningOut', 'overdue', 'dueSoon', 'replacement', 'idle', 'stranded', 'lowStock']
-const KIND_TONE: Record<AlertKind, string> = { runningOut: C.red, overdue: C.red, dueSoon: C.teal, replacement: C.amber, idle: C.amber, stranded: C.amber, lowStock: C.blue }
 
-function AlertsPanel({ alerts }: { alerts: Alert[] }) {
-  const [kind, setKind] = useState<AlertKind | 'all'>('all')
-  if (alerts.length === 0) return <Card><Empty>Nothing needs attention.</Empty></Card>
+/* The alerts in four groups a store manager thinks in. Each group is a tile
+ * at the top of the screen; a click shows only that group's items. */
+type AlertGroup = 'out' | 'late' | 'idle' | 'owed'
+const GROUPS: { id: AlertGroup; label: string; kinds: AlertKind[]; tone: string; none: string }[] = [
+  { id: 'out', label: 'Running out', kinds: ['runningOut', 'lowStock'], tone: C.red, none: 'Every part has enough stock' },
+  { id: 'late', label: 'Deliveries late or due', kinds: ['overdue', 'dueSoon'], tone: C.amber, none: 'No delivery is late' },
+  { id: 'idle', label: 'Idle or stranded stock', kinds: ['idle', 'stranded'], tone: C.amber, none: 'All stock is in use' },
+  { id: 'owed', label: 'Replacements owed', kinds: ['replacement'], tone: C.amber, none: 'No supplier owes us parts' },
+]
 
-  const kinds = KIND_ORDER.map(k => {
-    const mine = alerts.filter(a => a.kind === k)
-    return { kind: k, count: mine.length, value: mine.reduce((s, a) => s + (a.value ?? 0), 0) }
-  }).filter(x => x.count > 0)
-
-  const active = kind !== 'all' && !kinds.some(k => k.kind === kind) ? 'all' : kind
-  const shown = active === 'all' ? alerts : alerts.filter(a => a.kind === active)
-  const urgent = alerts.filter(a => a.level === 'urgent').length
-  const shownValue = shown.reduce((s, a) => s + (a.value ?? 0), 0)
-
-  const chip = (label: string, count: number, value: number, on: boolean, tone: string, onClick: () => void) => (
-    <button key={label} onClick={onClick} style={{ display: 'flex', alignItems: 'baseline', gap: 7, padding: '5px 11px', borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', background: on ? `${hexA(tone, 0x22)}` : 'rgba(var(--x-ov),0.03)', border: `1px solid ${on ? `${hexA(tone, 0x66)}` : C.border}`, color: on ? tone : C.faint }}>
-      <span style={{ fontSize: 11.5, fontWeight: 700 }}>{label}</span>
-      <span style={{ fontSize: 11, fontWeight: 800, fontFamily: 'ui-monospace, monospace' }}>{count}</span>
-      {value > 0 && <span style={{ fontSize: 10, opacity: 0.7, fontFamily: 'ui-monospace, monospace' }}>{moneyL(value)}</span>}
-    </button>
+function AlertTiles({ alerts, group, onGroup }: { alerts: Alert[]; group: AlertGroup | null; onGroup: (g: AlertGroup | null) => void }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 }}>
+      {GROUPS.map(g => {
+        const mine = alerts.filter(a => g.kinds.includes(a.kind))
+        const urgent = mine.some(a => a.level === 'urgent')
+        const value = mine.reduce((s, a) => s + (a.value ?? 0), 0)
+        const tone = mine.length === 0 ? C.green : urgent ? C.red : g.tone
+        const on = group === g.id
+        return (
+          <button key={g.id} onClick={() => onGroup(on ? null : g.id)} aria-pressed={on} disabled={mine.length === 0}
+            style={{
+              textAlign: 'left', padding: '14px 16px', borderRadius: 12, fontFamily: 'inherit', cursor: mine.length ? 'pointer' : 'default',
+              background: on ? `${hexA(tone, 0x14)}` : C.card, boxShadow: 'var(--x-card-shadow)',
+              border: `1px solid ${on ? hexA(tone, 0x66) : C.border}`, borderTop: `3px solid ${tone}`,
+            }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: C.faint }}>{g.label}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
+              <span style={{ fontSize: 24, fontWeight: 700, color: C.text, fontFamily: DISPLAY, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{mine.length}</span>
+              {value > 0 && <span style={{ fontSize: 12.5, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{moneyL(value)}</span>}
+            </div>
+            <div style={{ fontSize: 12, color: mine.length ? tone : C.green, marginTop: 6 }}>
+              {mine.length === 0 ? `✓ ${g.none}` : urgent ? 'Needs action today' : on ? 'Showing below · click to clear' : 'Click to see them'}
+            </div>
+          </button>
+        )
+      })}
+    </div>
   )
+}
+
+const ALERTS_SHOWN = 5
+
+function AlertsPanel({ alerts, group, onGroup }: { alerts: Alert[]; group: AlertGroup | null; onGroup: (g: AlertGroup | null) => void }) {
+  const [all, setAll] = useState(false)
+  if (alerts.length === 0) return null
+  const g = GROUPS.find(x => x.id === group)
+  const rank: Record<AlertLevel, number> = { urgent: 0, warn: 1, info: 2 }
+  const list = (g ? alerts.filter(a => g.kinds.includes(a.kind)) : alerts)
+    .slice().sort((a, b) => rank[a.level] - rank[b.level] || (b.value ?? 0) - (a.value ?? 0))
+  const shown = all ? list : list.slice(0, ALERTS_SHOWN)
+  const urgent = list.filter(a => a.level === 'urgent').length
 
   return (
-    <Card title="Needs attention" subtitle={`${alerts.length} item${alerts.length === 1 ? '' : 's'}${urgent ? `, ${urgent} urgent` : ''}`} pad={false} accent={urgent ? C.red : C.amber}>
-      <div style={{ display: 'flex', gap: 6, padding: '11px 16px', borderBottom: rowBorder, flexWrap: 'wrap' }}>
-        {chip('All', alerts.length, alerts.reduce((s, a) => s + (a.value ?? 0), 0), active === 'all', C.orange, () => setKind('all'))}
-        <span style={{ width: 1, background: C.border, margin: '2px 4px' }} />
-        {kinds.map(k => chip(KIND_LABEL[k.kind], k.count, k.value, active === k.kind, KIND_TONE[k.kind], () => setKind(active === k.kind ? 'all' : k.kind)))}
-      </div>
+    <Card title={g ? g.label : 'Needs attention first'} pad={false}
+      subtitle={g ? `${list.length} item${list.length === 1 ? '' : 's'}` : `The ${Math.min(ALERTS_SHOWN, list.length)} most pressing of ${list.length}${urgent ? `, ${urgent} urgent` : ''}`}
+      right={g ? <Btn size="sm" onClick={() => onGroup(null)}>Show every kind</Btn> : undefined}>
       <div>
         {shown.map(a => (
-          <div key={a.id} style={{ display: 'flex', gap: 12, padding: '11px 16px', borderBottom: rowBorder, alignItems: 'flex-start' }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: LEVEL_TONE[a.level], marginTop: 5, flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
+          <div key={a.id} style={{ display: 'flex', gap: 12, padding: '12px 18px', borderBottom: rowBorder, alignItems: 'flex-start' }}>
+            <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: LEVEL_TONE[a.level], marginTop: 6, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>{a.title}</span>
-                {active === 'all' && <Tag tone={KIND_TONE[a.kind]}>{KIND_LABEL[a.kind]}</Tag>}
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text }}>{a.title}</span>
+                {!g && <Tag tone={C.faint}>{KIND_LABEL[a.kind]}</Tag>}
               </div>
-              <div style={{ fontSize: 11.5, color: C.faint, marginTop: 3, lineHeight: 1.55 }}>{a.detail}</div>
+              <div style={{ fontSize: 12.5, color: C.faint, marginTop: 3, lineHeight: 1.55 }}>{a.detail}</div>
             </div>
-            {a.value != null && <span style={{ fontSize: 12, fontWeight: 700, color: LEVEL_TONE[a.level], fontFamily: 'ui-monospace, monospace' }}>{money(a.value)}</span>}
+            {a.value != null && <span style={{ fontSize: 13, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{money(a.value)}</span>}
           </div>
         ))}
       </div>
-      {shown.length > 1 && (
-        <div style={{ padding: '9px 16px', display: 'flex', justifyContent: 'space-between', gap: 12, background: 'rgba(var(--x-ov),0.02)' }}>
-          <span style={{ fontSize: 11, color: C.faint }}>{shown.length} shown{active !== 'all' ? ` of ${alerts.length}` : ''}</span>
-          <span style={{ fontSize: 12, fontWeight: 800, color: C.text, fontFamily: 'ui-monospace, monospace' }}>{money(shownValue)}</span>
+      {list.length > ALERTS_SHOWN && (
+        <div style={{ padding: '10px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 12, color: C.faint }}>{all ? `All ${list.length} shown` : `${list.length - ALERTS_SHOWN} more`}</span>
+          <Btn size="sm" onClick={() => setAll(v => !v)}>{all ? 'Show fewer' : `Show all ${list.length}`}</Btn>
         </div>
       )}
     </Card>
@@ -268,6 +297,8 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
     (cat === 'All' || p.category === cat) &&
     (sup === 'All' || p.supplier === sup) &&
     (!q || p.name.toLowerCase().includes(q.toLowerCase()) || p.partNumber.toLowerCase().includes(q.toLowerCase())))
+  // Most parts are bought by part number, not tracked one by one: the serial column shows only once one has a serial.
+  const serials = state.catalogue.some(p => !!p.serialNumber)
 
   const blank = (): Part => ({
     id: uid('t'), partNumber: '', name: '', category: 'Bit', formationUse: 'all', rate: 0,
@@ -314,34 +345,34 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
           <table style={tableStyle}>
             <thead>
               <tr>
-                <th style={th}>Part number</th><th style={th}>Item</th><th style={th}>Serial no.</th>
+                <th style={th}>Part</th>{serials && <th style={th}>Serial no.</th>}
                 <th style={th}>Category</th><th style={th}>Used in</th><th style={thR}>Rate</th><th style={thR}>Life</th>
                 <th style={thR}>Cost / metre</th><th style={th}>Supplier</th><th style={thR}>Lead</th><th style={thR}>Min stock</th><th style={th} />
               </tr>
             </thead>
             <tbody>
               {parts.length === 0 && (
-                <tr><td colSpan={12}><Empty>{state.catalogue.length === 0 ? 'No parts yet. Add one or import a CSV.' : 'Nothing matches those filters.'}</Empty></td></tr>
+                <tr><td colSpan={serials ? 11 : 10}><Empty>{state.catalogue.length === 0 ? 'No parts yet. Add one or import a CSV.' : 'Nothing matches those filters.'}</Empty></td></tr>
               )}
               {parts.map(p => (
                 <tr key={p.id} style={{ borderBottom: rowBorder, opacity: p.active ? 1 : 0.45 }}>
-                  <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber || '—'}</td>
-                  <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 230 }}>
-                    {p.name}{!p.active && <span style={{ marginLeft: 7 }}><Tag tone={C.dim}>retired</Tag></span>}
+                  <td style={{ ...td, minWidth: 220 }}>
+                    <div style={{ color: C.text, fontWeight: 600 }}>{p.name}{!p.active && <span style={{ marginLeft: 7 }}><Tag tone={C.dim}>Retired</Tag></span>}</div>
+                    <div style={{ fontSize: 12, color: C.faint, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{p.partNumber || 'No part number'}</div>
                   </td>
-                  <td style={{ ...tdMono, color: p.serialNumber ? C.muted : C.dim }}>{p.serialNumber || '—'}</td>
+                  {serials && <td style={{ ...tdMono, color: p.serialNumber ? C.muted : C.dim }}>{p.serialNumber || '—'}</td>}
                   <td style={td}><Tag tone={C.dim}>{p.category}</Tag></td>
                   <td style={{ ...td, color: C.muted }}>{useLabel(p)}</td>
                   <td style={tdN}>{money(p.rate)}</td>
                   <td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td>
-                  <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(costPerMetre(p))}</td>
+                  <td style={{ ...tdN, color: C.text, fontWeight: 600 }}>{perMetre(costPerMetre(p))}</td>
                   <td style={td}>{p.supplier}</td>
                   <td style={tdN}>{p.leadTimeDays}d</td>
                   <td style={{ ...tdN, color: C.faint }}>{p.minStock}</td>
                   <td style={{ ...td, textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: 6 }}>
                       <Btn size="sm" onClick={() => onEdit(p)}>Edit</Btn>
-                      <Btn size="sm" tone="danger" onClick={() => deletePart(p.id)}>Delete</Btn>
+                      <Btn size="sm" onClick={() => deletePart(p.id)}>Delete</Btn>
                     </div>
                   </td>
                 </tr>
@@ -349,13 +380,13 @@ function CatalogueTab({ onEdit, onImport }: { onEdit: (p: Part) => void; onImpor
             </tbody>
             <tfoot>
               <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
-                <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>
+                <td style={{ ...td, fontWeight: 700, color: C.text }} colSpan={serials ? 6 : 5}>
                   Whole catalogue, every active part
                   <span style={{ fontWeight: 400, color: C.faint, marginLeft: 8 }}>
                     a reference price — a rig is charged on what it is actually carrying
                   </span>
                 </td>
-                <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{perMetre(toolingPerMetre(parts))}</td>
+                <td style={{ ...tdN, fontWeight: 700, color: C.text }}>{perMetre(toolingPerMetre(parts))}</td>
                 <td style={td} colSpan={4} />
               </tr>
             </tfoot>
@@ -375,9 +406,9 @@ function PartModal({ part, onSave, onClose }: { part: Part; onSave: (p: Part) =>
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn tone="primary" disabled={!f.name.trim()} onClick={() => { onSave(f); onClose() }}>Save part</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Grid cols={3}>
-          <Field label="Part number"><input value={f.partNumber} onChange={e => u({ partNumber: e.target.value })} style={{ ...iStyle, fontFamily: 'ui-monospace, monospace' }} placeholder="e.g. HQ-BIT-IMP" /></Field>
+          <Field label="Part number"><input value={f.partNumber} onChange={e => u({ partNumber: e.target.value })} style={{ ...iStyle, fontVariantNumeric: 'tabular-nums' }} placeholder="e.g. HQ-BIT-IMP" /></Field>
           <Field label="Item"><input value={f.name} onChange={e => u({ name: e.target.value })} style={iStyle} /></Field>
-          <Field label="Serial number" hint="Optional"><input value={f.serialNumber ?? ''} onChange={e => u({ serialNumber: e.target.value || undefined })} style={{ ...iStyle, fontFamily: 'ui-monospace, monospace' }} /></Field>
+          <Field label="Serial number" hint="Optional"><input value={f.serialNumber ?? ''} onChange={e => u({ serialNumber: e.target.value || undefined })} style={{ ...iStyle, fontVariantNumeric: 'tabular-nums' }} /></Field>
         </Grid>
         <Grid cols={3}>
           <Field label="Category">
@@ -395,7 +426,7 @@ function PartModal({ part, onSave, onClose }: { part: Part; onSave: (p: Part) =>
         <Grid cols={3}>
           <Field label="Life in metres" hint="Metres before replacement">
             <input type="number" value={f.lifeMetres} onChange={e => u({ lifeMetres: parseFloat(e.target.value) || 0 })} style={numStyle} />
-            {f.lifeMetres > 0 && f.rate > 0 && <div style={{ fontSize: 11, color: C.orange, marginTop: 5, textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontWeight: 700 }}>{perMetre(f.rate / f.lifeMetres)}</div>}
+            {f.lifeMetres > 0 && f.rate > 0 && <div style={{ fontSize: 11, color: C.orange, marginTop: 5, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{perMetre(f.rate / f.lifeMetres)}</div>}
           </Field>
           <Field label="Minimum stock" hint="units"><input type="number" value={f.minStock} onChange={e => u({ minStock: parseFloat(e.target.value) || 0 })} style={numStyle} /></Field>
           <Field label="Lead time" hint="days"><input type="number" value={f.leadTimeDays} onChange={e => u({ leadTimeDays: parseFloat(e.target.value) || 0 })} style={numStyle} /></Field>
@@ -461,7 +492,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn tone="primary" disabled={parsed.length === 0} onClick={() => { importParts(parsed); onClose() }}>Import {parsed.length} part{parsed.length === 1 ? '' : 's'}</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Btn size="sm" onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([TEMPLATE], { type: 'text/csv' })); a.download = 'xplorix-parts-template.csv'; a.click() }}>Download template</Btn>
-        <Field label="CSV"><textarea value={text} onChange={e => setText(e.target.value)} rows={7} placeholder={TEMPLATE} style={{ ...iStyle, fontFamily: 'ui-monospace, monospace', fontSize: 11.5, lineHeight: 1.6, resize: 'vertical' }} /></Field>
+        <Field label="CSV"><textarea value={text} onChange={e => setText(e.target.value)} rows={7} placeholder={TEMPLATE} style={{ ...iStyle, fontVariantNumeric: 'tabular-nums', fontSize: 11.5, lineHeight: 1.6, resize: 'vertical' }} /></Field>
         {parsed.length > 0 && (
           <Card title="Preview" pad={false} subtitle={`${parsed.filter(p => !existing(p)).length} new, ${parsed.filter(existing).length} updates`}>
             <table style={tableStyle}>
@@ -473,7 +504,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
                     <td style={{ ...td, color: C.muted }}>{useLabel(p)}</td>
                     <td style={tdN}>{money(p.rate)}</td>
                     <td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td>
-                    <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{p.lifeMetres > 0 ? perMetre(p.rate / p.lifeMetres) : '—'}</td>
+                    <td style={{ ...tdN, color: C.text, fontWeight: 600 }}>{p.lifeMetres > 0 ? perMetre(p.rate / p.lifeMetres) : '—'}</td>
                     <td style={td}><Tag tone={existing(p) ? C.amber : C.green}>{existing(p) ? 'update' : 'new'}</Tag></td>
                   </tr>
                 ))}
@@ -579,7 +610,7 @@ function OrdersTab({ onReceive, onCreate, onEdit, onRaiseReorder, onReceiveReord
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                   {po.receipts.map(r => (<div key={r.id} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.6 }}><Tag tone={C.blue}>received</Tag>{' '}<span style={{ color: C.text }}>{fullDate(r.date)}</span>{' — '}{r.lines.map(l => `${l.accepted} × ${nameOf(l.itemId)}${l.damaged ? ` (+${l.damaged} damaged)` : ''}`).join(', ')}{r.delayReason && <span style={{ color: C.red }}> · {r.delayReason}</span>}</div>))}
                                   {po.reorders.map(r => (<div key={r.id} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.6 }}><Tag tone={r.receipt ? C.amber : C.red}>reorder r{r.round}</Tag>{' '}<span style={{ color: C.text }}>{fullDate(r.raisedDate)}</span>{' — '}{r.qty} × {nameOf(r.itemId)} · {r.reason}{r.receipt && <span style={{ color: r.receipt.accepted > 0 ? C.green : C.red }}>{' · '}{fullDate(r.receipt.date)}: {r.receipt.accepted} accepted{r.receipt.damaged + r.receipt.rejected > 0 ? `, ${r.receipt.damaged + r.receipt.rejected} faulty again` : ''}</span>}</div>))}
-                                  {po.issues.map(i => (<div key={i.id} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.6 }}><Tag tone={C.green}>issued to rig</Tag>{' '}<span style={{ color: C.text }}>{fullDate(i.date)}</span>{' → '}<span style={{ fontFamily: 'ui-monospace, monospace' }}>{i.rig}</span>{' · '}{projectCode(i.project ?? po.project)}{' — '}{i.lines.map(l => `${l.qty} × ${nameOf(l.itemId)}`).join(', ')}</div>))}
+                                  {po.issues.map(i => (<div key={i.id} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.6 }}><Tag tone={C.green}>issued to rig</Tag>{' '}<span style={{ color: C.text }}>{fullDate(i.date)}</span>{' → '}<span style={{ fontVariantNumeric: 'tabular-nums' }}>{i.rig}</span>{' · '}{projectCode(i.project ?? po.project)}{' — '}{i.lines.map(l => `${l.qty} × ${nameOf(l.itemId)}`).join(', ')}</div>))}
                                 </div>
                               )}
                             </div>
@@ -713,6 +744,9 @@ function StoreTab() {
   const [addingStock, setAddingStock] = useState(false)
   const [addingKit, setAddingKit]     = useState(false)
   const [issuingLine, setIssuingLine] = useState<StockLine | null>(null)
+  const [view, setView] = useState<'shelf' | 'rigs'>('shelf')
+  const [openRigs, setOpenRigs] = useState<Set<string>>(new Set())
+  const toggleRig = (r: string) => setOpenRigs(s => { const n = new Set(s); n.has(r) ? n.delete(r) : n.add(r); return n })
 
   const poStock = useMemo(() => stockInStore(state.pos, TODAY).filter(l => l.project === project), [state.pos, project])
 
@@ -763,14 +797,18 @@ function StoreTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px' }}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <Chain label="Project">
           {PROJECTS.map(p => <Chip key={p} on={project === p} label={projectCode(p)} onClick={() => setProject(p)} />)}
         </Chain>
+        <KSeg value={view} onChange={setView} options={[
+          { value: 'shelf', label: `On the shelf · ${moneyL(shelfValue)}` },
+          { value: 'rigs', label: `On the rigs · ${rigs.length} rig${rigs.length === 1 ? '' : 's'}` },
+        ]} />
       </div>
 
       {/* ── The shelf ── */}
-      <Card title="On the shelf" pad={false}
+      {view === 'shelf' && <Card title="On the shelf" pad={false}
         subtitle={`${shelfRows.length} lines, ${money(shelfValue)}. Nothing here is costing a hole anything yet.`}
         right={
           <div style={{ display: 'flex', gap: 8 }}>
@@ -782,7 +820,7 @@ function StoreTab() {
           <div style={{ padding: 36, textAlign: 'center' }}>
             <p style={{ fontSize: 13, color: C.muted, fontWeight: 600, marginBottom: 8 }}>The shelf is empty for {projectCode(project)}.</p>
             <p style={{ fontSize: 12, color: C.faint, lineHeight: 1.7, maxWidth: 460, margin: '0 auto 20px' }}>
-              Parts a rig needs to start drilling go on with <strong style={{ color: C.orange }}>Assign starting kit</strong>.
+              Parts a rig needs to start drilling go on with <strong style={{ color: C.text }}>Assign starting kit</strong>.
               Parts already sitting in the store go on with <strong style={{ color: C.text }}>Add existing stock</strong>.
               Anything received against a purchase order appears here on its own.
             </p>
@@ -795,7 +833,7 @@ function StoreTab() {
           <div style={{ overflowX: 'auto' }}>
             <table style={tableStyle}>
               <thead><tr>
-                <th style={th}>Part number</th><th style={th}>Item</th>
+                <th style={th}>Part</th>
                 <th style={th}>Category</th><th style={th}>Used in</th>
                 <th style={th}>Came from</th>
                 <th style={thR}>Qty</th><th style={thR}>Rate</th><th style={thR}>Value</th>
@@ -807,19 +845,21 @@ function StoreTab() {
                   const old  = r.ageDays >= state.alerts.idleDays
                   return (
                     <tr key={r.key} style={{ borderBottom: rowBorder, background: old ? 'color-mix(in srgb, var(--x-amber) 4%, transparent)' : undefined }}>
-                      <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{part?.partNumber || '—'}</td>
-                      <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 200 }}>{nameOf(r.itemId)}</td>
+                      <td style={{ ...td, minWidth: 200 }}>
+                        <div style={{ color: C.text, fontWeight: 600 }}>{nameOf(r.itemId)}</div>
+                        <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>{part?.partNumber || 'No part number'}</div>
+                      </td>
                       <td style={td}>{part ? <Tag tone={C.dim}>{part.category}</Tag> : '—'}</td>
                       <td style={{ ...td, color: C.muted }}>{part ? FORMATION_USE_LABEL[formationUse(part)] : '—'}</td>
                       <td style={td}>
                         {r.source === 'existing'
                           ? <Tag tone={C.teal}>Existing stock</Tag>
-                          : <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11 }}>{r.ref}</span>}
+                          : <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 11 }}>{r.ref}</span>}
                       </td>
                       <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{r.qty}</td>
                       <td style={tdN}>{money(r.rate)}</td>
-                      <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(r.value)}</td>
-                      <td style={{ ...tdN, color: old ? C.red : C.faint, fontWeight: old ? 700 : 400 }}>{r.ageDays}d</td>
+                      <td style={{ ...tdN, color: C.text, fontWeight: 600 }}>{money(r.value)}</td>
+                      <td style={{ ...tdN, color: old ? C.amber : C.faint, fontWeight: old ? 600 : 400 }}>{r.ageDays} days{old ? ' ⚠' : ''}</td>
                       <td style={{ ...td, textAlign: 'right' }}>
                         {r.source === 'po' && isLiveProject(project) && (() => {
                           const sl = poStock.find(l => l.key === r.key)
@@ -832,24 +872,22 @@ function StoreTab() {
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
-                  <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={7}>Total on the shelf</td>
-                  <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(shelfValue)}</td>
+                  <td style={{ ...td, fontWeight: 700, color: C.text }} colSpan={6}>Total on the shelf</td>
+                  <td style={{ ...tdN, fontWeight: 700, color: C.text }}>{money(shelfValue)}</td>
                   <td style={td} colSpan={2} />
                 </tr>
               </tfoot>
             </table>
           </div>
         )}
-      </Card>
+      </Card>}
 
       {/* ── On the rigs ── */}
-      {rigs.length > 0 && (
+      {view === 'rigs' && rigs.length === 0 && <Card><Empty>No rig on {projectCode(project)} is carrying parts yet. Assign a starting kit from On the shelf.</Empty></Card>}
+      {view === 'rigs' && rigs.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
-            On the rigs
-            <span style={{ fontSize: 11, color: C.faint, fontWeight: 400, marginLeft: 10 }}>
-              {projectCode(project)} — starting kit plus everything issued since
-            </span>
+          <div style={{ fontSize: 12.5, color: C.faint }}>
+            What each rig on {projectCode(project)} is carrying: its starting kit plus everything issued since. Finance charges every metre from this.
           </div>
           {rigs.map(({ rig, lines, tooling, total, metres }) => {
             /* Never sum the Cost/m column. A metre of soft ground does not
@@ -870,21 +908,21 @@ function StoreTab() {
             return (
               <Card key={rig} pad={false} title={rig}
                 subtitle={`${money(total)} of parts on this rig, ${metres.toLocaleString('en-IN')} m drilled`}
-                accent={C.blue}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, padding: '12px 16px', borderBottom: `1px solid ${C.border}` }}>
-                  <Stat label="Starting kit" value={moneyL(lines.reduce((s, l) => s + l.kitValue, 0))} color={C.purple} />
-                  <Stat label="Issued since" value={moneyL(lines.reduce((s, l) => s + l.issuedValue, 0))} color={C.amber} />
-                  <Stat label="Tooling cost" value={rateRange} color={C.orange} note="per metre, soft ground to hardest" />
-                  <Stat label="Spent per metre" value={metres > 0 ? perMetre(spent) : '—'} color={C.muted} note="cash out ÷ metres so far" />
+                right={<Btn size="sm" onClick={() => toggleRig(rig)}>{openRigs.has(rig) ? 'Hide kit' : `View kit · ${lines.length} part${lines.length === 1 ? '' : 's'}`}</Btn>}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, padding: '12px 16px', borderBottom: `1px solid ${LINE}` }}>
+                  <Stat label="Starting kit" value={moneyL(lines.reduce((s, l) => s + l.kitValue, 0))} />
+                  <Stat label="Issued since" value={moneyL(lines.reduce((s, l) => s + l.issuedValue, 0))} />
+                  <Stat label="Tooling cost a metre" value={rateRange} note="soft ground to hardest" />
+                  <Stat label="Spent a metre so far" value={metres > 0 ? perMetre(spent) : '—'} note="cash out ÷ metres drilled" />
                 </div>
 
                 {/* Per-formation rates: the figures finance actually charges. */}
-                <div style={{ display: 'flex', gap: 8, padding: '11px 16px', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Per metre of</span>
+                <div style={{ display: 'flex', gap: 8, padding: '11px 16px', borderBottom: openRigs.has(rig) ? `1px solid ${LINE}` : undefined, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: C.faint }}>Per metre of</span>
                   {FORMATIONS.map(f => (
                     <span key={f} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7, padding: '4px 10px', borderRadius: 7, background: `${hexA(FORMATION_TONE[f], 0x14)}`, border: `1px solid ${hexA(FORMATION_TONE[f], 0x33)}` }}>
                       <span style={{ fontSize: 11, color: FORMATION_TONE[f], fontWeight: 700 }}>{f}</span>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: C.text, fontFamily: 'ui-monospace, monospace' }}>{rateAt(f).map(x => `${x.z ? `${x.z} ` : ''}${perMetre(x.r)}`).join(' · ')}</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{rateAt(f).map(x => `${x.z ? `${x.z} ` : ''}${perMetre(x.r)}`).join(' · ')}</span>
                     </span>
                   ))}
                   {tooling.fellBack.length > 0 && (
@@ -894,10 +932,10 @@ function StoreTab() {
                   )}
                 </div>
 
-                <div style={{ overflowX: 'auto' }}>
+                {openRigs.has(rig) && <div style={{ overflowX: 'auto' }}>
                   <table style={tableStyle}>
                     <thead><tr>
-                      <th style={th}>Part number</th><th style={th}>Item</th>
+                      <th style={th}>Part</th>
                       <th style={th}>Used in</th>
                       <th style={thR}>Life</th>
                       <th style={thR}>Starting kit</th>
@@ -911,34 +949,36 @@ function StoreTab() {
                     <tbody>
                       {lines.sort((a, b) => b.costPerMetre - a.costPerMetre).map(l => (
                         <tr key={l.itemId} style={{ borderBottom: rowBorder }}>
-                          <td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{l.partNumber || '—'}</td>
-                          <td style={{ ...td, color: C.text, fontWeight: 600, whiteSpace: 'normal', maxWidth: 190 }}>{l.name}</td>
+                          <td style={{ ...td, minWidth: 200 }}>
+                            <div style={{ color: C.text, fontWeight: 600 }}>{l.name}</div>
+                            <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>{l.partNumber || 'No part number'}</div>
+                          </td>
                           <td style={{ ...td, color: C.muted }}>{FORMATION_USE_LABEL[l.use]}{l.size ? ` · ${l.size} only` : ''}</td>
                           <td style={{ ...tdN, color: C.faint }}>{l.lifeMetres.toLocaleString('en-IN')} m</td>
-                          <td style={{ ...tdN, color: l.kitQty > 0 ? C.purple : C.dim }}>{l.kitQty > 0 ? l.kitQty : '—'}</td>
-                          <td style={{ ...tdN, color: l.issuedQty > 0 ? C.amber : C.dim, fontWeight: l.issuedQty > 0 ? 700 : 400 }}>{l.issuedQty > 0 ? l.issuedQty : '—'}</td>
+                          <td style={{ ...tdN, color: l.kitQty > 0 ? C.text : C.dim }}>{l.kitQty > 0 ? l.kitQty : '—'}</td>
+                          <td style={{ ...tdN, color: l.issuedQty > 0 ? C.text : C.dim }}>{l.issuedQty > 0 ? l.issuedQty : '—'}</td>
                           <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{l.totalQty}</td>
-                          <td style={{ ...tdN, color: l.totalUsed > 0 ? C.red : C.dim }}>{l.totalUsed > 0 ? l.totalUsed : '—'}</td>
+                          <td style={{ ...tdN, color: l.totalUsed > 0 ? C.muted : C.dim }}>{l.totalUsed > 0 ? l.totalUsed : '—'}</td>
                           <td style={tdN}>{money(l.avgRate)}</td>
-                          <td style={{ ...tdN, color: C.amber, fontWeight: 700 }}>{money(l.totalValue)}</td>
-                          <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(l.costPerMetre)}</td>
+                          <td style={{ ...tdN, color: C.text, fontWeight: 600 }}>{money(l.totalValue)}</td>
+                          <td style={{ ...tdN, color: C.text, fontWeight: 600 }}>{perMetre(l.costPerMetre)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
-                        <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={9}>
+                        <td style={{ ...td, fontWeight: 700, color: C.text }} colSpan={8}>
                           Every part on this rig
                           <span style={{ fontWeight: 400, color: C.faint, marginLeft: 8 }}>
                             rates do not add up — each metre is charged only the parts that work in its ground
                           </span>
                         </td>
-                        <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(total)}</td>
-                        <td style={{ ...tdN, fontWeight: 900, color: C.orange, fontSize: 11 }}>{rateRange}</td>
+                        <td style={{ ...tdN, fontWeight: 700, color: C.text }}>{money(total)}</td>
+                        <td style={{ ...tdN, fontWeight: 700, color: C.text }}>{rateRange}</td>
                       </tr>
                     </tfoot>
                   </table>
-                </div>
+                </div>}
               </Card>
             )
           })}
@@ -1030,7 +1070,7 @@ function PickPartsModal({ title, subtitle, tone, note, qtyLabel, withRig, confir
         <Grid cols={withRig ? 3 : 2}>
           {withRig && (
             <Field label="Rig">
-              <select value={rig} onChange={e => setRig(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}>
+              <select value={rig} onChange={e => setRig(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontVariantNumeric: 'tabular-nums' }}>
                 {RIGS.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </Field>
@@ -1058,7 +1098,7 @@ function PickPartsModal({ title, subtitle, tone, note, qtyLabel, withRig, confir
               {byCategory.map(({ cat, parts }) => (
                 <Fragment key={cat}>
                   <tr style={{ background: 'rgba(var(--x-ov),0.03)' }}>
-                    <td colSpan={8} style={{ ...td, fontSize: 10, fontWeight: 800, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '6px 12px' }}>{cat}</td>
+                    <td colSpan={8} style={{ ...td, fontSize: 12, fontWeight: 700, color: C.text, padding: '10px 12px 6px', background: 'rgba(var(--x-ov),0.02)' }}>{cat}</td>
                   </tr>
                   {parts.map(p => {
                     const row  = rows.find(r => r.itemId === p.id)
@@ -1096,7 +1136,7 @@ function PickPartsModal({ title, subtitle, tone, note, qtyLabel, withRig, confir
         {valid.length > 0 && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: 16 }}>
             <span style={{ fontSize: 11, color: C.faint }}>{valid.length} part{valid.length === 1 ? '' : 's'} selected</span>
-            <span style={{ fontSize: 15, fontWeight: 900, color: tone, fontFamily: 'ui-monospace, monospace' }}>{money(total)}</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: tone, fontVariantNumeric: 'tabular-nums' }}>{money(total)}</span>
           </div>
         )}
       </div>
@@ -1126,7 +1166,7 @@ function IssueModal({ project, prefill, onSave, onClose }: {
       </Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Grid cols={3}>
-          <Field label="Rig"><select value={rig} onChange={e => setRig(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontFamily: 'ui-monospace, monospace' }}>{RIGS.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
+          <Field label="Rig"><select value={rig} onChange={e => setRig(e.target.value)} style={{ ...iStyle, cursor: 'pointer', fontVariantNumeric: 'tabular-nums' }}>{RIGS.map(r => <option key={r} value={r}>{r}</option>)}</select></Field>
           <Field label="Issued on" hint="This date changes the rig's tooling cost from here on"><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...iStyle }} /></Field>
           <Field label="Issued by"><input value={by} onChange={e => setBy(e.target.value)} style={iStyle} /></Field>
         </Grid>
@@ -1151,7 +1191,7 @@ function IssueModal({ project, prefill, onSave, onClose }: {
             )})}</tbody>
             <tfoot><tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
               <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={4}>Total leaving the shelf</td>
-              <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{money(value)}</td>
+              <td style={{ ...tdN, fontWeight: 700, color: C.text }}>{money(value)}</td>
             </tr></tfoot>
           </table>
         )}
@@ -1328,7 +1368,7 @@ function TerrainPanel({ rows, metres }: { rows: TerrainRow[]; metres: number }) 
                 catalogue life, or the driller is not recording it. */}
             {unworn.length > 0 && (
               <tr style={{ background: 'rgba(var(--x-ov),0.03)' }}>
-                <td colSpan={9} style={{ ...td, fontSize: 10, fontWeight: 800, color: C.faint, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '6px 12px' }}>
+                <td colSpan={9} style={{ ...td, fontSize: 12, fontWeight: 700, color: C.text, padding: '10px 12px 6px', background: 'rgba(var(--x-ov),0.02)' }}>
                   On a rig, no wear recorded yet
                 </td>
               </tr>
@@ -1386,7 +1426,7 @@ function GroundPanel({ bands, tooling, rig }: { bands: ReturnType<typeof groundM
                 <td style={{ ...td, width: '38%' }}><Bar value={b.metres} max={maxM} tone={FORMATION_TONE[b.formation]} /></td>
                 <td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{b.metres.toLocaleString('en-IN')}</td>
                 <td style={{ ...tdN, color: C.faint }}>{b.sharePct.toFixed(1)}%</td>
-                <td style={{ ...tdN, color: C.orange, fontWeight: 700 }}>{perMetre(b.toolingPerMetre)}</td>
+                <td style={{ ...tdN, color: C.text, fontWeight: 600 }}>{perMetre(b.toolingPerMetre)}</td>
                 <td style={{ ...tdN, color: C.amber }}>{money(b.toolingSpend)}</td>
               </tr>
             ))}
@@ -1394,10 +1434,10 @@ function GroundPanel({ bands, tooling, rig }: { bands: ReturnType<typeof groundM
           <tfoot>
             <tr style={{ borderTop: `2px solid ${C.border}`, background: 'rgba(var(--x-ov),0.02)' }}>
               <td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={2}>Whole project</td>
-              <td style={{ ...tdN, fontWeight: 900, color: C.text }}>{total.toLocaleString('en-IN')}</td>
+              <td style={{ ...tdN, fontWeight: 700, color: C.text }}>{total.toLocaleString('en-IN')}</td>
               <td style={tdN} />
-              <td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{total > 0 ? perMetre(spend / total) : '—'}</td>
-              <td style={{ ...tdN, fontWeight: 900, color: C.amber }}>{money(spend)}</td>
+              <td style={{ ...tdN, fontWeight: 700, color: C.text }}>{total > 0 ? perMetre(spend / total) : '—'}</td>
+              <td style={{ ...tdN, fontWeight: 700, color: C.amber }}>{money(spend)}</td>
             </tr>
           </tfoot>
         </table>
@@ -1552,7 +1592,7 @@ function SupplierInsightPanel() {
                               ] as [string, string][]).map(([k, v]) => (
                                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 18 }}>
                                   <span style={{ fontSize: 11, color: C.faint }}>{k}</span>
-                                  <span style={{ fontSize: 12, color: C.text, fontFamily: 'ui-monospace, monospace', fontWeight: 600, textAlign: 'right' }}>{v}</span>
+                                  <span style={{ fontSize: 12, color: C.text, fontVariantNumeric: 'tabular-nums', fontWeight: 600, textAlign: 'right' }}>{v}</span>
                                 </div>
                               ))}
                             </div>
@@ -1626,8 +1666,8 @@ function ReceiveModal({ po, onSave, onClose }: { po: PurchaseOrder; onSave: (dat
           <tbody>{po.lines.map(l => { const out = outstanding(l.itemId); const r = rows[l.itemId]; return (<tr key={l.itemId} style={{ borderBottom: rowBorder, opacity: out > 0 ? 1 : 0.4 }}><td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{nameOf(l.itemId)}</td><td style={{ ...tdN, color: out > 0 ? C.amber : C.dim }}>{out}</td>{(['accepted', 'damaged', 'rejected'] as const).map(k => (<td key={k} style={{ padding: '5px 8px', width: 104 }}><input type="number" min={0} max={out} disabled={out === 0} value={r[k]} onChange={e => set(l.itemId, k, parseFloat(e.target.value) || 0)} style={{ ...numStyle, color: k === 'accepted' ? C.green : k === 'damaged' ? C.red : C.amber }} /></td>))}</tr>) })}</tbody>
         </table>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 24, alignItems: 'baseline' }}>
-          <div><span style={{ fontSize: 11, color: C.faint, marginRight: 8 }}>Onto the shelf</span><span style={{ fontSize: 15, fontWeight: 900, color: C.green, fontFamily: 'ui-monospace, monospace' }}>{money(acceptedValue)}</span></div>
-          {faultyValue > 0 && <div><span style={{ fontSize: 11, color: C.faint, marginRight: 8 }}>Not fit to use</span><span style={{ fontSize: 15, fontWeight: 900, color: C.red, fontFamily: 'ui-monospace, monospace' }}>{money(faultyValue)}</span></div>}
+          <div><span style={{ fontSize: 11, color: C.faint, marginRight: 8 }}>Onto the shelf</span><span style={{ fontSize: 15, fontWeight: 700, color: C.green, fontVariantNumeric: 'tabular-nums' }}>{money(acceptedValue)}</span></div>
+          {faultyValue > 0 && <div><span style={{ fontSize: 11, color: C.faint, marginRight: 8 }}>Not fit to use</span><span style={{ fontSize: 15, fontWeight: 700, color: C.red, fontVariantNumeric: 'tabular-nums' }}>{money(faultyValue)}</span></div>}
         </div>
       </div>
     </Modal>
@@ -1653,7 +1693,7 @@ function RaiseReorderModal({ po, onSave, onClose }: { po: PurchaseOrder; onSave:
           <thead><tr><th style={th}>Part</th><th style={thR}>Faulty</th><th style={thR}>Reordering</th><th style={th}>What was wrong</th><th style={thR}>Value</th></tr></thead>
           <tbody>{candidates.map(l => { const max = qtyToReorder(po, l.itemId); const r = rows[l.itemId]; const on = r.qty > 0; return (<tr key={l.itemId} style={{ borderBottom: rowBorder, opacity: on ? 1 : 0.5 }}><td style={{ ...td, color: C.text, whiteSpace: 'normal', maxWidth: 220 }}>{nameOf(l.itemId)}</td><td style={{ ...tdN, color: C.red }}>{max}</td><td style={{ padding: '5px 8px', width: 104 }}><input type="number" min={0} max={max} value={r.qty} onChange={e => set(l.itemId, { qty: Math.min(max, Math.max(0, parseFloat(e.target.value) || 0)) })} style={{ ...numStyle, color: on ? C.orange : C.muted }} /></td><td style={{ padding: '5px 8px', minWidth: 220 }}><input value={r.reason} disabled={!on} onChange={e => set(l.itemId, { reason: e.target.value })} placeholder="e.g. cases cracked in transit" style={{ ...iStyle, opacity: on ? 1 : 0.45 }} /></td><td style={{ ...tdN, color: on ? C.text : C.dim, fontWeight: on ? 700 : 400 }}>{on ? money(r.qty * rateOfLine(po, l.itemId)) : '—'}</td></tr>) })}</tbody>
         </table>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: 10 }}><span style={{ fontSize: 11, color: C.faint }}>Value owed by {po.supplier}</span><span style={{ fontSize: 15, fontWeight: 900, color: C.red, fontFamily: 'ui-monospace, monospace' }}>{money(owed)}</span></div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: 10 }}><span style={{ fontSize: 11, color: C.faint }}>Value owed by {po.supplier}</span><span style={{ fontSize: 15, fontWeight: 700, color: C.red, fontVariantNumeric: 'tabular-nums' }}>{money(owed)}</span></div>
       </div>
     </Modal>
   )
@@ -1721,7 +1761,7 @@ function POModal({ po, onSave, onPlace, onClose }: { po: PurchaseOrder; onSave: 
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn onClick={() => { onSave(f); onClose() }} disabled={f.lines.length === 0}>Save as draft</Btn><Btn tone="primary" disabled={f.lines.length === 0} onClick={() => { setPromised(addDays(ordered, quoted)); setPlacing(true) }}>Place order</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Grid cols={3}>
-          <Field label="Order number"><input value={f.number} onChange={e => setF(x => ({ ...x, number: e.target.value }))} style={{ ...iStyle, fontFamily: 'ui-monospace, monospace' }} /></Field>
+          <Field label="Order number"><input value={f.number} onChange={e => setF(x => ({ ...x, number: e.target.value }))} style={{ ...iStyle, fontVariantNumeric: 'tabular-nums' }} /></Field>
           <Field label="Supplier" hint="Changing the supplier clears the lines"><select value={f.supplier} onChange={e => setF(x => ({ ...x, supplier: e.target.value, lines: [] }))} style={{ ...iStyle, cursor: 'pointer' }}>{state.suppliers.map(x => <option key={x.id} value={x.name}>{x.name}</option>)}</select></Field>
           <Field label="Project"><select value={f.project} onChange={e => setF(x => ({ ...x, project: e.target.value }))} style={{ ...iStyle, cursor: 'pointer' }}>{PROJECTS.filter(isLiveProject).map(x => <option key={x} value={x}>{projectCode(x)} — {x}</option>)}</select></Field>
         </Grid>
@@ -1731,7 +1771,7 @@ function POModal({ po, onSave, onPlace, onClose }: { po: PurchaseOrder; onSave: 
               <thead><tr><th style={th}>Part number</th><th style={th}>Item</th><th style={th}>Category</th><th style={thR}>Life</th><th style={thR}>Cost/m</th><th style={thR}>Rate</th><th style={thR}>Quantity</th><th style={thR}>Line value</th></tr></thead>
               <tbody>
                 {catalogue.length === 0 && <tr><td colSpan={8}><Empty>No parts match. Tick &quot;All suppliers&quot; to buy from another supplier.</Empty></td></tr>}
-                {catalogue.map(p => { const qty = qtyOf(p.id); const on = qty > 0; return (<tr key={p.id} style={{ borderBottom: rowBorder, background: on ? 'color-mix(in srgb, var(--x-orange) 6%, transparent)' : undefined }}><td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber || '—'}</td><td style={{ ...td, color: C.text, whiteSpace: 'normal', maxWidth: 220 }}>{p.name}</td><td style={td}><Tag tone={C.dim}>{p.category}</Tag></td><td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td><td style={{ ...tdN, color: C.orange }}>{perMetre(costPerMetre(p))}</td><td style={{ padding: '5px 8px', width: 120 }}><input type="number" min={0} value={rateOf(p.id)} disabled={!on} onChange={e => setRate(p.id, parseFloat(e.target.value) || 0)} style={{ ...numStyle, opacity: on ? 1 : 0.45 }} /></td><td style={{ padding: '5px 8px', width: 100 }}><input type="number" min={0} value={qty} onChange={e => setQty(p.id, Math.max(0, parseFloat(e.target.value) || 0))} style={{ ...numStyle, color: on ? C.orange : C.muted }} /></td><td style={{ ...tdN, color: on ? C.text : C.dim, fontWeight: on ? 700 : 400 }}>{on ? money(qty * rateOf(p.id)) : '—'}</td></tr>) })}
+                {catalogue.map(p => { const qty = qtyOf(p.id); const on = qty > 0; return (<tr key={p.id} style={{ borderBottom: rowBorder, background: on ? 'color-mix(in srgb, var(--x-orange) 6%, transparent)' : undefined }}><td style={{ ...tdMono, color: C.text, fontWeight: 700 }}>{p.partNumber || '—'}</td><td style={{ ...td, color: C.text, whiteSpace: 'normal', maxWidth: 220 }}>{p.name}</td><td style={td}><Tag tone={C.dim}>{p.category}</Tag></td><td style={{ ...tdN, color: C.faint }}>{p.lifeMetres.toLocaleString('en-IN')} m</td><td style={{ ...tdN, color: C.text }}>{perMetre(costPerMetre(p))}</td><td style={{ padding: '5px 8px', width: 120 }}><input type="number" min={0} value={rateOf(p.id)} disabled={!on} onChange={e => setRate(p.id, parseFloat(e.target.value) || 0)} style={{ ...numStyle, opacity: on ? 1 : 0.45 }} /></td><td style={{ padding: '5px 8px', width: 100 }}><input type="number" min={0} value={qty} onChange={e => setQty(p.id, Math.max(0, parseFloat(e.target.value) || 0))} style={{ ...numStyle, color: on ? C.orange : C.muted }} /></td><td style={{ ...tdN, color: on ? C.text : C.dim, fontWeight: on ? 700 : 400 }}>{on ? money(qty * rateOf(p.id)) : '—'}</td></tr>) })}
               </tbody>
             </table>
           </div>
@@ -1741,7 +1781,7 @@ function POModal({ po, onSave, onPlace, onClose }: { po: PurchaseOrder; onSave: 
             <table style={tableStyle}>
               <thead><tr><th style={th}>Part</th><th style={thR}>Qty</th><th style={thR}>Rate</th><th style={thR}>Value</th><th style={th} /></tr></thead>
               <tbody>{f.lines.map(l => (<tr key={l.itemId} style={{ borderBottom: rowBorder }}><td style={{ ...td, color: C.text, whiteSpace: 'normal' }}>{nameOf(l.itemId)}</td><td style={tdN}>{l.qty}</td><td style={tdN}>{money(l.rate)}</td><td style={{ ...tdN, color: C.text, fontWeight: 700 }}>{money(l.qty * l.rate)}</td><td style={{ ...td, textAlign: 'right' }}><Btn size="sm" tone="danger" onClick={() => setQty(l.itemId, 0)}>Remove</Btn></td></tr>))}</tbody>
-              <tfoot><tr style={{ borderTop: `2px solid ${C.border}` }}><td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={3}>Order value</td><td style={{ ...tdN, fontWeight: 900, color: C.orange }}>{money(value)}</td><td style={td} /></tr></tfoot>
+              <tfoot><tr style={{ borderTop: `2px solid ${C.border}` }}><td style={{ ...td, fontWeight: 800, color: C.text }} colSpan={3}>Order value</td><td style={{ ...tdN, fontWeight: 700, color: C.text }}>{money(value)}</td><td style={td} /></tr></tfoot>
             </table>
           )}
         </Card>
@@ -1756,6 +1796,7 @@ function POModal({ po, onSave, onPlace, onClose }: { po: PurchaseOrder; onSave: 
 
 const TABS = ['Catalogue', 'Orders', 'Store', 'Insights'] as const
 type Tab = typeof TABS[number]
+const TAB_LABEL: Record<Tab, string> = { Catalogue: 'Parts catalogue', Orders: 'Purchase orders', Store: 'Store and rigs', Insights: 'Insights' }
 
 export default function InventoryPage() {
   const { state, savePart, savePO, placeOrder, addReceipt, addReorder, receiveReorder } = useInventory()
@@ -1793,32 +1834,23 @@ export default function InventoryPage() {
   const alerts = useMemo(() => buildAlerts(state.pos, state.catalogue, TODAY, COMPLETED_PROJECTS, burn, state.alerts, state.suppliers), [state.pos, state.catalogue, state.alerts, state.suppliers, burn])
   const urgent = alerts.filter(a => a.level === 'urgent').length
 
+  const [group, setGroup] = useState<AlertGroup | null>(null)
+  const answer = alerts.length === 0
+    ? 'Nothing needs attention. Stock, orders and rigs are all in order.'
+    : urgent
+      ? `${urgent} thing${urgent === 1 ? '' : 's'} need${urgent === 1 ? 's' : ''} action today, and ${alerts.length - urgent} more to keep an eye on.`
+      : `${alerts.length} thing${alerts.length === 1 ? '' : 's'} to keep an eye on, none urgent.`
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: 20, paddingBottom: 56 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ fontSize: 26, fontWeight: 900, color: C.text, margin: 0 }}>Parts &amp; inventory</h1>
-          <p style={{ fontSize: 13, color: C.faint, marginTop: 5, maxWidth: 700, lineHeight: 1.6 }}>
-            The catalogue, what is on order, what is on the shelf, and what each rig is carrying.
-            Finance charges every metre from what the rig holds, so the two modules can never disagree.
-          </p>
-        </div>
-        {alerts.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px', borderRadius: 9, background: urgent ? 'color-mix(in srgb, var(--x-red) 10%, transparent)' : 'color-mix(in srgb, var(--x-amber) 10%, transparent)', border: `1px solid ${urgent ? 'color-mix(in srgb, var(--x-red) 30%, transparent)' : 'color-mix(in srgb, var(--x-amber) 30%, transparent)'}` }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: urgent ? C.red : C.amber }} />
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: urgent ? C.red : C.amber }}>{alerts.length} need{alerts.length === 1 ? 's' : ''} attention</span>
-          </div>
-        )}
-      </div>
+      <PageHead question="Do the rigs have the parts they need?" tone={alerts.length === 0 ? 'good' : urgent ? 'bad' : 'warn'}
+        answer={<>{answer} <span style={{ color: C.faint }}>Finance charges every metre from what the rig holds, so the two can never disagree.</span></>} />
 
-      <AlertsPanel alerts={alerts} />
+      <AlertTiles alerts={alerts} group={group} onGroup={setGroup} />
+      <AlertsPanel key={group ?? 'all'} alerts={alerts} group={group} onGroup={setGroup} />
 
-      <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 4, alignSelf: 'flex-start' }}>
-        {TABS.map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ padding: '7px 18px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: 'none', fontFamily: 'inherit', background: tab === t ? C.orange : 'transparent', color: tab === t ? '#fff' : C.muted }}>
-            {t}
-          </button>
-        ))}
+      <div style={{ alignSelf: 'flex-start' }}>
+        <KSeg value={tab} onChange={setTab} options={TABS.map(t => ({ value: t, label: TAB_LABEL[t] }))} />
       </div>
 
       {tab === 'Catalogue' && <CatalogueTab onEdit={setEditPart} onImport={() => setImporting(true)} />}
