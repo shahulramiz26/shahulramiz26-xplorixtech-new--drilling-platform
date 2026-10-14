@@ -12,6 +12,11 @@ import { Pool, type PoolClient } from 'pg'
  * ========================================================================== */
 
 export function dbUrl() {
+  /* A Vercel preview (a branch or pull request, before it is merged) runs as
+   * the browser demo and never reaches the live database, so new work can be
+   * tried without touching real data. XPLORIX_PREVIEW_DB=1 lets a preview use
+   * the database on purpose. */
+  if (process.env.VERCEL_ENV === 'preview' && process.env.XPLORIX_PREVIEW_DB !== '1') return ''
   const direct = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL
   if (direct) return direct
   // The integration can be connected with a prefix of your choosing
@@ -80,6 +85,16 @@ create index if not exists xp_records_rev on xp_records (company_id, rev);
 alter table xp_companies add column if not exists code text;
 create unique index if not exists xp_companies_code on xp_companies (upper(code));
 update xp_companies set code = 'APX' where id = 'c1' and code is null;
+create table if not exists xp_media (
+  company_id text not null,
+  id text not null,
+  mime text not null,
+  bytes bytea not null,
+  size int not null,
+  created_by text,
+  created_at timestamptz not null default now(),
+  primary key (company_id, id)
+);
 create table if not exists xp_attempts (
   key text primary key,
   fails int not null default 0,

@@ -60,14 +60,18 @@ function scope(who: Who, all: Rec[]) {
 /* A shift as the client may read it: what happened on the rig, and nothing
  * about what it cost or who was hired to drill it. */
 function shiftForClient(l: Any) {
-  const { fuelLitres, waterLitres, additivesKg, partsUsed, bitRuns, equipmentUsed, notes, attachments, contractor, workOrderId, check, engineHmr, engineHours, loggedBy, editedBy, editedAt, ...keep } = l
+  const { fuelLitres, waterLitres, additivesKg, partsUsed, bitRuns, equipmentUsed, notes, attachments, contractor, workOrderId, check, engineHmr, engineHours, loggedBy, editedBy, editedAt, surveys, ...keep } = l
   void fuelLitres; void waterLitres; void additivesKg; void partsUsed; void bitRuns; void equipmentUsed; void notes; void attachments
+  // Survey readings reach the client once approved, as records of their own.
+  void surveys
   void contractor; void workOrderId; void check; void engineHmr; void engineHours; void loggedBy; void editedBy; void editedAt
   return { ...keep, fuelLitres: 0, waterLitres: 0, additivesKg: 0, partsUsed: [] }
 }
 /* The client reads the project as agreed with him; the daily target is the
  * contractor's own KPI and stays behind. */
-const projectForClient = (p: Any) => { const { dailyTarget, ...rest } = p; void dailyTarget; return rest }
+const projectForClient = (p: Any) => { const { dailyTarget, budgetTotal, budgetPerMetre, ...rest } = p; void dailyTarget; void budgetTotal; void budgetPerMetre; return rest }
+/* A supervisor reads his projects in full, except what they may cost. */
+const projectForSupervisor = (p: Any) => { const { budgetTotal, budgetPerMetre, ...rest } = p; void budgetTotal; void budgetPerMetre; return rest }
 const projectStub = (p: Any) => ({
   id: p.id, name: p.name, code: p.code, location: p.location, client: '', status: p.status, startDate: p.startDate,
   holeSize: p.holeSize, shared: false, rigs: [], supervisors: [], drillers: [], createdAt: p.createdAt,
@@ -91,8 +95,10 @@ export function visible(who: Who, all: Rec[]): Rec[] {
   keep(of(all, 'wording'), () => true)
 
   if (who.role === 'supervisor') {
-    keep(s.projects, r => s.names.has(r.data.name))
+    keep(s.projects, r => s.names.has(r.data.name), projectForSupervisor)
     keep(s.logs, inMine)
+    keep(of(all, 'surveys'), inMine)
+    keep(of(all, 'corePhotos'), inMine)
     keep(of(all, 'maintenance'), inMine)
     keep(s.plans, myHole)
     keep(of(all, 'holeStatus'), myHole)
@@ -132,6 +138,9 @@ export function visible(who: Who, all: Rec[]): Rec[] {
     keep(s.plans, myHole)
     keep(of(all, 'holeStatus'), myHole)
     keep(s.orders, inMine, orderStub)
+    // The hole's survey as approved, and its core photos.
+    keep(of(all, 'surveys'), r => inMine(r) && r.data.status === 'approved')
+    keep(of(all, 'corePhotos'), inMine)
   }
   return out
 }

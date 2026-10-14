@@ -26,6 +26,7 @@ import { workOrderFor, contractorName, words, currentPayRate } from '../../../li
 import { TODAY } from '../../../lib/inventory-store'
 import Link from 'next/link'
 import { hexA } from '../../../lib/theme'
+import { projectBudget } from '../../../lib/plan'
 
 /* ==========================================================================
  * XPLORIX COSTING — one screen.
@@ -2217,6 +2218,8 @@ function CostingScreen() {
         </div>
       </div>
 
+      <BudgetStrip project={project} />
+
       <div style={{ display: 'flex', gap: 4, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 4, alignSelf: 'flex-start' }}>
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
@@ -2246,6 +2249,45 @@ function CostingScreen() {
           onCreate={inv => { addInvoice(inv); setQuickInvoice(null); setTab('Tracker') }} />
       )}
       {showHistory && <RatesHistoryModal project={project} rig={rig} onClose={() => setShowHistory(false)} />}
+    </div>
+  )
+}
+
+/* The whole project against its budget, above the rig-by-rig detail: every
+ * rig and every month, from the same costed days as the tables below. */
+function BudgetStrip({ project }: { project: string }) {
+  const { state } = useCosting()
+  const { state: inv } = useInventory()
+  const p = (state.projects ?? []).find(x => x.name === project)
+  const b = useMemo(() => p ? projectBudget(state, inv, p) : null, [state, inv, p])
+  if (!p || !b) return null
+  const link = <Link href={`/admin/projects/${encodeURIComponent(p.id)}`} style={{ color: C.orange, fontWeight: 700, textDecoration: 'none', fontSize: 12 }}>{b.set ? 'Change the budget' : 'Set a budget'}</Link>
+  if (!b.set) {
+    return (
+      <div style={{ background: C.card, border: `1px dashed ${C.border}`, borderRadius: 12, padding: '10px 14px', display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, color: C.muted }}>
+        <span><b style={{ color: C.text }}>{projectCode(project)}</b> has no budget. So far {money(b.spent)} on {Math.round(b.metres).toLocaleString('en-IN')} m{b.metres ? `, ${money(b.cpm)} a metre` : ''}.</span>
+        {link}
+      </div>
+    )
+  }
+  const over = b.overPerMetre ?? 0
+  const perColor = !b.metres || !b.budgetPerMetre ? C.text : over > 0 ? (over / b.budgetPerMetre > 0.1 ? C.red : C.amber) : C.green
+  const cell = (label: string, value: string, sub: string, color: string = C.text) => (
+    <div style={{ minWidth: 150 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color, marginTop: 3, fontFamily: 'ui-monospace, monospace' }}>{value}</div>
+      <div style={{ fontSize: 11.5, color: C.faint, marginTop: 2 }}>{sub}</div>
+    </div>
+  )
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 16px', display: 'flex', gap: 26, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.text, minWidth: 120 }}>{projectCode(project)} budget<div style={{ fontSize: 11, fontWeight: 400, color: C.faint, marginTop: 2 }}>every rig, since the start</div></div>
+      {cell('Cost per metre', b.metres ? money(b.cpm) : '—', b.budgetPerMetre ? `budget ${money(b.budgetPerMetre)}${b.metres ? ` · ${over > 0 ? `${money(over)} over` : `${money(-over)} under`}` : ''}` : 'no budget per metre', perColor)}
+      {cell('Spent', money(b.spent), b.budgetTotal ? `of ${money(b.budgetTotal)} · ${(b.spentPct ?? 0).toFixed(1)}%` : 'no total budget')}
+      {cell('Drilled', `${Math.round(b.metres).toLocaleString('en-IN')} m`, b.target ? `of ${Math.round(b.target).toLocaleString('en-IN')} m · ${(b.donePct ?? 0).toFixed(1)}%` : '')}
+      {b.atCompletion && b.budgetTotal ? cell('At this rate, the whole project', money(b.atCompletion), b.atCompletion > b.budgetTotal ? `${money(b.atCompletion - b.budgetTotal)} over budget` : `${money(b.budgetTotal - b.atCompletion)} under budget`, b.atCompletion > b.budgetTotal * 1.1 ? C.red : b.atCompletion > b.budgetTotal ? C.amber : C.green) : null}
+      <div style={{ flex: 1 }} />
+      {link}
     </div>
   )
 }

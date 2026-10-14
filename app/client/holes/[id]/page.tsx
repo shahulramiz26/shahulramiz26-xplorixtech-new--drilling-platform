@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -11,7 +11,13 @@ import { projectHoles, day } from '../../../../lib/projects'
 import {
   Page, PageHead, Card, Tile, Grid, Split, Btn, Table, Status, Note, Modal, Field, Empty, inputStyle,
   th, thR, td, tdR, tdStrong, rowLine, T, tint,
+  Seg,
 } from '../../../components/kit'
+import { holeSurvey, holePhotos } from '../../../../lib/survey'
+import { depthBands } from '../../../../lib/plan'
+import { useInventory } from '../../../../lib/inventory-store'
+import { Path3D, PlanView, SectionView, DeviationFigures } from '../../../components/hole-path'
+import { SurveyTable, DepthPanel, PhotoViewer } from '../../../components/survey-panel'
 
 /* ==========================================================================
  * ONE HOLE — from the first metre to the invoice
@@ -229,6 +235,8 @@ export default function ClientHole() {
         </Card>
       )}
 
+      <HoleSurveyAndCore hole={hole.id} state={c.state} />
+
       <Card title="Every shift on this hole" subtitle="Newest first. This is the record each billing line is checked against." pad={false}>
         <Table>
           <thead>
@@ -320,5 +328,36 @@ function Back() {
     <Link href="/client/holes" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: T.faint, textDecoration: 'none' }}>
       <ArrowLeft size={13} /> All holes
     </Link>
+  )
+}
+
+/* Where the hole went and what came up: the survey as approved by the
+ * contractor's office, and the core tray photos, depth by depth. Speed by
+ * depth is shown; what a metre cost the contractor is not. */
+function HoleSurveyAndCore({ hole, state }: { hole: string; state: Parameters<typeof holeSurvey>[0] & Parameters<typeof depthBands>[0] }) {
+  const { state: inv } = useInventory()
+  const s = useMemo(() => {
+    const all = holeSurvey(state, hole)
+    return { ...all, readings: all.approved, warnings: all.warnings.filter(w => w.id === 'dev' || w.id === 'gap' || w.id === 'dls') }
+  }, [state, hole])
+  const { bands, step } = useMemo(() => depthBands(state, inv, hole, undefined, false), [state, inv, hole])
+  const photos = useMemo(() => holePhotos(state, hole), [state, hole])
+  const [shape, setShape] = useState<'3d' | 'plan' | 'section'>('3d')
+  const [open, setOpen] = useState<number | null>(null)
+  const hasPath = s.path.length > 1
+  return (
+    <>
+      <Card title="Survey" subtitle={s.approved.length ? `${s.approved.length} approved ${s.approved.length === 1 ? 'reading' : 'readings'}, the deepest at ${n1(s.lastSurveyed)} m.` : 'No approved survey readings yet.'}
+        right={hasPath ? <Seg<'3d' | 'plan' | 'section'> options={[{ value: '3d', label: '3D' }, { value: 'plan', label: 'Plan' }, { value: 'section', label: 'Section' }]} value={shape} onChange={setShape} /> : undefined}>
+        {s.warnings.map(w => <div key={w.id} style={{ marginBottom: 12 }}><Note tone={w.tone === 'bad' ? 'bad' : 'warn'}><b style={{ color: T.text }}>{w.title}.</b> {w.detail}</Note></div>)}
+        <DeviationFigures s={s} />
+        {hasPath && <div style={{ marginTop: 16, maxWidth: shape === '3d' ? 760 : 560 }}>{shape === '3d' ? <Path3D s={s} /> : shape === 'plan' ? <PlanView s={s} /> : <SectionView s={s} />}</div>}
+      </Card>
+      {s.readings.length > 0 && <Card title="Survey readings" pad={false}><SurveyTable readings={s.readings} editable={false} /></Card>}
+      <Card title="Down the hole" subtitle="How fast each band of depth was drilled, with the core tray photos beside it.">
+        <DepthPanel bands={bands} step={step} photos={photos} cost={false} onOpenPhoto={i => setOpen(i)} />
+      </Card>
+      {open != null && <PhotoViewer photos={photos} start={open} onClose={() => setOpen(null)} />}
+    </>
   )
 }
