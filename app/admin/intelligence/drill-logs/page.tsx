@@ -121,10 +121,10 @@ export default function DrillLogCheck() {
         </div>
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: 16 }}>
         <Card title="What the checks find most" pad={false} subtitle="Each kind of check, and how many shifts it caught in the period.">
           {byKind.length === 0 ? <Empty>Nothing found.</Empty> : byKind.map(([k, v]) => (
-            <div key={k} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 34px', gap: 12, alignItems: 'center', padding: '10px 18px', borderTop: rowLine }}>
+            <div key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(60px,120px) 34px', gap: 12, alignItems: 'center', padding: '10px 18px', borderTop: rowLine }}>
               <div style={{ fontSize: 12.5, color: T.text, lineHeight: 1.4 }}>
                 <Status tone={v.level === 'stop' ? 'bad' : 'warn'}>{v.level === 'stop' ? 'Cannot be right' : 'Unusual'}</Status>{' '}
                 <span style={{ color: T.muted }}>{v.title}</span>
