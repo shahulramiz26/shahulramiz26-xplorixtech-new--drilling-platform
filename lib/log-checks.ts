@@ -426,3 +426,43 @@ export function supervisorScores(audits: LogAudit[]): SupervisorScore[] {
   })
   return Object.values(by).sort((a, b) => b.shifts - a.shifts)
 }
+
+/* ==========================================================================
+ * CHECKED BY XPLORIX — the mark another company can rely on
+ *
+ * A hole is checked when every shift on it passes the checks, or was saved
+ * with a reason for what was unusual. Where the full shift is at hand (the
+ * company's own screens, the demo) the checks are run again now. Where it is
+ * not (the client's login, which never receives fuel or engine figures) the
+ * stamp saved with the shift is read instead: a shift cannot be saved past a
+ * check that stops it, so a stamped shift passed when it was logged.
+ * ========================================================================== */
+
+export type ShiftVerdict = 'pass' | 'explained' | 'open' | 'stop' | 'unchecked'
+
+/* `live` is false when the record at hand has had the working figures taken
+ * out (the client's login); the stamp is read instead. */
+export const isFullRecord = (state: CheckState) => state.shiftLogs.some(l => l.engineHours != null || l.fuelLitres > 0)
+
+export function shiftVerdict(state: CheckState, l: ShiftLog, live: boolean = isFullRecord(state)): ShiftVerdict {
+  if (live) {
+    const checks = checkShift(state, l, { contractor: !!l.contractor })
+    if (checks.some(c => c.level === 'stop')) return 'stop'
+    const said = new Set((l.trust?.warnings ?? []).map(w => w.id))
+    const warns = checks.filter(c => c.level === 'warn')
+    if (warns.some(c => !said.has(c.id))) return 'open'
+    return warns.length ? 'explained' : 'pass'
+  }
+  if (l.trust) return l.trust.warnings.length ? 'explained' : 'pass'
+  return 'unchecked'
+}
+
+export interface HoleVerdict { shifts: number; checked: number; open: number; stops: number; ok: boolean }
+
+export function holeVerdict(state: CheckState, hole: string): HoleVerdict {
+  const logs = state.shiftLogs.filter(l => !l.segmentOf && (l.holeNumber === hole || l.nextHole?.holeNumber === hole))
+  const live = isFullRecord(state)
+  const v = logs.map(l => shiftVerdict(state, l, live))
+  const checked = v.filter(x => x === 'pass' || x === 'explained').length
+  return { shifts: logs.length, checked, open: v.filter(x => x === 'open').length, stops: v.filter(x => x === 'stop').length, ok: logs.length > 0 && checked === logs.length }
+}

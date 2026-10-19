@@ -4,10 +4,11 @@ import { useMemo, useState } from 'react'
 import { useCosting, loginOfContractor } from '../../../lib/costing-store'
 import { TODAY } from '../../../lib/inventory-store'
 import {
-  reportFlags, hasProblem, contractorName, contractorOf, workOrderById,
+  reportFlags, hasProblem, contractorName, contractorOf, workOrderById, reportToDraft,
   SOURCE_LABEL, type ContractorReport, type WorkOrder, type Flag,
 } from '../../../lib/contracting'
 import { when } from '../../../lib/projects'
+import { checkShift } from '../../../lib/log-checks'
 import { T, tint, Card, Btn, Note, Modal, Field, Switch, Status, Empty, Table, inputStyle, th, thR, td, tdR, rowLine, toneColor } from '../../components/kit'
 import { me, n1, shortDay, linkBtn, numInput, SourceTag } from './shared'
 
@@ -29,6 +30,24 @@ function Flags({ flags }: { flags: Flag[] }) {
       ))}
     </div>
   )
+}
+
+/* The same drill log checks as every shift in the record, run on the
+ * contractor's report before it is accepted. What the report check above
+ * already says (depth, closed hole, plan, best shift) is not said twice. A
+ * warning the contractor gave a reason for shows his reason. */
+const SAID_ALREADY = new Set(['hole-continuity', 'hole-closed', 'hole-past-plan', 'speed-record'])
+function xplorixFlags(state: Parameters<typeof checkShift>[0] & Parameters<typeof workOrderById>[0], r: ContractorReport, waiting: ContractorReport[]): Flag[] {
+  const wo = workOrderById(state, r.workOrderId)
+  const log = { ...reportToDraft(r), contractor: wo?.contractorId, workOrderId: r.workOrderId }
+  const ord = (x: { date: string; shift: string }) => `${x.date}${x.shift === 'Day' ? 0 : 1}`
+  const pendingOnHole = waiting.filter(x => x.id !== r.id && x.holeNumber && x.holeNumber === r.holeNumber && ord(x) < ord(r)).reduce((a, x) => a + x.metres, 0)
+  const reasons = new Map((r.extra?.trust?.warnings ?? []).map(w => [w.id, w.reason]))
+  return checkShift(state, log, { contractor: true, isNew: true, pendingOnHole })
+    .filter(c => !SAID_ALREADY.has(c.id))
+    .map(c => c.level === 'stop' ? { tone: 'bad' as const, text: `XPLORIX: ${c.title}` }
+      : reasons.has(c.id) ? { tone: 'info' as const, text: `XPLORIX: ${c.title} Contractor's reason: “${reasons.get(c.id)}”` }
+      : { tone: 'warn' as const, text: `XPLORIX: ${c.title}` })
 }
 
 function hoursWords(r: ContractorReport) {
@@ -97,7 +116,7 @@ export function ReportsTab({ project, orders }: { project: string; orders: WorkO
   const returned = mine.filter(r => r.status === 'returned')
   const flagsOf = useMemo(() => {
     const m: Record<string, Flag[]> = {}
-    waiting.forEach(r => { m[r.id] = reportFlags(state, r, TODAY) })
+    waiting.forEach(r => { m[r.id] = [...reportFlags(state, r, TODAY), ...xplorixFlags(state, r, waiting)] })
     return m
   }, [waiting, state])
   const clean = waiting.filter(r => !hasProblem(flagsOf[r.id] ?? []) && r.standbyHours === 0)
