@@ -11,6 +11,7 @@ import { buildScorecard, buildRiskRegister, type ScoredRisk } from './intelligen
 import { buildForecast, type Forecast, type RiskArea } from './forecast'
 import { auditRecord, missingShifts, type LogAudit } from './log-checks'
 import { standbyLedger, checkHole } from './money-checks'
+import { buyCheck, lifeGaps } from './stock-checks'
 
 /* ==========================================================================
  * FINDINGS — one list of what needs doing, for every department
@@ -229,6 +230,30 @@ export function buildFindings(state: CostingState, inv: InvState, today: string 
       money: a.value, moneyNote: a.kind === 'idle' || a.kind === 'stranded' ? 'tied up in stock' : 'to order', href: '/admin/inventory',
     })
   })
+
+  /* Draft orders for parts that already sit free in another store. */
+  inv.pos.filter(po => po.status === 'draft' && po.lines.length).forEach(po => {
+    const c = buyCheck(inv.pos, inv.catalogue, po, today, COMPLETED_PROJECTS)
+    if (!c.length) return
+    const saves = c.reduce((a, x) => a + x.saves, 0)
+    push({
+      id: `stock:buy-check:${po.id}:${c.map(x => `${x.itemId}x${x.free}`).join(',')}`, dept: 'stock', severity: 'act',
+      title: `${po.number} buys ${money(saves)} of parts already in another store`,
+      detail: c.map(x => `${x.name}: ordering ${x.ordering}, ${x.free} free on ${Array.from(new Set(x.spares.map(sp => sp.project))).join(', ')}`).join('; ') + '.',
+      action: 'Open the order: XPLORIX moves them across in one click and trims the order.',
+      owner: 'Procurement', money: saves, moneyNote: 'not spent', href: '/admin/inventory',
+    })
+  })
+
+  /* Parts the ground wears out faster than the catalogue says: every metre in
+   * that ground is costed, and quoted, too cheap. */
+  lifeGaps(logs, inv.catalogue).slice(0, 5).forEach(g => push({
+    id: `stock:life:${g.itemId}:${g.formation}:${g.scrapped}`, dept: 'stock', severity: 'plan',
+    title: `${g.name} lasts ${Math.round(g.observedLife)} m in ${g.formation.toLowerCase()} ground, not ${g.catalogueLife} m`,
+    detail: `${g.scrapped} used up over ${Math.round(g.metres).toLocaleString('en-IN')} m of ${g.formation.toLowerCase()} ground: ${Math.abs(Math.round(g.deltaPct))}% less than the catalogue. Finance and bids still price it at the catalogue life.`,
+    action: `Set its life to what the ground gives in the parts catalogue, or take it up with the supplier. Price ${g.formation.toLowerCase()} ground in the next bid at the real figure.`,
+    owner: 'Stores', money: Math.round(g.understated), moneyNote: 'cost not in the figures so far', href: '/admin/inventory',
+  }))
 
   // ── costing and finance ────────────────────────────────────────────────
   const card = buildScorecard(state, inv, 'all', 'all')
