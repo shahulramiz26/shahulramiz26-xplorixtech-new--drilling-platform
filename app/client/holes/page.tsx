@@ -1,8 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { holeVerdict } from '../../../lib/log-checks'
-import { CheckedMark } from '../../components/checked-mark'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { money, moneyL, COMPANY_NAME } from '../../../lib/costing-store'
 import { useClient, CLIENT_HOLE } from '../../../lib/client-view'
@@ -44,9 +42,6 @@ export default function ClientHoles() {
     ...planned.map(h => ({ id: h.id, project: h.project, rig: '', planned: h.planned, drilled: 0, days: 0, rate: null, recovery: null, standbyDays: 0, breakdownDays: 0, value: 0, status: 'planned' as PlanStatus, start: '', end: undefined, returned: undefined })),
   ].filter(h => project === 'all' || h.project === project)
   const shown = rows.filter(h => view === 'all' || h.status === view)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const verdicts = useMemo(() => Object.fromEntries(rows.filter(h => h.status !== 'planned').map(h => [h.id, holeVerdict(c.state, h.id)])), [c.state, rows.length])
-  const checkedCount = Object.values(verdicts).filter(v => v.ok).length
 
   const touched = rows.filter(h => h.status !== 'planned')
   const metres = touched.reduce((s, h) => s + h.drilled, 0)
@@ -80,7 +75,7 @@ export default function ClientHoles() {
         <Tile label="Billed or billable" value={moneyL(touched.reduce((s, h) => s + h.value, 0))} note="At your contract rates, before tax" />
       </Grid>
 
-      <Card pad={false} title="Holes" subtitle={`Click a hole for every shift on it, what stopped it and what it bills.${checkedCount ? ` ${checkedCount} of ${touched.length} are marked Checked: every shift on them passed the XPLORIX drill log checks as it was logged.` : ''}`}
+      <Card pad={false} title="Holes" subtitle="Click a hole for every shift on it, what stopped it and what it bills."
         right={<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {c.projects.length > 1 && (
             <select value={project} onChange={e => setProject(e.target.value)} aria-label="Project" style={{ ...inputStyle, width: 'auto', padding: '6px 10px', fontSize: 12.5 }}>
@@ -102,7 +97,7 @@ export default function ClientHoles() {
             <tbody>
               {shown.map(h => (
                 <tr key={h.id} className="xpl-row" onClick={() => router.push(`/client/holes/${encodeURIComponent(h.id)}`)} style={{ borderBottom: rowLine, cursor: 'pointer' }}>
-                  <td style={tdStrong}>{h.id}{verdicts[h.id]?.ok && <div style={{ marginTop: 3 }}><CheckedMark v={verdicts[h.id]} compact /></div>}</td>
+                  <td style={tdStrong}>{h.id}</td>
                   <td style={td}>{h.project}</td>
                   <td style={td}>{h.rig || '—'}</td>
                   <td style={td}>{h.status === 'planned' ? <span>{h.planned ? `${num(h.planned)} m planned` : '—'}</span> : <DepthBar drilled={h.drilled} planned={h.planned} width={150} />}</td>

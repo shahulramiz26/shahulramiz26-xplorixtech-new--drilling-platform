@@ -22,7 +22,6 @@ import {
   type InvoiceStatus, type RateStructure,
 } from '../../../lib/costing-store'
 import { computeRigMonth, type RigMonthView } from '../../../lib/costing-view'
-import { checkHole, looseStandby } from '../../../lib/money-checks'
 import { workOrderFor, contractorName, words, currentPayRate } from '../../../lib/contracting'
 import { TODAY } from '../../../lib/inventory-store'
 import Link from 'next/link'
@@ -1383,14 +1382,6 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
   const isFlat = v.clientRate?.structure !== 'slab'
   const finished = v.holes.filter(h => isFinished(h.hole))
   const stillDrilling = v.holes.length - finished.length
-  /* Every closed hole is read against its own shift logs before it can go to
-   * the client or be approved: the same checks as the drill log form. */
-  const { state: logState } = useCosting()
-  const holeChecks = useMemo(() => {
-    const m: Record<string, ReturnType<typeof checkHole>> = {}
-    finished.forEach(h => { m[h.hole.holeNumber] = checkHole(logState, h.hole.holeNumber) })
-    return m
-  }, [finished, logState])
 
   if (finished.length === 0) {
     return (
@@ -1439,7 +1430,6 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
                       <td style={td}>{dayLabel(hole.startDate)} → {hole.endDate ? dayLabel(hole.endDate) : 'open'}</td>
                       <td style={td}>
                         <Tag tone={holeStatusColor(hole.status)}>{HOLE_STATUS_LABEL[hole.status]}</Tag>
-                        <HoleLogMark c={holeChecks[hole.holeNumber]} />
                         {hole.status === 'closed' && hole.returnReason && <span style={{ color: C.red, marginLeft: 7, fontSize: 11 }}>returned</span>}
                       </td>
                       <td style={tdN}>{h.roll.days}</td>
@@ -1590,25 +1580,16 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
                               approve its own hole: it is sent across and the
                               client decides. Elsewhere nothing has
                               changed. */}
-                          {(holeChecks[hole.holeNumber]?.stops.length ?? 0) > 0 && hole.status === 'closed' && (
-                            <div style={{ marginTop: 16 }}>
-                              <Note tone={C.red}>
-                                {holeChecks[hole.holeNumber].stops.length} {holeChecks[hole.holeNumber].stops.length === 1 ? 'figure' : 'figures'} in the shifts behind {hole.holeNumber} cannot be right
-                                ({Array.from(new Set(holeChecks[hole.holeNumber].stops.map(x => x.check.title.replace(/\.$/, '')))).slice(0, 2).join('; ')}).
-                                Put {holeChecks[hole.holeNumber].stops.length === 1 ? 'it' : 'them'} right in the <Link href="/admin/logs/drill" style={{ color: C.red, fontWeight: 700 }}>drill log</Link> before this hole is {linked ? 'sent for approval' : 'approved'}.
-                              </Note>
-                            </div>
-                          )}
                           <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                             {!linked && hole.status === 'closed' &&
-                              <Btn size="sm" tone="primary" disabled={(holeChecks[hole.holeNumber]?.stops.length ?? 0) > 0} onClick={() => onStatus(hole.holeNumber, 'approved')}>Approve for billing</Btn>}
+                              <Btn size="sm" tone="primary" onClick={() => onStatus(hole.holeNumber, 'approved')}>Approve for billing</Btn>}
                             {!linked && hole.status === 'approved' && <>
                               <Btn size="sm" onClick={() => onStatus(hole.holeNumber, 'closed')}>Withdraw approval</Btn>
                               <Btn size="sm" tone="primary" onClick={() => onInvoice(h)}>Create invoice</Btn>
                             </>}
 
                             {linked && hole.status === 'closed' &&
-                              <Btn size="sm" tone="primary" disabled={(holeChecks[hole.holeNumber]?.stops.length ?? 0) > 0} onClick={() => onSubmit(hole.holeNumber)}>
+                              <Btn size="sm" tone="primary" onClick={() => onSubmit(hole.holeNumber)}>
                                 {hole.returnReason ? 'Send again for approval' : 'Send hole for approval'}
                               </Btn>}
                             {linked && hole.status === 'submitted' && <>
@@ -1651,15 +1632,6 @@ function DrillholesTab({ v, linked, client, onStatus, onSubmit, onWithdraw, onIn
       </Card>
     </div>
   )
-}
-
-/* The logs behind a hole, in one mark: wrong, to explain, or checked. */
-function HoleLogMark({ c }: { c?: ReturnType<typeof checkHole> }) {
-  if (!c || c.shifts === 0) return null
-  const [tone, text, tip] = c.stops.length ? [C.red, `✕ ${c.stops.length} in logs`, 'Figures in the logs behind this hole cannot be right']
-    : c.open.length ? [C.amber, `! ${c.open.length} to explain`, 'Unusual figures in the logs with no reason given']
-    : [C.green, '✓ Logs checked', `All ${c.shifts} shifts behind this hole pass the XPLORIX checks`]
-  return <span title={tip} style={{ marginLeft: 7, fontSize: 10.5, fontWeight: 700, color: tone, whiteSpace: 'nowrap' }}>{text}</span>
 }
 
 function Mini({ k, v }: { k: string; v: string }) {
@@ -1910,24 +1882,6 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
   // Anything billable that isn't metres — mobilisation, demobilisation, a
   // one-off the contract allows — is added here rather than tracked as a cost.
   const [extras, setExtras] = useState<{ id: string; label: string; amount: number }[]>([])
-  const { state } = useCosting()
-  const { state: inv } = useInventory()
-
-  /* XPLORIX checks every shift behind these holes before the invoice goes
-   * out. A figure that cannot be right stops it; an unusual one with no
-   * reason has to be looked at first, because it is the line the client
-   * will send back. */
-  const checks = useMemo(() => holes.map(h => checkHole(state, h.hole.holeNumber)), [state, holes])
-  const stopCount = checks.reduce((s, c) => s + c.stops.length, 0)
-  const openCount = checks.reduce((s, c) => s + c.open.length, 0)
-  const noNote = checks.reduce((s, c) => s + c.standbyNoNote, 0)
-  const shiftCount = checks.reduce((s, c) => s + c.shifts, 0)
-  const [ack, setAck] = useState(false)
-
-  /* Standby the client caused on a day the rig was on no hole: it is in the
-   * record and on no hole's bill, so it is offered here, once. */
-  const loose = useMemo(() => looseStandby(state, inv, project), [state, inv, project])
-  const [standbyOn, setStandbyOn] = useState<string[]>(() => loose.map(d => d.key))
 
   // Lines are the measurement book — one per size, formation and rate, in
   // depth order, exactly as shown on the hole. A slab contract bills by depth,
@@ -1952,15 +1906,6 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
       rate: money(clientRate?.standbyPerDay ?? 0), amount: sb.reduce((s, d) => s + d.revenue, 0),
     })
   })
-  const looseOn = loose.filter(d => standbyOn.includes(d.key))
-  Array.from(new Set(looseOn.map(d => d.rig))).forEach(rig => {
-    const ds = looseOn.filter(d => d.rig === rig)
-    lines.push({
-      label: `${rig} · client standby, no hole · ${ds.map(d => d.date.slice(8) + '/' + d.date.slice(5, 7)).join(', ')}`,
-      qty: `${ds.length} ${ds.length === 1 ? 'day' : 'days'}`,
-      rate: money(clientRate?.standbyPerDay ?? ds[0].earned), amount: ds.reduce((s, d) => s + d.earned, 0),
-    })
-  })
   extras.filter(e => e.label.trim() && e.amount).forEach(e =>
     lines.push({ label: e.label.trim(), qty: '1', rate: money(e.amount), amount: e.amount }))
 
@@ -1971,18 +1916,16 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
   return (
     <Modal title="Review invoice" subtitle={project} width={840} onClose={onClose}
       footer={<><Btn onClick={onClose}>Cancel</Btn>
-        <Btn tone="primary" disabled={stopCount > 0 || (openCount > 0 && !ack) || lines.length === 0} onClick={() => onCreate({
+        <Btn tone="primary" onClick={() => onCreate({
           id: uid('inv'), number, project, client: PROJECT_CLIENTS[project] ?? '', date,
           holeNumbers: holes.map(h => h.hole.holeNumber), lines, subtotal, taxPercent, total,
           status: 'pending', dueDate,
-          ...(looseOn.length ? { standbyDays: looseOn.map(d => d.key) } : {}),
           // On a shared project the invoice goes to the client, who checks
           // it line by line in the Client Portal. Only the lines travel — cost
           // and margin are worked out on this screen and never stored on it.
           ...(linked ? { ownerStatus: 'awaiting' as const, lineReviews: lines.map(() => null), sentAt: date } : {}),
         })}>{linked ? 'Send to the client' : 'Create invoice'}</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        <InvoiceCheck checks={checks} shiftCount={shiftCount} stopCount={stopCount} openCount={openCount} noNote={noNote} ack={ack} onAck={setAck} />
         <Grid cols={4}>
           <TextField label="Invoice number" value={number} onChange={setNumber} />
           <DateField label="Date" value={date} onChange={setDate} />
@@ -2016,24 +1959,6 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
             </tfoot>
           </table>
         </div>
-
-        {loose.length > 0 && (
-          <Section title="Client standby on no hole" note="The rig was stopped by the client on a day it was on no hole, so no hole's bill carries it. Tick the days to bill on this invoice; each day can only be billed once.">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {loose.map(d => (
-                <label key={d.key} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 12.5, color: C.text, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={standbyOn.includes(d.key)} aria-label={`Bill standby ${d.rig} ${d.date}`}
-                    onChange={e => setStandbyOn(x => e.target.checked ? [...x, d.key] : x.filter(k => k !== d.key))} />
-                  <span style={{ fontFamily: 'ui-monospace, monospace', minWidth: 92 }}>{d.date}</span>
-                  <span style={{ minWidth: 70 }}>{d.rig}</span>
-                  <span style={{ flex: 1, color: C.muted }}>{d.hours} h · {d.reasons || 'no reason logged'}</span>
-                  {!d.noted && <Tag tone={C.amber}>No note: client may dispute</Tag>}
-                  <span style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: LAYER.revenue }}>{money(d.earned)}</span>
-                </label>
-              ))}
-            </div>
-          </Section>
-        )}
 
         <Section title="Other lines" note="Mobilisation, demobilisation, or anything else the contract lets you bill that isn't metres.">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -2074,44 +1999,6 @@ function ReviewModal({ project, linked, clientRate, holes, nextNumber, onClose, 
         </Note>
       </div>
     </Modal>
-  )
-}
-
-/* What XPLORIX found in the shifts behind the invoice, shown before it can
- * be sent. Each problem names the shift, so it can be put right in the log. */
-function InvoiceCheck({ checks, shiftCount, stopCount, openCount, noNote, ack, onAck }: {
-  checks: ReturnType<typeof checkHole>[]; shiftCount: number; stopCount: number; openCount: number; noNote: number
-  ack: boolean; onAck: (v: boolean) => void
-}) {
-  const tone = stopCount ? C.red : openCount ? C.amber : C.green
-  const items = checks.flatMap(c => [...c.stops.map(x => ({ ...x, hole: c.hole, stop: true })), ...c.open.map(x => ({ ...x, hole: c.hole, stop: false }))])
-  return (
-    <section aria-label="Invoice check" style={{ border: `1px solid ${hexA(tone, 0x5a)}`, background: hexA(tone, 0x10), borderRadius: 12, padding: '12px 14px' }}>
-      <div style={{ fontSize: 13.5, fontWeight: 700, color: tone }}>
-        {stopCount ? `Cannot be sent: ${stopCount} ${stopCount === 1 ? 'figure' : 'figures'} in the logs behind it cannot be right`
-          : openCount ? `Look before you send: ${openCount} unusual ${openCount === 1 ? 'figure has' : 'figures have'} no reason in the log`
-          : `Checked by XPLORIX: all ${shiftCount} shifts behind ${checks.length === 1 ? 'this hole' : `these ${checks.length} holes`} agree with the record`}
-      </div>
-      {items.length > 0 && (
-        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
-          {items.slice(0, 20).map((x, i) => (
-            <div key={i} style={{ fontSize: 12.5, color: C.text, display: 'flex', gap: 8 }}>
-              <span style={{ color: x.stop ? C.red : C.amber, fontWeight: 700, minWidth: 54 }}>{x.stop ? 'Wrong' : 'Explain'}</span>
-              <span style={{ color: C.muted, minWidth: 150 }}>{x.hole} · {x.log.rig} · {x.log.date} {x.log.shift.toLowerCase()}</span>
-              <span>{x.check.title}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {noNote > 0 && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 8 }}>{noNote} {noNote === 1 ? 'shift' : 'shifts'} of client standby on these holes {noNote === 1 ? 'has' : 'have'} no note saying why. Add one in the log so the client can see it.</div>}
-      {stopCount > 0 && <div style={{ fontSize: 12.5, marginTop: 8 }}><Link href="/admin/logs/drill" style={{ color: C.orange, fontWeight: 700 }}>Open the drill logs to put them right →</Link></div>}
-      {!stopCount && openCount > 0 && (
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: C.text, marginTop: 10, cursor: 'pointer' }}>
-          <input type="checkbox" checked={ack} onChange={e => onAck(e.target.checked)} />
-          I have looked at these and the invoice is right
-        </label>
-      )}
-    </section>
   )
 }
 

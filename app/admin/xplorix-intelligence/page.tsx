@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 /* The old address. XPLORIX Intelligence is now four screens under
- * /admin/intelligence; anyone with the old link lands on Today. */
+ * /admin/intelligence; anyone with the old link lands on the month forecast. */
 export default function OldIntelligence() {
-  redirect('/admin/intelligence')
+  redirect('/admin/intelligence/months')
 }

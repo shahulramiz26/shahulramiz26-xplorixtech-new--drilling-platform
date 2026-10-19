@@ -7,9 +7,6 @@ import { when } from '../../../lib/projects'
 import { T, tint, Page, Head, Card, Tile, Grid, Btn, Seg, Status, Empty, Table, th, thR, td, tdR, rowLine } from '../../components/kit'
 import { n0, n1, shortDay, linkBtn } from '../../admin/contractors/shared'
 import { useMe, myShifts, NoLogin, CLIENT_NAME } from '../me'
-import { reportToDraft } from '../../../lib/contracting'
-import { checkShift, shiftVerdict, isFullRecord } from '../../../lib/log-checks'
-import { VerdictPill } from '../../components/checked-mark'
 
 /* ==========================================================================
  * SUBMITTED LOGS — every log the contractor has sent, and what became of it
@@ -42,18 +39,6 @@ export default function SubmittedLogsPage() {
   const core = checked.reduce((s, x) => s + x.core, 0)
   const changed = checked.filter(s => s.log?.check?.claimedMetres != null || s.log?.check?.claimedRecovery != null)
   const refused = checked.filter(s => s.log?.downtimeReason === 'Contractor Delay')
-  /* The XPLORIX drill log checks on each shift he sent: what the client's
-   * site staff will see beside it when they check it. */
-  const live = isFullRecord(state)
-  const sentChecks = (r: NonNullable<typeof waiting[number]['report']>) => {
-    const said = new Set((r.extra?.trust?.warnings ?? []).map(w => w.id))
-    // His earlier shifts on the same hole that are still waiting count towards where it stands.
-    const ord = (x: { date: string; shift: string }) => `${x.date}${x.shift === 'Day' ? 0 : 1}`
-    const pendingOnHole = waiting.map(w => w.report!).filter(x => x.id !== r.id && x.holeNumber && x.holeNumber === r.holeNumber && ord(x) < ord(r)).reduce((a, x) => a + x.metres, 0)
-    const cs = checkShift(state, { ...reportToDraft(r), contractor: me?.id }, { contractor: true, pendingOnHole })
-    const stops = cs.filter(c => c.level === 'stop'), open = cs.filter(c => c.level === 'warn' && !said.has(c.id))
-    return { v: stops.length ? 'stop' as const : open.length ? 'open' as const : cs.length ? 'explained' as const : 'pass' as const, open: open.length, titles: [...stops, ...open].map(c => c.title) }
-  }
 
   const exportIt = () => downloadCsv('shift-record', [
     ['Date', 'Shift', 'Rig', 'Hole', 'Metres checked', 'Metres sent', 'Core, m', 'Stopped, h', 'Reason', 'Checked by', 'Checked at', 'Note'],
@@ -91,7 +76,7 @@ export default function SubmittedLogsPage() {
       <Card title={`Waiting to be checked · ${waiting.length}`} pad={false} subtitle={`Sent to ${CLIENT_NAME}. Not counted or paid until they check it.`}>
         {waiting.length === 0 ? <Empty>Nothing is waiting. Every shift you sent has been checked.</Empty> : (
           <Table>
-            <thead><tr><th style={th}>Shift</th><th style={th}>Rig</th><th style={th}>Hole</th><th style={thR}>From</th><th style={thR}>To</th><th style={thR}>Metres</th><th style={thR}>Core</th><th style={th}>Stopped</th><th style={th}>XPLORIX checks</th><th style={th}>Sent</th><th style={th}></th></tr></thead>
+            <thead><tr><th style={th}>Shift</th><th style={th}>Rig</th><th style={th}>Hole</th><th style={thR}>From</th><th style={thR}>To</th><th style={thR}>Metres</th><th style={thR}>Core</th><th style={th}>Stopped</th><th style={th}>Sent</th><th style={th}></th></tr></thead>
             <tbody>
               {waiting.map(s => { const r = s.report!; return (
                 <tr key={s.key} className="xpl-row" style={{ borderBottom: rowLine }}>
@@ -101,7 +86,6 @@ export default function SubmittedLogsPage() {
                   <td style={{ ...tdR, color: T.text, fontWeight: 600 }}>{s.metres || '—'}</td>
                   <td style={tdR}>{s.metres > 0 ? `${((s.core / s.metres) * 100).toFixed(0)}%` : '—'}</td>
                   <td style={td}>{s.stoppedHours > 0 ? `${s.stoppedHours} h · ${s.reason || 'no reason'}` : '—'}</td>
-                  <td style={td}>{(() => { const k = sentChecks(r); return <span title={k.titles.join('\n') || 'Passes every check'}><VerdictPill v={k.v} open={k.open} /></span> })()}</td>
                   <td style={td}>{when(r.receivedAt)}</td>
                   <td style={{ ...td, textAlign: 'right' }}><button type="button" style={{ ...linkBtn, color: T.faint, fontWeight: 400 }} onClick={() => deleteReport(r.id)}>Take back</button></td>
                 </tr>
@@ -119,7 +103,7 @@ export default function SubmittedLogsPage() {
         </div>}>
         {checked.length === 0 ? <Empty>No checked shifts yet.</Empty> : (
           <Table>
-            <thead><tr><th style={th}>Shift</th><th style={th}>Rig</th><th style={th}>Hole</th><th style={thR}>Metres</th><th style={thR}>Core</th><th style={th}>Stopped</th><th style={th}>XPLORIX checks</th><th style={th}>Checked by {CLIENT_NAME}</th></tr></thead>
+            <thead><tr><th style={th}>Shift</th><th style={th}>Rig</th><th style={th}>Hole</th><th style={thR}>Metres</th><th style={thR}>Core</th><th style={th}>Stopped</th><th style={th}>Checked by {CLIENT_NAME}</th></tr></thead>
             <tbody>
               {shown.map(s => {
                 const c = s.log?.check
@@ -134,7 +118,6 @@ export default function SubmittedLogsPage() {
                     <td style={{ ...td, whiteSpace: 'normal', minWidth: 170 }}>
                       {s.stoppedHours > 0 ? <>{s.stoppedHours} h · {notPaid ? 'standby not accepted' : s.reason}</> : '—'}
                     </td>
-                    <td style={td}>{s.log ? <VerdictPill v={shiftVerdict(state, s.log, live)} /> : '—'}</td>
                     <td style={{ ...td, whiteSpace: 'normal', minWidth: 200 }}>{c ? <>{c.by} · {when(c.at)}</> : '—'}{c?.note && <div style={{ fontSize: 12, color: T.faint, marginTop: 2 }}>“{c.note}”</div>}</td>
                   </tr>
                 )

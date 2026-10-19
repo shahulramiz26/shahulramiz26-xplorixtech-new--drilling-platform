@@ -22,7 +22,6 @@ import {
 import { useCosting, monthOf } from '../../../lib/costing-store'
 import { ownLogs } from '../../../lib/contracting'
 import { hexA } from '../../../lib/theme'
-import { buyCheck, type BuyCheckLine } from '../../../lib/stock-checks'
 
 /* Parts are ours only on our own rigs. A contractor's rig wears the
  * contractor's bits and rods, so its shifts are left out of everything this
@@ -1692,7 +1691,7 @@ function ReceiveReorderModal({ po, reorder, onSave, onClose }: { po: PurchaseOrd
 }
 
 function POModal({ po, onSave, onPlace, onClose }: { po: PurchaseOrder; onSave: (po: PurchaseOrder) => void; onPlace: (id: string, ordered: string, promised: string) => void; onClose: () => void }) {
-  const { state, addTransfer } = useInventory()
+  const { state } = useInventory()
   const [f, setF] = useState<PurchaseOrder>(po)
   const [placing, setPlacing] = useState(false)
   const [q, setQ] = useState(''); const [cat, setCat] = useState<PartCategory | 'All'>('All'); const [allSuppliers, setAllSuppliers] = useState(false)
@@ -1706,19 +1705,6 @@ function POModal({ po, onSave, onPlace, onClose }: { po: PurchaseOrder; onSave: 
   const setRate = (id: string, rate: number) => setF(x => ({ ...x, lines: x.lines.map(l => l.itemId === id ? { ...l, rate } : l) }))
   const catalogue = state.catalogue.filter(p => p.active && (allSuppliers || p.supplier === f.supplier) && (cat === 'All' || p.category === cat) && (!q || p.name.toLowerCase().includes(q.toLowerCase()) || p.partNumber.toLowerCase().includes(q.toLowerCase())))
   const value = f.lines.reduce((s, l) => s + l.qty * l.rate, 0)
-  /* Before buying: the same part free in another store. */
-  const check = useMemo(() => buyCheck(state.pos, state.catalogue, f, TODAY, COMPLETED_PROJECTS), [state.pos, state.catalogue, f])
-  const [moved, setMoved] = useState<string[]>([])
-  const moveInstead = (c: BuyCheckLine) => {
-    let need = c.free, got = 0
-    c.spares.filter(x => x.movable).forEach(x => {
-      if (need <= 0) return
-      const take = Math.min(need, x.qty)
-      addTransfer(x.poId, { date: TODAY, itemId: c.itemId, qty: take, toProject: f.project, note: `Moved instead of buying on ${f.number}` })
-      need -= take; got += take
-    })
-    if (got > 0) { setQty(c.itemId, c.ordering - got); setMoved(m => [...m, `${got} × ${c.name} moved to ${projectCode(f.project)}`]) }
-  }
 
   if (placing) return (
     <Modal title={`Place ${f.number}`} subtitle={`${f.supplier} — ${money(value)}`} width={520} onClose={() => setPlacing(false)}
@@ -1750,27 +1736,6 @@ function POModal({ po, onSave, onPlace, onClose }: { po: PurchaseOrder; onSave: 
             </table>
           </div>
         </Card>
-        {(check.length > 0 || moved.length > 0) && (
-          <section aria-label="Before you buy" style={{ border: `1px solid ${hexA(C.amber, 0x55)}`, background: hexA(C.amber, 0x10), borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: C.amber }}>
-              {check.length ? `Before you buy: ${money(check.reduce((s, c) => s + c.saves, 0))} of this order is already in another store` : 'Moved instead of bought'}
-            </div>
-            {check.map(c => {
-              const canMove = c.spares.filter(x => x.movable).reduce((s, x) => s + x.qty, 0)
-              return (
-                <div key={c.itemId} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 12.5, color: C.text, flexWrap: 'wrap' }}>
-                  <span style={{ flex: '1 1 380px' }}>
-                    <b>{c.name}</b>: ordering {c.ordering}; {c.spares.map(x => `${x.qty} on ${projectCode(x.project)} (${x.closed ? 'closed project' : `untouched ${x.ageDays} days`})`).join(', ')}
-                  </span>
-                  {canMove > 0
-                    ? <Btn size="sm" tone="primary" onClick={() => moveInstead(c)}>Move {Math.min(c.free, canMove)} instead · saves {money(Math.min(c.free, canMove) * (c.saves / c.free))}</Btn>
-                    : <span style={{ color: C.muted }}>Move it from the Store tab first</span>}
-                </div>
-              )
-            })}
-            {moved.map(m => <div key={m} style={{ fontSize: 12.5, color: C.green }}>✓ {m}</div>)}
-          </section>
-        )}
         <Card title="Order lines" pad={false}>
           {f.lines.length === 0 ? <Empty>Set a quantity against a part above.</Empty> : (
             <table style={tableStyle}>

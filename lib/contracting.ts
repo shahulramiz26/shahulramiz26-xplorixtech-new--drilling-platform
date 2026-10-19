@@ -805,8 +805,6 @@ export function draftToReport(log: ShiftLog, wo: WorkOrder, id: string, received
       attachments: log.attachments, notes: log.notes, nextHole: log.nextHole,
       fuelLitres: log.fuelLitres, waterLitres: log.waterLitres, additivesKg: log.additivesKg,
       loggedBy: log.loggedBy, loggedAt: log.loggedAt,
-      // What the drill log checks said as he typed it, and his reasons.
-      trust: log.trust,
     },
     source: 'login', receivedAt, status: 'waiting',
   }
