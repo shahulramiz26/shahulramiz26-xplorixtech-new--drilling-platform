@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useMemo, useState } from 'react'
+import { ReactNode, useEffect, useMemo, useState } from 'react'
 import { Activity, Wrench, Download, Plus, Pencil, Trash2, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import {
   useCosting, projectCode, MAINTENANCE_TYPES, MAINTENANCE_TYPE_LABEL,
@@ -119,6 +119,19 @@ export function DrillLogsScreen({ who, supervisor }: { who: string; supervisor?:
   }, [mine, seg, project, rig, sup, shift, from, to, sort])
 
   const scopes = useMemo(() => ownScopes(state.projects, supervisor), [state.projects, supervisor])
+  /* Opened from a link elsewhere (the supervisor's Today, a finding): ?edit=<log id>
+   * opens that log, ?new=1 opens a blank one. Only logs this screen shows can be opened. */
+  const [linked, setLinked] = useState(false)
+  useEffect(() => {
+    if (linked || !mine.length) return
+    const q = new URLSearchParams(window.location.search)
+    const id = q.get('edit')
+    const hit = id ? mine.find(l => l.id === id) : undefined
+    if (hit) setEditing(hit)
+    else if (q.get('new') === '1' && scopes.length) setEditing('new')
+    if (id || q.get('new')) window.history.replaceState(null, '', window.location.pathname)
+    setLinked(true)
+  }, [mine, scopes, linked])
   /* A log being changed keeps its own project and rig in the choices, even on
    * a project that has since finished or a rig that belongs to a contractor. */
   const scopesFor = (l: ShiftLog): LogScope[] => {
