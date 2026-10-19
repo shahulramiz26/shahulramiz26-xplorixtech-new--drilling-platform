@@ -36,7 +36,7 @@ const SEES: Record<UserRole, string> = {
   client: 'Today, projects, operations, holes, invoices',
 }
 const OPEN: Record<UserRole, (u: AppUser) => string> = {
-  supervisor: u => `/supervisor/drilling-log?as=${u.id}`,
+  supervisor: u => `/supervisor/today?as=${u.id}`,
   contractor: u => `/contractor?as=${u.id}`,
   client: u => `/client?as=${u.id}`,
 }

@@ -9,9 +9,7 @@ import { useInventory } from '../../../lib/inventory-store'
 import { IS_DEMO } from '../../../lib/company'
 import { useAdminOverview, financeLink, RIG_STATUS_LABEL, type RigStatus, type Attention } from '../../../lib/admin-overview'
 import { num } from '../../../lib/client-record'
-import { buildScorecard } from '../../../lib/intelligence'
-import { dashboardInsights } from '../../../lib/analytics'
-import { InsightsCard } from '../../components/insights-card'
+import { buildFindings, deptLabel, SEVERITY_LABEL } from '../../../lib/findings'
 import {
   Page, Head, Card, Split, Btn, Table, Status, Legend, Tip, DepthBar, Spark, Delta, Empty,
   th, thR, td, tdR, rowLine, T, display, toneColor, axisTick, gridStroke, type Tone,
@@ -65,15 +63,58 @@ function StartHere() {
   )
 }
 
+/* XPLORIX Intelligence on the Dashboard: the five things to act on first,
+ * and whether the drill logs underneath every figure can be trusted. The full
+ * list, with who does what and by when, is on Intelligence > Today. */
+function IntelligenceCard({ intel, handled }: { intel: ReturnType<typeof buildFindings>; handled: Record<string, { status: string }> }) {
+  const open = intel.findings.filter(f => !handled[f.id] || handled[f.id].status === 'assigned')
+  const act = open.filter(f => f.severity === 'act')
+  const top = (act.length ? act : open).slice(0, 5)
+  const atStake = open.reduce((s, f) => s + (f.money ?? 0), 0)
+  const clean = intel.audits.filter(a => a.checks.length === 0).length
+  const pct = intel.audits.length ? Math.round((clean / intel.audits.length) * 100) : 100
+  const pctTone: Tone = pct >= 90 ? 'good' : pct >= 70 ? 'warn' : 'bad'
+  const sevTone: Record<string, Tone> = { act: 'bad', plan: 'warn', watch: 'neutral' }
+  return (
+    <Card title="XPLORIX Intelligence" pad={false}
+      subtitle={open.length ? `${open.length} open across the company · ${act.length} to act on now · ${moneyL(atStake)} at stake` : 'Nothing in the record needs action today.'}
+      right={<Btn href="/admin/intelligence">Open Today</Btn>}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center', padding: '12px 18px', borderBottom: `1px solid ${T.line}`, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13, color: T.muted }}>Drill logs that pass every check</span>
+        <b style={{ fontSize: 15, color: toneColor[pctTone] }}>{pct}%</b>
+        <Link href="/admin/intelligence/drill-logs" style={{ fontSize: 12.5, color: T.orange, textDecoration: 'none', fontWeight: 600, marginLeft: 'auto' }}>
+          {intel.audits.length - clean} of {intel.audits.length} shifts to look at →
+        </Link>
+      </div>
+      {top.length === 0
+        ? <Empty>Nothing to act on. New findings appear here as each shift comes in.</Empty>
+        : top.map((f, i) => {
+          const body = (
+            <div style={{ display: 'flex', gap: 12, padding: '12px 18px', borderTop: i ? `1px solid ${T.line}` : 'none', alignItems: 'flex-start' }}>
+              <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: toneColor[sevTone[f.severity]], flexShrink: 0, marginTop: 6 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: T.text, lineHeight: 1.4 }}>{f.title}</div>
+                <div style={{ fontSize: 12, color: T.faint, marginTop: 3 }}>
+                  {SEVERITY_LABEL[f.severity]} · {deptLabel(f.dept)} · {f.owner}{f.money ? ` · ${moneyL(f.money)}` : ''}
+                </div>
+              </div>
+              {f.href && <ChevronRight size={16} style={{ color: T.faint, flexShrink: 0, marginTop: 3 }} />}
+            </div>
+          )
+          return f.href
+            ? <Link key={f.id} href={f.href} className="xpl-row" style={{ display: 'block', textDecoration: 'none' }}>{body}</Link>
+            : <div key={f.id}>{body}</div>
+        })}
+    </Card>
+  )
+}
+
 export default function AdminDashboard() {
   const o = useAdminOverview()
   const { state: costing } = useCosting()
   const { state: inv } = useInventory()
-  // The money questions, across every project since the start, from the same scorecard as Intelligence.
-  const insights = useMemo(() => dashboardInsights({ rigs: buildScorecard(costing, inv, 'all', 'all').rigs.map(r => ({
-    name: r.name, kind: r.kind, metres: r.metres, days: r.days, cost: r.cost, revenue: r.revenue, costPerMetre: r.costPerMetre,
-    marginPerMetre: r.marginPerMetre, ratePerMetre: r.ratePerMetre, onTargetDays: r.onTargetDays, targetDays: r.targetDays,
-  })) }), [costing, inv])
+  // The same findings as XPLORIX Intelligence > Today, the most urgent first.
+  const intel = useMemo(() => buildFindings(costing, inv), [costing, inv])
   const drilling = o.rigs.filter(r => r.status === 'drilling').length
   const working = o.rigs.filter(r => r.project).length
   const todayMetres = o.rigs.reduce((s, r) => s + (r.day ?? 0) + (r.night ?? 0), 0)
@@ -120,7 +161,7 @@ export default function AdminDashboard() {
         </Card>
       </Split>
 
-      {insights.length > 0 && <InsightsCard insights={insights} subtitle="Worked out from your own logs, every project since the start. Each one opens the screen behind it." />}
+      {costing.shiftLogs.length > 0 && <IntelligenceCard intel={intel} handled={costing.findingStatus ?? {}} />}
 
       <Card title="Rigs today" subtitle="Where each rig is, how deep its hole has gone, and what it did on today's two shifts" pad={false}
         right={<Link href="/admin/rigs" style={{ fontSize: 12.5, color: T.muted, textDecoration: 'none' }}>All rigs</Link>}>
