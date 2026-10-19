@@ -12,7 +12,7 @@ import { Page, Head, Card, Tile, Grid, Btn, Table, Status, Note, th, thR, td, td
 
 const DAILY_RATE = 10
 const PLANS = [
-  { name: 'Standard', billing: 'Billed monthly', current: true, adds: 'Digital shift logs, dashboards, AI insights, unlimited supervisor logins, email support.' },
+  { name: 'Standard', billing: 'Billed monthly', current: true, adds: 'Digital shift logs, dashboards, XPLORIX insights, unlimited supervisor logins, email support.' },
   { name: 'Growth', billing: 'Billed half-yearly, 8% less', current: false, adds: 'Everything in Standard, plus 24/7 priority support, on-site training, forecasting and downloadable reports.' },
   { name: 'Enterprise', billing: 'Billed yearly, 16% less', current: false, adds: 'Everything in Growth, plus an account manager, custom features, API links and your own branding.' },
 ]

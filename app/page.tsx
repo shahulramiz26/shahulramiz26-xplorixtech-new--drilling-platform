@@ -88,7 +88,7 @@ const FAQS = [
   { q: 'What does the supervisor have to enter?', a: 'One drill log per shift: the hole, the metres drilled, the core recovered, the hours, any downtime and the parts used. Cost per metre, hole status, billing and stock are worked out from that log.' },
   { q: 'We hire contractors as well as running our own rigs. Does it handle that?', a: 'Yes. Each contractor gets a login and writes his own drill log and maintenance log. Your site staff check each shift before it counts. Your own rigs and each contractor are then compared on the same measures.' },
   { q: 'What can the client see?', a: 'Only the projects you choose to show him: the contract rates, the holes, the shift record, the invoices and the payments. He does not see your costs, margin, stock, suppliers or what you pay a contractor.' },
-  { q: 'What do the AI insights do?', a: 'On the analytics dashboards they point out what is unusual, forecast what comes next and suggest an action. The month forecast and the hole finish dates are worked out from your own shift logs and planned holes.' },
+  { q: 'What do XPLORIX insights do?', a: 'On every dashboard they point out what is unusual, forecast what comes next and suggest an action, worked out by rules from your own shift logs, planned holes, stock and bills. XPLORIX Intelligence gathers them into one list of what to do, with who should do it and the money at stake. Every drill log is checked as it is typed, so the figures underneath can be trusted.' },
   { q: 'How does pricing work?', a: 'Ask us for the current plans when you see the demo.' },
 ]
 
@@ -144,7 +144,7 @@ export default function LandingPage() {
           <div className="lp-wrap">
             <div className="lp-window lp-rise">
               <video src="/landing/xplorix-reel.mp4" poster="/landing/reel-poster.jpg" autoPlay muted loop playsInline preload="metadata"
-                aria-label="A short silent reel of XPLORIX screens: the shift log, the dashboard, the billing check, AI insights and next month's forecast" />
+                aria-label="A short silent reel of XPLORIX screens: the shift log, the dashboard, the billing check, XPLORIX insights and next month's forecast" />
             </div>
             <p className="lp-caption">Real screens from the XPLORIX demo, on demo data.</p>
           </div>
@@ -263,8 +263,8 @@ export default function LandingPage() {
               </figure>
               <figure className="lp-shot">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/landing/ai-insights.jpg" width={1760} height={1040} loading="lazy" alt="The AI insights panel on the operation dashboard, with one insight opened to show what to do" />
-                <figcaption><b>AI insights on every dashboard.</b> What is unusual, what is forecast, and what to do about it.</figcaption>
+                <img src="/landing/ai-insights.jpg" width={1760} height={1040} loading="lazy" alt="The XPLORIX insights panel on the operation dashboard, with one insight opened to show what to do" />
+                <figcaption><b>XPLORIX insights on every dashboard.</b> What is unusual, what is forecast, and what to do about it.</figcaption>
               </figure>
               <figure className="lp-shot">
                 {/* eslint-disable-next-line @next/next/no-img-element */}

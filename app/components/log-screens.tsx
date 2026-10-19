@@ -10,6 +10,7 @@ import { contractorName } from '../../lib/contracting'
 import { downloadCsv } from '../../lib/client-record'
 import { T, tint, Page, Head, Card, Btn, Modal, Status, Empty, Table, inputStyle, th, td, rowLine, mono } from './kit'
 import { DrillLogForm, type LogScope } from './drill-log-form'
+import { checkShift } from '../../lib/log-checks'
 import { MaintenanceLogForm } from './maintenance-log-form'
 
 /* ==========================================================================
@@ -167,6 +168,7 @@ export function DrillLogsScreen({ who, supervisor }: { who: string; supervisor?:
             <thead><tr>
               <SortTh k="date" label="Date" sort={sort} onSort={onSort} />
               <SortTh k="shift" label="Shift" sort={sort} onSort={onSort} />
+              <th style={th}>Checks</th>
               <th style={th}>Project</th><th style={th}>Rig</th><th style={th}>Driller</th><th style={th}>Supervisor</th><th style={th}>Hole</th>
               <th style={th}>Meter start (m)</th><th style={th}>Meter end (m)</th>
               <SortTh k="metres" label="Meters drilled" sort={sort} onSort={onSort} />
@@ -185,6 +187,7 @@ export function DrillLogsScreen({ who, supervisor }: { who: string; supervisor?:
                   <tr key={l.id} className="xpl-row" style={{ borderBottom: rowLine }}>
                     <td style={td}><DateCell date={l.date} icon={<Activity size={15} />} /></td>
                     <td style={td}><ShiftPill shift={l.shift} /></td>
+                    <td style={td}><TrustMark log={l} state={state} /></td>
                     <td style={{ ...tdM, color: T.blue }}>{projectCode(l.project)}</td>
                     <td style={tdM}>{l.rig}{l.contractor && <div style={{ fontFamily: 'inherit', fontSize: 11.5, color: T.faint }}>{contractorName(state, l.contractor)}</div>}</td>
                     <td style={{ ...td, color: T.text, fontWeight: 600 }}>{l.driller || '—'}</td>
@@ -370,4 +373,22 @@ export function MaintenanceLogsScreen({ who, supervisor }: { who: string; superv
       )}
     </Page>
   )
+}
+
+/* What the drill log checks say about one shift, in a glance: clean, saved
+ * with reasons, unusual and unexplained, or figures that cannot be right. */
+function TrustMark({ log, state }: { log: ShiftLog; state: Parameters<typeof checkShift>[0] }) {
+  const checks = checkShift(state, log, { contractor: !!log.contractor })
+  const said = new Set((log.trust?.warnings ?? []).map(w => w.id))
+  const stops = checks.filter(c => c.level === 'stop')
+  const open = checks.filter(c => c.level === 'warn' && !said.has(c.id))
+  const explained = checks.filter(c => c.level === 'warn' && said.has(c.id))
+  const tip = [...stops, ...open].map(c => c.title).concat(explained.map(c => `Explained: ${c.title} (${log.trust?.warnings.find(w => w.id === c.id)?.reason})`)).join('\n')
+  const pill = (bg: string, fg: string, text: string) => (
+    <span title={tip || 'Passes every XPLORIX check'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, background: bg, color: fg, whiteSpace: 'nowrap' }}>{text}</span>
+  )
+  if (stops.length) return pill(tint(T.red, 14), T.red, `✕ ${stops.length} wrong`)
+  if (open.length) return pill(tint(T.amber, 16), T.amber, `! ${open.length} to explain`)
+  if (explained.length) return pill('rgba(var(--x-ov),0.06)', T.muted, `✓ ${explained.length} explained`)
+  return pill(tint(T.green, 14), T.green, '✓ Clean')
 }

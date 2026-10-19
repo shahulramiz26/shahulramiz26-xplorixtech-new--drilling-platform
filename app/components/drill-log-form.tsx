@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Trash2, Paperclip, Upload } from 'lucide-react'
+import { Plus, Trash2, Paperclip, Upload, ShieldCheck, ShieldAlert, OctagonX } from 'lucide-react'
 import {
   useCosting, uid, nowStamp, shiftOrder, isOwnStop, HOLE_SIZES, LITHOLOGIES,
   type ShiftLog, type ShiftName, type DowntimeLine,
@@ -9,6 +9,7 @@ import {
 import { useInventory, rigHoldings, TODAY } from '../../lib/inventory-store'
 import { equipment as EQUIPMENT, incidentTypes, severityTypes } from '../../lib/mock-data'
 import { projectHoles } from '../../lib/projects'
+import { checkShift, describeChanges, type LogCheck } from '../../lib/log-checks'
 import { T, tint, Btn, Seg, inputStyle } from './kit'
 
 /* ==========================================================================
@@ -188,6 +189,8 @@ export function DrillLogForm({ variant, scopes, existing, start = {}, lockSuperv
   const { state: inv } = useInventory()
   const [f, setF] = useState<F>(() => fromLog(existing, scopes, { ...start, supervisor: lockSupervisor ?? start.supervisor }))
   const [tried, setTried] = useState(false)
+  // The reason given for each warning, by the warning's id.
+  const [reasons, setReasons] = useState<Record<string, string>>({})
   const fileInput = useRef<HTMLInputElement>(null)
   const u = (p: Partial<F>) => setF(x => ({ ...x, ...p }))
   const contractor = variant === 'contractor'
@@ -336,9 +339,9 @@ export function DrillLogForm({ variant, scopes, existing, start = {}, lockSuperv
   if (f.equip.some(e => !e.name || !(num(e.hours) > 0))) problems.push('Every equipment line needs the equipment and its hours.')
   if (f.incidents.some(i => !i.type || !i.severity)) problems.push('Every incident needs a type and a severity.')
 
-  const submit = () => {
-    setTried(true)
-    if (problems.length) return
+  /* The shift as it would be saved. Built the same way for the checks as
+   * the typing goes on, and for the save itself. */
+  const build = (): ShiftLog => {
     const lines: DowntimeLine[] = f.standby
       ? [{ reason: f.standbyReason, side: 'client', hours: f.shiftHours }]
       : f.downRows.map(r => ({ reason: r.reason, side: r.side, hours: num(r.hours) }))
@@ -379,6 +382,38 @@ export function DrillLogForm({ variant, scopes, existing, start = {}, lockSuperv
       supervisor: f.supervisor.trim(), driller: f.driller.trim(),
       loggedBy: existing?.loggedBy ?? by, loggedAt: existing?.loggedAt ?? nowStamp(),
       ...(existing ? { editedBy: by, editedAt: nowStamp() } : {}),
+    }
+    return log
+  }
+
+  // ── the drill log checks ────────────────────────────────────────────────
+  /* Metres a contractor has sent on the hole that are still waiting for the
+   * site check: they are in the hole, just not accepted yet. */
+  const pendingOnHole = (() => {
+    if (!contractor || !f.hole || !f.date || !f.shift) return 0
+    const before = shiftOrder({ date: f.date, shift: f.shift })
+    return r2(state.contractorReports
+      .filter(r => r.status === 'waiting' && r.holeNumber === f.hole && r.id !== skipReportId && shiftOrder(r) < before)
+      .reduce((s, r) => s + r.metres, 0))
+  })()
+  const ready = !!f.rig && !!f.date && !!f.shift
+  const checks: LogCheck[] = useMemo(() => ready
+    ? checkShift(state, build(), { pendingOnHole, isNew: !existing, contractor, before: existing })
+    : [],
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [f, state, ready, pendingOnHole, existing?.id, contractor])
+  const stops = checks.filter(c => c.level === 'stop')
+  const warns = checks.filter(c => c.level === 'warn')
+  const unexplained = warns.filter(w => !(reasons[w.id] ?? '').trim())
+
+  const submit = () => {
+    setTried(true)
+    if (problems.length || stops.length || unexplained.length) return
+    const log = build()
+    log.trust = { checkedAt: nowStamp(), by, warnings: warns.map(w => ({ id: w.id, title: w.title, reason: (reasons[w.id] ?? '').trim() })) }
+    if (existing) {
+      const changes = describeChanges(existing, log)
+      if (changes.length) log.history = [...(existing.history ?? []), { at: nowStamp(), by, changes, reason: (reasons['edit-after-approval'] ?? '').trim() || undefined }]
     }
     onSubmit(log)
   }
@@ -746,6 +781,8 @@ export function DrillLogForm({ variant, scopes, existing, start = {}, lockSuperv
         </L>
       </Panel>
 
+      {ready && <ChecksPanel checks={checks} reasons={reasons} setReason={(id, v) => setReasons(r => ({ ...r, [id]: v }))} tried={tried} />}
+
       {tried && problems.length > 0 && (
         <div role="alert" style={{ padding: '12px 14px', borderRadius: 10, background: tint(T.amber, 8), border: `1px solid ${tint(T.amber, 36)}` }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 5 }}>Before this log can be saved</div>
@@ -758,5 +795,56 @@ export function DrillLogForm({ variant, scopes, existing, start = {}, lockSuperv
         <Btn kind="primary" onClick={submit}>{submitLabel}</Btn>
       </div>
     </div>
+  )
+}
+
+/* ── what the checks say, as the shift is typed ───────────────────────────── */
+
+function ChecksPanel({ checks, reasons, setReason, tried }: {
+  checks: LogCheck[]; reasons: Record<string, string>; setReason: (id: string, v: string) => void; tried: boolean
+}) {
+  const stops = checks.filter(c => c.level === 'stop')
+  const warns = checks.filter(c => c.level === 'warn')
+  if (!checks.length) return (
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 14px', borderRadius: 10, background: tint(T.green, 7), border: `1px solid ${tint(T.green, 30)}` }}>
+      <ShieldCheck size={17} style={{ color: T.green, flexShrink: 0 }} />
+      <div style={{ fontSize: 13, color: T.text }}><b>XPLORIX checks:</b> this shift agrees with the rest of the record.</div>
+    </div>
+  )
+  return (
+    <section aria-label="XPLORIX checks" style={{ border: `1px solid ${stops.length ? tint(T.red, 35) : tint(T.amber, 40)}`, borderRadius: 14, background: T.card, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '13px 18px', background: stops.length ? tint(T.red, 6) : tint(T.amber, 7), borderBottom: `1px solid ${T.line}` }}>
+        <ShieldAlert size={17} style={{ color: stops.length ? T.red : T.amber, flexShrink: 0 }} />
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: T.text }}>XPLORIX checks</div>
+          <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>
+            {stops.length ? `${stops.length} to put right before saving` : ''}{stops.length && warns.length ? ' · ' : ''}{warns.length ? `${warns.length} unusual, saved with a reason` : ''}
+          </div>
+        </div>
+      </div>
+      {stops.map(c => (
+        <div key={c.id} style={{ display: 'flex', gap: 10, padding: '12px 18px', borderTop: `1px solid ${T.line}` }}>
+          <OctagonX size={15} style={{ color: T.red, flexShrink: 0, marginTop: 2 }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: T.text, lineHeight: 1.4 }}>{c.title}</div>
+            {c.detail && <div style={{ fontSize: 12.5, color: T.muted, marginTop: 3, lineHeight: 1.5 }}>{c.detail}</div>}
+          </div>
+        </div>
+      ))}
+      {warns.map(c => {
+        const missing = tried && !(reasons[c.id] ?? '').trim()
+        return (
+          <div key={c.id} style={{ display: 'flex', gap: 10, padding: '12px 18px', borderTop: `1px solid ${T.line}` }}>
+            <span aria-hidden style={{ color: T.amber, fontWeight: 800, width: 15, textAlign: 'center', flexShrink: 0 }}>!</span>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: T.text, lineHeight: 1.4 }}>{c.title}</div>
+              {c.detail && <div style={{ fontSize: 12.5, color: T.muted, marginTop: 3, lineHeight: 1.5 }}>{c.detail}</div>}
+              <input value={reasons[c.id] ?? ''} onChange={e => setReason(c.id, e.target.value)} aria-label={`Reason: ${c.title}`}
+                placeholder="Why? (needed to save)" style={{ ...inputStyle, marginTop: 8, fontSize: 13, borderColor: missing ? T.red : undefined }} />
+            </div>
+          </div>
+        )
+      })}
+    </section>
   )
 }
