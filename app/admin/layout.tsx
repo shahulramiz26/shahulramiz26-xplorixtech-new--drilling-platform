@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Users, FolderOpen, Settings, Truck, CreditCard, BarChart3, LogOut, Menu, Search,
   DollarSign, X, Boxes, FileText, Store, HardHat, Target, Bell, CornerDownLeft, Handshake,
-  Activity, Wrench, GitCompare, ListChecks, ClipboardCheck, IndianRupee, Flag, CalendarRange, ShieldAlert, Building2,
+  Activity, Wrench, GitCompare, ListChecks, ClipboardCheck, IndianRupee, Calculator, Flag, CalendarRange, ShieldAlert, Building2,
 } from 'lucide-react'
 import { CurrencyProvider } from '../components/currency-context'
 import { CostingProvider, monthOf, projectCode } from '../../lib/costing-store'
@@ -72,6 +72,7 @@ const NAV: { title: string | null; items: NavItem[] }[] = [
       { href: '/admin/intelligence', label: 'Today', icon: ListChecks },
       { href: '/admin/intelligence/drill-logs', label: 'Drill log check', icon: ClipboardCheck },
       { href: '/admin/intelligence/money', label: 'Money checks', icon: IndianRupee },
+      { href: '/admin/intelligence/pricing', label: 'Price a tender', icon: Calculator },
       { href: '/admin/intelligence/contractors', label: 'Contractor comparison', icon: GitCompare },
       { href: '/admin/intelligence/holes', label: 'Hole finish prediction', icon: Flag },
       { href: '/admin/intelligence/months', label: 'This month and next', icon: CalendarRange },

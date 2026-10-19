@@ -15,6 +15,9 @@ import {
 import { useInventory, stockInStore, TODAY } from '../../../lib/inventory-store'
 import { useCosting } from '../../../lib/costing-store'
 import { hexA } from '../../../lib/theme'
+import Link from 'next/link'
+import { buildRateBook, priceTender } from '../../../lib/own-rates'
+import type { Formation } from '../../../lib/inventory-store'
 
 /* ==========================================================================
  * XPLORIX BID INTELLIGENCE
@@ -298,6 +301,36 @@ function BidList({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () =>
 
 const STATE_TONE: Record<SectionState, string> = { done: C.green, attention: C.amber, missing: C.red }
 
+/* The estimate above is engineering: rates of penetration, a fleet, unit
+ * prices. This puts it beside the company's own record for the same size,
+ * ground and depth: what those metres cost last time, all-in. A big gap
+ * between the two is the thing to look at before the bid goes in. */
+function OwnRecordCheck({ bid, r }: { bid: Bid; r: BidResult }) {
+  const { state: inv } = useInventory()
+  const { state: cost } = useCosting()
+  const book = useMemo(() => buildRateBook(cost, inv), [cost, inv])
+  const mix: Record<Formation, number> = { Soft: 0, Medium: 0, Hard: 0, 'Very Hard': 0 }
+  bid.bands.forEach(b => { const f: Formation = b.hardness === 'Extremely Hard' ? 'Very Hard' : b.hardness; mix[f] += b.sharePct })
+  const own = priceTender(book, { holeSize: bid.scope.holeSize, totalMetres: bid.scope.totalMetres, avgDepth: bid.scope.avgDepth, mix, marginPct: 0, rigs: Math.max(1, bid.rigIds.length), kind: 'own' })
+  const priced = bid.scope.totalMetres - own.missing
+  if (book.totals.own.metres === 0) return null
+  const ownCpm = priced > 0 ? own.cost / priced : null
+  const est = r.costs.perDrilledMetre
+  const gap = ownCpm != null && est > 0 ? ((est - ownCpm) / ownCpm) * 100 : null
+  const tone = gap == null ? C.faint : Math.abs(gap) <= 15 ? C.green : C.amber
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${tone}`, borderRadius: 12, padding: '12px 16px', display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ flex: '1 1 420px', fontSize: 12.5, color: C.muted, lineHeight: 1.6 }}>
+        <b style={{ color: C.text }}>Against your own record.</b>{' '}
+        {ownCpm != null
+          ? <>{bid.scope.holeSize} metres in this ground and depth have cost you {perMetre(ownCpm)} all-in{own.missing > 0 ? ` (${Math.round(own.missing).toLocaleString('en-IN')} m of this bid fall in ground you have not drilled in ${bid.scope.holeSize})` : ''}. This estimate says {perMetre(est)}{gap != null ? <>: <b style={{ color: tone }}>{gap > 0 ? `${gap.toFixed(0)}% above` : `${Math.abs(gap).toFixed(0)}% below`}</b> your record{Math.abs(gap) > 15 ? '. Check the assumptions that differ before you bid.' : '.'}</> : '.'}</>
+          : <>You have not drilled {bid.scope.holeSize} in this ground yet, so this estimate is the only figure. Price it with care.</>}
+      </div>
+      <Link href="/admin/intelligence/pricing" style={{ fontSize: 12.5, color: C.orange, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>Rates by band from your record →</Link>
+    </div>
+  )
+}
+
 function Workspace({ bid, onChange, onBack }: { bid: Bid; onChange: (b: Bid) => void; onBack: () => void }) {
   const { state: inv } = useInventory()
   const { state: cost } = useCosting()
@@ -341,6 +374,8 @@ function Workspace({ bid, onChange, onBack }: { bid: Bid; onChange: (b: Bid) => 
           <Btn size="sm" onClick={() => duplicateBid(bid.id, `${bid.name} — scenario`)}>Duplicate as scenario</Btn>
         </div>
       </div>
+
+      <OwnRecordCheck bid={bid} r={r} />
 
       {/* The six numbers that decide everything, always on screen */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0,1fr))', gap: 10 }}>
@@ -1343,6 +1378,10 @@ export default function BidIntelligencePage() {
               and it works out the rate of penetration, the fleet, the duration, the consumables, the cost per metre and
               the price — showing its working at every step, and telling you which parts of the answer rest on evidence
               and which rest on a guess.
+            </p>
+            <p style={{ fontSize: 13, color: C.muted, marginTop: 6, maxWidth: 760, lineHeight: 1.65 }}>
+              The rates of penetration and unit prices here are sample figures. For rates straight from what your own metres
+              have cost, by ground, size and depth, open <Link href="/admin/intelligence/pricing" style={{ color: C.orange, fontWeight: 700, textDecoration: 'none' }}>Price a tender</Link>.
             </p>
           </div>
           <BidList onOpen={setOpenId} onNew={() => {
