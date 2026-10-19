@@ -1,103 +1,42 @@
-# 🚀 XPLORIX - Drilling Intelligence Platform MVP
+# XPLORIX — Drilling Intelligence Platform
 
-A comprehensive AI-powered drilling operations management system for Exploration and Blast Hole industries.
+One record of the drilling, for both sides of the contract. XPLORIX is built for exploration drilling contractors and the mine owners they drill for: the supervisor logs each shift once at the rig, and cost per metre, profit per hole, contractor checks, the client's approvals and invoices, and the forecast are all worked out from that record.
 
-**Brand Name:** XPLORIX  
-**Tagline:** Drilling Intelligence Platform
+## Four logins
 
-## 📋 All 7 Phases Implemented
+| Login | Sees |
+| --- | --- |
+| Company admin | Everything in the company |
+| Supervisor | His projects' rigs and logs. No rates, no costs, no invoices |
+| Contractor (sub-contractor) | His own work orders, shifts, logs and bills |
+| Client (mine owner) | The shift record without fuel, parts or crew cost; his rates, holes and invoices |
 
-### ✅ Phase 1: Registration & Login
-- Complete registration form with all required fields
-- Company auto-creation with trial period
-- First user becomes Company Admin
-- Email confirmation flow
+The rules are enforced on the server (`lib/server/policy.ts`), not only on the screens.
 
-### ✅ Phase 2: User Management
-- 5 operational logins included (1 Admin + 5 Operational)
-- Auto-generated usernames (e.g., `RIG01_SUP01`)
-- Auto-generated secure passwords
-- Activate/deactivate users
-- Reset password functionality
+## What is in it
 
-### ✅ Phase 3: Trial & Billing
-- 15-day free trial with countdown
-- Per-rig per-day billing model ($10/day)
-- Rig activation/deactivation
-- Monthly invoice generation
-- Billing calculation example
+- **Drill log** with checks as the shift is typed: figures that cannot be right are stopped, unusual ones are saved only with a reason (`lib/log-checks.ts`)
+- **Dashboard** with what needs the owner today
+- **Finance and costing**: cost per metre by day, profit per hole, standby billed
+- **Contractors**: shifts checked before they count, bills checked against the record
+- **Client portal**: hole approvals, invoices checked line by line
+- **Analytics**: six dashboards, each with XPLORIX insights
+- **XPLORIX Intelligence**: Today (one list of findings across every department, with owner, deadline and money), Drill log check, Contractor comparison, Hole finish prediction, This month and next, Risk analysis (`lib/findings.ts`, `lib/intelligence.ts`, `lib/forecast.ts`)
+- **Parts and inventory**: what runs out before an order can arrive, late orders, idle stock
 
-### ✅ Phase 4: Project Management
-- Create projects with location, status, client
-- Add Rigs, Drillers, Supervisors, Bits
-- Dynamic "Add More" pattern
-- Project-specific resource management
+Every insight and forecast is a rule or a projection applied to the company's own record. It is not a trained model. An AI layer that explains causes and drafts actions is planned, and will read the same findings.
 
-### ✅ Phase 5: Data Entry (Supervisor)
-- **Drilling Log**: All fields including shift details, operation metrics, consumables, incidents
-- **Maintenance Log**: Service details, components, fluids
-- Hour validation (12h/10h shift modes)
-- Multi-select downtime reasons
-- Dynamic accessories/equipment addition
+Sample screens, not connected to real data yet: Bid Intelligence, Marketplace, Crew & jobs, Performance reports, Billing.
 
-### ✅ Phase 6: Analytics Dashboards
-1. **Operation Dashboard**: ROP trends, meters drilled, downtime analysis, bit performance
-2. **Maintenance Dashboard**: Maintenance types, component frequency, oil consumption
-3. **Driller & Crew Dashboard**: Performance by driller, crew hours
-4. **Consumable Dashboard**: Fluid usage, accessories, equipment hours
-5. **HSC Dashboard**: Incidents, severity analysis, safety metrics
-
-### ✅ Phase 7: AI Insights (NEW!)
-- **AI-Powered Anomaly Detection** across all dashboards
-- **Predictive Analytics** for downtime, maintenance, bit wear
-- **Smart Recommendations** for optimization
-- **Global Notification Center** for all alerts
-- **Real-time Insights Panel** with severity levels
-
-## 🎯 Key Features for Investors
-
-1. **Complete User Journey**: From registration to daily operations
-2. **Role-Based Access**: Admin vs Supervisor interfaces
-3. **Flexible Billing**: Per-rig per-day model with trial
-4. **Comprehensive Logging**: All drilling and maintenance data
-5. **Rich Analytics**: 5 dashboards with interactive charts
-6. **AI-Powered Insights**: Anomaly detection and predictions
-7. **Mobile Responsive**: Works on all devices
-8. **Scalable Architecture**: Ready for production deployment
-
-## 🚀 Quick Start
+## Run it
 
 ```bash
-# Install dependencies
 npm install
-
-# Setup environment
-cp .env.example .env.local
-
-# Run development server
 npm run dev
 ```
 
-## 🛠️ Tech Stack
+To connect a database, set `DATABASE_URL` (see `.env.example`). With no database the app runs as a demo company (Apex Drilling Solutions), kept in the browser and frozen on 13 Sep 2026 so the figures stay the same. On the login page, any email and password work and **Login As** picks the role.
 
-- Next.js 14 (App Router)
-- TypeScript
-- Tailwind CSS
-- Recharts (Analytics)
-- Lucide React (Icons)
+## Tech
 
-## 📱 Demo Flow for Investors
-
-1. **Landing Page** - Professional XPLORIX branding
-2. **Register a Company** - Show 15-day trial activation
-3. **Login as Admin** - Dashboard with trial countdown
-4. **Create a User** - Auto-generated credentials feature
-5. **Create a Project** - Resource management
-6. **Activate a Rig** - Billing model demonstration
-7. **Switch to Supervisor** - Data entry forms
-8. **View Analytics** - 5 dashboards with AI insights
-
----
-
-**Built for investor demo and rapid iteration.**
-**Brand: XPLORIX - Drilling Intelligence Platform**
+Next.js 14 (App Router), TypeScript, Tailwind CSS, Recharts, Lucide icons, Postgres when a database is connected.

@@ -10,7 +10,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: 'XPLORIX | Drilling Intelligence Platform',
-  description: 'XPLORIX - Premium AI-powered drilling operations management system for Exploration and Blast Hole industries',
+  description: 'XPLORIX - Drilling intelligence platform for exploration drilling: one record of the drilling for contractors and mine owners',
 }
 
 const NO_FLASH = `try{if(/^\\/(admin|client|supervisor)(\\/|$)/.test(location.pathname)&&localStorage.getItem('xplorix_theme')!=='dark')document.documentElement.dataset.theme='light'}catch(e){}`

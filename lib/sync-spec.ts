@@ -21,7 +21,7 @@ export const SPEC: Record<StoreName, Record<string, Shape>> = {
     shiftLogs: 'list', maintenance: 'list', ownership: 'list', operating: 'list', clientRates: 'list',
     invoices: 'list', projects: 'list', projectEvents: 'list', rateProposals: 'list',
     contractors: 'list', workOrders: 'list', contractorReports: 'list', contractorBills: 'list', users: 'list',
-    holeStatus: 'map', holePlans: 'map', wording: 'value',
+    holeStatus: 'map', holePlans: 'map', wording: 'value', findingStatus: 'map',
   },
   inventory: {
     catalogue: 'list', suppliers: 'list', pos: 'list', rigKit: 'list', storeStock: 'list', alerts: 'value',

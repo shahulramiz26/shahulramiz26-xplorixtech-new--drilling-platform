@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { GitCompare, Flag, CalendarRange, ShieldAlert } from 'lucide-react'
+import { GitCompare, Flag, CalendarRange, ShieldAlert, ListChecks, ClipboardCheck } from 'lucide-react'
 import { useCosting, C } from '../../../lib/costing-store'
 import { useInventory } from '../../../lib/inventory-store'
 import { buildForecast } from '../../../lib/forecast'
@@ -24,13 +24,15 @@ export function useIntel() {
 }
 
 const SCREENS = [
+  { href: '/admin/intelligence', label: 'Today', icon: ListChecks },
+  { href: '/admin/intelligence/drill-logs', label: 'Drill log check', icon: ClipboardCheck },
   { href: '/admin/intelligence/contractors', label: 'Contractor comparison', icon: GitCompare },
   { href: '/admin/intelligence/holes', label: 'Hole finish prediction', icon: Flag },
   { href: '/admin/intelligence/months', label: 'This month and next', icon: CalendarRange },
   { href: '/admin/intelligence/risks', label: 'Risk analysis', icon: ShieldAlert },
 ]
 
-/* The four screens are one piece of work, so each carries the way to the others. */
+/* The screens are one piece of work, so each carries the way to the others. */
 export function IntelTabs() {
   const path = usePathname()
   return (
