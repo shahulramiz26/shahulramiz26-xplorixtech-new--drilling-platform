@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { holeVerdict } from '../../../../lib/log-checks'
+import { CheckedMark } from '../../../components/checked-mark'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -82,6 +84,7 @@ export default function ClientHole() {
           It bills {money(hole.value)} at your contract rates, before tax.
         </>}
         right={<div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', fontSize: 13, color: T.muted }}>
+          <CheckedMark v={holeVerdict(c.state, hole.id)} />
           <span>{hole.project} · {rigs.join(', ')}</span><Status tone={st.tone}>{st.label}</Status>
           <Btn size="sm" onClick={exportCsv}>Export shifts</Btn>
         </div>} />

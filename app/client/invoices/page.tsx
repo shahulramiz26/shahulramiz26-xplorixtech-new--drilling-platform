@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { money, moneyL, perUnit, COMPANY_NAME, type LineReview } from '../../../lib/costing-store'
 import { useClient } from '../../../lib/client-view'
+import { holeVerdict } from '../../../lib/log-checks'
+import { CheckedMark } from '../../components/checked-mark'
 import {
   spendSummary, invoiceState, INVOICE_STATE_LABEL, isInvoiceOverdue, payable, disputedValue, disputedLineValue,
   num, downloadCsv, type PortalInvoice, type InvoiceState,
@@ -109,7 +111,9 @@ function InvoicesScreen() {
                     <td style={td}>{i.project}</td>
                     <td style={td}>{day(i.date)}</td>
                     <td style={td}>{day(i.due)}{late && <span style={{ color: T.amber, marginLeft: 7, fontWeight: 600 }}>! overdue</span>}</td>
-                    <td style={{ ...td, whiteSpace: 'normal', maxWidth: 170 }}>{i.holes.join(', ') || '—'}</td>
+                    <td style={{ ...td, whiteSpace: 'normal', maxWidth: 190 }}>{i.holes.join(', ') || '—'}
+                      {i.holes.length > 0 && i.holes.every(h => holeVerdict(c.state, h).ok) && <div style={{ marginTop: 3 }}><CheckedMark compact v={{ shifts: 1, checked: 1, open: 0, stops: 0, ok: true }} title="Every shift on every hole on this invoice passed the XPLORIX drill log checks as it was logged" /></div>}
+                    </td>
                     <td style={tdR}>{money(i.subtotal)}</td>
                     <td style={tdR}>{money(i.total)}</td>
                     <td style={{ ...tdR, color: disputedValue(i) ? T.text : T.muted }}>{disputedValue(i) ? money(disputedValue(i)) : '—'}</td>
