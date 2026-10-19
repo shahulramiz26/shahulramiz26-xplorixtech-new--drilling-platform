@@ -21,8 +21,10 @@ The rules are enforced on the server (`lib/server/policy.ts`), not only on the s
 - **Contractors**: shifts checked before they count, bills checked against the record
 - **Client portal**: hole approvals, invoices checked line by line
 - **Analytics**: six dashboards, each with XPLORIX insights
-- **XPLORIX Intelligence**: Today (one list of findings across every department, with owner, deadline and money), Drill log check, Contractor comparison, Hole finish prediction, This month and next, Risk analysis (`lib/findings.ts`, `lib/intelligence.ts`, `lib/forecast.ts`)
-- **Parts and inventory**: what runs out before an order can arrive, late orders, idle stock
+- **XPLORIX Intelligence**: Today (one list of findings across every department, with owner, deadline and money), Drill log check, Money checks (standby that reached no invoice, holes blocked by their logs, fuel against the engine), Price a tender (rates per metre by ground, size and depth from the company's own costed metres), Contractor comparison, Hole finish prediction, This month and next, Risk analysis (`lib/findings.ts`, `lib/money-checks.ts`, `lib/own-rates.ts`, `lib/intelligence.ts`, `lib/forecast.ts`)
+- **Supervisor Today**: his rigs, shifts not logged, and his logs the checks want put right
+- **Contractor and client**: sub-contractor reports run through the same checks before they are accepted; the client sees "Checked by XPLORIX" on holes and invoices whose every shift passed
+- **Parts and inventory**: what runs out before an order can arrive, late orders, idle stock; a new order is checked against every other store first, and part life is measured by ground (`lib/stock-checks.ts`)
 
 Every insight and forecast is a rule or a projection applied to the company's own record. It is not a trained model. An AI layer that explains causes and drafts actions is planned, and will read the same findings.
 
