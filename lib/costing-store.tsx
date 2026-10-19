@@ -580,6 +580,9 @@ export interface Invoice {
   lineReviews?: (LineReview | null)[]   // same order as lines; null = not looked at yet
   sentAt?: string
   reviewedAt?: string
+  /* Standby days billed on this invoice that were on no hole, as rig|date.
+   * Kept so the same day is never billed twice (lib/money-checks.ts). */
+  standbyDays?: string[]
 }
 
 /* The client's answer, kept apart from the company's own status so

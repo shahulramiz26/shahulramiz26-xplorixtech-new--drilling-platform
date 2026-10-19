@@ -10,6 +10,7 @@ import {
 import { buildScorecard, buildRiskRegister, type ScoredRisk } from './intelligence'
 import { buildForecast, type Forecast, type RiskArea } from './forecast'
 import { auditRecord, missingShifts, type LogAudit } from './log-checks'
+import { standbyLedger, checkHole } from './money-checks'
 
 /* ==========================================================================
  * FINDINGS — one list of what needs doing, for every department
@@ -263,6 +264,39 @@ export function buildFindings(state: CostingState, inv: InvState, today: string 
     detail: `Proposed ${shortDate(p.proposedAt.slice(0, 10))}${p.rate.note ? ` (${p.rate.note})` : ''}. Until he accepts, invoices go out at the old rates.`,
     action: 'Follow up with the client this week.', owner: 'Billing', project: p.project, href: '/admin/projects',
   }))
+
+  /* Standby the contract pays for that is on no hole, so on no invoice.
+   * The invoice builder in Finance offers these days, once. */
+  const sb = standbyLedger(state, inv)
+  const loose = sb.days.filter(d => d.state === 'not-on-hole')
+  Array.from(new Set(loose.map(d => d.project))).forEach(project => {
+    const ds = loose.filter(d => d.project === project)
+    const amount = ds.reduce((a, d) => a + d.earned, 0)
+    push({
+      id: `billing:standby-loose:${project}:${ds.length}:${ds.map(d => d.date).sort().pop()}`, dept: 'billing', severity: 'act',
+      title: `${money(amount)} of client standby on ${project} is on no invoice`,
+      detail: `${plural(ds.length, 'day')} the client stopped the rig while it was on no hole (${ds.slice(0, 4).map(d => `${d.rig} ${shortDate(d.date)}`).join(', ')}${ds.length > 4 ? '…' : ''}). No hole's bill carries them.`,
+      action: 'Add them on the next invoice: Finance offers them when you review it.', owner: 'Billing', project,
+      money: amount, moneyNote: 'standby at the contract rate', href: '/admin/intelligence/money',
+      evidence: ds.map(d => `${d.rig} · ${shortDate(d.date)} · ${d.hours} h${d.noted ? '' : ' · no note'}`),
+    })
+  })
+
+  /* Closed holes that cannot go to the client because a log behind them
+   * cannot be right. */
+  const holeNs = Array.from(new Set(logs.filter(l => l.holeNumber && l.holeClosedThisShift).map(l => l.holeNumber as string)))
+  const blocked = holeNs.filter(n => {
+    const st = state.holeStatus[n]?.status
+    return (!st || st === 'closed' || st === 'submitted' || st === 'approved') && !state.holeStatus[n]?.invoiceId
+  }).map(n => ({ n, c: checkHole(state, n) })).filter(x => x.c.stops.length > 0)
+  if (blocked.length) push({
+    id: `billing:holes-blocked:${blocked.map(b => b.n).join(',')}`, dept: 'billing', severity: 'act',
+    title: `${plural(blocked.length, 'closed hole')} cannot be billed until ${blocked.length === 1 ? 'its logs are' : 'their logs are'} put right`,
+    detail: `${blocked.map(b => `${b.n} (${b.c.stops[0].check.title.replace(/\.$/, '')})`).slice(0, 3).join('; ')}.`,
+    action: 'Correct the shifts in the drill log. Finance will not approve or send these holes until then.',
+    owner: 'Site in-charge', href: '/admin/intelligence/money',
+    evidence: blocked.flatMap(b => b.c.stops.map(x => `${b.n} · ${shiftLabel(x.log)} · ${x.check.title}`)),
+  })
 
   // ── sub-contractors (from the risk register) and crew ──────────────────
   crewInsights(crew(state, window)).forEach(i => push(fromInsight('crew', '30d', i, '/admin/analytics/driller-crew')))
