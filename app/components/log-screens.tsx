@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useEffect, useMemo, useState } from 'react'
+import { ReactNode, useMemo, useState } from 'react'
 import { Activity, Wrench, Download, Plus, Pencil, Trash2, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import {
   useCosting, projectCode, MAINTENANCE_TYPES, MAINTENANCE_TYPE_LABEL,
@@ -10,7 +10,6 @@ import { contractorName } from '../../lib/contracting'
 import { downloadCsv } from '../../lib/client-record'
 import { T, tint, Page, Head, Card, Btn, Modal, Status, Empty, Table, inputStyle, th, td, rowLine, mono } from './kit'
 import { DrillLogForm, type LogScope } from './drill-log-form'
-import { checkShift } from '../../lib/log-checks'
 import { MaintenanceLogForm } from './maintenance-log-form'
 
 /* ==========================================================================
@@ -119,19 +118,6 @@ export function DrillLogsScreen({ who, supervisor }: { who: string; supervisor?:
   }, [mine, seg, project, rig, sup, shift, from, to, sort])
 
   const scopes = useMemo(() => ownScopes(state.projects, supervisor), [state.projects, supervisor])
-  /* Opened from a link elsewhere (the supervisor's Today, a finding): ?edit=<log id>
-   * opens that log, ?new=1 opens a blank one. Only logs this screen shows can be opened. */
-  const [linked, setLinked] = useState(false)
-  useEffect(() => {
-    if (linked || !mine.length) return
-    const q = new URLSearchParams(window.location.search)
-    const id = q.get('edit')
-    const hit = id ? mine.find(l => l.id === id) : undefined
-    if (hit) setEditing(hit)
-    else if (q.get('new') === '1' && scopes.length) setEditing('new')
-    if (id || q.get('new')) window.history.replaceState(null, '', window.location.pathname)
-    setLinked(true)
-  }, [mine, scopes, linked])
   /* A log being changed keeps its own project and rig in the choices, even on
    * a project that has since finished or a rig that belongs to a contractor. */
   const scopesFor = (l: ShiftLog): LogScope[] => {
@@ -181,7 +167,6 @@ export function DrillLogsScreen({ who, supervisor }: { who: string; supervisor?:
             <thead><tr>
               <SortTh k="date" label="Date" sort={sort} onSort={onSort} />
               <SortTh k="shift" label="Shift" sort={sort} onSort={onSort} />
-              <th style={th}>Checks</th>
               <th style={th}>Project</th><th style={th}>Rig</th><th style={th}>Driller</th><th style={th}>Supervisor</th><th style={th}>Hole</th>
               <th style={th}>Meter start (m)</th><th style={th}>Meter end (m)</th>
               <SortTh k="metres" label="Meters drilled" sort={sort} onSort={onSort} />
@@ -200,7 +185,6 @@ export function DrillLogsScreen({ who, supervisor }: { who: string; supervisor?:
                   <tr key={l.id} className="xpl-row" style={{ borderBottom: rowLine }}>
                     <td style={td}><DateCell date={l.date} icon={<Activity size={15} />} /></td>
                     <td style={td}><ShiftPill shift={l.shift} /></td>
-                    <td style={td}><TrustMark log={l} state={state} /></td>
                     <td style={{ ...tdM, color: T.blue }}>{projectCode(l.project)}</td>
                     <td style={tdM}>{l.rig}{l.contractor && <div style={{ fontFamily: 'inherit', fontSize: 11.5, color: T.faint }}>{contractorName(state, l.contractor)}</div>}</td>
                     <td style={{ ...td, color: T.text, fontWeight: 600 }}>{l.driller || '—'}</td>
@@ -386,22 +370,4 @@ export function MaintenanceLogsScreen({ who, supervisor }: { who: string; superv
       )}
     </Page>
   )
-}
-
-/* What the drill log checks say about one shift, in a glance: clean, saved
- * with reasons, unusual and unexplained, or figures that cannot be right. */
-function TrustMark({ log, state }: { log: ShiftLog; state: Parameters<typeof checkShift>[0] }) {
-  const checks = checkShift(state, log, { contractor: !!log.contractor })
-  const said = new Set((log.trust?.warnings ?? []).map(w => w.id))
-  const stops = checks.filter(c => c.level === 'stop')
-  const open = checks.filter(c => c.level === 'warn' && !said.has(c.id))
-  const explained = checks.filter(c => c.level === 'warn' && said.has(c.id))
-  const tip = [...stops, ...open].map(c => c.title).concat(explained.map(c => `Explained: ${c.title} (${log.trust?.warnings.find(w => w.id === c.id)?.reason})`)).join('\n')
-  const pill = (bg: string, fg: string, text: string) => (
-    <span title={tip || 'Passes every XPLORIX check'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, background: bg, color: fg, whiteSpace: 'nowrap' }}>{text}</span>
-  )
-  if (stops.length) return pill(tint(T.red, 14), T.red, `✕ ${stops.length} wrong`)
-  if (open.length) return pill(tint(T.amber, 16), T.amber, `! ${open.length} to explain`)
-  if (explained.length) return pill('rgba(var(--x-ov),0.06)', T.muted, `✓ ${explained.length} explained`)
-  return pill(tint(T.green, 14), T.green, '✓ Clean')
 }

@@ -6,7 +6,6 @@ import {
   PROJECTS as INV_PROJECTS, COMPLETED_PROJECTS as INV_COMPLETED, RIGS as INV_RIGS, PROJECT_CODES as INV_CODES,
 } from './inventory-store'
 import type { ToolingRates, Formation } from './inventory-store'
-import type { LogTrust, LogChange } from './log-checks'
 import {
   reportToShift, seedBills,
   type Contractor, type WorkOrder, type ContractorReport, type ContractorBill, type ShiftCheck, type Wording, type BillSnapshot,
@@ -131,11 +130,6 @@ export interface ShiftLog {
   loggedAt?: string           // YYYY-MM-DDTHH:MM
   editedBy?: string
   editedAt?: string
-  /* What the drill log checks said when the shift was saved, and the reason
-   * the supervisor gave for each warning (lib/log-checks.ts). */
-  trust?: LogTrust
-  /* Every change made after the shift was first saved: who, when, what. */
-  history?: LogChange[]
 }
 
 export interface DowntimeLine { reason: string; side: 'internal' | 'client'; hours: number }
@@ -580,9 +574,6 @@ export interface Invoice {
   lineReviews?: (LineReview | null)[]   // same order as lines; null = not looked at yet
   sentAt?: string
   reviewedAt?: string
-  /* Standby days billed on this invoice that were on no hole, as rig|date.
-   * Kept so the same day is never billed twice (lib/money-checks.ts). */
-  standbyDays?: string[]
 }
 
 /* The client's answer, kept apart from the company's own status so
@@ -1837,16 +1828,6 @@ interface State {
   contractorBills: ContractorBill[]
   wording: Wording
   users: AppUser[]
-  /* What people did with each XPLORIX Intelligence finding (lib/findings.ts),
-   * by the finding's id. A finding with no entry is open. */
-  findingStatus: Record<string, FindingStatus>
-}
-
-export interface FindingStatus {
-  status: 'done' | 'dismissed' | 'assigned'
-  by: string; at: string
-  to?: string        // who it was handed to
-  note?: string      // why it is not relevant, or what was done
 }
 
 function initial(): State {
@@ -1859,7 +1840,6 @@ function initial(): State {
     contractors: SEED_CONTRACTORS, workOrders: SEED_WORK_ORDERS, contractorReports: SEED_CONTRACTOR_REPORTS,
     wording: 'standard' as Wording,
     users: SEED_USERS,
-    findingStatus: {} as Record<string, FindingStatus>,
   }
   const demo = seedInvoices(base, SEED_PROJECTS[0].name, SEED_PROJECTS[0].client)
   const withInvoices = { ...base, invoices: demo.invoices, holeStatus: { ...base.holeStatus, ...demo.holeStatus } }
@@ -1876,7 +1856,7 @@ function emptyState(): State {
   return {
     shiftLogs: [], maintenance: [], ownership: [], operating: [], clientRates: [], holeStatus: {}, invoices: [],
     holePlans: {}, projects: [], projectEvents: [], rateProposals: [], contractors: [], workOrders: [],
-    contractorReports: [], contractorBills: [], wording: 'standard', users: [], findingStatus: {},
+    contractorReports: [], contractorBills: [], wording: 'standard', users: [],
   }
 }
 
@@ -1956,7 +1936,6 @@ interface CtxValue {
   reopenBill: (id: string) => void
   markBillPaid: (id: string) => void
   setWording: (w: Wording) => void
-  setFindingStatus: (id: string, st: FindingStatus | null) => void
   resetAll: () => void
   /* True once the state on screen is the real one: read from this browser in
    * the demo, or from the server when a database is connected. */
@@ -2187,11 +2166,6 @@ function CostingRoot({ children }: { children: ReactNode }) {
   // ── the shift record ─────────────────────────────────────────────────────
   /* A log and the second-hole row that hangs off it are saved together, so a
    * change to the log can never leave an old second row behind. */
-  const setFindingStatus: CtxValue['setFindingStatus'] = (id, st) => setState(s => {
-    const next = { ...(s.findingStatus ?? {}) }
-    if (st) next[id] = st; else delete next[id]
-    return { ...s, findingStatus: next }
-  })
   const saveShiftLog: CtxValue['saveShiftLog'] = log => setState(s => {
     const seg = segmentFor(log)
     const rest = s.shiftLogs.filter(l => l.id !== log.id && l.segmentOf !== log.id)
@@ -2260,7 +2234,7 @@ function CostingRoot({ children }: { children: ReactNode }) {
       createProject, updateProject, planHoles, proposeRates, withdrawProposal, ownerAnswerRates, markProjectSeen,
       saveShiftLog, deleteShiftLog, saveMaintenance, deleteMaintenance, saveUser, removeUser,
       saveContractor, saveWorkOrder, addReports, saveReport, acceptReport, returnReport, reopenReport, deleteReport,
-      saveBill, approveBill, returnBill, reopenBill, markBillPaid, setWording, setFindingStatus,
+      saveBill, approveBill, returnBill, reopenBill, markBillPaid, setWording,
       resetAll: () => { if (local) setState(initial()) },
       ready: local ? loaded : sync.ready, mode: sync.mode,
     }}>{children}</CostingContext.Provider>

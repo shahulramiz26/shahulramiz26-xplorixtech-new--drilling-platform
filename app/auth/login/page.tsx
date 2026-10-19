@@ -49,7 +49,7 @@ export default function LoginPage() {
     // other three from the Users screen.
     const home: Record<string, string> = {
       admin: '/admin/dashboard',
-      supervisor: '/supervisor/today',
+      supervisor: '/supervisor/drilling-log',
       contractor: '/contractor',
       client: '/client',
     }

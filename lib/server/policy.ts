@@ -60,15 +60,10 @@ function scope(who: Who, all: Rec[]) {
 /* A shift as the client may read it: what happened on the rig, and nothing
  * about what it cost or who was hired to drill it. */
 function shiftForClient(l: Any) {
-  const { fuelLitres, waterLitres, additivesKg, partsUsed, bitRuns, equipmentUsed, notes, attachments, contractor, workOrderId, check, engineHmr, engineHours, loggedBy, editedBy, editedAt, trust, history, ...keep } = l
-  /* The drill log checks and the change history are the company's own working
-   * record. The client keeps only the stamp that the shift was checked as it
-   * was logged, for the "Checked by XPLORIX" mark: no reasons, no names. */
-  void history
-  const stamp = trust ? { checkedAt: trust.checkedAt, by: '', warnings: [] } : undefined
+  const { fuelLitres, waterLitres, additivesKg, partsUsed, bitRuns, equipmentUsed, notes, attachments, contractor, workOrderId, check, engineHmr, engineHours, loggedBy, editedBy, editedAt, ...keep } = l
   void fuelLitres; void waterLitres; void additivesKg; void partsUsed; void bitRuns; void equipmentUsed; void notes; void attachments
   void contractor; void workOrderId; void check; void engineHmr; void engineHours; void loggedBy; void editedBy; void editedAt
-  return { ...keep, fuelLitres: 0, waterLitres: 0, additivesKg: 0, partsUsed: [], ...(stamp ? { trust: stamp } : {}) }
+  return { ...keep, fuelLitres: 0, waterLitres: 0, additivesKg: 0, partsUsed: [] }
 }
 /* The client reads the project as agreed with him; the daily target is the
  * contractor's own KPI and stays behind. */
